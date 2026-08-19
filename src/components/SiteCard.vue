@@ -1,0 +1,276 @@
+<template>
+  <div class="card" :class="{ 'card-list': isList, 'card-batch': batchMode, 'card-selected': selected }"
+       @click="onCardClick" @contextmenu.prevent="batchMode ? null : showContextMenu($event)"
+       @mouseenter="onHover" @mouseleave="onHoverLeave">
+    <!-- 批量选择复选框 -->
+    <div v-if="batchMode" class="card-checkbox" :class="{ checked: selected }">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+        <polyline v-if="selected" points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+
+    <div class="card-header">
+      <div v-if="showDragHandle && !batchMode" class="drag-handle" title="拖拽排序">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      </div>
+      <div class="card-favicon" :style="{ background: site.color }">{{ site.initial }}</div>
+      <div v-if="!isList" class="card-title-group">
+        <div class="card-title">{{ site.name }}</div>
+        <div class="card-url">{{ site.url }}</div>
+      </div>
+    </div>
+    <div v-if="!isList" class="card-body">
+      <div class="card-desc">{{ site.desc }}</div>
+    </div>
+    <div v-if="!batchMode" class="card-footer">
+      <span class="card-tag">
+        <span class="card-tag-dot" :style="{ background: categoriesStore.getCategoryColor(site.categoryId) }"></span>
+        {{ categoriesStore.getCategoryLabel(site.categoryId) }}
+      </span>
+      <div class="card-actions">
+        <button class="card-fav-btn" :class="{ favorited: favoritesStore.isFav(site.id) }"
+                @click.stop="favoritesStore.toggle(site.id)" :aria-label="favoritesStore.isFav(site.id) ? '取消收藏' : '收藏'">
+          <svg viewBox="0 0 24 24" :fill="favoritesStore.isFav(site.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        <a :href="'https://' + site.url" target="_blank" rel="noopener noreferrer"
+           class="card-visit" @click="onVisit" :aria-label="'访问 ' + site.name">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+        </a>
+      </div>
+    </div>
+    <!-- 列表模式的内联描述 -->
+    <div v-if="isList && !batchMode" class="card-body-inline">
+      <div class="card-title">{{ site.name }}</div>
+      <div class="card-desc">{{ site.desc }}</div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <Teleport to="body">
+      <div v-if="contextMenu.visible" class="context-menu"
+           :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+           @click.stop @contextmenu.prevent>
+        <div class="context-menu-item" @click="copyLink">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          复制链接
+        </div>
+        <div class="context-menu-item" @click="editSite" v-if="!isReadOnly">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          编辑
+        </div>
+        <div class="context-menu-divider" v-if="!isReadOnly"></div>
+        <div class="context-menu-item context-menu-danger" @click="deleteSite" v-if="!isReadOnly">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          删除
+        </div>
+      </div>
+    </Teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useFavoritesStore } from '@/stores/favorites'
+import { useSitesStore } from '@/stores/sites'
+import { useCategoriesStore } from '@/stores/categories'
+import { useHistoryStore } from '@/stores/history'
+import { useSidebarStore } from '@/stores/sidebar'
+
+const props = defineProps({
+  site: { type: Object, required: true },
+  isList: { type: Boolean, default: false },
+  isReadOnly: { type: Boolean, default: false },
+  showDragHandle: { type: Boolean, default: false },
+  batchMode: { type: Boolean, default: false },
+  selected: { type: Boolean, default: false }
+})
+
+const emit = defineEmits(['edit', 'delete', 'select'])
+
+const favoritesStore = useFavoritesStore()
+const sitesStore = useSitesStore()
+const categoriesStore = useCategoriesStore()
+const historyStore = useHistoryStore()
+const sidebarStore = useSidebarStore()
+
+const contextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0
+})
+
+function onCardClick() {
+  if (props.batchMode) {
+    emit('select')
+  }
+}
+
+function onVisit() {
+  sitesStore.recordVisit(props.site.id)
+  historyStore.addRecord(props.site.id)
+}
+
+function onHover() {
+  if (sidebarStore.rightCollapsed) return
+  sidebarStore.setHoveredSite(props.site)
+}
+
+function onHoverLeave() {
+  sidebarStore.clearHoveredSite()
+}
+
+function showContextMenu(e) {
+  contextMenu.visible = true
+  let x = e.clientX
+  let y = e.clientY
+  const menuWidth = 180
+  const menuHeight = 160
+  if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8
+  if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 8
+  if (x < 8) x = 8
+  if (y < 8) y = 8
+  contextMenu.x = x
+  contextMenu.y = y
+}
+
+function hideContextMenu() {
+  contextMenu.visible = false
+}
+
+function copyLink() {
+  navigator.clipboard.writeText('https://' + props.site.url)
+  hideContextMenu()
+}
+
+function editSite() {
+  emit('edit', props.site)
+  hideContextMenu()
+}
+
+function deleteSite() {
+  emit('delete', props.site)
+  hideContextMenu()
+}
+
+onMounted(() => {
+  document.addEventListener('click', hideContextMenu)
+  document.addEventListener('scroll', hideContextMenu, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', hideContextMenu)
+  document.removeEventListener('scroll', hideContextMenu, true)
+})
+</script>
+
+<style scoped>
+.card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  transition: all .15s ease;
+  cursor: default;
+  position: relative;
+  border-left: 3px solid transparent;
+  box-shadow: var(--shadow-card);
+  animation: fadeInUp 0.35s ease both;
+}
+.card:hover {
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-2px);
+}
+.card-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; transition: transform .2s ease; }
+.card:hover .card-favicon { transform: scale(1.05); }
+.card-title-group { min-width: 0; }
+.card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.card-url { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
+.card-body { flex: 1; }
+.card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-footer { display: flex; align-items: center; justify-content: space-between; }
+.card-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+.card-tag-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.card-actions { display: flex; align-items: center; gap: 4px; }
+.card-visit, .card-fav-btn {
+  width: 30px; height: 30px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all .2s cubic-bezier(.4,0,.2,1);
+  color: var(--text-secondary);
+}
+.card-visit:hover { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.1); }
+.card-fav-btn:hover { color: #eab308; border-color: #eab308; transform: scale(1.1); }
+.card-fav-btn.favorited { color: #eab308; border-color: #eab308; background: #fefce8; }
+.card-fav-btn:active { transform: scale(0.9); }
+.card-fav-btn svg, .card-visit svg { width: 14px; height: 14px; transition: transform .2s ease; }
+.card-fav-btn.favorited svg { animation: heartPop 0.3s ease; }
+.card-visit { text-decoration: none; }
+.drag-handle { cursor: grab; color: var(--text-secondary); opacity: 0.5; display: flex; align-items: center; padding: 4px; border-radius: 4px; transition: opacity var(--transition); flex-shrink: 0; }
+.drag-handle:hover { opacity: 1; }
+.drag-handle:active { cursor: grabbing; }
+.drag-handle svg { width: 14px; height: 14px; }
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* 批量选择模式 */
+.card-batch { cursor: pointer; }
+.card-batch:hover { border-left-color: var(--accent); }
+.card-selected { background: var(--accent-light); border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,113,227,.2); }
+.card-checkbox {
+  position: absolute; top: 12px; right: 12px; z-index: 2;
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--bg-white);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s ease;
+}
+.card-checkbox.checked { background: var(--accent); border-color: var(--accent); }
+.card-checkbox svg { width: 12px; height: 12px; color: #fff; }
+
+/* 列表模式 */
+.card-list { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-left-width: 3px; }
+.card-list .card-header { margin-bottom: 0; flex: 0 0 auto; }
+.card-list .card-favicon { width: 34px; height: 34px; border-radius: 8px; font-size: 13px; }
+.card-list .card-body-inline { flex: 1; min-width: 0; }
+.card-list .card-body-inline .card-desc { margin-bottom: 0; -webkit-line-clamp: 1; }
+.card-list .card-footer { flex: 0 0 auto; }
+.card-list:hover { transform: translateX(2px) translateY(0); }
+</style>
+
+<!-- 全局右键菜单样式（非 scoped，因为 Teleport 到 body） -->
+<style>
+.context-menu {
+  position: fixed;
+  z-index: 500;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 160px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.15);
+}
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background .1s ease;
+}
+.context-menu-item:hover { background: var(--border-light); }
+.context-menu-item svg { width: 15px; height: 15px; color: var(--text-secondary); flex-shrink: 0; }
+.context-menu-danger { color: #ef4444; }
+.context-menu-danger svg { color: #ef4444; }
+.context-menu-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+</style>

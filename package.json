@@ -1,0 +1,30 @@
+{
+  "name": "nav-v2",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && vercel deploy --prod --yes --name=navigator-v2"
+  },
+  "dependencies": {
+    "@vercel/kv": "^3.0.0",
+    "@vueuse/core": "^10.7.0",
+    "fuse.js": "^7.5.0",
+    "pinia": "^2.1.0",
+    "pinia-plugin-persistedstate": "^3.2.0",
+    "pinyin-pro": "^3.28.2",
+    "uuid": "^14.0.1",
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "vue-virtual-scroller": "^3.0.4",
+    "vuedraggable": "^4.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-plugin-pwa": "^0.17.0"
+  }
+}

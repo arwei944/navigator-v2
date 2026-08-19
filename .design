@@ -1,0 +1,20 @@
+{
+  "version": "1.0",
+  "data": [
+    {
+      "id": "page-nav-v2",
+      "type": "page",
+      "name": "导航 - Aurora Glass 毛玻璃",
+      "title": "导航 - Aurora Glass 毛玻璃",
+      "version": 1,
+      "createdAt": 1753430000000,
+      "deviceType": "web",
+      "canvasData": {
+        "group": "default"
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html"
+      }
+    }
+  ]
+}
