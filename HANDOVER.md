@@ -307,10 +307,11 @@ nav-v2/
 - 命令面板：Ctrl+K 快速搜索和导航
 - PWA：可安装为桌面/移动应用，支持离线使用
 
-### 5.4 云同步
-- 基于 Vercel KV 的站点数据同步
-- API 端点：`/api/sync/upload`、`/api/sync/download`、`/api/sync/merge`
-- 前端服务：`src/services/sync.js`
+### 5.4 云数据（站点热更新）
+- （2026-09-21 移除失效的 Vercel KV 同步，下为当前正确架构）
+- 运行时站点数据唯一来源：**Vercel Blob**（`sites.json`），前端每 30s 轮询 `/api/sites`（`Cache-Control: no-store`）实现热更新
+- 写入入口：`scripts/publish.mjs`（发布）或管理后台「发布到云端」，POST 到 `/api/sites`（`SITES_ADMIN_KEY` 鉴权）
+- 本地 `api/sites-data.json` 作为 Blob 空的 SEED 兜底与发布源，由 publish 保持同步
 
 ### 5.5 数据持久化
 使用 `pinia-plugin-persistedstate`，以下 store 开启了持久化：
@@ -570,3 +571,37 @@ npm run icons        # 抓取/补抓 favicon
 - 空态文案由"还没有访问记录"改为"还没有收录的站点"
 - 数据面验证：293 站点全部带 `createdAt`，顶层 8 个即最近收录（ac15/dx14/dt31/...），符合预期
 - 说明：`history.js` 的 `getRecentSites` 已无调用方（保留为纯函数未删除）；真正"最近访问"仍存在于"内容聚合/feed"的独立区块，未受影响
+
+### 13.9 P0 架构升级批次（2026-09-21，Nav V3）
+
+按 [NAV-v3-upgrade-plan.md](docs/NAV-v3-upgrade-plan.md) 的 P0 批次完成架构止血：
+
+**P0-1 移除失效 KV 同步**
+- 删除 `api/sync/*`（key/merge/upload/download）与 `src/services/sync.js`
+- `BookmarkImport.vue` 移除"云同步" Tab，仅保留"导入/导出"
+- 线上 `/api/sync/*` 已确认 404，构建产物无 sync 残留
+
+**P0-2 统一数据真相源**
+- 明确 Vercel Blob `sites.json` 为运行时唯一来源，`api/sites.js` 补充架构注释
+- 单一写入入口（publish / admin POST），`sites-data.json` 仅作 SEED
+
+**P0-3 强化 metadata 代理**（`api/metadata.js`）
+- 优先 apple-touch-icon/mask-icon，其次 icon，最后 favicon.ico
+- 多编码回退：utf-8 → gbk → gb18030 → big5 → latin1（含 charset 声明识别）
+- 实测 GitHub 正确返回高清 SVG 图标
+
+**P0-4 发布门禁校验**
+- 新增 `scripts/validate-data.mjs`：校验 id 唯一/必填字段/createdAt/sortOrder 等，附 `npm run validate`
+- `publish.mjs` 步骤 1b 接入门禁，校验失败即中止（用 execFileSync 修复含空格路径问题）
+
+**P0-5 密钥安全**
+- `publish.mjs` 移除硬编码回退 key，仅从 `.env.local`/环境变量/`--key=` 读取，缺失即报错中止
+- 新增 `.env.example` 文档化环境变量
+
+**P0-6 基线整理**
+- README 全面校正（去掉失效 KV、对齐 Blob 架构/命令/目录/LICENSE）
+- `.gitignore` 补充 `backups/`、`tmp-payload.json`、`.env.example` 特例
+- `package.json` 升级至 `3.0.0`，新增 `validate` 脚本
+- git 建立 V3 基线提交 `c642eac`
+
+**验证**：发布成功 v85（293 站点 / 293 图标 / 数据校验通过 / 轮询一次收敛）；浏览器确认书签面板云端 Tab 移除（PWA 旧缓存需刷新后消失）
