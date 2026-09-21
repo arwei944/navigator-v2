@@ -3,3 +3,8 @@ dist
 .DS_Store
 *.local
 .vercel
+.env
+.env.*
+!.env.example
+backups/
+tmp-payload.json

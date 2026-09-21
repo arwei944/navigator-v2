@@ -5,6 +5,8 @@
       <input type="search" class="search-input site-search-input" v-model="localQuery"
              placeholder="搜索站点名称、描述、拼音..." aria-label="搜索站点"
              @focus="focused = true" @blur="onBlur" @keydown.escape="focused = false"
+             @keydown.down.prevent="moveDown" @keydown.up.prevent="moveUp"
+             @keydown.enter.prevent="onEnter"
              ref="searchInput">
       <span v-if="localQuery" class="search-count">{{ filteredCount }} 个结果</span>
       <button v-if="localQuery" class="search-clear" @click="clearSearch" aria-label="清除搜索">
@@ -17,8 +19,12 @@
     <Transition name="dropdown">
       <div v-if="focused && localQuery && suggestions.length > 0" class="search-suggestions">
         <div v-for="(item, i) in suggestions" :key="item.id" class="suggestion-item"
-             @mousedown.prevent="jumpToSite(item)">
-          <span class="suggestion-icon" :style="{ background: item.color }">{{ item.initial }}</span>
+             :class="{ active: i === activeIndex }"
+             @mousedown.prevent="jumpToSite(item)" @mouseenter="activeIndex = i">
+          <span class="suggestion-icon" :style="{ background: item.color }">
+            <span class="favicon-fallback">{{ item.initial }}</span>
+            <img v-if="item.icon" :src="'/' + item.icon" :alt="item.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+          </span>
           <div class="suggestion-info">
             <span class="suggestion-name" v-html="highlight(item.name)"></span>
             <span class="suggestion-desc" v-html="highlight(item.desc)"></span>
@@ -44,10 +50,12 @@ const categoriesStore = useCategoriesStore()
 const searchInput = ref(null)
 const focused = ref(false)
 const localQuery = ref(sitesStore.searchQuery)
+const activeIndex = ref(-1)
 let debounceTimer = null
 
 // 防抖同步到 store
 watch(localQuery, (val) => {
+  activeIndex.value = -1
   clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     sitesStore.setSearchQuery(val)
@@ -88,6 +96,23 @@ function clearSearch() {
 function jumpToSite(site) {
   window.open('https://' + site.url, '_blank')
   sitesStore.recordVisit(site.id)
+}
+
+function moveDown() {
+  if (suggestions.value.length === 0) return
+  activeIndex.value = (activeIndex.value + 1) % suggestions.value.length
+}
+
+function moveUp() {
+  if (suggestions.value.length === 0) return
+  activeIndex.value = activeIndex.value <= 0 ? suggestions.value.length - 1 : activeIndex.value - 1
+}
+
+function onEnter() {
+  const idx = activeIndex.value >= 0 ? activeIndex.value : 0
+  if (suggestions.value[idx]) {
+    jumpToSite(suggestions.value[idx])
+  }
 }
 
 function onBlur() {
@@ -215,6 +240,7 @@ onUnmounted(() => {
 }
 .suggestion-item:last-child { border-bottom: none; }
 .suggestion-item:hover { background: var(--accent-light); }
+.suggestion-item.active { background: var(--accent-light); }
 .suggestion-icon {
   width: 30px; height: 30px;
   border-radius: 8px;
@@ -225,7 +251,11 @@ onUnmounted(() => {
   font-size: 12px;
   color: #fff;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 1px; background: #fff; box-sizing: border-box; }
 .suggestion-info {
   flex: 1;
   min-width: 0;

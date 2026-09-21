@@ -1,0 +1,21 @@
+packages:
+  - "."
+allowBuilds:
+  "@tailwindcss/oxide": true
+  esbuild: true
+  sharp: true
+  vue-demi: true
+onlyBuiltDependencies:
+  - "@google/genai"
+  - "@tailwindcss/oxide"
+  - "better-sqlite3"
+  - "canvas"
+  - "cpu-features"
+  - "electron"
+  - "electron-builder"
+  - "esbuild"
+  - "node-pty"
+  - "protobufjs"
+  - "sharp"
+  - "ssh2"
+  - "unrs-resolver"

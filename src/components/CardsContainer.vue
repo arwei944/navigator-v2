@@ -36,7 +36,10 @@
       <div v-else class="trash-list">
         <div v-for="site in sitesStore.trash" :key="site.id" class="trash-item">
           <div class="trash-item-left">
-            <div class="card-favicon" :style="{ background: site.color }">{{ site.initial }}</div>
+            <div class="card-favicon" :style="{ background: site.color }">
+              <span class="favicon-fallback">{{ site.initial }}</span>
+              <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+            </div>
             <div class="trash-item-info">
               <div class="card-title">{{ site.name }}</div>
               <div class="card-desc">{{ site.desc }}</div>
@@ -187,7 +190,10 @@ const displaySites = computed(() => {
     case 'favorites':
       return sitesStore.filteredSites.filter(s => favoritesStore.isFav(s.id))
     case 'recent':
-      return historyStore.getRecentSites(sitesStore.filteredSites)
+      // 最近添加：按录入时间倒序展示最新站点
+      return [...sitesStore.filteredSites]
+        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .slice(0, 24)
     default:
       return sitesStore.filteredSites
   }
@@ -196,7 +202,7 @@ const displaySites = computed(() => {
 const emptyMessage = computed(() => {
   switch (sidebarStore.activeNav) {
     case 'favorites': return '还没有收藏的站点'
-    case 'recent': return '还没有访问记录'
+    case 'recent': return '还没有收录的站点'
     default: return '没有找到匹配的站点'
   }
 })
@@ -333,7 +339,9 @@ function onDragChange() {
 .trash-restore-btn svg, .trash-delete-btn svg { width: 14px; height: 14px; }
 
 /* 卡片样式复用 */
-.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; }
+.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; position: relative; overflow: hidden; }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: #fff; box-sizing: border-box; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
 .card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 

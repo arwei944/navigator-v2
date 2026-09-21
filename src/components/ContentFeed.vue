@@ -19,7 +19,10 @@
           class="feed-item"
           @click="onVisit(item.site.id)"
         >
-          <div class="feed-item-favicon" :style="{ background: item.site.color }">{{ item.site.initial }}</div>
+          <div class="feed-item-favicon" :style="{ background: item.site.color }">
+            <span class="favicon-fallback">{{ item.site.initial }}</span>
+            <img v-if="item.site.icon" :src="'/' + item.site.icon" :alt="item.site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+          </div>
           <div class="feed-item-info">
             <span class="feed-item-name">{{ item.site.name }}</span>
             <span class="feed-item-time">{{ formatTime(item.timestamp) }}</span>
@@ -49,7 +52,10 @@
           class="feed-card"
           @click="onVisit(site.id)"
         >
-          <div class="feed-card-favicon" :style="{ background: site.color }">{{ site.initial }}</div>
+          <div class="feed-card-favicon" :style="{ background: site.color }">
+            <span class="favicon-fallback">{{ site.initial }}</span>
+            <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+          </div>
           <div class="feed-card-info">
             <span class="feed-item-name">{{ site.name }}</span>
             <span class="feed-item-desc">{{ site.desc }}</span>
@@ -84,7 +90,10 @@
           @click="onVisit(site.id)"
         >
           <div class="feed-card-top">
-            <div class="feed-card-favicon" :style="{ background: site.color }">{{ site.initial }}</div>
+            <div class="feed-card-favicon" :style="{ background: site.color }">
+              <span class="favicon-fallback">{{ site.initial }}</span>
+              <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+            </div>
             <span class="feed-card-name">{{ site.name }}</span>
           </div>
           <div class="feed-card-desc">{{ site.desc }}</div>
@@ -244,7 +253,11 @@ function onVisit(siteId) {
   font-weight: 700;
   font-size: 13px;
   color: #fff;
+  position: relative;
+  overflow: hidden;
 }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 1px; background: #fff; box-sizing: border-box; border-radius: 50%; }
 .feed-item-info {
   flex: 1;
   min-width: 0;
@@ -335,6 +348,8 @@ function onVisit(siteId) {
   font-weight: 700;
   font-size: 13px;
   color: #fff;
+  position: relative;
+  overflow: hidden;
 }
 .feed-card-info {
   display: flex;

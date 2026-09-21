@@ -23,11 +23,6 @@
             :class="{ active: activeTab === 'export' }"
             @click="activeTab = 'export'"
           >导出</button>
-          <button
-            class="tab"
-            :class="{ active: activeTab === 'sync' }"
-            @click="activeTab = 'sync'"
-          >云同步</button>
         </div>
 
         <!-- 导入面板 -->
@@ -94,64 +89,16 @@
             </button>
           </div>
         </div>
-
-        <!-- 同步面板 -->
-        <div v-else-if="activeTab === 'sync'" class="sync-panel">
-          <div class="sync-section">
-            <div class="sync-icon-area">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-            </div>
-            <p class="sync-desc">在不同设备之间同步你的导航数据，基于 Vercel KV 加密存储。</p>
-
-            <div v-if="!syncKey" class="sync-key-input-area">
-              <label class="sync-label">已有同步密钥？</label>
-              <div class="sync-key-row">
-                <input type="text" v-model="inputKey" class="sync-key-input" placeholder="粘贴同步密钥..." @keyup.enter="connectKey">
-                <button class="sync-btn" @click="connectKey" :disabled="syncing">连接</button>
-              </div>
-              <div class="sync-divider"><span>或</span></div>
-              <button class="sync-btn primary" @click="createKey" :disabled="syncing">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-                {{ syncing ? '生成中...' : '生成新密钥' }}
-              </button>
-            </div>
-
-            <div v-else class="sync-connected">
-              <div class="sync-key-display">
-                <span class="sync-key-label">当前密钥</span>
-                <code class="sync-key-value">{{ syncKey.slice(0, 8) }}...{{ syncKey.slice(-4) }}</code>
-              </div>
-              <div class="sync-actions">
-                <button class="sync-btn primary" @click="doSync" :disabled="syncing">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                  {{ syncing ? '同步中...' : '立即同步' }}
-                </button>
-                <button class="sync-btn danger" @click="disconnectKey" :disabled="syncing">断开</button>
-              </div>
-              <div v-if="lastSyncTime" class="sync-status">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                上次同步：{{ lastSyncTime }}
-              </div>
-              <div v-if="syncResult" class="sync-result" :class="{ success: syncResult.success, error: !syncResult.success }">
-                {{ syncResult.message }}
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   </Teleport>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useHistoryStore } from '@/stores/history'
-import * as syncService from '@/services/sync'
 
 const emit = defineEmits(['close'])
 const sitesStore = useSitesStore()
@@ -161,72 +108,6 @@ const historyStore = useHistoryStore()
 const activeTab = ref('import')
 const dragging = ref(false)
 const previewItems = ref([])
-
-// Sync state
-const syncKey = ref(syncService.getSyncKey())
-const inputKey = ref('')
-const syncing = ref(false)
-const syncResult = ref(null)
-const lastSyncTime = ref('')
-
-onMounted(() => {
-  if (syncKey.value) {
-    const stored = localStorage.getItem('nav-sync-last')
-    if (stored) {
-      lastSyncTime.value = new Date(stored).toLocaleString()
-    }
-  }
-})
-
-async function createKey() {
-  syncing.value = true
-  syncResult.value = null
-  try {
-    const key = await syncService.generateKey()
-    syncKey.value = key
-    syncResult.value = { success: true, message: '同步密钥已生成！请复制并在其他设备上使用。' }
-    lastSyncTime.value = new Date().toLocaleString()
-  } catch (e) {
-    syncResult.value = { success: false, message: '生成失败：' + e.message }
-  } finally {
-    syncing.value = false
-  }
-}
-
-function connectKey() {
-  if (!inputKey.value.trim()) return
-  syncKey.value = inputKey.value.trim()
-  syncService.setKey(syncKey.value)
-  syncResult.value = { success: true, message: '密钥已连接，点击"立即同步"拉取数据。' }
-}
-
-async function doSync() {
-  if (!syncKey.value) return
-  syncing.value = true
-  syncResult.value = null
-  try {
-    const data = await syncService.mergeSnapshot(syncKey.value)
-    if (data) {
-      await syncService.applySnapshot(data)
-      syncResult.value = { success: true, message: '同步成功！刷新页面查看最新数据。' }
-      lastSyncTime.value = new Date().toLocaleString()
-    } else {
-      syncResult.value = { success: true, message: '同步完成，无新数据。' }
-    }
-  } catch (e) {
-    syncResult.value = { success: false, message: '同步失败：' + e.message }
-  } finally {
-    syncing.value = false
-  }
-}
-
-function disconnectKey() {
-  syncService.clearKey()
-  syncKey.value = null
-  inputKey.value = ''
-  syncResult.value = null
-  lastSyncTime.value = ''
-}
 
 function onDrop(e) {
   dragging.value = false
@@ -635,212 +516,6 @@ function exportHTML() {
   border-color: var(--accent);
   color: var(--accent);
   opacity: 1;
-}
-
-/* 同步面板 */
-.sync-panel {
-  padding: 24px;
-}
-
-.sync-section {
-  text-align: center;
-}
-
-.sync-icon-area {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 12px;
-  color: var(--accent);
-  opacity: 0.8;
-}
-
-.sync-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 24px;
-  line-height: 1.5;
-}
-
-.sync-key-input-area {
-  max-width: 360px;
-  margin: 0 auto;
-}
-
-.sync-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-  text-align: left;
-}
-
-.sync-key-row {
-  display: flex;
-  gap: 8px;
-}
-
-.sync-key-input {
-  flex: 1;
-  padding: 9px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  font-size: 13px;
-  font-family: var(--font);
-  color: var(--text-primary);
-  background: var(--bg-white);
-  outline: none;
-  transition: border-color var(--transition);
-}
-
-.sync-key-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-light);
-}
-
-.sync-key-input::placeholder {
-  color: var(--text-secondary);
-}
-
-.sync-divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.sync-divider::before,
-.sync-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
-}
-
-.sync-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg-white);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: all var(--transition);
-  white-space: nowrap;
-}
-
-.sync-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.sync-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.sync-btn.primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
-
-.sync-btn.primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-}
-
-.sync-btn.danger {
-  color: #ef4444;
-  border-color: #fecaca;
-}
-
-.sync-btn.danger:hover:not(:disabled) {
-  background: #fef2f2;
-  border-color: #ef4444;
-}
-
-.sync-btn svg {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-}
-
-.sync-connected {
-  max-width: 360px;
-  margin: 0 auto;
-}
-
-.sync-key-display {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  padding: 10px 16px;
-  background: var(--accent-light);
-  border-radius: var(--radius-sm);
-}
-
-.sync-key-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.sync-key-value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-  font-family: 'SF Mono', 'Fira Code', monospace;
-  letter-spacing: 0.5px;
-}
-
-.sync-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  margin-bottom: 12px;
-}
-
-.sync-status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.sync-status svg {
-  flex-shrink: 0;
-}
-
-.sync-result {
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-}
-
-.sync-result.success {
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
-}
-
-.sync-result.error {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fecaca;
 }
 
 @keyframes fadeIn {

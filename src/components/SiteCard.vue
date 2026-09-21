@@ -13,7 +13,10 @@
       <div v-if="showDragHandle && !batchMode" class="drag-handle" title="拖拽排序">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
       </div>
-      <div class="card-favicon" :style="{ background: site.color }">{{ site.initial }}</div>
+      <div class="card-favicon" :style="{ background: site.color }">
+        <span class="favicon-fallback">{{ site.initial }}</span>
+        <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+      </div>
       <div v-if="!isList" class="card-title-group">
         <div class="card-title">{{ site.name }}</div>
         <div class="card-url">{{ site.url }}</div>
@@ -49,6 +52,14 @@
       <div v-if="contextMenu.visible" class="context-menu"
            :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
            @click.stop @contextmenu.prevent>
+        <div class="context-menu-item" @click="toggleFav">
+          <svg viewBox="0 0 24 24" :fill="favoritesStore.isFav(props.site.id) ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          {{ favoritesStore.isFav(props.site.id) ? '取消收藏' : '收藏' }}
+        </div>
+        <div class="context-menu-item" @click="openNewWindow">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          新窗口打开
+        </div>
         <div class="context-menu-item" @click="copyLink">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
           复制链接
@@ -136,6 +147,18 @@ function hideContextMenu() {
   contextMenu.visible = false
 }
 
+function toggleFav() {
+  favoritesStore.toggle(props.site.id)
+  hideContextMenu()
+}
+
+function openNewWindow() {
+  window.open('https://' + props.site.url, '_blank', 'noopener,noreferrer')
+  sitesStore.recordVisit(props.site.id)
+  historyStore.addRecord(props.site.id)
+  hideContextMenu()
+}
+
 function copyLink() {
   navigator.clipboard.writeText('https://' + props.site.url)
   hideContextMenu()
@@ -180,7 +203,9 @@ onUnmounted(() => {
   transform: translateY(-2px);
 }
 .card-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; transition: transform .2s ease; }
+.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; transition: transform .2s ease; position: relative; overflow: hidden; }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: #fff; box-sizing: border-box; }
 .card:hover .card-favicon { transform: scale(1.05); }
 .card-title-group { min-width: 0; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }

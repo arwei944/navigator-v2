@@ -46,7 +46,9 @@ export const useCategoriesStore = defineStore('categories', () => {
       collapsed: false,
       categories: [
         { id: 'sms', label: '短信接码', dotColor: '#22c55e' },
-        { id: 'aiapi', label: 'AI API 平台', dotColor: '#2563eb' }
+        { id: 'aiapi', label: 'AI API 平台', dotColor: '#2563eb' },
+        { id: 'account', label: '账号/卡密', dotColor: '#f59e0b' },
+        { id: 'projects', label: '项目参考', dotColor: '#0d9488' }
       ]
     },
     {

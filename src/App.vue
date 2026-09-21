@@ -107,6 +107,10 @@ onMounted(() => {
   syncRouteToStore()
   updatePageTitle()
 
+  // 云端站点热更新：启动拉取 + 30s 轮询
+  sitesStore.initCloudSites()
+  sitesStore.startPolling(30000)
+
   document.addEventListener('keydown', (e) => {
     // Ctrl+K 打开全局命令面板
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

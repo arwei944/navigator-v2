@@ -72,7 +72,10 @@
               @click="execute(item)"
               @mouseenter="selectedIndex = getIndex('site', i)"
             >
-              <span class="cp-site-icon" :style="{ background: item.color }">{{ item.initial }}</span>
+              <span class="cp-site-icon" :style="{ background: item.color }">
+                <span class="favicon-fallback">{{ item.initial }}</span>
+                <img v-if="item.icon" :src="'/' + item.icon" :alt="item.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+              </span>
               <div class="cp-site-info">
                 <span class="cp-site-name">{{ item.name }}</span>
                 <span class="cp-site-url">{{ item.url }}</span>
@@ -438,7 +441,11 @@ defineExpose({ open, close })
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 1px; background: #fff; box-sizing: border-box; }
 .cp-site-info {
   display: flex;
   flex-direction: column;

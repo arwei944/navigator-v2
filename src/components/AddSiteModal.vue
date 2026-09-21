@@ -9,37 +9,49 @@
       </div>
       <form @submit.prevent="submit" class="modal-body">
         <div class="form-group">
+          <label>网址 <span class="hint">（输入后自动抓取站点信息）</span></label>
+          <div class="url-row">
+            <input type="url" v-model="form.url" required placeholder="例如: chat.openai.com 或 https://..." class="form-input"
+                   @blur="onUrlBlur" @keyup.enter="fetchMeta">
+            <button type="button" class="btn btn-small" :disabled="fetching" @click="fetchMeta">
+              {{ fetching ? '抓取中...' : '自动抓取' }}
+            </button>
+          </div>
+          <div v-if="fetchError" class="form-error">{{ fetchError }}</div>
+        </div>
+
+        <div class="form-group">
           <label>站点名称</label>
           <input type="text" v-model="form.name" required placeholder="例如: ChatGPT" class="form-input">
         </div>
-        <div class="form-group">
-          <label>网址</label>
-          <input type="url" v-model="form.url" required placeholder="例如: https://chat.openai.com" class="form-input"
-                 @blur="autoCompleteUrl">
-        </div>
+
         <div class="form-group" v-if="faviconUrl">
           <label>图标预览</label>
           <div class="favicon-preview-row">
-            <img :src="faviconUrl" alt="favicon" class="favicon-preview" />
+            <img :src="faviconUrl" alt="favicon" class="favicon-preview"
+                 @error="$event.target.src = 'https://favicon.im/' + form.url.replace(/^https?:\/\//, '').split('/')[0] + '?format=png&size=128'">
             <span class="favicon-domain">{{ form.url.replace(/^https?:\/\//, '').split('/')[0] }}</span>
+            <span class="hint">（提交后由脚本下载到本地）</span>
           </div>
         </div>
+
         <div class="form-group">
           <label>描述</label>
           <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"></textarea>
         </div>
+
         <div class="form-group">
-          <label>分类</label>
+          <label>分类 <span v-if="suggestedCat" class="hint">（已按关键词推荐）</span></label>
           <select v-model="form.categoryId" required class="form-input">
             <option v-for="cat in categoriesStore.categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
           </select>
         </div>
+
         <div class="form-group">
           <label>颜色</label>
           <div class="color-picker-row">
             <input type="color" v-model="form.color" class="color-input">
             <span class="color-hex">{{ form.color }}</span>
-            <button type="button" class="btn btn-small" @click="fetchFavicon">获取图标</button>
           </div>
         </div>
         <div class="form-actions">
@@ -61,12 +73,33 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 
 const faviconUrl = ref('')
+const fetching = ref(false)
+const fetchError = ref('')
+const suggestedCat = ref('')
+
+const CATEGORY_HINTS = [
+  { re: /sms|jiema|接码/i, cat: 'sms' },
+  { re: /api|openai|claude|gpt|deepseek|llm|model|router|gateway|key/i, cat: 'aiapi' },
+  { re: /swap|dex|uniswap|pancake|raydium|orca|hyperliquid|perp/i, cat: 'dex' },
+  { re: /binance|okx|bybit|coinbase|bitget|gate\.io|kraken|exchange|cex/i, cat: 'cex' },
+  { re: /defi|lend|compound|aave|yield|vault/i, cat: 'defi' },
+  { re: /token|chart|data|analytics|terminal|dashboard|research/i, cat: 'data' },
+  { re: /wallet/i, cat: 'wallet' },
+  { re: /nft|opensea|magic.?eden|collectible/i, cat: 'nft' },
+  { re: /security|audit|hack|vuln/i, cat: 'security' },
+  { re: /etherscan|blockchain|explorer|chain/i, cat: 'chain' },
+  { re: /dribbble|behance|figma|design|ui/i, cat: 'design' },
+  { re: /github|gitlab|code|coding|developer|deploy/i, cat: 'coding' },
+  { re: /learn|course|tutorial|school|prompt/i, cat: 'learning' },
+  { re: /airdrop|earn/i, cat: 'airdrop' },
+  { re: /media|news|feed|blog/i, cat: 'media' }
+]
 
 const form = reactive({
   name: '',
   url: '',
   desc: '',
-  categoryId: 'ai',
+  categoryId: 'starter',
   color: '#3b82f6',
   initial: ''
 })
@@ -77,13 +110,50 @@ function autoCompleteUrl() {
   }
 }
 
-async function fetchFavicon() {
+function onUrlBlur() {
   autoCompleteUrl()
-  const domain = form.url.replace(/^https?:\/\//, '').split('/')[0]
-  if (domain) {
-    faviconUrl.value = `https://www.google.com/s2/favicons?sz=64&domain=${domain}&sz=64`
+  if (form.url.trim()) fetchMeta()
+}
+
+function suggestCategory(text) {
+  for (const h of CATEGORY_HINTS) {
+    if (h.re.test(text)) return h.cat
+  }
+  return ''
+}
+
+async function fetchMeta() {
+  autoCompleteUrl()
+  const url = form.url.trim()
+  if (!url) return
+  fetching.value = true
+  fetchError.value = ''
+  try {
+    const res = await fetch('/api/metadata?url=' + encodeURIComponent(url))
+    const data = await res.json()
+    if (!res.ok) {
+      fetchError.value = data.error || '抓取失败'
+      return
+    }
+    if (!form.name || form.name === suggestedName.value) {
+      form.name = data.name
+    }
+    suggestedName.value = data.name
+    if (data.desc) form.desc = data.desc
+    if (data.favicon) faviconUrl.value = data.favicon
+    const cat = suggestCategory((data.name || '') + ' ' + (data.desc || '') + ' ' + data.domain)
+    if (cat) {
+      form.categoryId = cat
+      suggestedCat.value = cat
+    }
+  } catch (e) {
+    fetchError.value = '抓取失败：' + e.message
+  } finally {
+    fetching.value = false
   }
 }
+
+const suggestedName = ref('')
 
 function submit() {
   const domain = form.url.replace(/^https?:\/\//, '').split('/')[0]
@@ -112,7 +182,7 @@ function submit() {
 .modal {
   background: var(--bg-white);
   border-radius: 12px;
-  width: 440px;
+  width: 460px;
   max-width: 90vw;
   max-height: 85vh;
   overflow-y: auto;
@@ -141,6 +211,10 @@ function submit() {
 .modal-body { padding: 20px 24px 24px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.hint { font-weight: 400; font-size: 11.5px; color: var(--text-secondary); }
+.url-row { display: flex; gap: 8px; }
+.url-row .form-input { flex: 1; }
+.form-error { margin-top: 6px; font-size: 12px; color: #dc2626; }
 .form-input {
   width: 100%;
   padding: 9px 12px;
@@ -172,8 +246,9 @@ function submit() {
 .btn-cancel:hover { background: var(--border); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { filter: brightness(1.1); }
-.btn-small { padding: 4px 10px; font-size: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-white); color: var(--text-secondary); cursor: pointer; }
+.btn-small { padding: 4px 12px; font-size: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-white); color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
 .btn-small:hover { border-color: var(--accent); color: var(--accent); }
+.btn-small:disabled { opacity: .5; cursor: not-allowed; }
 .favicon-preview-row { display: flex; align-items: center; gap: 10px; }
 .favicon-preview { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); }
 .favicon-domain { font-size: 12px; color: var(--text-secondary); }

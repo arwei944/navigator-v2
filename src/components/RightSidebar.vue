@@ -14,7 +14,8 @@
       <!-- 站点头部 -->
       <div class="detail-header" :style="{ '--site-color': site.color || '#64748b' }">
         <div class="detail-icon" :style="{ background: site.color || '#64748b' }">
-          <span>{{ site.initial || site.name.charAt(0).toUpperCase() }}</span>
+          <span class="favicon-fallback">{{ site.initial || site.name.charAt(0).toUpperCase() }}</span>
+          <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
         </div>
         <div class="detail-title-group">
           <h3 class="detail-name">{{ site.name }}</h3>
@@ -311,7 +312,11 @@ watch(() => site.value, () => {
   justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 2px 8px color-mix(in srgb, var(--site-color, #64748b) 30%, transparent);
+  position: relative;
+  overflow: hidden;
 }
+.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 3px; background: #fff; box-sizing: border-box; border-radius: 12px; }
 .detail-icon span {
   font-size: 18px;
   font-weight: 700;
