@@ -1,6 +1,6 @@
 # Navigator V2 项目交接文档
 
-> 最后更新：2026-08-19
+> 最后更新：2026-09-25
 > 线上地址：https://navigator-v2-two.vercel.app
 > 仓库本地路径：`c:\work\solo work\new\nav-v2`
 
@@ -823,3 +823,58 @@ npm run icons        # 抓取/补抓 favicon
 - 新：`Web3 项目数据平台：热榜、融资、空投日历、代币解锁追踪，可查看单个项目（如 Arc 链）激励计划与详情，投融资研究必备。`
 - `updatedAt` 同步刷新
 - 随 v94 一并发布上线
+
+---
+
+## 二十一、Nav V4 升级：本地运维控制台 + CI/CD + 一致性修复（2026-09-25）
+
+### 21.1 需求与方案
+
+用户诉求两条：① 版本升级方案要**更智能、透明、可视化、自动化**；② 要一个**可视化的本地提交 + 远程实时同步**工具。
+
+经选项确认，工具形态定为 **本地 Web 控制台**，同步范围覆盖 **全链路 + CI/CD**，智能化程度为 **规则式 + 变更摘要**。完整方案见 `docs/NAV-v4-upgrade-plan.md`。
+
+关键取舍：
+
+- **单一发布入口**：控制台只编排并可视化 `scripts/publish.mjs`，不重复实现发布逻辑，避免两套链路漂移
+- **零新增依赖**：Git 封装直接调 `git` CLI（`simple-git` 因 npm arborist 崩溃弃用），HTTP 用 `node:http`，实时推送用 SSE
+- **CI 只做门禁不部署**：Vercel Git 集成未开启，避免「代码自动部署」与「数据热更新」互相覆盖
+
+### 21.2 交付物
+
+| 里程碑 | 交付物 |
+|--------|--------|
+| M1 骨架 | `tools/console/server.mjs`（node:http + SSE 端点）、`ui/` 单页壳、`npm run console` |
+| M2 Git 面板 | `lib/git.mjs`（状态/diff/暂存/提交/推送）、`ui/gitpanel.js`、`ui/diffview.js` |
+| M3 同步面板 | `lib/jobs.mjs`（长任务 + 自定义事件 + 事件回放）、`lib/vercel.mjs`（部署状态机）、`lib/sync.mjs`（9 步全链路编排）、`ui/syncpanel.js` |
+| M4 摘要 + 历史 | `lib/changes.mjs`（规则式 diff + 建议消息）、`lib/history.mjs`（提交×部署关联）、`lib/data.mjs`（数据体检）、`ui/historypanel.js`、`ui/datapanel.js` |
+| M5 CI/CD | `.github/workflows/ci.yml`（validate + build 门禁）、`.github/workflows/release-please.yml`、`release-please-config.json`、`.release-please-manifest.json` |
+| M6 透明增强 | `api/sites.js` 的 `useCache: false` 修复、README/HANDOVER 更新 |
+
+控制台 6 个面板：概览 / 改动 / 提交 / 同步 / 历史 / 数据。
+
+### 21.3 关键实现要点
+
+- **SSE 任务结束必须主动关连接**：`jobs.mjs#finish` 遍历订阅者 `res.end()` 并清空集合，否则客户端（curl 等）会挂到超时（exit 28）
+- **子进程路径含空格**：`publish.mjs` 调用校验脚本必须用 `execFileSync(process.execPath, [scriptPath])`，不能 shell 拼接（`C:\work\solo work\...` 会被拆开）
+- **Vercel 部署关联按 commit SHA 精确匹配**，不做近似推断；无匹配时在历史面板顶部展示「当前生产部署」基线，避免整屏「未关联部署」而无参照
+- **面板懒加载**：历史面板会打 Vercel API，故仅在首次切到该标签时加载，且不纳入 30s 轮询
+- **状态行吸顶**：`#panel-sync / #panel-history / #panel-data > .card.tight` 设 `position: sticky; top: 0`，保证刷新入口不被长列表挤出视口
+
+### 21.4 验收结果
+
+- `node scripts/validate-data.mjs`：298 站点 / 29 分类，**通过**
+- `pnpm install --frozen-lockfile`：锁文件一致，**通过**（仓库锁定 pnpm，`pnpm-lock.yaml` 为唯一锁文件）
+- `pnpm run build`：约 10s 构建成功
+- `/api/history`、`/api/data/report`：返回真实数据（14 次提交 / 2 次已推送 / 2 条部署关联；数据体检全绿）
+- 浏览器实测：6 个面板渲染正常、标签切换正常、吸顶生效、**新标签页控制台零错误**
+
+### 21.5 排障记录
+
+浏览器实测时控制台一度报 `SyntaxError: Invalid regular expression: missing /` 与 `/ui/app.js ERR_CONNECTION_FAILED`。经三重证伪确认为**假阳性**：
+
+1. 服务端字节与磁盘文件逐字节比对全部 MATCH
+2. 对**服务端返回的字节**跑 `node --check`，7 个模块全部 parse-OK
+3. 新开标签页复测，控制台**零消息**
+
+根因是排查过程中多次重启控制台服务，浏览器控制台缓冲区保留了重启窗口期的陈旧条目（且报错行号指向 `gitpanel.js:243` 的右花括号，并非网络调用点）。**结论：控制台消息缓冲跨导航保留，排查时须以新标签页为准。**

@@ -14,7 +14,9 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 - **数据真相源**: Vercel Blob（站点数据云端热更新，无需改代码即同步线上）
 - **智能能力**: 站点实时在线状态角标 + 基于历史/分类共现的智能推荐
 - **会话同步**: 收藏/待办/偏好按会话密钥云端同步（多设备一致）
-- **部署**: Vercel
+- **部署**: Vercel（本地 `scripts/publish.mjs` 为唯一发布入口）
+- **本地运维控制台**: Node 原生 HTTP + SSE 实时日志的单页控制台（`tools/console`，仅监听 `127.0.0.1`）
+- **CI/CD**: GitHub Actions 门禁（数据校验 + 构建）+ release-please 自动版本与 CHANGELOG
 
 ## 架构概览
 
@@ -34,6 +36,7 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 - **运行时数据唯一来源**：Vercel Blob 上的 `sites.json`
 - **本地种子**：`api/sites-data.json` 仅作 Blob 为空时的兜底，由 `scripts/publish.mjs` 保持同步
 - **热更新**：前端每 30s 轮询 `/api/sites`（`Cache-Control: no-store`）+ 标签页回到前台立即重拉，发布后秒级可见
+- **读取一致性**：`api/sites.js` 的 `readStored()` 使用 `get(PATHNAME, { access: 'private', useCache: false })` 绕过 Blob CDN 缓存，发布后**首次**读取即拿到最新版本（此前需轮询 1~4 次才收敛）
 - **在线状态**：`src/stores/health.js` 仅探测当前可见卡片，60s 缓存 + 6 路并发，卡片角标显示在线/限流/失效
 - **会话同步**：`api/session.js` 以会话密钥为隔离凭证（`session/<key>.json`），字段级合并，与站点热更新互不冲突
 - **本地数据版本化**：localStorage 持久化的 stores 统一附加 schema 版本号，未来结构变更可平滑迁移
@@ -64,26 +67,27 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 ## 常用命令
 
 ```bash
-npm install          # 安装依赖
-npm run dev          # 本地开发
-npm run build        # 构建
-npm run publish      # 一键发布：备份 → 数据校验 → 构建 → 部署 → 云端热更新 → 轮询验证
-npm run validate     # 站点数据 schema 校验（发布门禁会自动调用）
-npm run check        # 健康检查：探测所有站点可访问性
-npm run check:report # 健康检查并生成 Markdown 报告
-npm run icons        # 抓取/补抓网站 favicon
-npm run perf         # 生成卡片虚拟化滚动基准页（默认 1000 卡片，可 --count N）
+pnpm install         # 安装依赖（仓库锁定 pnpm，pnpm-lock.yaml 为唯一锁文件）
+pnpm run dev         # 本地开发
+pnpm run build       # 构建
+pnpm run console     # 本地运维控制台 → http://localhost:5175（仅监听 127.0.0.1）
+pnpm run publish     # 一键发布：备份 → 数据校验 → 构建 → 部署 → 云端热更新 → 轮询验证
+pnpm run validate    # 站点数据 schema 校验（发布门禁与 CI 会自动调用）
+pnpm run check       # 健康检查：探测所有站点可访问性
+pnpm run check:report # 健康检查并生成 Markdown 报告
+pnpm run icons       # 抓取/补抓网站 favicon
+pnpm run perf        # 生成卡片虚拟化滚动基准页（默认 1000 卡片，可 --count N）
 node scripts/fix-sortorder.mjs   # 清理 sortOrder 重复/空洞，重排为连续序列（自动备份）
-npm run publish -- --key=<k> --webhook=<url> # 发布 + 成功后 webhook 通知
-npm run perf -- --count 2000    # 生成 2000 卡片基准
+pnpm run publish -- --key=<k> --webhook=<url> # 发布 + 成功后 webhook 通知
+pnpm run perf -- --count 2000    # 生成 2000 卡片基准
 ```
 
 ### 发布脚本参数
 
 ```bash
-npm run publish -- --skip-build   # 跳过前端构建，仅热更新云端数据
-npm run publish -- -k <密钥>      # 显式传管理密钥（-k / --key=，否则读 .env.local / 环境变量）
-npm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知（-w / --webhook=）
+pnpm run publish -- --skip-build   # 跳过前端构建，仅热更新云端数据
+pnpm run publish -- -k <密钥>      # 显式传管理密钥（-k / --key=，否则读 .env.local / 环境变量）
+pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知（-w / --webhook=）
 ```
 
 > CLI 参数统一用 Node 内置 `parseArgs` 解析（`publish.mjs`、`check-sites.mjs` 均支持）。
@@ -103,6 +107,34 @@ npm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知�
 | 默认（1024–1440） | 3 列 |
 | `≤1024px` | 2 列 |
 | `≤768px` | 1 列（移动端） |
+
+## 本地运维控制台
+
+`pnpm run console` 启动，仅监听 `127.0.0.1:5175`（**绝不可部署**）。零框架依赖（Node 原生 `node:http`），单页 UI + SSE 实时日志。
+
+| 面板 | 能力 |
+|------|------|
+| 概览 | 运行环境、环境变量是否就绪、SSE 与子进程日志管道自检 |
+| 改动 | 文件列表（含增删行数）、单文件 diff 行级高亮、暂存 / 取消暂存 |
+| 提交 | 规则式变更摘要 + 建议提交消息（Conventional Commits）、提交 / 提交并推送 / 预演推送 |
+| 同步 | 一键发布全链路时间线（检查→提交→推送→备份→门禁→构建→部署→热更新→验证）、云端版本对比 |
+| 历史 | 提交记录 + 「已推送 / 仅本地」标注 + 按 commit SHA 关联 Vercel 部署状态 |
+| 数据 | 工作区 vs HEAD 站点数据 diff、分类分布、完整性体检（图标/配色/描述缺失、sortOrder 重复与空洞、域名重复） |
+
+设计取舍：
+
+- **单一发布入口**：控制台不重复实现发布逻辑，只编排并可视化 `scripts/publish.mjs`，避免两套发布链路漂移
+- **零新增依赖**：Git 操作直接封装 `git` CLI（放弃 `simple-git`），HTTP 用 `node:http`，实时推送用 SSE（原生断线重连）
+- **安全边界**：仅监听回环地址；写操作校验同源 + 自定义请求头 `X-Nav-Console`，阻断跨站伪造；管理密钥不落盘、不回显
+
+## CI/CD
+
+| 工作流 | 触发 | 作用 |
+|--------|------|------|
+| `ci.yml` | push / PR | 数据 schema 门禁（`validate`）+ 构建门禁（`build`），**只做门禁、不重复部署** |
+| `release-please.yml` | push 到 `master` | 依 Conventional Commits 推断语义化版本、生成 `CHANGELOG.md`、开 release PR |
+
+> 发布仍以本地 `scripts/publish.mjs` 为唯一入口（Vercel Git 集成未开启），CI 不参与部署，避免「代码自动部署」与「数据热更新」两条链路互相覆盖。
 
 ## 环境变量
 
@@ -138,6 +170,12 @@ nav-v2/
 │   ├── validate-data.mjs  # 站点数据 schema 校验
 │   ├── check-sites.mjs    # 全站点健康检查
 │   └── fetch-favicons.mjs # favicon 批量抓取（支持 --only <id>）
+├── tools/
+│   └── console/           # 本地运维控制台（仅 127.0.0.1，绝不可部署）
+│       ├── server.mjs     # node:http 入口 + SSE 端点
+│       ├── lib/           # git / jobs / changes / sync / vercel / history / data
+│       └── ui/            # 单页 UI（6 个面板，零框架依赖）
+├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
 ├── src/
 │   ├── components/        # Vue 组件
