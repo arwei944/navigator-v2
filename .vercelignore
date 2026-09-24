@@ -1,0 +1,6 @@
+# 本地工具与文档不参与 Vercel 部署，减少上传体积
+tools/
+docs/
+backups/
+perf-report/
+.github/

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nav-console · 本地运维控制台</title>
+  <link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="dot" id="health-dot"></span>
+      <strong>nav-console</strong>
+      <span class="tag">本地运维</span>
+    </div>
+    <div class="health" id="health">检测中…</div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-panel="overview">概览</button>
+    <button class="tab" data-panel="changes">改动</button>
+    <button class="tab" data-panel="commit">提交</button>
+    <button class="tab" data-panel="sync">同步</button>
+    <button class="tab" data-panel="history">历史</button>
+    <button class="tab" data-panel="data">数据</button>
+  </nav>
+
+  <main class="content">
+    <section class="panel active" id="panel-overview">
+      <div class="grid-2">
+        <div class="card">
+          <h3>运行环境</h3>
+          <dl class="kv" id="env-info"></dl>
+        </div>
+        <div class="card">
+          <h3>环境变量</h3>
+          <dl class="kv" id="env-vars"></dl>
+          <p class="hint">仅显示是否已配置，不显示具体值。</p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>控制台自检</h3>
+        <p class="hint">验证 SSE 实时通道与子进程日志管道是否正常。</p>
+        <button class="btn primary" id="btn-selfcheck">运行自检</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-changes">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="repo-info"></div>
+          <button class="btn ghost" id="btn-refresh-status">刷新状态</button>
+        </div>
+      </div>
+      <div class="split">
+        <div class="card pane file-list">
+          <div class="list-scroll" id="file-scroll">
+            <div id="list-staged"></div>
+            <div id="list-unstaged"></div>
+          </div>
+        </div>
+        <div class="card pane diff-pane" id="diff-pane">
+          <div class="pane-head" id="diff-title">选择文件查看 diff</div>
+          <pre class="diff-view" id="diff-view"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-commit">
+      <div class="card">
+        <h3>变更摘要 · 规则式理解</h3>
+        <div id="suggest-box"></div>
+      </div>
+      <div class="card">
+        <h3>提交</h3>
+        <textarea id="commit-message" rows="2" placeholder="feat(sites): 新增 …"></textarea>
+        <div class="actions">
+          <button class="btn primary" id="btn-commit">提交</button>
+          <button class="btn" id="btn-commit-push">提交并推送</button>
+          <button class="btn ghost" id="btn-push-only">仅推送</button>
+          <button class="btn ghost" id="btn-push-dry">预演推送</button>
+        </div>
+        <div class="result" id="commit-result"></div>
+        <div class="commit-files">
+          <span class="dim">本次将提交（已暂存）：</span>
+          <div class="chips" id="staged-chips"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-sync">
+      <div class="placeholder">
+        <h3>同步面板</h3>
+        <p>提交→推送→Vercel 部署→Blob 热更新→一致性验证 时间线 · <b>将在 M3 实现</b></p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-history">
+      <div class="placeholder">
+        <h3>历史面板</h3>
+        <p>提交记录与其部署状态关联 · <b>将在 M4 实现</b></p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-data">
+      <div class="placeholder">
+        <h3>数据面板</h3>
+        <p>站点数据 diff 摘要、分类分布、完整性检查 · <b>将在 M4 实现</b></p>
+      </div>
+    </section>
+  </main>
+
+  <section class="console">
+    <div class="console-head">
+      <span class="console-title">实时日志</span>
+      <span class="badge idle" id="job-status">空闲</span>
+      <span class="job-title" id="job-title"></span>
+      <button class="btn ghost" id="btn-toggle-console">收起</button>
+      <button class="btn ghost" id="btn-kill" disabled>终止任务</button>
+      <button class="btn ghost" id="btn-clear">清空</button>
+    </div>
+    <div class="log-view" id="log-view">
+      <div class="log-empty">暂无日志。运行自检或提交 / 推送后，这里会实时输出。</div>
+    </div>
+  </section>
+
+  <script type="module" src="/ui/app.js"></script>
+</body>
+</html>

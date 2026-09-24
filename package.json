@@ -13,7 +13,8 @@
     "check": "node scripts/check-sites.mjs",
     "check:report": "node scripts/check-sites.mjs --only-bad --report",
     "icons": "node scripts/fetch-favicons.mjs",
-    "perf": "node scripts/perf-scroll.mjs"
+    "perf": "node scripts/perf-scroll.mjs",
+    "console": "node tools/console/server.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
