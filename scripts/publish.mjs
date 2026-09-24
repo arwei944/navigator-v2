@@ -1,12 +1,14 @@
 /**
  * 一键发布脚本：备份 → 构建 → 部署 → 热更新数据 → 验证
- * 用法: node scripts/publish.mjs [--skip-build] [--key xxx]
+ * 用法: node scripts/publish.mjs [--skip-build] [--key xxx] [--webhook URL]
  * 管理密钥来源（按优先级）：--key=<xxx> > 环境变量 SITES_ADMIN_KEY
+ * webhook 可选：发布成功后 POST 通知到指定 URL
  */
 import { execSync, execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { parseArgs } from 'node:util'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(root, 'api', 'sites-data.json')
@@ -23,9 +25,18 @@ try {
   }
 } catch { /* 无 .env.local 时忽略 */ }
 
-const args = process.argv.slice(2)
-const skipBuild = args.includes('--skip-build')
-const key = args.find(a => a.startsWith('--key='))?.split('=')[1] || process.env.SITES_ADMIN_KEY || ''
+const args = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    'skip-build': { type: 'boolean', default: false },
+    key: { type: 'string', short: 'k' },
+    webhook: { type: 'string', short: 'w' },
+  },
+  allowPositionals: false
+})
+const skipBuild = args.values['skip-build']
+const key = args.values.key || process.env.SITES_ADMIN_KEY || ''
+const webhook = args.values.webhook || ''
 
 if (!key) {
   console.error('❌ 缺少管理密钥：未找到 SITES_ADMIN_KEY（环境变量/.env.local/--key=）。')
@@ -78,11 +89,21 @@ shell('npx vercel deploy --prod --yes')
 
 step('4/5 热更新云端数据')
 const payload = join(root, 'tmp-payload.json')
-writeFileSync(payload, JSON.stringify({ key, sites }))
+writeFileSync(payload, JSON.stringify({ sites }), 'utf-8')
 try {
-  const out = execFileSync('curl.exe', ['-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`, '-H', 'Content-Type: application/json', '--data-binary', '@' + payload], { encoding: 'utf8' })
+  const out = execFileSync('curl.exe', ['-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`, '-H', 'Content-Type: application/json', '-H', `Authorization: Bearer ${key}`, '--data-binary', '@' + payload], { encoding: 'utf8' })
   const j = JSON.parse(out)
   console.log(`发布成功: version=${j.version} count=${j.sites.length} withIcons=${j.sites.filter(s => s.icon).length}`)
+
+  // 可选 webhook 通知（--webhook=URL）
+  if (webhook) {
+    try {
+      execFileSync('curl.exe', ['-s', '--max-time', '15', '-X', 'POST', webhook, '-H', 'Content-Type: application/json', '--data', JSON.stringify({ event: 'publish', version: j.version, count: j.sites.length, time: new Date().toISOString() })], { encoding: 'utf8' })
+      console.log(`✅ webhook 通知已发送: ${webhook}`)
+    } catch (e) {
+      console.warn(`⚠️ webhook 通知失败: ${e.message}`)
+    }
+  }
 } catch (e) {
   console.error('发布失败: ' + e.message)
   if (existsSync(payload)) rmSync(payload, { force: true })

@@ -12,7 +12,8 @@
     "validate": "node scripts/validate-data.mjs",
     "check": "node scripts/check-sites.mjs",
     "check:report": "node scripts/check-sites.mjs --only-bad --report",
-    "icons": "node scripts/fetch-favicons.mjs"
+    "icons": "node scripts/fetch-favicons.mjs",
+    "perf": "node scripts/perf-scroll.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

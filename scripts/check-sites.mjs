@@ -6,17 +6,25 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { parseArgs } from 'node:util'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const sites = JSON.parse(readFileSync(join(root, 'api', 'sites-data.json'), 'utf-8'))
 
-const args = process.argv.slice(2)
-const limitIdx = args.indexOf('--limit')
-const limit = limitIdx >= 0 ? Number(args[limitIdx + 1]) : sites.length
-const timeoutIdx = args.indexOf('--timeout')
-const timeout = timeoutIdx >= 0 ? Number(args[timeoutIdx + 1]) : 15
-const onlyBad = args.includes('--only-bad')
-const makeReport = args.includes('--report')
+const args = parseArgs({
+  args: process.argv.slice(2),
+  options: {
+    limit: { type: 'string', short: 'l' },
+    timeout: { type: 'string', short: 't' },
+    'only-bad': { type: 'boolean' },
+    report: { type: 'boolean' },
+  },
+  allowPositionals: false
+})
+const limit = args.values.limit !== undefined ? Number(args.values.limit) : sites.length
+const timeout = args.values.timeout !== undefined ? Number(args.values.timeout) : 15
+const onlyBad = !!args.values['only-bad']
+const makeReport = !!args.values.report
 
 const targets = sites.slice(0, limit)
 const CONC = 12
