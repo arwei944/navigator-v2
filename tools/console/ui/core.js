@@ -100,7 +100,7 @@ export function closeStream() {
   if (es) { es.close(); es = null }
 }
 
-export function openStream(jobId, title, onDone) {
+export function openStream(jobId, title, onDone, handlers) {
   closeStream()
   currentJob = jobId
   doneHook = onDone || null
@@ -110,6 +110,14 @@ export function openStream(jobId, title, onDone) {
 
   es = new EventSource(`/api/events?job=${encodeURIComponent(jobId)}`)
   es.addEventListener('log', ev => appendLog(JSON.parse(ev.data)))
+  // 自定义事件（如时间线步骤 steps/step/deployment/verdict）
+  if (handlers) {
+    for (const [name, fn] of Object.entries(handlers)) {
+      es.addEventListener(name, ev => {
+        try { fn(JSON.parse(ev.data)) } catch (e) { appendLocal(`事件处理失败（${name}）：${e.message}`, 'stderr') }
+      })
+    }
+  }
   es.addEventListener('done', ev => {
     const d = JSON.parse(ev.data)
     setStatus(d.status, d.status === 'success' ? `完成 · ${(d.duration / 1000).toFixed(1)}s` : `失败 · 退出码 ${d.code}`)

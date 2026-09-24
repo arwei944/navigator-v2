@@ -6,6 +6,7 @@ import { ROOT, getAdminKey, envSummary } from './env.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as changes from './changes.mjs'
+import * as sync from './sync.mjs'
 
 export function sendJson(res, code, obj) {
   const body = JSON.stringify(obj)
@@ -114,6 +115,21 @@ export async function handleApi(req, res, path, url) {
     return true
   }
 
+  if (method === 'GET' && path === '/api/sync/status') {
+    sendJson(res, 200, await sync.status())
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/sync/cloud') {
+    sendJson(res, 200, await sync.fetchCloud())
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/sync/deployments') {
+    sendJson(res, 200, await sync.deployments(Number(url.searchParams.get('limit')) || 8))
+    return true
+  }
+
   if (method === 'POST') {
     if (!isTrusted(req)) {
       sendJson(res, 403, { error: '请求来源不受信任（缺少 X-Nav-Console 头或跨站来源）' })
@@ -160,6 +176,31 @@ export async function handleApi(req, res, path, url) {
       } catch (e) {
         sendJson(res, 400, { error: e.message })
       }
+      return true
+    }
+
+    if (path === '/api/sync/publish') {
+      const body = await readJsonBody(req)
+      if (jobs.listJobs().some(j => j.title === sync.PUBLISH_JOB_TITLE && j.status === 'running')) {
+        sendJson(res, 409, { error: '已有发布任务在运行中，请等待完成或终止后再试。' })
+        return true
+      }
+      const job = sync.startPublish({
+        message: body.message,
+        push: body.push !== false,
+        skipBuild: body.skipBuild === true,
+      })
+      sendJson(res, 200, { jobId: job.id, steps: job.steps.map(s => s.key) })
+      return true
+    }
+
+    if (path === '/api/sync/verify') {
+      const body = await readJsonBody(req)
+      const job = sync.startVerify({
+        expectCount: Number.isFinite(body.expectCount) ? body.expectCount : null,
+        tries: Number(body.tries) || 6,
+      })
+      sendJson(res, 200, { jobId: job.id })
       return true
     }
   }

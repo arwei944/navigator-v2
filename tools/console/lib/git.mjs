@@ -209,6 +209,15 @@ export async function showFileAtHead(relPath) {
   return out || null
 }
 
+/** 最近一次提交的概要信息（供同步面板展示本地版本锚点） */
+export async function headCommit() {
+  const out = await git(['log', '-1', '--pretty=%H%x1f%h%x1f%s%x1f%cI'], { allowNonZero: true })
+  const line = out.trim()
+  if (!line) return null
+  const [sha, short, subject, date] = line.split('\x1f')
+  return { sha, short, subject, date }
+}
+
 export async function getRemoteUrl() {
   const out = await git(['remote', 'get-url', 'origin'], { allowNonZero: true })
   return out.trim()

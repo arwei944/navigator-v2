@@ -1,11 +1,11 @@
 /**
- * 长任务管理：注册任务、收集子进程输出、通过 SSE 广播日志。
- * 日志保留环形缓冲，新订阅者可回放历史。
+ * 长任务管理：注册任务、收集子进程输出、通过 SSE 广播事件。
+ * 所有事件（日志 / 自定义步骤 / 结束）写入环形缓冲，新订阅者可完整回放。
  */
 import { spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 
-const MAX_LOG_LINES = 3000
+const MAX_EVENTS = 4000
 const jobs = new Map()
 
 export function createJob(title) {
@@ -16,9 +16,10 @@ export function createJob(title) {
     startedAt: Date.now(),
     endedAt: null,
     exitCode: null,
-    logs: [],
+    events: [],
     subscribers: new Set(),
     proc: null,
+    timer: null,
   }
   jobs.set(job.id, job)
   return job
@@ -37,20 +38,28 @@ export function listJobs() {
     }))
 }
 
+function buffer(job, event, data) {
+  job.events.push({ event, data })
+  if (job.events.length > MAX_EVENTS) job.events.splice(0, job.events.length - MAX_EVENTS)
+}
+
 function emit(job, event, data) {
+  buffer(job, event, data)
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
   for (const res of job.subscribers) {
     try { res.write(payload) } catch { /* 连接已断开，交给 close 事件清理 */ }
   }
 }
 
+/** 推送自定义事件（如时间线步骤状态），前端按 event 名监听 */
+export function emitEvent(job, event, data) {
+  emit(job, event, data)
+}
+
 export function log(job, text, stream = 'stdout') {
   for (const line of String(text).split(/\r?\n/)) {
     if (line === '') continue
-    const entry = { t: Date.now(), stream, text: line }
-    job.logs.push(entry)
-    if (job.logs.length > MAX_LOG_LINES) job.logs.splice(0, job.logs.length - MAX_LOG_LINES)
-    emit(job, 'log', entry)
+    emit(job, 'log', { t: Date.now(), stream, text: line })
   }
 }
 
@@ -68,17 +77,12 @@ export function finish(job, code) {
   job.subscribers.clear()
 }
 
-/** 订阅任务日志：先回放已有日志，再持续推送；返回取消订阅函数 */
+/** 订阅任务事件：先回放缓冲，再持续推送；返回取消订阅函数 */
 export function subscribe(job, res) {
-  for (const entry of job.logs) {
-    res.write(`event: log\ndata: ${JSON.stringify(entry)}\n\n`)
+  for (const { event, data } of job.events) {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
   }
   if (job.status !== 'running') {
-    res.write(`event: done\ndata: ${JSON.stringify({
-      code: job.exitCode,
-      status: job.status,
-      duration: (job.endedAt || Date.now()) - job.startedAt,
-    })}\n\n`)
     res.end()
     return () => {}
   }
@@ -86,11 +90,15 @@ export function subscribe(job, res) {
   return () => job.subscribers.delete(res)
 }
 
-/** 运行子进程并把输出接入任务日志流 */
+/**
+ * 运行子进程并把输出接入任务事件流。
+ * autoFinish=false 时不由本函数结束任务（供多步流水线复用同一任务）。
+ */
 export function run(job, command, cmdArgs, opts = {}) {
   const child = spawn(command, cmdArgs, {
     cwd: opts.cwd,
     env: { ...process.env, ...(opts.env || {}) },
+    windowsHide: true,
   })
   job.proc = child
   job.timer = null
@@ -100,20 +108,29 @@ export function run(job, command, cmdArgs, opts = {}) {
       killJob(job.id)
     }, opts.timeoutMs)
   }
-  child.stdout.on('data', c => log(job, String(c), 'stdout'))
-  // git 把进度与结果都写在 stderr，正常输出不应标红；仅错误关键字保留红色
+
+  const onLine = opts.onLine
+  child.stdout.on('data', c => {
+    const text = String(c)
+    log(job, text, 'stdout')
+    if (onLine) for (const l of text.split(/\r?\n/)) if (l.trim()) onLine(l.trim())
+  })
+  // git / vercel 把进度与结果都写在 stderr，正常输出不应标红；仅错误关键字保留红色
   const stderrMode = opts.stderrMode || 'error'
   child.stderr.on('data', c => {
     const text = String(c)
     const isError = /(^|\n)\s*(fatal|error|failed|denied|rejected|conflict)/i.test(text)
     log(job, text, stderrMode === 'info' && !isError ? 'info' : 'stderr')
+    if (onLine) for (const l of text.split(/\r?\n/)) if (l.trim()) onLine(l.trim())
   })
   child.on('error', e => {
     log(job, `子进程启动失败: ${e.message}`, 'stderr')
-    finish(job, -1)
+    if (opts.autoFinish !== false) finish(job, -1)
   })
   child.on('close', code => {
     job.proc = null
+    if (job.timer) { clearTimeout(job.timer); job.timer = null }
+    if (opts.autoFinish === false) return
     finish(job, code ?? -1)
   })
   return child

@@ -89,9 +89,32 @@
     </section>
 
     <section class="panel" id="panel-sync">
-      <div class="placeholder">
-        <h3>同步面板</h3>
-        <p>提交→推送→Vercel 部署→Blob 热更新→一致性验证 时间线 · <b>将在 M3 实现</b></p>
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="sync-summary"></div>
+          <div class="row-actions">
+            <button class="btn ghost" id="btn-sync-refresh">刷新</button>
+            <button class="btn ghost" id="btn-sync-verify">仅验证云端</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>一键发布 · 全链路时间线</h3>
+        <div class="publish-form">
+          <input class="msg-input" id="sync-message" placeholder="提交消息（有已暂存改动时必填）">
+          <label class="chk"><input type="checkbox" id="sync-push" checked> 推送远端</label>
+          <label class="chk"><input type="checkbox" id="sync-skip-build"> 跳过构建</label>
+          <button class="btn primary" id="btn-sync-publish">一键发布</button>
+        </div>
+        <div class="result" id="sync-result"></div>
+        <ol class="timeline" id="sync-timeline"></ol>
+        <p class="hint">发布复用 <code>scripts/publish.mjs</code>（单一发布入口），控制台只做编排与可视化。</p>
+      </div>
+
+      <div class="card">
+        <h3>云端版本对比</h3>
+        <div class="cloud-compare" id="cloud-compare"></div>
       </div>
     </section>
 

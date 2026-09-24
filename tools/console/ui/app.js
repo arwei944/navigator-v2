@@ -1,6 +1,7 @@
 /** 控制台入口：标签切换、概览面板、日志控制台按钮 */
 import { $, $$, api, renderKv, clearLog, killCurrent, openStream } from './core.js'
 import { initGitPanel, refresh } from './gitpanel.js'
+import { initSyncPanel, refresh as refreshSync } from './syncpanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -9,6 +10,7 @@ $('#tabs').addEventListener('click', e => {
   $$('.tab').forEach(t => t.classList.toggle('active', t === btn))
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.panel}`))
   if (btn.dataset.panel === 'changes' || btn.dataset.panel === 'commit') refresh()
+  if (btn.dataset.panel === 'sync') refreshSync()
 })
 
 /* ---------- 概览 ---------- */
@@ -56,6 +58,7 @@ $('#btn-toggle-console').addEventListener('click', () => {
 
 /* ---------- 初始化 ---------- */
 initGitPanel()
+initSyncPanel()
 loadHealth()
 loadEnv()
 
@@ -63,4 +66,5 @@ loadEnv()
 setInterval(() => {
   const active = $('.panel.active')?.id
   if (active === 'panel-changes' || active === 'panel-commit') refresh()
+  if (active === 'panel-sync') refreshSync()
 }, 30000)

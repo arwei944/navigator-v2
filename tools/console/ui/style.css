@@ -269,3 +269,93 @@ body.console-collapsed .log-view { display: none; }
 .list-scroll::-webkit-scrollbar-thumb, .diff-view::-webkit-scrollbar-thumb {
   background: #2e333d; border-radius: 4px;
 }
+
+/* ---------- 同步面板 ---------- */
+.row-actions { display: flex; gap: 8px; }
+/* 状态行吸顶：面板内容（含 9 步时间线）会超出一屏，保证刷新/验证入口始终可达 */
+#panel-sync > .card.tight {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg-panel); border-color: var(--border);
+}
+
+.publish-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.msg-input {
+  flex: 1; min-width: 260px;
+  background: var(--bg-raised); color: var(--text);
+  border: 1px solid var(--border); border-radius: 7px; padding: 8px 11px;
+  font-family: var(--mono); font-size: 12.5px;
+}
+.msg-input:focus { outline: none; border-color: var(--accent); }
+.chk {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12.5px; color: var(--text-dim); cursor: pointer; white-space: nowrap;
+}
+.chk input { accent-color: var(--accent); cursor: pointer; }
+
+/* 云端版本对比 */
+.cloud-compare { display: flex; flex-direction: column; gap: 10px; }
+.cc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 700px) { .cc-grid { grid-template-columns: 1fr; } }
+.cc-col {
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+.cc-title { font-size: 12px; color: var(--text-dim); }
+.cc-count { font-family: var(--mono); font-size: 22px; margin: 4px 0 2px; }
+.cc-count.err { color: var(--err); }
+.cc-sub { font-size: 12px; color: var(--text-dim); }
+.cc-meta {
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+  margin-top: 6px; word-break: break-all;
+}
+.cc-verdict { font-size: 12.5px; padding: 7px 11px; border-radius: 7px; }
+.cc-verdict.ok { color: var(--ok); background: rgba(52, 211, 153, .10); }
+.cc-verdict.warn { color: var(--warn); background: rgba(251, 191, 36, .10); }
+.cc-deploy { display: flex; align-items: center; gap: 8px; font-size: 12px; flex-wrap: wrap; }
+.link { color: var(--accent); text-decoration: none; font-family: var(--mono); }
+.link:hover { text-decoration: underline; }
+
+/* 发布全链路时间线 */
+.timeline { list-style: none; margin-top: 14px; }
+.tl-empty { font-size: 12.5px; color: var(--text-dim); padding: 8px 0; }
+.tl-item {
+  position: relative; display: grid;
+  grid-template-columns: 14px 22px 1fr auto;
+  align-items: center; gap: 10px; padding: 7px 0;
+}
+.tl-item::before {
+  content: ''; position: absolute; left: 6px; top: 0; bottom: 0;
+  width: 1px; background: var(--border);
+}
+.tl-item:first-child::before { top: 50%; }
+.tl-item:last-child::before { bottom: 50%; }
+.tl-dot {
+  position: relative; z-index: 1;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--bg-panel); border: 2px solid var(--border);
+}
+.tl-dot.running { border-color: var(--accent); background: var(--accent); animation: tl-pulse 1.2s infinite; }
+.tl-dot.success { border-color: var(--ok); background: var(--ok); }
+.tl-dot.failed { border-color: var(--err); background: var(--err); }
+.tl-dot.skipped { border-color: var(--text-dim); }
+@keyframes tl-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 124, 250, .5); }
+  50% { box-shadow: 0 0 0 5px rgba(91, 124, 250, 0); }
+}
+.tl-idx { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+.tl-label { font-size: 13px; }
+.tl-item.pending .tl-label { color: var(--text-dim); }
+.tl-meta { display: flex; align-items: center; gap: 8px; }
+.tl-dur { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); }
+.tl-state {
+  font-size: 11px; padding: 2px 7px; border-radius: 5px;
+  background: var(--bg-raised); color: var(--text-dim);
+}
+.tl-state.running { color: var(--accent); }
+.tl-state.success { color: var(--ok); }
+.tl-state.failed { color: var(--err); }
+.tl-detail {
+  grid-column: 3 / -1; margin-top: 2px;
+  font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+  word-break: break-all;
+}
