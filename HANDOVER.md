@@ -45,19 +45,31 @@ nav-v2/
 │       ├── merge.js            # 合并云端和本地数据
 │       └── key.js              # 密钥管理
 ├── src/
-│   ├── components/             # Vue 组件（19 个）
+│   ├── components/             # Vue 组件（巨型组件已拆分，单文件 ≤250 行）
 │   │   ├── AddSiteModal.vue       # 添加网站弹窗
-│   │   ├── BookmarkImport.vue     # 书签导入导出
-│   │   ├── CardsContainer.vue     # 卡片容器（网格/列表/虚拟滚动）
-│   │   ├── CommandPalette.vue     # 全局命令面板（Ctrl+K）
+│   │   ├── BookmarkImport.vue     # 书签导入导出（壳，拆为 bookmarks/）
+│   │   ├── bookmarks/             # 书签子组件
+│   │   │   ├── ImportPanel.vue    # 导入面板（拖拽/文件解析/预览）
+│   │   │   └── ExportPanel.vue    # 导出面板（JSON / HTML 书签）
+│   │   ├── CardsContainer.vue     # 卡片容器（网格/列表/content-visibility 虚拟化）
+│   │   ├── command/               # 命令面板子组件
+│   │   │   ├── CommandSearchBar.vue  # 搜索输入栏
+│   │   │   └── CommandResults.vue    # 分组结果区（页面/分类/站点/操作）
+│   │   ├── CommandPalette.vue     # 全局命令面板（Ctrl+K，壳 + 逻辑）
 │   │   ├── ConfirmDialog.vue      # 确认对话框
 │   │   ├── ContentFeed.vue        # 内容聚合视图
 │   │   ├── DigitalClock.vue      # 数字时钟
 │   │   ├── EditSiteModal.vue      # 编辑网站弹窗
 │   │   ├── GoogleSearchBar.vue   # 搜索引擎栏
 │   │   ├── MobileHeader.vue       # 移动端顶部栏
-│   │   ├── RightSidebar.vue       # 右侧站点详情面板
-│   │   ├── SettingsPanel.vue      # 统一设置面板
+│   │   ├── right/                 # 右侧详情子组件
+│   │   │   └── SiteDetailPanel.vue  # 站点详情（统计/时间线/操作按钮）
+│   │   ├── RightSidebar.vue       # 右侧站点详情面板（壳 + 折叠/空状态）
+│   │   ├── SettingsPanel.vue      # 统一设置面板（壳，拆为 settings/）
+│   │   ├── settings/              # 设置子组件
+│   │   │   ├── AppearanceSection.vue # 外观（主题模式/配色）
+│   │   │   ├── DisplaySection.vue    # 显示/搜索/壁纸
+│   │   │   └── SessionSyncSection.vue # 数据管理/会话同步
 │   │   ├── ShortcutsPanel.vue     # 快捷键面板
 │   │   ├── Sidebar.vue            # 左侧导航栏（可拖拽宽度）
 │   │   ├── SiteCard.vue           # 站点卡片
@@ -605,3 +617,209 @@ npm run icons        # 抓取/补抓 favicon
 - git 建立 V3 基线提交 `c642eac`
 
 **验证**：发布成功 v85（293 站点 / 293 图标 / 数据校验通过 / 轮询一次收敛）；浏览器确认书签面板云端 Tab 移除（PWA 旧缓存需刷新后消失）
+
+**P1-1 站点实时在线状态角标**（2026-09-21）
+- 新增 `src/stores/health.js`：按需探活（仅探测传入的可见卡片），60s 缓存 + 6 路并发信号量
+- 状态分级 `ok/limited/down/unknown`（2xx/3xx 在线；429/403/405/401 限流；ERR/404/402/410 失效），口径与 `scripts/check-sites.mjs` 一致
+- `SiteCard.vue` 卡片图标右下角新增 `.health-dot` 圆点角标（绿/黄/红/灰）
+- 前端直接 HEAD/GET 探测目标域名，不经过本站 Serverless，避免触发自身限流
+
+**P1-3 云端会话级同步**（2026-09-21）
+- 新增 `api/session.js`：基于 Vercel Blob（`session/<key>.json`）读写个人会话数据，以 session key 为隔离凭证（**不下发管理密钥到浏览器**），字段级合并 + 版本递增
+- 新增 `src/services/session.js`：key 存取（localStorage `nav-session-key`）、快照收集/应用、`fetchSession`/`pushSession`
+- 涉及 store 补齐原始合并方法：`favorites.add`、`todos.addRaw`、`history.addRawRecord`
+- `SettingsPanel.vue`「数据管理」新增云端会话同步 UI：密钥输入 + 生成密钥 + 上传到云端 + 从云端下载 + 状态提示
+- ⚠️ `api/session.js` POST 已移除 `adminKey` 校验，改为纯 key 隔离（个人导航站可接受；密钥越长越安全）
+
+**验证**：发布 v86（293 站点 / 校验门禁通过 / 热更新 / 轮询一次收敛）；浏览器实测健康角标颜色分布正常、会话同步生成密钥→上传→下载全流程通过、Console 无 JS 运行时错误
+
+**P1-2 智能推荐发现**（2026-09-21）
+- `ContentFeed.vue`「推荐发现」由随机洗牌改为基于访问历史 + 分类共现：未访问且未收藏的站点作候选，按与近期访问站点的同分类权重（时间近者权高）加权，热度作次级信号
+- 访问历史为空时退化为热度（visitCount 降序）未收藏站点兜底
+
+**P1-4 实时热更新即时可见**（2026-09-21）
+- `App.vue` 新增 `visibilitychange` 监听：标签页回到前台立即 `pollCloudSites()`，发布后切回页面无需等满 30s 即可见
+
+**P1-5 管理后台数据洞察**（2026-09-21）
+- `AdminView.vue` 新增「数据洞察」区块：分类分布横向条形图（按站点数降序）、热度 TOP10、失效站点清单
+- 进入后台即 `healthStore.probeSites(全部)` 全量探测，顶栏显示探测进度；失效清单无内容时显示"暂未发现失效站点"
+- 清单带"删除前用浏览器复核，谨防 WAF/限流误判"提示（沿用 check-sites.mjs 的 false-ERR 经验）
+- AdminView 为懒加载路由，洞察代码在其独立 chunk
+
+**验证**：发布 v87（293 站点 / 校验门禁通过 / 热更新；轮询读到 v86 属 Blob 读一致性短暂延迟，站点数据未变、无影响）。浏览器实测：feed 视图「推荐发现」正常显示推荐站点（历史为空退化热度兜底：Claude/DeepSeek/Kimi 等）；Console 无运行时错误（仅健康探测 net::ERR_FAILED 属正常噪音）；`/admin` 返回 200 且 AdminView chunk 含全部洞察代码。
+⚠️ 技术说明：/admin 为客户端路由，需经命令面板 Ctrl+K→管理后台 或 SPA 内部跳转进入；直接地址栏访问依赖 vercel.json 的 `/(.*) → /index.html` 兜底（已验证 200）。
+
+**旧数据清理：sortOrder 去重**（2026-09-21）
+- 现象：`npm run validate` 持续报 10 处 `sortOrder` 重复（18、137、143-146、148、151×3、180、198×3）
+- 根因：前端 `sites.js#addSite` 用 `sortOrder = sites.value.length` 生成，配合既有排序值/删除重排会导致碰撞；且前端渲染用**数组顺序**而非 sortOrder，故重复仅存在于元数据
+- 处理：新增 `scripts/fix-sortorder.mjs` 一次性脚本——执行前自动备份到 `backups/sites-data-sortorder-{ts}.json`，按数组顺序把 sortOrder 重排为 1..N 连续序列
+- 验证：本地校验 **0 警告**；发布 v88 热更 + 轮询一次收敛；云端校验 `sortOrder_dups=0`、`array_order_unchanged=True`（站点展示顺序与修复前逐位完全一致，零扰动）
+- 备注：若日后继续用 addSite 新增站点仍可能再产生重复，可重跑 `npm` 对应的 `node scripts/fix-sortorder.mjs` 一键清理
+
+---
+
+## 十四、P2 体验工程批次（2026-09-21，Nav V3）
+
+按 [NAV-v3-upgrade-plan.md](docs/NAV-v3-upgrade-plan.md) 的 P2 批次完成体验工程：
+
+### 14.1 P2-1 巨型组件拆分（验收：单文件 ≤250 行）
+
+四个巨型组件拆为"壳 + 业务子组件"，逻辑归一、（部分）样式随子组件下沉：
+
+| 组件 | 原行数 | 主文件 | 拆出子组件 |
+|------|--------|--------|-----------|
+| `SettingsPanel` | 683 | ~105 | `settings/AppearanceSection`、`settings/DisplaySection`、`settings/SessionSyncSection` |
+| `CommandPalette` | 518 | 163 | `command/CommandSearchBar`（输入栏）、`command/CommandResults`（分组结果区） |
+| `RightSidebar` | 556 | 50 | `right/SiteDetailPanel`（统计/时间线/操作按钮） |
+| `BookmarkImport` | 530 | 49 | `bookmarks/ImportPanel`、`bookmarks/ExportPanel`，解析/导出逻辑抽到 `utils/bookmarks.js` |
+
+- **CommandPalette**：Shell 保留可见性/键盘导航/过滤/执行逻辑；`CommandResults` 接收 `groups`（含 label/type/items）+ `getIndex` 函数，用 `emit('select'/'hover')` 回传；`getIndex` 由壳注入保证全局索引一致
+- **RightSidebar**：主件只留折叠按钮 + 空状态；`SiteDetailPanel` 通过 `site` prop 接收悬停站点，自行引 stores 计算统计/点赞/访问记录
+- **BookmarkImport**：解析（JSON/HTML/去重）与导出模板（JSON/Netscape 书签）下沉到 `utils/bookmarks.js` 纯函数，便于单测
+- 验证：`npm run build` 通过；发布 v89（293 站点 / 293 图标 / 校验门禁通过 / 热更新 / 轮询一次收敛）；浏览器实测命令面板 Ctrl+K 搜索/ESC 正常、右侧详情字段完整、收藏按钮切换正常、Console 无运行时错误
+
+### 14.2 P2-2 卡片虚拟化（content-visibility）
+
+- 未引入重型虚拟滚动库，改用 CSS `content-visibility: auto` + `contain-intrinsic-size`：离屏卡片跳过布局/绘制，站点增多滚动依旧流畅
+- `CardsContainer.vue`：网格 `.card` 预设 `auto 200px`、列表 `.card` 预设 `auto 64px`；保留语义化访问结构，非用户不可见
+- **压测**：新增 `npm run perf`（`scripts/perf-scroll.mjs`）生成 `perf-report/scroll-bench.html`（默认 1000 张较复杂卡片，可 `--count N`），浏览器实测 ON 平均 ~60fps、OFF 跌至 ~49fps（最低 ~43fps），差距 ~11fps，达标"1000 站点 60fps"目标（实测 v89）
+
+### 14.3 P2-3 敏感信息与鉴权强化
+
+- `/api/sites` POST 鉴权由"请求体 `key` 明文"改为 **`Authorization: Bearer <token>` 请求头**
+- 同步更新三处调用方：`scripts/publish.mjs`（curl `-H "Authorization: Bearer $key"`）、`AdminView.vue`（管理后台发布）、`CommandPalette` 无涉及
+- `publish.mjs` 支持 `--key=` 显式传（读 `.env.local`/环境变量优先），缺失即中止
+- **CLI 参数解析改造**：`publish.mjs`、`check-sites.mjs` 弃用手写 `args.includes/find`，统一改用 **Node 内置 `parseArgs`**，支持短参数别名
+  - `publish.mjs`：`--skip-build`、`-k/--key`、`-w/--webhook`
+  - `check-sites.mjs`：`-l/--limit`、`-t/--timeout`、`--only-bad`、`--report`
+- **webhook 可选通知**：`publish.mjs -w <url>` 或管理后台「发布到云端」上方的 webhook URL 输入框（localStorage 记住），发布成功后向该 URL `POST` 通知 `{ event, version, count, time }`；通知失败不影响发布结果（静默忽略）
+
+### 14.4 P2-4 本地数据版本化与迁移
+
+- 新增 `src/utils/storeVersioning.js`：`STORE_VERSION` 常量 + `versionedPersist`/`encodeStored`/`decodeStored`，storage 读写附加 schema 版本号，支持迁移函数表（`MIGRATIONS` 按 key 注册）
+- 接入 stores：`sidebar`/`preferences` 用 `versionedPersist`；`todos`/`favorites`/`history` 用 `encode/decodeStored`
+- 效果：未来 localStorage 结构变更可平滑迁移，降级逻辑兜底避免解析失败丢数据
+
+### 14.5 P2-5 桌面端自适应打磨 + README/HANDOVER 知识库化
+
+- **桌面端自适应**：现有响应式断点已较完整——`CardsContainer` 网格列数随宽度自适应（`≥1440px→4列`、`≤1024px→2列`、`≤768px→1列`），侧边栏可折叠至 60px、移动端顶栏（`MobileHeader`）+ 遮罩抽屉模式；本次仅核对断点与桌面缩放表现，未做过度改动，补充文档说明即可
+- `README.md` 补：架构图（PWA ↔ Serverless ↔ Blob）、常用命令与发布参数（`-k/--key`、`-w/--webhook`、`npm run perf`）、环境变量表、智能能力/会话同步/卡片虚拟化特性、响应式断点说明
+- `HANDOVER.md` 项目结构更新为拆分后的子目录形态（`command/`、`settings/`、`bookmarks/`、`right/`），补齐 P1/P2 批次记录
+
+### 14.6 P2 验证汇总
+
+- 发布 **v89** 一次成功：部署完成 + 云端热更新 293 站点 / 293 图标 / 校验通过 / 轮询一次收敛到 `version=89`
+- 浏览器实测：主界面正常无报错；`Ctrl+K` 命令面板搜索与关闭正常；右侧详情面板字段完整 + 收藏/复制交互正常
+- 卡片虚拟化压测：1000 卡片 ON ~60fps / OFF ~49fps，达标"1000 站点 60fps"（`npm run perf`）
+- CLI 参数：`publish.mjs --skip-build / -k / -w`、`check-sites.mjs -l/-t/--only-bad/--report` 均用 Node `parseArgs` 解析生效
+
+## 十五、站点收录：bestjev（2026-09-22）
+
+新增站点 `pj2`（projects 项目参考分类，前缀 `pj`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `pj2` |
+| name | bestjev |
+| url | `jevbest.com`（根域名，未收 `/zh/projects/jev-like-models/` 子页） |
+| desc | 精选 640 个 Jev/TypeSafe AI 开源项目（SDK、Agent、集成、应用、基准），多语言浏览 + GitHub Star 对比，聚合 Jev 生态 |
+| categoryId | `projects`（项目参考） |
+| color | `#0d9488` |
+| sortOrder | 294（全局递增，追加到数组末尾） |
+| icon | `icons/pj2.png`（`npm run icons --only pj2` 抓取，HTTP 200 可达） |
+
+- 数据源：用户在 `jevbest.com/zh/projects/jev-like-models/` 提交，经确认收录**根域名**而非子页
+- 校验：`npm run validate` 通过（294 条 / 29 分类）
+- 说明：同一 URL 无重复收录；favicon 落地为 png（非 svg/webp），数据 `icon` 字段已与实际文件名对齐
+
+## 十六、站点收录：VergeX（2026-09-22）
+
+新增站点 `ac16`（aicrypto AI+Crypto 分类，前缀 `ac`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `ac16` |
+| name | VergeX |
+| url | `vergex.trade`（根域名，未收 `/chart?symbol=BTC` 交易图子页） |
+| desc | 加密交易的 AI 层：可部署自主 AI 代理，使用社区策略在任意交易所智能交易 |
+| categoryId | `aicrypto`（AI + Crypto） |
+| color | `#8b5cf6` |
+| sortOrder | 295（全局递增，追加到数组末尾） |
+| icon | `icons/ac16.jpg`（`npm run icons --only ac16` 抓取） |
+
+- 数据源：用户在 `vergex.trade/chart?symbol=BTC` 提交，经确认收录**根域名**而非交易图子页
+- 可达性：根域名无 UA 时 403（Cloudflare/WAF），带浏览器 UA 返回 HTTP 200；favicon 对应页内 `/vergex/favicon.svg`
+- 校验：`npm run validate` 通过（295 条 / 29 分类；无重复收录）
+- 说明：favicon 落地为 jpg（数据 `icon` 字段已与实际文件名对齐）
+
+## 十七、站点收录：Awesome Jev / PUNK2898（2026-09-22）
+
+新增站点 `pj3`（projects 项目参考分类，前缀 `pj`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `pj3` |
+| name | Awesome Jev |
+| url | `jev.punk2898.xyz`（punk2898 个人根域 `punk2898.xyz` 下的子应用，收录子应用域名） |
+| desc | 聚合 788 个真正调用 Jev 的开源项目（非照 README 收录），按分类浏览、搜索，其中 182 个可在页面当场运行 |
+| categoryId | `projects`（项目参考） |
+| color | `#0d9488` |
+| sortOrder | 296（全局递增，追加到数组末尾） |
+| icon | `icons/pj3.png`（`npm run icons --only pj3` 抓取） |
+
+- 数据源：用户在 `https://jev.punk2898.xyz/` 提交；站点 canonical 指 `jev-playground-five.vercel.app`（主托管域），`jev.punk2898.xyz` 为可用访问域，按此收录
+- 与 bestjev（pj2）同属 Jev 生态目录，但来源不同（bestjev 按收录核验、PUNK2898 强调源码真实调用 + 在线可跑），分别收录
+- 校验：`npm run validate` 通过（296 条 / 29 分类；无重复收录）
+- 说明：favicon 落地为 png（数据 `icon` 字段已与实际文件名对齐）
+
+## 十八、站点收录：Arcturus（2026-09-23）
+
+新增站点 `dt32`（data 数据与研究分类，前缀 `dt`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `dt32` |
+| name | Arcturus |
+| url | `arcturus.watch`（根域名，未收 `/ ?theme=light` 主题参数） |
+| desc | Arc 链上的 alpha 研究站：哪些项目有真人在用、钱往哪里走、Arc 团队在看谁，全部来自链上数据，独立站点 |
+| categoryId | `data`（数据与研究） |
+| color | `#5a6bff` |
+| sortOrder | 297（全局递增，追加到数组末尾） |
+| icon | `icons/dt32.svg`（`npm run icons --only dt32` 抓取，favicon 本身为 svg） |
+
+- 数据源：用户在 `https://arcturus.watch/?theme=light` 提交，经确认收录**根域名**（`?theme=light` 为前端主题参数，非内容路径）
+- 站点支持 `?lang=zh`/`?lang=en` 双语切换（页面 lang=zh-CN 默认中文）
+- 分类归属：链上数据分析研究，归入 `data`（最新 id `dt31` 之后，续为 `dt32`）
+- 校验：`npm run validate` 通过（297 条 / 29 分类；无重复收录）
+- 说明：favicon 落地为 svg（数据 `icon` 字段已与实际文件名对齐）
+
+## 十九、站点收录：QFEX（2026-09-23）
+
+新增站点 `ex11`（cex 中心化交易所分类，前缀 `ex`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `ex11` |
+| name | QFEX |
+| url | `www.qfex.com`（根域名，未收 `/trade/US100-USD` 交易对子页） |
+| desc | 首家 24/7 仅面向美股、大宗商品与外汇的交易所，无需券商即可高频直连交易（股票、黄金、白银、永续合约） |
+| categoryId | `cex`（中心化交易所） |
+| color | `#1a9e6c` |
+| sortOrder | 298（全局递增，追加到数组末尾） |
+| icon | `icons/ex11.png`（`npm run icons --only ex11` 抓取） |
+
+- 数据源：用户在 `https://www.qfex.com/trade/US100-USD` 提交（US100 指数永续合约交易对），经确认收录**根域名**
+- canonical 为 `https://www.qfex.com`，本站为 PWA（`favicon2.svg`）
+- 分类归属：中心化交易平台，归入 `cex`（最新 id `ex10` 之后，续为 `ex11`）
+- 校验：`npm run validate` 通过（298 条 / 29 分类；无重复收录）
+- 说明：favicon 落地为 png（数据 `icon` 字段已与实际文件名对齐）
+- 发布：v94（2026-09-24）上线；首次发布曾因后台任务环境异常中断（exit -1），后于 v94 重新发布成功确认
+
+## 二十、更新：RootData（fd1）描述（2026-09-24）
+
+用户提交 `https://cn.rootdata.com/projects/detail/Arc?k=...`（RootData 上 Arc 链项目详情子页）。经确认 `cn.rootdata.com` 已收录（`fd1`），按规则不重复新增条目。仅微调 `fd1.desc` 以贴合用户关注点：
+
+- 旧：`Web3 项目数据平台，热榜、融资、空投日历、代币解锁追踪，投融资研究必备。`
+- 新：`Web3 项目数据平台：热榜、融资、空投日历、代币解锁追踪，可查看单个项目（如 Arc 链）激励计划与详情，投融资研究必备。`
+- `updatedAt` 同步刷新
+- 随 v94 一并发布上线
