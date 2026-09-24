@@ -111,6 +111,14 @@ onMounted(() => {
   sitesStore.initCloudSites()
   sitesStore.startPolling(30000)
 
+  // 标签页重新可见时立即重拉，避免热更新后等待整轮 30s
+  const onVisibility = () => {
+    if (document.visibilityState === 'visible') {
+      sitesStore.pollCloudSites()
+    }
+  }
+  document.addEventListener('visibilitychange', onVisibility)
+
   document.addEventListener('keydown', (e) => {
     // Ctrl+K 打开全局命令面板
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

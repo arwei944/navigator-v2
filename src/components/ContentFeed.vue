@@ -145,15 +145,41 @@ const hotSites = computed(() => {
     .slice(0, 6)
 })
 
-/** 推荐发现：从 filteredSites 随机取 6 条 */
+/**
+ * 推荐发现：基于访问历史 + 分类共现
+ * - 对访问记录里每类打分（最近访问加权更高），同分类候选站得分更高
+ * - 从未访问过、且未收藏的站点作为候选
+ * - 无历史时退化为热门（visitCount 降序）未收藏站点
+ */
 const discoverSites = computed(() => {
-  const pool = [...sitesStore.filteredSites]
-  // Fisher-Yates 洗牌
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]]
+  const visited = new Set(historyStore.records.map(r => r.siteId))
+  const favIds = new Set(favoritesStore.favoriteIds || [])
+  const pool = sitesStore.sites.filter(s => !visited.has(s.id) && !favIds.has(s.id))
+
+  if (pool.length === 0) {
+    // 兜底：全部访问过时推荐热门未收藏
+    return [...sitesStore.sites]
+      .filter(s => !favIds.has(s.id))
+      .sort((a, b) => b.visitCount - a.visitCount)
+      .slice(0, 6)
   }
-  return pool.slice(0, 6)
+
+  // 访问历史分类权重：越早访问记越低的权重
+  const catScore = new Map()
+  historyStore.records.forEach((r, i) => {
+    const site = sitesStore.sites.find(s => s.id === r.siteId)
+    if (!site) return
+    const w = 1 / (i + 1)
+    catScore.set(site.categoryId, (catScore.get(site.categoryId) || 0) + w)
+  })
+
+  const scored = pool.map(s => {
+    // 主信号：与已访问站点同分类（分类共现）；次级信号：全局热度
+    const score = (catScore.get(s.categoryId) || 0) + Math.log1p(s.visitCount || 0) * 0.05
+    return { site: s, score }
+  })
+  scored.sort((a, b) => b.score - a.score || b.site.visitCount - a.site.visitCount)
+  return scored.slice(0, 6).map(x => x.site)
 })
 
 /** 是否有内容展示 */

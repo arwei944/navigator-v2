@@ -86,6 +86,54 @@
       </div>
     </div>
 
+    <div class="admin-section">
+      <div class="admin-section-header">
+        <h2>数据洞察</h2>
+        <span class="admin-cloud-version" v-if="probingNow">健康探测中（{{ deadProbedCount }}/{{ sitesStore.sites.length }}）…</span>
+        <span class="admin-cloud-version" v-else-if="deadCount">失效站点 {{ deadCount }} 个</span>
+      </div>
+      <div class="insight-grid">
+        <div class="insight-card">
+          <h3 class="insight-title">分类分布</h3>
+          <div class="cat-bars">
+            <div v-for="c in categoryDistribution" :key="c.id" class="cat-bar-row">
+              <span class="cat-bar-label" :style="{ color: c.color }">{{ c.label }}</span>
+              <div class="cat-bar-track">
+                <div class="cat-bar-fill" :style="{ width: (c.count / maxCatCount * 100) + '%', background: c.color }"></div>
+              </div>
+              <span class="cat-bar-count">{{ c.count }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="insight-card">
+          <h3 class="insight-title">热度 TOP 10</h3>
+          <ol class="top-list">
+            <li v-for="(s, i) in topSites" :key="s.id">
+              <span class="top-rank" :class="{ hot: i < 3 }">{{ i + 1 }}</span>
+              <div class="top-meta">
+                <span class="top-name">{{ s.name }}</span>
+                <span class="top-url">{{ s.url }}</span>
+              </div>
+              <span class="top-count">{{ s.visitCount }}</span>
+            </li>
+          </ol>
+        </div>
+      </div>
+      <div class="insight-card dead-card">
+        <h3 class="insight-title">失效站点清单
+          <span class="dead-note">（探测判定无法访问；删除前请先用浏览器复核，谨防 WAF/限流误判）</span>
+        </h3>
+        <div v-if="deadSites.length === 0" class="dead-empty">✓ 暂未发现失效站点{{ probingNow ? '，探测完成后自动更新' : '' }}</div>
+        <div v-else class="dead-list">
+          <div v-for="s in deadSites" :key="s.id" class="dead-item">
+            <span class="dead-name">{{ s.name }}</span>
+            <span class="dead-url">{{ s.url }}</span>
+            <span class="dead-code" :class="{ warn: s.statusCode === 'ERR' }">HTTP {{ s.statusCode || 'ERR' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="admin-section" ref="publishSectionRef">
       <div class="admin-section-header">
         <h2>云端发布（热更新）</h2>
@@ -99,6 +147,12 @@
             {{ publishState === 'loading' ? '发布中...' : '发布到云端' }}
           </button>
         </div>
+        <input
+          v-model="webhookUrl"
+          type="url"
+          class="admin-key-input admin-webhook-input"
+          placeholder="可选：发布成功后的 Webhook 通知地址（POST）"
+        />
         <div v-if="adminKey" class="admin-key-saved">密钥已保存在本机，下次发布自动填充 <button class="admin-link-btn" @click="clearSavedKey">清除</button></div>
         <div v-if="publishMsg" class="admin-publish-msg" :class="{ success: publishState === 'success', error: publishState === 'error' }">
           {{ publishMsg }}
@@ -118,11 +172,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useHistoryStore } from '@/stores/history'
+import { useHealthStore } from '@/stores/health'
 import AddSiteModal from '@/components/AddSiteModal.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -131,6 +186,7 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const favoritesStore = useFavoritesStore()
 const historyStore = useHistoryStore()
+const healthStore = useHealthStore()
 
 const todayCount = computed(() => {
   const today = new Date()
@@ -138,11 +194,57 @@ const todayCount = computed(() => {
   return historyStore.records.filter(r => r.timestamp >= today.getTime()).length
 })
 
+// ── P1-5 数据洞察 ──
+// 进入后台即探测全部站点，形成失效清单
+onMounted(() => {
+  healthStore.probeSites(sitesStore.sites)
+})
+
+/** 分类分布（按站点数降序） */
+const categoryDistribution = computed(() => {
+  return categoriesStore.categories
+    .map(cat => ({
+      id: cat.id,
+      label: cat.label,
+      color: cat.dotColor,
+      count: sitesStore.sites.filter(s => s.categoryId === cat.id).length
+    }))
+    .filter(x => x.count > 0)
+    .sort((a, b) => b.count - a.count)
+})
+const maxCatCount = computed(() => Math.max(1, ...categoryDistribution.value.map(c => c.count)))
+
+/** 热度 TOP10 */
+const topSites = computed(() => {
+  return [...sitesStore.sites].sort((a, b) => b.visitCount - a.visitCount).slice(0, 10)
+})
+
+/** 失效站点清单（health 判定 down） */
+const deadSites = computed(() => {
+  return sitesStore.sites
+    .map(s => {
+      const h = healthStore.getStatus(s.id)
+      return h.status === 'down' ? { ...s, statusCode: h.code } : null
+    })
+    .filter(Boolean)
+})
+
+const deadProbedCount = computed(() => {
+  let n = 0
+  for (const s of sitesStore.sites) {
+    if (healthStore.getStatus(s.id).status !== 'unknown') n++
+  }
+  return n
+})
+const probingNow = computed(() => deadProbedCount.value < sitesStore.sites.length)
+const deadCount = computed(() => deadSites.value.length)
+
 const showAdd = ref(false)
 const editingSite = ref(null)
 const deletingSite = ref(null)
 const publishSectionRef = ref(null)
 const adminKey = ref(localStorage.getItem('nav_admin_key') || '')
+const webhookUrl = ref(localStorage.getItem('nav_admin_webhook') || '')
 const publishState = ref('idle')
 const publishMsg = ref('')
 
@@ -150,6 +252,10 @@ const publishMsg = ref('')
 watch(adminKey, (v) => {
   if (v) localStorage.setItem('nav_admin_key', v)
   else localStorage.removeItem('nav_admin_key')
+})
+watch(webhookUrl, (v) => {
+  if (v) localStorage.setItem('nav_admin_webhook', v)
+  else localStorage.removeItem('nav_admin_webhook')
 })
 
 function clearSavedKey() {
@@ -174,8 +280,11 @@ async function publishToCloud() {
   try {
     const res = await fetch('/api/sites', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: adminKey.value.trim(), sites: sitesStore.sites })
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${adminKey.value.trim()}`
+      },
+      body: JSON.stringify({ sites: sitesStore.sites })
     })
     const data = await res.json()
     if (!res.ok) {
@@ -185,9 +294,24 @@ async function publishToCloud() {
     }
     publishState.value = 'success'
     publishMsg.value = `发布成功！云端版本 v${data.version}，其他设备将在 30 秒内自动更新。`
+    if (webhookUrl.value.trim()) {
+      notifyWebhook(data.version, data.sites?.length || sitesStore.sites.length)
+    }
   } catch (e) {
     publishState.value = 'error'
     publishMsg.value = '发布失败：' + e.message
+  }
+}
+
+async function notifyWebhook(version, count) {
+  try {
+    await fetch(webhookUrl.value.trim(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'publish', version, count, time: new Date().toISOString() })
+    })
+  } catch {
+    // webhook 通知失败不影响发布结果，静默忽略
   }
 }
 
@@ -339,6 +463,7 @@ function doDelete() {
 .admin-publish-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6; }
 .admin-publish-desc b { color: var(--accent); }
 .admin-publish-row { display: flex; gap: 10px; }
+.admin-webhook-input { margin-top: 10px; display: block; width: 100%; box-sizing: border-box; }
 .admin-key-saved { margin-top: 8px; font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; }
 .admin-link-btn { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; text-decoration: underline; }
 .admin-key-input {
@@ -363,4 +488,45 @@ function doDelete() {
 }
 .admin-publish-msg.success { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
 .admin-publish-msg.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+
+/* ── 数据洞察 ── */
+.insight-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.insight-card {
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+.insight-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.cat-bar-label { width: 120px; flex-shrink: 0; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-bar-track { flex: 1; height: 10px; background: var(--border-light); border-radius: 5px; overflow: hidden; }
+.cat-bar-fill { height: 100%; border-radius: 5px; transition: width .3s ease; }
+.cat-bar-count { width: 28px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+.top-list { list-style: none; margin: 0; padding: 0; }
+.top-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
+.top-list li:last-child { border-bottom: none; }
+.top-rank { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 5px; background: var(--border-light); color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.top-rank.hot { background: #fef3c7; color: #b45309; }
+.top-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.top-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-url { font-size: 11px; color: var(--text-secondary); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top-count { font-size: 12px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+.dead-note { font-size: 11px; font-weight: 400; color: var(--text-secondary); }
+.dead-empty { font-size: 13px; color: #059669; padding: 6px 0; }
+.dead-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+.dead-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }
+.dead-item:last-child { border-bottom: none; }
+.dead-name { font-weight: 600; color: var(--text-primary); min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dead-url { flex: 1; color: var(--text-secondary); font-family: monospace; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dead-code { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #dc2626; background: #fef2f2; padding: 2px 8px; border-radius: 10px; }
+.dead-code.warn { color: #b45309; background: #fffbeb; }
+@media (max-width: 900px) {
+  .insight-grid { grid-template-columns: 1fr; }
+}
 </style>

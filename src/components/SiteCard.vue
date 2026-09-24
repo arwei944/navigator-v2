@@ -16,6 +16,9 @@
       <div class="card-favicon" :style="{ background: site.color }">
         <span class="favicon-fallback">{{ site.initial }}</span>
         <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+        <!-- 在线状态角标 -->
+        <span class="health-dot" :class="'health-' + healthNode"
+              :title="healthTip" @click.stop></span>
       </div>
       <div v-if="!isList" class="card-title-group">
         <div class="card-title">{{ site.name }}</div>
@@ -79,12 +82,13 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useHistoryStore } from '@/stores/history'
 import { useSidebarStore } from '@/stores/sidebar'
+import { useHealthStore } from '@/stores/health'
 
 const props = defineProps({
   site: { type: Object, required: true },
@@ -102,6 +106,21 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const historyStore = useHistoryStore()
 const sidebarStore = useSidebarStore()
+const healthStore = useHealthStore()
+
+// 在线状态角标
+const healthState = computed(() => healthStore.getStatus(props.site.id))
+const healthNode = computed(() => healthState.value.status)   // ok|limited|down|unknown
+const healthTip = computed(() => {
+  const m = { ok: '在线', limited: '限流/需验证', down: '无法访问', unknown: '状态未知' }
+  const code = healthState.value.code
+  return m[healthState.value.status] + (code ? ` (HTTP ${code})` : '')
+})
+
+// 进入视口后触发探测（避免一加载就并发打全部）
+watch(() => props.site.id, (id) => {
+  if (id) healthStore.probeSites([props.site])
+}, { immediate: true })
 
 const contextMenu = reactive({
   visible: false,
@@ -207,6 +226,24 @@ onUnmounted(() => {
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: #fff; box-sizing: border-box; }
 .card:hover .card-favicon { transform: scale(1.05); }
+
+/* 在线状态角标 */
+.health-dot {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 2px rgba(0,0,0,.35);
+  z-index: 2;
+}
+.health-ok   { background: #22c55e; }
+.health-limited { background: #f59e0b; }
+.health-down { background: #ef4444; }
+.health-unknown,
+.health-gray { background: #94a3b8; }
 .card-title-group { min-width: 0; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
 .card-url { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }

@@ -267,6 +267,10 @@ function onDragChange() {
 .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .cards-list { display: flex; flex-direction: column; gap: 8px; }
 
+/* 卡片虚拟化：离屏卡片跳过渲染（content-visibility），站点增多时滚动仍流畅 */
+.cards-grid .card { content-visibility: auto; contain-intrinsic-size: auto 200px; }
+.cards-list .card { content-visibility: auto; contain-intrinsic-size: auto 64px; }
+
 .no-results { text-align: center; padding: 60px 20px; color: var(--text-secondary); font-size: 14px; }
 .no-results svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: .3; }
 
