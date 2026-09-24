@@ -218,6 +218,22 @@ export async function headCommit() {
   return { sha, short, subject, date }
 }
 
+/** 提交历史（供历史面板） */
+export async function getLog(limit = 20) {
+  const out = await git(['log', `-${limit}`, '--pretty=%H%x1f%h%x1f%an%x1f%cI%x1f%s'], { allowNonZero: true })
+  return out.trim().split('\n').filter(Boolean).map(line => {
+    const [sha, short, author, date, subject] = line.split('\x1f')
+    return { sha, short, author, date, subject }
+  })
+}
+
+/** 远端已有提交的 SHA 集合（用于标注「已推送 / 仅本地」） */
+export async function remoteShas(upstream, limit = 300) {
+  if (!upstream) return new Set()
+  const out = await git(['log', `-${limit}`, upstream, '--pretty=%H'], { allowNonZero: true })
+  return new Set(out.trim().split('\n').filter(Boolean))
+}
+
 export async function getRemoteUrl() {
   const out = await git(['remote', 'get-url', 'origin'], { allowNonZero: true })
   return out.trim()

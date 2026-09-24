@@ -119,16 +119,40 @@
     </section>
 
     <section class="panel" id="panel-history">
-      <div class="placeholder">
-        <h3>历史面板</h3>
-        <p>提交记录与其部署状态关联 · <b>将在 M4 实现</b></p>
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="history-summary"></div>
+          <button class="btn ghost" id="btn-history-refresh">刷新</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>提交历史 · 部署关联</h3>
+        <div class="deploy-base" id="history-deploy"></div>
+        <div class="hint" id="history-note"></div>
+        <div class="commit-list" id="history-list"></div>
       </div>
     </section>
 
     <section class="panel" id="panel-data">
-      <div class="placeholder">
-        <h3>数据面板</h3>
-        <p>站点数据 diff 摘要、分类分布、完整性检查 · <b>将在 M4 实现</b></p>
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="data-summary"></div>
+          <button class="btn ghost" id="btn-data-refresh">刷新</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>数据变更摘要 · 工作区 vs HEAD</h3>
+        <div id="data-diff"></div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h3>分类分布</h3>
+          <div class="dist-list" id="data-dist"></div>
+        </div>
+        <div class="card">
+          <h3>完整性检查</h3>
+          <div id="data-integrity"></div>
+        </div>
       </div>
     </section>
   </main>

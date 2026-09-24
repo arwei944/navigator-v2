@@ -2,6 +2,8 @@
 import { $, $$, api, renderKv, clearLog, killCurrent, openStream } from './core.js'
 import { initGitPanel, refresh } from './gitpanel.js'
 import { initSyncPanel, refresh as refreshSync } from './syncpanel.js'
+import { initHistoryPanel, refresh as refreshHistory } from './historypanel.js'
+import { initDataPanel, refresh as refreshData } from './datapanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -11,6 +13,8 @@ $('#tabs').addEventListener('click', e => {
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.panel}`))
   if (btn.dataset.panel === 'changes' || btn.dataset.panel === 'commit') refresh()
   if (btn.dataset.panel === 'sync') refreshSync()
+  if (btn.dataset.panel === 'history') refreshHistory()
+  if (btn.dataset.panel === 'data') refreshData()
 })
 
 /* ---------- 概览 ---------- */
@@ -59,6 +63,8 @@ $('#btn-toggle-console').addEventListener('click', () => {
 /* ---------- 初始化 ---------- */
 initGitPanel()
 initSyncPanel()
+initHistoryPanel()
+initDataPanel()
 loadHealth()
 loadEnv()
 

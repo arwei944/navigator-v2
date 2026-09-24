@@ -127,6 +127,7 @@ body {
 }
 .chip.ok { color: var(--ok); border-color: rgba(52, 211, 153, .35); }
 .chip.warn { color: var(--warn); border-color: rgba(251, 191, 36, .35); }
+.chip.err { color: var(--err); border-color: rgba(248, 113, 113, .35); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
@@ -358,4 +359,83 @@ body.console-collapsed .log-view { display: none; }
   grid-column: 3 / -1; margin-top: 2px;
   font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
   word-break: break-all;
+}
+
+/* ---------- 历史面板 ---------- */
+/* 状态行吸顶：提交列表会超出一屏，保证刷新入口始终可达 */
+#panel-history > .card.tight,
+#panel-data > .card.tight {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bg-panel);
+}
+
+.commit-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+/* 生产部署基线：最近一次部署，作为「提交未关联」时的可见参照 */
+.deploy-base { margin-bottom: 8px; }
+.deploy-base:empty { display: none; }
+.db-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.db-title { font-size: 12.5px; font-weight: 600; }
+.db-time { font-family: var(--mono); font-size: 11.5px; color: var(--text-dim); }
+.db-sha {
+  margin-top: 4px; font-family: var(--mono); font-size: 11.5px;
+  color: var(--text-dim); word-break: break-all;
+}
+.commit-item {
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: 8px; padding: 9px 12px;
+}
+.ci-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ci-sha {
+  font-family: var(--mono); font-size: 11.5px; color: var(--accent);
+  background: rgba(91, 124, 250, .12); padding: 2px 7px; border-radius: 5px;
+  flex-shrink: 0;
+}
+.ci-subject { flex: 1; min-width: 200px; font-size: 13px; word-break: break-word; }
+.ci-badges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ci-meta {
+  display: flex; gap: 12px; flex-wrap: wrap;
+  margin-top: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--text-dim);
+}
+
+/* ---------- 数据面板 ---------- */
+.ss-cur { font-family: var(--mono); }
+.ss-cur.ok { color: var(--ok); }
+.ss-cur.warn { color: var(--warn); }
+
+.diff-groups { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.dg-row { display: grid; grid-template-columns: 72px 1fr; gap: 10px; align-items: start; }
+.dg-label {
+  font-size: 12px; color: var(--text-dim);
+  font-family: var(--mono); padding-top: 3px;
+}
+.dg-body { min-width: 0; }
+
+.dist-list { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.dist-row { display: flex; flex-direction: column; gap: 4px; }
+.dist-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.dist-name { display: flex; align-items: center; gap: 7px; font-size: 12.5px; }
+.dist-name.unknown { color: var(--warn); }
+.dist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dist-tag {
+  font-size: 10.5px; color: var(--warn);
+  border: 1px solid rgba(251, 191, 36, .35); border-radius: 4px; padding: 0 4px;
+}
+.dist-count { font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.dist-track { height: 5px; border-radius: 3px; background: var(--bg-raised); overflow: hidden; }
+.dist-bar { height: 100%; border-radius: 3px; transition: width .25s; }
+
+.int-row { padding: 7px 0; border-bottom: 1px solid var(--border); }
+.int-row:last-of-type { border-bottom: none; }
+.int-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.int-label { font-size: 12.5px; }
+.int-count {
+  font-family: var(--mono); font-size: 11.5px;
+  padding: 2px 8px; border-radius: 5px; background: var(--bg-raised); color: var(--text-dim);
+}
+.int-count.ok { color: var(--ok); }
+.int-count.warn { color: var(--warn); }
+.int-count.err { color: var(--err); }
+.int-list {
+  margin-top: 5px; font-family: var(--mono); font-size: 11.5px;
+  color: var(--text-dim); word-break: break-all; line-height: 1.6;
 }

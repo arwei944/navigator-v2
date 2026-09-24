@@ -7,6 +7,8 @@ import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as changes from './changes.mjs'
 import * as sync from './sync.mjs'
+import * as history from './history.mjs'
+import * as data from './data.mjs'
 
 export function sendJson(res, code, obj) {
   const body = JSON.stringify(obj)
@@ -127,6 +129,16 @@ export async function handleApi(req, res, path, url) {
 
   if (method === 'GET' && path === '/api/sync/deployments') {
     sendJson(res, 200, await sync.deployments(Number(url.searchParams.get('limit')) || 8))
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/history') {
+    sendJson(res, 200, await history.history({ limit: Number(url.searchParams.get('limit')) || 25 }))
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/data/report') {
+    sendJson(res, 200, data.report())
     return true
   }
 
