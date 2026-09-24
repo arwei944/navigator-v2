@@ -12,7 +12,9 @@ const SEED_SITES = JSON.parse(
 const PATHNAME = 'sites.json'
 
 async function readStored() {
-  const blob = await get(PATHNAME, { access: 'private' })
+  // useCache:false 绕过 Blob CDN 缓存：发布后首次读取即拿到最新版本，
+  // 否则 publish.mjs 的一致性轮询要 1~4 次才收敛
+  const blob = await get(PATHNAME, { access: 'private', useCache: false })
   if (!blob || !blob.stream) return null
   const text = await new Response(blob.stream).text()
   return JSON.parse(text)
