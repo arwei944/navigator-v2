@@ -8,3 +8,4 @@ dist
 !.env.example
 backups/
 tmp-payload.json
+perf-report/
