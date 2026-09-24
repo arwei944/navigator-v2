@@ -56,6 +56,10 @@ export default async function handler(req, res) {
       return
     }
 
+    // 鉴权走请求头，不在请求体明文携带管理密钥
+    const auth = (req.headers && req.headers.authorization) || ''
+    const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : auth.trim()
+
     let body
     if (typeof req.body === 'string') {
       body = JSON.parse(req.body)
@@ -64,9 +68,9 @@ export default async function handler(req, res) {
     } else {
       body = req.body
     }
-    const { key, sites } = body
+    const { sites } = body
 
-    if (key !== adminKey) {
+    if (token !== adminKey) {
       res.status(401).json({ error: 'Unauthorized' })
       return
     }
