@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { versionedPersist } from '@/utils/storeVersioning'
 
 export const useFavoritesStore = defineStore('favorites', () => {
   const favoriteIds = ref([])
@@ -20,7 +21,11 @@ export const useFavoritesStore = defineStore('favorites', () => {
     return favoriteIds.value.includes(id)
   }
 
-  return { favoriteIds, isFavorite, count, toggle, isFav }
+  function add(id) {
+    if (!favoriteIds.value.includes(id)) favoriteIds.value.push(id)
+  }
+
+  return { favoriteIds, isFavorite, count, toggle, isFav, add }
 }, {
-  persist: true
+  persist: versionedPersist('favorites')
 })

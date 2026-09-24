@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { versionedPersist } from '@/utils/storeVersioning'
 
 export const useHistoryStore = defineStore('history', () => {
   const records = ref([])
@@ -14,6 +15,13 @@ export const useHistoryStore = defineStore('history', () => {
 
   function clear() {
     records.value = []
+  }
+
+  function addRawRecord(r) {
+    if (!r || r.siteId === undefined) return
+    if (records.value.some(x => x.siteId === r.siteId)) return
+    records.value.push(r)
+    if (records.value.length > 50) records.value = records.value.slice(0, 50)
   }
 
   function getRecentSites(sites) {
@@ -31,7 +39,7 @@ export const useHistoryStore = defineStore('history', () => {
     return found ? found.timestamp : null
   }
 
-  return { records, addRecord, clear, getRecentSites, getLastVisitTime }
+  return { records, addRecord, addRawRecord, clear, getRecentSites, getLastVisitTime }
 }, {
-  persist: true
+  persist: versionedPersist('history')
 })

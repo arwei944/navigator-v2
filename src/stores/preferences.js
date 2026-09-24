@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { versionedPersist } from '@/utils/storeVersioning'
 
 const THEME_PRESETS = {
   'default': {
@@ -147,7 +148,5 @@ export const usePreferencesStore = defineStore('preferences', () => {
     setThemePreset, setWallpaper, THEME_PRESETS
   }
 }, {
-  persist: {
-    pick: ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur']
-  }
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur'])
 })

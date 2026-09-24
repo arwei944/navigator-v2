@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { versionedPersist } from '@/utils/storeVersioning'
 
 export const useSidebarStore = defineStore('sidebar', () => {
   const open = ref(false)
@@ -26,7 +27,5 @@ export const useSidebarStore = defineStore('sidebar', () => {
     setHoveredSite, clearHoveredSite
   }
 }, {
-  persist: {
-    pick: ['width', 'collapsed', 'rightCollapsed']
-  }
+  persist: versionedPersist('sidebar', ['width', 'collapsed', 'rightCollapsed'])
 })
