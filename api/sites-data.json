@@ -458,8 +458,7 @@
     "sortOrder": 33,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/l1.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "l2",
@@ -1186,8 +1185,7 @@
     "sortOrder": 85,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/ch6.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "ch7",
@@ -1368,8 +1366,8 @@
     "sortOrder": 98,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/nf4.svg"
+    "updatedAt": 1790306706289,
+    "icon": "icons/nf4.png"
   },
   {
     "id": "sc1",
@@ -1495,7 +1493,7 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1789881991356,
-    "icon": "icons/md5.svg"
+    "icon": "icons/md5.ico"
   },
   {
     "id": "md6",
@@ -2166,8 +2164,7 @@
     "sortOrder": 155,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/df8.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "df9",
@@ -2236,8 +2233,7 @@
     "sortOrder": 160,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/dt13.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "dt14",
@@ -2656,8 +2652,8 @@
     "sortOrder": 190,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/fd6.svg"
+    "updatedAt": 1790306876649,
+    "icon": "icons/fd6.png"
   },
   {
     "id": "fd7",
@@ -2880,8 +2876,7 @@
     "sortOrder": 206,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/sm3.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "sm4",
@@ -3034,8 +3029,7 @@
     "sortOrder": 217,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000,
-    "icon": "icons/bs3.svg"
+    "updatedAt": 1787184000000
   },
   {
     "id": "fd9",
@@ -3384,8 +3378,8 @@
     "sortOrder": 242,
     "visitCount": 0,
     "createdAt": 1787508586045,
-    "updatedAt": 1787508586050,
-    "icon": "icons/dt17.svg"
+    "updatedAt": 1790305625066,
+    "icon": "icons/dt17.jpg"
   },
   {
     "id": "aiapi12",
@@ -3706,8 +3700,7 @@
     "sortOrder": 265,
     "visitCount": 0,
     "createdAt": 1788183404767,
-    "updatedAt": 1788183404771,
-    "icon": "icons/acc3.svg"
+    "updatedAt": 1788183404771
   },
   {
     "id": "bs8",
@@ -3875,7 +3868,7 @@
     "visitCount": 0,
     "createdAt": 1788566113651,
     "updatedAt": 1788566113657,
-    "icon": "icons/dt26.svg"
+    "icon": "icons/dt26.png"
   },
   {
     "id": "dt27",
@@ -4028,8 +4021,7 @@
     "sortOrder": 288,
     "visitCount": 0,
     "createdAt": 1789336337140,
-    "updatedAt": 1789336337145,
-    "icon": "icons/pj1.svg"
+    "updatedAt": 1789336337145
   },
   {
     "id": "ac14",
@@ -4042,8 +4034,7 @@
     "sortOrder": 289,
     "visitCount": 0,
     "createdAt": 1789428462821,
-    "updatedAt": 1789428462821,
-    "icon": "icons/ac14.svg"
+    "updatedAt": 1789428462821
   },
   {
     "id": "s12",

@@ -42,23 +42,44 @@ function pickDesc(html) {
   return ''
 }
 
+/**
+ * 取标签属性值，按定界引号配对。
+ * 不能用 `[^"']+`：内联 SVG 的 href 值是双引号包裹、内部含单引号
+ * （`href="data:image/svg+xml,%3Csvg xmlns='…'"`），会从第一个单引号处被截断。
+ */
+function attrValue(tag, name) {
+  const quoted = tag.match(new RegExp(name + "\\s*=\\s*([\"'])([\\s\\S]*?)\\1", 'i'))
+  if (quoted) return quoted[2]
+  const bare = tag.match(new RegExp(name + '\\s*=\\s*([^\\s>]+)', 'i'))
+  return bare ? bare[1] : ''
+}
+
+/**
+ * 解析 `<link rel="icon">` 的 href：
+ * - `data:,`（example.com 等用它抑制 favicon 请求）等于没声明，需继续回退
+ * - `data:image/svg+xml,<svg…>` 是真实内联图标，直接返回给前端预览
+ */
+function resolveIconHref(href, base) {
+  const h = String(href || '').trim()
+  if (!h) return ''
+  if (h.startsWith('data:')) {
+    const comma = h.indexOf(',')
+    if (comma < 0 || !/^image\//i.test(h.slice(5, comma))) return ''
+    return h.slice(comma + 1).trim() ? h : ''
+  }
+  try { return new URL(h, base).href } catch { return '' }
+}
+
 function pickFavicon(html, base) {
   // 优先高分辨率 apple-touch-icon，其次标准 icon，最后 /favicon.ico
   const apple = html.match(/<link[^>]+rel=["'][^"']*(?:apple-touch-icon|mask-icon)[^"']*["'][^>]*>/i)
   if (apple) {
-    const h = apple[0].match(/href=["']([^"']+)["']/i)
-    if (h && h[1]) {
-      try { return new URL(h[1], base).href } catch { /* next */ }
-    }
+    const href = resolveIconHref(attrValue(apple[0], 'href'), base)
+    if (href) return href
   }
-  const links = [...html.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)]
-  for (const l of links) {
-    const href = l[0].match(/href=["']([^"']+)["']/i)
-    if (href && href[1]) {
-      try {
-        return new URL(href[1], base).href
-      } catch { /* next */ }
-    }
+  for (const l of html.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)) {
+    const href = resolveIconHref(attrValue(l[0], 'href'), base)
+    if (href) return href
   }
   return new URL('/favicon.ico', base).href
 }
