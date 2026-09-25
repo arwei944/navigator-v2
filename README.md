@@ -115,6 +115,7 @@ pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知
 | 面板 | 能力 |
 |------|------|
 | 概览 | 运行环境、环境变量是否就绪、SSE 与子进程日志管道自检 |
+| 站点 | 站点增删改（写 `api/sites-data.json`）、元信息抓取、图标抓取落盘、一键同步云端（提交→推送→备份→门禁→热更新→收敛） |
 | 改动 | 文件列表（含增删行数）、单文件 diff 行级高亮、暂存 / 取消暂存 |
 | 提交 | 规则式变更摘要 + 建议提交消息（Conventional Commits）、提交 / 提交并推送 / 预演推送 |
 | 同步 | 一键发布全链路时间线（检查→提交→推送→备份→门禁→构建→部署→热更新→验证）、云端版本对比 |
@@ -126,6 +127,7 @@ pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知
 - **单一发布入口**：控制台不重复实现发布逻辑，只编排并可视化 `scripts/publish.mjs`，避免两套发布链路漂移
 - **零新增依赖**：Git 操作直接封装 `git` CLI（放弃 `simple-git`），HTTP 用 `node:http`，实时推送用 SSE（原生断线重连）
 - **安全边界**：仅监听回环地址；写操作校验同源 + 自定义请求头 `X-Nav-Console`，阻断跨站伪造；管理密钥不落盘、不回显
+- **图标宁缺勿错**：图标来源依次为「页面声明 → `/favicon.ico` → `favicon.im`」；`data:,`（抑制请求）视为未声明，`data:image/…` 内联图标则本地解码落盘，并识别拒收 `favicon.im` 的灰色占位图，避免把假图标落盘（无图标时前端回落为分类色首字母块）
 
 ## CI/CD
 
@@ -173,8 +175,8 @@ nav-v2/
 ├── tools/
 │   └── console/           # 本地运维控制台（仅 127.0.0.1，绝不可部署）
 │       ├── server.mjs     # node:http 入口 + SSE 端点
-│       ├── lib/           # git / jobs / changes / sync / vercel / history / data
-│       └── ui/            # 单页 UI（6 个面板，零框架依赖）
+│       ├── lib/           # git / jobs / changes / sync / vercel / history / data / sites
+│       └── ui/            # 单页 UI（7 个面板，零框架依赖）
 ├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
 ├── src/

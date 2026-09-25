@@ -850,8 +850,9 @@ npm run icons        # 抓取/补抓 favicon
 | M4 摘要 + 历史 | `lib/changes.mjs`（规则式 diff + 建议消息）、`lib/history.mjs`（提交×部署关联）、`lib/data.mjs`（数据体检）、`ui/historypanel.js`、`ui/datapanel.js` |
 | M5 CI/CD | `.github/workflows/ci.yml`（validate + build 门禁）、`.github/workflows/release-please.yml`、`release-please-config.json`、`.release-please-manifest.json` |
 | M6 透明增强 | `api/sites.js` 的 `useCache: false` 修复、README/HANDOVER 更新 |
+| M7 站点管理 | `tools/console/lib/sites.mjs`（站点 CRUD + 元信息抓取 + 图标下载 + 云端同步编排）、`tools/console/ui/sitespanel.js`、`api/sites/list|meta|add|update|remove|icon|sync` 路由、`server.mjs` 的 `/icons/` 静态服务 |
 
-控制台 6 个面板：概览 / 改动 / 提交 / 同步 / 历史 / 数据。
+控制台 7 个面板：概览 / 站点 / 改动 / 提交 / 同步 / 历史 / 数据。
 
 ### 21.3 关键实现要点
 
@@ -878,3 +879,62 @@ npm run icons        # 抓取/补抓 favicon
 3. 新开标签页复测，控制台**零消息**
 
 根因是排查过程中多次重启控制台服务，浏览器控制台缓冲区保留了重启窗口期的陈旧条目（且报错行号指向 `gitpanel.js:243` 的右花括号，并非网络调用点）。**结论：控制台消息缓冲跨导航保留，排查时须以新标签页为准。**
+
+### 21.6 M7 站点管理闭环（2026-09-25）
+
+**诉求**：在前端页面「添加站点」后，新站点只进浏览器 `localStorage`，必须切回前端才能入库；且云端生效依赖人工跑发布脚本。要求「在控制台上添加网站后能实时同步到远程服务器」。
+
+**闭环**（控制台「站点」面板）：
+
+```
+新增/编辑/删除 → 写 api/sites-data.json（原子写 tmp+rename）
+抓取元信息     → curl.exe 抓标题/描述/图标 + 分类建议（多编码回退）
+抓取图标       → 页面声明 → /favicon.ico → favicon.im 兜底 → public/icons/<id>.<ext>
+一键同步云端   → 差异检查 → 提交（仅数据+图标）→ 推送 → 备份 → schema 门禁 → Blob 热更新 → 轮询收敛
+```
+
+**沿用的项目口径**（避免第二套标准）：id 前缀沿用该分类既有前缀、序号全局递增；`sortOrder` 取全局最大 +1；`url` 只存域名；写盘 2 空格缩进 + 末尾换行；热更新复用 `/api/sites` + `Authorization: Bearer`。
+
+**关键实现要点**：
+
+- **提交范围收敛**：同步只 `stage` `api/sites-data.json` 与 `public/icons/*`，不裹挟工作区其他改动
+- **图标可预览**：`server.mjs` 新增 `/icons/` 静态服务（复用仓库 `public/icons`），面板内直接看到本地图标
+- **`hostOf` 需兼容裸域名**：数据里存的是无协议域名，`data.mjs#hostOf` 补全 `https://` 后再解析，否则域名查重失效
+- **分类建议表与前端同源**：`sites.mjs` 的 `CATEGORY_HINTS` 与 `AddSiteModal.vue` 保持一致；两处均已修正 `design` 的 `ui` 误匹配（"b**ui**ld" 曾把 github.com 判成设计类）
+
+**验收结果（本地 + 浏览器实测）**：
+
+- 站点增删改：新增 → 落盘 `pj4`/`sortOrder 299`/继承分类色 → 删除后 `api/sites-data.json` 与 HEAD **零差异**（298 条）
+- 图标双路径：`example.org`（无真实图标）→ 任务 `failed`、**0 文件落盘**；`vuejs.org` → 任务 `success`、落盘真实 Vue logo SVG
+- 浏览器：站点面板 298 行渲染正常，搜索 `github`→3 条、分类 `coding`→16 条，新增表单可开可关，**控制台零报错**
+
+**发现并修复的三个图标陷阱**（`sites.mjs` + `fetch-favicons.mjs` + `api/metadata.js` 三侧同步加固）：
+
+1. `data:` 图标：`example.com` 等用 `<link rel="icon" href="data:,">` 抑制请求，原实现把它当图标地址返回 → 前端破图。现按「未声明」处理继续回退。
+2. `favicon.im` 占位图：查不到的域名返回 **200 + 灰圆斜体 `f` 的 SVG**（257B，格式合法），会被当真实图标落盘。全站排查 **14 个站点**中招（含迁移时重抓的 `md5`）→ 现识别并拒收，宁缺勿错。
+3. **内联 SVG 被引号截断**：`tapeout.link` 等把图标写成 `href="data:image/svg+xml,%3Csvg xmlns='…'"`——值由双引号包裹、内部含单引号，而取值正则用的是 `[^"']+`，会从第一个单引号处截断，解出 `"<svg xmlns="` 共 **11 字节的坏文件**（`ac15.svg` 即由此产生）。现统一改为**按定界引号配对**的 `attrValue()`，并把 `data:image/…` 视为真实内联图标、由 `decodeDataUri()` 本地解码落盘（不再交给 curl）。
+
+### 21.7 图标清理收口（2026-09-25）
+
+**结果**：占位图标已全量清理，`public/icons` 无占位图、无孤儿、无悬空引用。
+
+| 项 | 数量 | 说明 |
+|----|------|------|
+| 删除的占位图标文件 | 14 | `ac14/acc3/bs3/ch6/df8/dt13/dt17/dt26/fd6/l1/md5/nf4/pj1/sm3` 的占位 SVG |
+| 重抓成功（换真实图标） | 5 | `dt17.jpg`、`dt26.png`、`md5.ico`、`nf4.png`（LooksRare）、`fd6.png`（CoinList） |
+| 修复的坏文件 | 1 | `ac15.svg` 11B 坏文件 → 354B 真实内联 SVG（芯片图标） |
+| 清理的孤儿文件 | 2 | `p1.ico`（learnprompting.com→.org 迁移遗留）、`l6.png`（已被 `l6.ico` 取代） |
+| 确认无真实图标 | 9 | `ac14/pj1/acc3/bs3/sm3/dt13/df8/ch6/l1` |
+
+**9 个站点确认拿不到真实图标**（逐个核验：页面无任何 `rel=icon` 声明、`/favicon.ico` 返回 404/SPA 兜底 HTML、Google s2 与 gstatic 均返回默认地球占位图）：
+
+- `ac14` tradingkit.com / `pj1` kking2020.com / `acc3` chejiu888.online / `bs3` 三毛机场 —— 首页无图标声明
+- `dt13` ops.mangoslab.xyz —— `/favicon.ico` 返回 FastAPI 404 JSON
+- `df8` venus.io —— 全站 SPA rewrite，任何图标路径都返回 `index.html`
+- `ch6` zapper.fi —— 已 302 到 `zapper.xyz`，Cloudflare 挑战页拦截（403）
+- `l1` fast.ai —— 首页 252KB 无任何图标声明，`/favicon.ico` 与 `/images/favicon.ico` 均 404
+- `sm3` xtemporary.com —— 域名已失效（SSL 握手失败），此前用户选择保留
+
+处理方式：**清空 `icon` 字段**（不写空串、直接删键），前端 `SiteCard.vue` 回落为「分类色块 + 首字母」（`@error` 亦会摘掉加载失败的 `<img>`），不会出现破图或假图标。
+
+**验收**：`npm run validate` 通过（9 条 `缺少 icon` 为预期警告）；图标文件 289 个，占位图 0 / 孤儿 0 / 悬空引用 0；`api/sites-data.json` 相对 HEAD 仅 **14 条** `icon` 字段变化（9 条清空 + 5 条换真实图标），无增删站点。

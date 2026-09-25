@@ -107,7 +107,7 @@ nav-v2/
 └── .github/workflows/ci.yml # CI 门禁（M5）
 ```
 
-### 4.4 五大面板
+### 4.4 六大面板
 
 | 面板 | 内容 | 对应维度 |
 |------|------|---------|
@@ -116,6 +116,7 @@ nav-v2/
 | **同步** | 端到端时间线：`本地改动 → 提交 → 推送 → Vercel 部署（含状态机）→ Blob 热更新 → 一致性验证`；每步状态 + 耗时 + 可展开原始日志 | 透明 |
 | **历史** | 最近 N 条提交 + 每条关联的部署状态与 commit SHA（`withGitRepoInfo`） | 透明 |
 | **数据** | 站点数据 diff 摘要、分类分布、图标缺失、`sortOrder` 重复/空洞检查 | 智能 |
+| **站点**（M7） | 站点增删改 + 元信息抓取 + 图标抓取 + 一键同步云端（提交→推送→备份→门禁→热更新→收敛） | 自动化 |
 
 ### 4.5 接口设计
 
@@ -131,6 +132,11 @@ nav-v2/
 | GET | `/api/sync/status` | 本地版本 / 云端版本 / 最近部署状态 |
 | POST | `/api/sync/publish` | 触发全链路发布（流式日志） |
 | GET | `/api/history` | 最近提交 + 部署状态 |
+| GET | `/api/sites/list?q=&category=` | 站点列表（含分类标签/配色、未登记分类与缺图标标记） |
+| GET | `/api/sites/meta?url=` | 抓取标题/描述/图标地址 + 分类建议 |
+| POST | `/api/sites/add` \| `update` \| `remove` | 站点增 / 改 / 删（写本地 `api/sites-data.json`） |
+| POST | `/api/sites/icon` | 抓取并落盘站点图标（流式日志） |
+| POST | `/api/sites/sync` | 一键同步站点数据到云端（时间线：差异检查→提交→推送→备份→门禁→热更新→收敛） |
 | GET | `/api/events?job=<id>` | **SSE** 实时日志流 |
 
 ### 4.6 实时日志实现要点
@@ -224,6 +230,35 @@ const blob = await get(PATHNAME, { access: 'private', useCache: false })
 
 现有 `validate-data.mjs` 为手写校验。可升级为 zod v4 schema，获得更可读的报错与类型推断；保留现有 CLI 形态，不改调用方。
 
+### 6.4 站点管理闭环（M7）
+
+原先前端「添加站点」后，新站点只落在浏览器 `localStorage`，必须切回前端页面才能入库，且云端生效依赖人工跑发布脚本。M7 把这条链路收进控制台：
+
+```
+控制台「站点」面板
+  新增/编辑/删除  →  写 api/sites-data.json（原子写：tmp + rename）
+  抓取元信息      →  curl.exe 抓标题/描述/图标 + 分类建议（多编码回退 utf-8→gb18030→big5）
+  抓取图标        →  页面声明 → /favicon.ico → favicon.im 兜底，落盘 public/icons/<id>.<ext>
+  一键同步云端    →  差异检查 → 提交（仅数据文件与图标）→ 推送 → 备份 → schema 门禁 → Blob 热更新 → 轮询收敛
+```
+
+沿用既有约定，避免产生第二套口径：
+
+- **id 前缀**沿用该分类既有站点的字母前缀，序号全局递增（`pj3` → `pj4`）
+- **`sortOrder`** 取全局最大值 +1，维持跨分类递增序列
+- **`url` 只存域名**，去协议/查询串/尾斜杠（与 `AddSiteModal` 一致）
+- **写盘 2 空格缩进 + 末尾换行**，避免无关 diff
+- **热更新复用 `/api/sites` 与 `Authorization: Bearer <key>`**，与 `publish.mjs` 同一入口与鉴权方式
+- **网络请求一律走 `curl.exe`**（本机 Node fetch 不走系统代理）
+
+三个实测踩到的坑（已修）：
+
+1. **`data:` 图标陷阱**：部分站点用 `<link rel="icon" href="data:,">` 抑制 favicon 请求（如 `example.com`），原实现会把这个无意义值当成图标地址返回，前端预览破图。现统一按「未声明」处理，继续回退到 `/favicon.ico`。
+2. **`favicon.im` 占位图陷阱**：该服务对查不到图标的域名返回 **200 + 灰色圆底斜体 `f` 的 SVG**，格式合法、体积仅 257B，会被当成真图标落盘。全站排查发现 **14 个站点**中招（含域名迁移时"重新抓取"的 `md5`）。现于 `tools/console/lib/sites.mjs` 与 `scripts/fetch-favicons.mjs` 双侧加入占位图识别并拒收，宁缺勿错（无图标时前端回落为分类色首字母块）。
+3. **内联 SVG 被引号截断**：站点把图标写成 `href="data:image/svg+xml,%3Csvg xmlns='…'"`——值由双引号包裹、内部含单引号，而属性取值正则用 `[^"']+`，会从第一个单引号处截断，解出 `"<svg xmlns="` 这个 **11 字节的坏文件**（`ac15.svg` 即由此产生）。现三处（`sites.mjs` / `scripts/fetch-favicons.mjs` / `api/metadata.js`）统一改用**按定界引号配对**的 `attrValue()`，并将 `data:image/…` 视为真实内联图标、由 `decodeDataUri()` 本地解码落盘。
+
+图标清理收口结果：14 个占位图标已删、5 个重抓为真实图标、1 个坏文件修复、2 个孤儿文件清理；余 **9 个站点确认拿不到真实图标**（页面无声明 + `/favicon.ico` 404/SPA 兜底 + Google s2/gstatic 均为默认地球占位图），已清空 `icon` 字段由前端回落为分类色首字母块。
+
 ---
 
 ## 七、里程碑与验收标准
@@ -237,8 +272,9 @@ const blob = await get(PATHNAME, { access: 'private', useCache: false })
 | **M4 摘要 + 历史** | 规则式变更摘要 + 历史/部署关联 | 提交前可见数据 diff 摘要与建议消息；历史面板显示提交与其部署状态 | 2h |
 | **M5 CI/CD** | `.github/workflows/ci.yml` + release-please | push/PR 自动跑校验+构建；合并后自动产出版本与 CHANGELOG | 2h |
 | **M6 透明增强** | `useCache:false` 修复 + 文档 | 发布后**首次**轮询即收敛；README/HANDOVER 更新 | 1h |
+| **M7 站点管理** | 控制台内增删改站点 + 图标抓取 + 一键同步云端 | 控制台内可"新增站点→本地落盘→云端热更新→收敛"闭环，无需回前端页面 | 3h |
 
-**执行顺序**：严格串行 M0 → M1 → M2 → M3 → M4 → M5 → M6，每个里程碑完成后验证通过再进入下一个。
+**执行顺序**：严格串行 M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7，每个里程碑完成后验证通过再进入下一个。
 
 ---
 
