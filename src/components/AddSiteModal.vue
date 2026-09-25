@@ -88,8 +88,8 @@ const CATEGORY_HINTS = [
   { re: /nft|opensea|magic.?eden|collectible/i, cat: 'nft' },
   { re: /security|audit|hack|vuln/i, cat: 'security' },
   { re: /etherscan|blockchain|explorer|chain/i, cat: 'chain' },
-  { re: /dribbble|behance|figma|design|ui/i, cat: 'design' },
   { re: /github|gitlab|code|coding|developer|deploy/i, cat: 'coding' },
+  { re: /dribbble|behance|figma|design|\bui\b|ui[-_ ]?kit/i, cat: 'design' },
   { re: /learn|course|tutorial|school|prompt/i, cat: 'learning' },
   { re: /airdrop|earn/i, cat: 'airdrop' },
   { re: /media|news|feed|blog/i, cat: 'media' }

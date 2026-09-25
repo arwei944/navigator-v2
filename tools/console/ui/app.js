@@ -4,6 +4,7 @@ import { initGitPanel, refresh } from './gitpanel.js'
 import { initSyncPanel, refresh as refreshSync } from './syncpanel.js'
 import { initHistoryPanel, refresh as refreshHistory } from './historypanel.js'
 import { initDataPanel, refresh as refreshData } from './datapanel.js'
+import { initSitesPanel, refresh as refreshSites } from './sitespanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -11,6 +12,7 @@ $('#tabs').addEventListener('click', e => {
   if (!btn) return
   $$('.tab').forEach(t => t.classList.toggle('active', t === btn))
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.panel}`))
+  if (btn.dataset.panel === 'sites') refreshSites()
   if (btn.dataset.panel === 'changes' || btn.dataset.panel === 'commit') refresh()
   if (btn.dataset.panel === 'sync') refreshSync()
   if (btn.dataset.panel === 'history') refreshHistory()
@@ -65,6 +67,7 @@ initGitPanel()
 initSyncPanel()
 initHistoryPanel()
 initDataPanel()
+initSitesPanel()
 loadHealth()
 loadEnv()
 

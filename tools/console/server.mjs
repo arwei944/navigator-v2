@@ -21,6 +21,7 @@ const args = parseArgs({
 })
 const START_PORT = Number(args.values.port) || 5175
 const UI_DIR = join(ROOT, 'tools', 'console', 'ui')
+const ICON_DIR = join(ROOT, 'public', 'icons')
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -29,13 +30,18 @@ const MIME = {
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.avif': 'image/avif',
 }
 
-async function serveStatic(res, urlPath) {
-  const rel = urlPath === '/' ? 'index.html' : urlPath.replace(/^\/ui\//, '')
-  const target = normalize(join(UI_DIR, rel))
-  // 防目录穿越：解析后的路径必须仍在 UI 目录内
-  if (!target.startsWith(UI_DIR + sep) && target !== UI_DIR) {
+/** 静态文件服务：解析后的路径必须仍在该目录内，防目录穿越 */
+async function serveFrom(res, baseDir, rel) {
+  const target = normalize(join(baseDir, rel))
+  if (!target.startsWith(baseDir + sep) && target !== baseDir) {
     sendJson(res, 403, { error: 'Forbidden' })
     return
   }
@@ -78,8 +84,19 @@ const server = createServer(async (req, res) => {
   const path = url.pathname
 
   try {
-    if (req.method === 'GET' && (path === '/' || path.startsWith('/ui/'))) {
-      await serveStatic(res, path)
+    if (req.method === 'GET' && path === '/') {
+      await serveFrom(res, UI_DIR, 'index.html')
+      return
+    }
+
+    if (req.method === 'GET' && path.startsWith('/ui/')) {
+      await serveFrom(res, UI_DIR, path.replace(/^\/ui\//, ''))
+      return
+    }
+
+    // 站点图标：直接复用仓库 public/icons，使面板内可预览本地图标
+    if (req.method === 'GET' && path.startsWith('/icons/')) {
+      await serveFrom(res, ICON_DIR, path.replace(/^\/icons\//, ''))
       return
     }
 

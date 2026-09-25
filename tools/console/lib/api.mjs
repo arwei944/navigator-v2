@@ -9,6 +9,7 @@ import * as changes from './changes.mjs'
 import * as sync from './sync.mjs'
 import * as history from './history.mjs'
 import * as data from './data.mjs'
+import * as sites from './sites.mjs'
 
 export function sendJson(res, code, obj) {
   const body = JSON.stringify(obj)
@@ -56,6 +57,24 @@ const timer = setInterval(() => {
 }, 350)
 `
   jobs.run(job, process.execPath, ['-e', script], { cwd: ROOT })
+  return job
+}
+
+/** 抓取单个站点图标（多来源兜底，耗时不定，走任务 + SSE） */
+function startIconFetch(id, faviconUrl) {
+  const job = jobs.createJob(`抓取图标 ${id}`)
+  ;(async () => {
+    jobs.log(job, `开始抓取 ${id} 的图标（页面声明 → /favicon.ico → favicon.im）`, 'info')
+    try {
+      const r = await sites.downloadIcon(id, { faviconUrl })
+      jobs.emitEvent(job, 'icon', r)
+      jobs.log(job, `✅ 已保存 ${r.icon}（${(r.bytes / 1024).toFixed(1)} KB，来源 ${r.source}）`, 'success')
+      jobs.finish(job, 0)
+    } catch (e) {
+      jobs.log(job, `❌ ${e.message}`, 'stderr')
+      jobs.finish(job, -1)
+    }
+  })()
   return job
 }
 
@@ -142,6 +161,23 @@ export async function handleApi(req, res, path, url) {
     return true
   }
 
+  if (method === 'GET' && path === '/api/sites/list') {
+    sendJson(res, 200, sites.list({
+      q: url.searchParams.get('q') || '',
+      category: url.searchParams.get('category') || '',
+    }))
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/sites/meta') {
+    try {
+      sendJson(res, 200, await sites.fetchMeta(url.searchParams.get('url') || ''))
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
   if (method === 'POST') {
     if (!isTrusted(req)) {
       sendJson(res, 403, { error: '请求来源不受信任（缺少 X-Nav-Console 头或跨站来源）' })
@@ -213,6 +249,59 @@ export async function handleApi(req, res, path, url) {
         tries: Number(body.tries) || 6,
       })
       sendJson(res, 200, { jobId: job.id })
+      return true
+    }
+
+    if (path === '/api/sites/add') {
+      const body = await readJsonBody(req)
+      try {
+        sendJson(res, 200, { ok: true, site: sites.addSite(body) })
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
+    if (path === '/api/sites/update') {
+      const body = await readJsonBody(req)
+      try {
+        sendJson(res, 200, { ok: true, site: sites.updateSite(body.id, body.patch || {}) })
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
+    if (path === '/api/sites/remove') {
+      const body = await readJsonBody(req)
+      try {
+        sendJson(res, 200, { ok: true, site: sites.removeSite(body.id) })
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
+    if (path === '/api/sites/icon') {
+      const body = await readJsonBody(req)
+      if (!body.id) { sendJson(res, 400, { error: '缺少 id' }); return true }
+      const job = startIconFetch(body.id, body.faviconUrl || '')
+      sendJson(res, 200, { jobId: job.id })
+      return true
+    }
+
+    if (path === '/api/sites/sync') {
+      const body = await readJsonBody(req)
+      try {
+        const job = sites.startDataSync({
+          commit: body.commit !== false,
+          push: body.push !== false,
+          message: body.message,
+        })
+        sendJson(res, 200, { jobId: job.id, steps: job.steps.map(s => s.key) })
+      } catch (e) {
+        sendJson(res, 409, { error: e.message })
+      }
       return true
     }
   }

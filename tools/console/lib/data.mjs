@@ -9,24 +9,44 @@ import { ROOT } from './env.mjs'
 const SITES_FILE = 'api/sites-data.json'
 const CATEGORY_FILE = 'src/stores/categories.js'
 
-function readSites() {
+export function readSites() {
   return JSON.parse(readFileSync(join(ROOT, SITES_FILE), 'utf-8'))
 }
 
-/** 从分类 store 源码提取 id/标签/圆点色（该文件结构稳定，正则足够且不引入构建依赖） */
-function readCategoryMeta() {
+/**
+ * 从分类 store 源码解析分组结构（该文件结构稳定，正则足够且不引入构建依赖）。
+ * 先定位分组对象（含 collapsed 字段），再在分组区间内提取分类项，避免两类对象混淆。
+ */
+export function categoryGroups() {
   const file = join(ROOT, CATEGORY_FILE)
-  if (!existsSync(file)) return {}
+  if (!existsSync(file)) return []
   const text = readFileSync(file, 'utf-8')
+  const heads = [...text.matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']+)',\s*collapsed:/g)]
+  return heads.map((h, i) => {
+    const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : text.length)
+    const categories = [...body.matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']+)',\s*dotColor:\s*'([^']+)'\s*\}/g)]
+      .map(m => ({ id: m[1], label: m[2], color: m[3] }))
+    return { id: h[1], label: h[2], categories }
+  })
+}
+
+/** 扁平分类元信息：id -> { label, color, group } */
+export function readCategoryMeta() {
   const map = {}
-  const re = /\{\s*id:\s*'([^']+)',\s*label:\s*'([^']+)',\s*dotColor:\s*'([^']+)'\s*\}/g
-  let m
-  while ((m = re.exec(text))) map[m[1]] = { label: m[2], color: m[3] }
+  for (const g of categoryGroups()) {
+    for (const c of g.categories) map[c.id] = { label: c.label, color: c.color, group: g.label }
+  }
   return map
 }
 
-function hostOf(url) {
-  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return '' }
+/** 取主机名做去重比较：数据里存的是裸域名（无协议），需兼容补全后再解析 */
+export function hostOf(url) {
+  const raw = String(url || '').trim()
+  if (!raw) return ''
+  try {
+    const u = new URL(raw.includes('://') ? raw : 'https://' + raw)
+    return u.hostname.replace(/^www\./, '').toLowerCase()
+  } catch { return '' }
 }
 
 export function report() {

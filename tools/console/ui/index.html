@@ -18,6 +18,7 @@
 
   <nav class="tabs" id="tabs">
     <button class="tab active" data-panel="overview">概览</button>
+    <button class="tab" data-panel="sites">站点</button>
     <button class="tab" data-panel="changes">改动</button>
     <button class="tab" data-panel="commit">提交</button>
     <button class="tab" data-panel="sync">同步</button>
@@ -42,6 +43,61 @@
         <h3>控制台自检</h3>
         <p class="hint">验证 SSE 实时通道与子进程日志管道是否正常。</p>
         <button class="btn primary" id="btn-selfcheck">运行自检</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-sites">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="sites-summary"></div>
+          <div class="row-actions">
+            <input class="msg-input mini" id="sites-search" placeholder="搜索名称 / 域名 / id">
+            <select class="msg-input mini" id="sites-filter"></select>
+            <button class="btn ghost" id="btn-sites-refresh">刷新</button>
+            <button class="btn primary" id="btn-sites-new">新增站点</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="sites-form-card" hidden>
+        <h3 id="sites-form-title">新增站点</h3>
+        <div class="site-form">
+          <label class="fld">
+            <span>站点地址 <em>（输入后点「抓取元信息」自动填充）</em></span>
+            <input class="msg-input" id="f-url" placeholder="example.com">
+          </label>
+          <label class="fld"><span>站点名称</span><input class="msg-input" id="f-name"></label>
+          <label class="fld"><span>分类</span><select class="msg-input" id="f-category"></select></label>
+          <label class="fld"><span>配色</span><input type="color" class="color-input" id="f-color"></label>
+          <label class="fld wide"><span>描述</span><input class="msg-input" id="f-desc"></label>
+        </div>
+        <div class="icon-preview" id="icon-preview"></div>
+        <div class="actions">
+          <button class="btn" id="btn-fetch-meta">抓取元信息</button>
+          <button class="btn primary" id="btn-save-site">保存到本地</button>
+          <button class="btn ghost" id="btn-cancel-site">取消</button>
+          <span class="result" id="site-form-result"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>站点列表 <span class="dim" id="sites-count"></span></h3>
+        <div class="site-list" id="site-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>同步到云端 · 实时生效</h3>
+        <div class="publish-form">
+          <label class="chk"><input type="checkbox" id="sites-sync-commit" checked> 一并提交并推送代码</label>
+          <input class="msg-input" id="sites-sync-message" placeholder="提交消息（留空按数据 diff 自动生成）">
+          <button class="btn primary" id="btn-sites-sync">同步到云端</button>
+        </div>
+        <div class="result" id="sites-sync-result"></div>
+        <ol class="timeline" id="sites-timeline"></ol>
+        <p class="hint">
+          云端热更新写入 Vercel Blob，前端每 30 秒轮询，保存后点同步即可在线上生效；
+          新增的图标文件需随下次部署（<code>npm run publish</code>）上线。
+        </p>
       </div>
     </section>
 
