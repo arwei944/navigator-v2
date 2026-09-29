@@ -1,6 +1,6 @@
 /**
  * 控制台 JSON API 路由。返回 true 表示已处理。
- * 所有写操作要求同源 + 自定义请求头（X-Nav-Console），阻断跨站伪造请求。
+ * 来源校验统一在 server.mjs 入口执行（isTrusted），本模块只做路由。
  */
 import { ROOT, getAdminKey, envSummary } from './env.mjs'
 import * as jobs from './jobs.mjs'
@@ -28,16 +28,39 @@ async function readJsonBody(req) {
   try { return JSON.parse(Buffer.concat(chunks).toString('utf-8')) } catch { return {} }
 }
 
-/** 同源校验：跨站请求带自定义头会先触发预检，本服务不返回 CORS 许可即被浏览器拦截 */
-function isTrusted(req) {
+/** 回环主机名白名单（IPv6 字面量带方括号，与 URL.hostname 的输出形式一致） */
+const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+
+/** 取 Host 头的主机名部分：剥离端口，兼容 [::1]:5175 这类 IPv6 字面量 */
+function hostNameOf(req) {
+  const raw = String(req.headers.host || '').trim().toLowerCase()
+  if (!raw) return ''
+  const v6 = raw.match(/^\[([^\]]+)\](?::\d+)?$/)
+  return v6 ? v6[1] : raw.replace(/:\d+$/, '')
+}
+
+function isLoopbackOrigin(origin) {
+  try { return LOOPBACK.has(new URL(origin).hostname) } catch { return false }
+}
+
+/**
+ * 来源可信判定 —— 控制台所有请求（含静态资源与读接口）的统一入口校验。
+ *
+ * ① Host 必须是回环地址：DNS rebinding 攻击中浏览器发出的 Host 仍是攻击者域名，
+ *    仅监听 127.0.0.1 挡不住，这一条才是核心防线。
+ * ② Origin 存在时其主机名也必须是回环地址：阻断跨站页面直接调用。
+ * ③ 非 GET 的写操作额外要求自定义头 X-Nav-Console：跨站携带该头会触发预检，
+ *    而本服务不返回 CORS 许可。GET 通道（如 EventSource）无法携带请求头，由 ①② 兜底。
+ *
+ * 本机 curl / 脚本调试天然满足 ①②（Host=127.0.0.1、无 Origin）；
+ * 调写接口需自行附加 -H "X-Nav-Console: 1"。
+ */
+export function isTrusted(req) {
+  if (!LOOPBACK.has(hostNameOf(req))) return false
   const origin = req.headers.origin
-  if (origin) {
-    try {
-      const host = new URL(origin).hostname
-      if (!['127.0.0.1', 'localhost', '::1'].includes(host)) return false
-    } catch { return false }
-  }
-  return req.headers['x-nav-console'] === '1'
+  if (origin && !isLoopbackOrigin(origin)) return false
+  if (req.method !== 'GET' && req.headers['x-nav-console'] !== '1') return false
+  return true
 }
 
 /** 控制台自检任务：验证 SSE 通道与子进程日志管道 */
@@ -179,11 +202,6 @@ export async function handleApi(req, res, path, url) {
   }
 
   if (method === 'POST') {
-    if (!isTrusted(req)) {
-      sendJson(res, 403, { error: '请求来源不受信任（缺少 X-Nav-Console 头或跨站来源）' })
-      return true
-    }
-
     if (path === '/api/jobs/selfcheck') {
       const job = startSelfCheck()
       sendJson(res, 200, { jobId: job.id })

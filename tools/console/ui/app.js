@@ -1,5 +1,6 @@
-/** 控制台入口：标签切换、概览面板、日志控制台按钮 */
-import { $, $$, api, renderKv, clearLog, killCurrent, openStream } from './core.js'
+/** 控制台入口：主题、标签切换、概览面板、日志控制台按钮 */
+import { $, $$, api, renderKv, initLogConsole, openStream } from './core.js'
+import { initTheme } from './theme.js'
 import { initGitPanel, refresh } from './gitpanel.js'
 import { initSyncPanel, refresh as refreshSync } from './syncpanel.js'
 import { initHistoryPanel, refresh as refreshHistory } from './historypanel.js'
@@ -53,9 +54,6 @@ $('#btn-selfcheck').addEventListener('click', async () => {
   openStream(jobId, '控制台自检')
 })
 
-$('#btn-clear').addEventListener('click', () => clearLog())
-$('#btn-kill').addEventListener('click', () => killCurrent())
-
 // 日志区可收起，给面板腾出纵向空间
 $('#btn-toggle-console').addEventListener('click', () => {
   const collapsed = document.body.classList.toggle('console-collapsed')
@@ -63,6 +61,8 @@ $('#btn-toggle-console').addEventListener('click', () => {
 })
 
 /* ---------- 初始化 ---------- */
+initTheme()
+initLogConsole()
 initGitPanel()
 initSyncPanel()
 initHistoryPanel()

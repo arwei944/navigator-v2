@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
+import { inferSite, decodeHtmlBytes, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
 import { diffSites } from './changes.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
@@ -54,6 +55,17 @@ export function normalizeUrl(input) {
   try { u = new URL(raw) } catch { throw new Error(`站点地址无法解析：${input}`) }
   if (!['http:', 'https:'].includes(u.protocol)) throw new Error('仅支持 http/https 地址')
   return u.hostname
+}
+
+/**
+ * 抓取目标：保留用户填写的路径与协议，与线上 api/metadata.js 口径一致。
+ * 落库仍只存域名（normalizeUrl），但抓取要带路径 —— SPA 子页与带路径的站点
+ * 只有访问原地址才拿得到真实标题，一律抓根域名会退化成按域名猜。
+ */
+export function toTarget(input) {
+  const raw = String(input || '').trim()
+  if (!raw) throw new Error('请填写站点地址')
+  return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw
 }
 
 function letterPrefix(categoryId, sites) {
@@ -141,7 +153,8 @@ export function getSite(id) {
 
 /* ---------------- 增 / 改 / 删 ---------------- */
 
-export function addSite(input = {}) {
+/** dryRun=true 时只做全部校验并返回将写入的条目，不落盘（CLI --dry-run 复用同一套规则，避免预演与实写口径漂移） */
+export function addSite(input = {}, { dryRun = false } = {}) {
   const sites = loadSites()
   const meta = readCategoryMeta()
 
@@ -174,12 +187,13 @@ export function addSite(input = {}) {
   }
   if (input.icon) site.icon = input.icon
 
+  if (dryRun) return site
   sites.push(site)
   saveSites(sites)
   return site
 }
 
-export function updateSite(id, patch = {}) {
+export function updateSite(id, patch = {}, { dryRun = false } = {}) {
   const sites = loadSites()
   const idx = sites.findIndex(s => s.id === id)
   if (idx === -1) throw new Error(`站点不存在：${id}`)
@@ -206,15 +220,17 @@ export function updateSite(id, patch = {}) {
   if (patch.categoryId !== undefined && !next.color) next.color = meta[next.categoryId].color
 
   next.updatedAt = Date.now()
+  if (dryRun) return next
   sites[idx] = next
   saveSites(sites)
   return next
 }
 
-export function removeSite(id) {
+export function removeSite(id, { dryRun = false } = {}) {
   const sites = loadSites()
   const site = sites.find(s => s.id === id)
   if (!site) throw new Error(`站点不存在：${id}`)
+  if (dryRun) return site
   saveSites(sites.filter(s => s.id !== id))
   return site
 }
@@ -231,80 +247,6 @@ async function curlBuffer(url, { maxTime = 15, fail = true } = {}) {
   return stdout
 }
 
-/** 多编码回退：utf-8 → gb18030 → big5（与 api/metadata.js 同策略） */
-function decodeHtml(buf) {
-  const dec = enc => new TextDecoder(enc).decode(buf)
-  let text = dec('utf-8')
-  if (text.includes('\uFFFD')) {
-    for (const enc of ['gb18030', 'big5']) {
-      const alt = dec(enc)
-      if (!alt.includes('\uFFFD')) return alt
-    }
-  }
-  return text
-}
-
-function entities(str) {
-  return str
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-}
-
-function pickTitle(html) {
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
-  if (og) return entities(og[1]).trim()
-  const t = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
-  if (t) return entities(t[1].replace(/\s+/g, ' ').trim()).slice(0, 120)
-  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
-  return h1 ? entities(h1[1].replace(/<[^>]+>/g, '').trim()).slice(0, 120) : ''
-}
-
-function pickDesc(html) {
-  const patterns = [
-    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i,
-    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i,
-  ]
-  for (const p of patterns) {
-    const m = html.match(p)
-    if (m && m[1]) return entities(m[1]).trim().slice(0, 200)
-  }
-  return ''
-}
-
-/**
- * 取标签属性值，按定界引号配对。
- * 不能用 `[^"']+`：内联 SVG 的 href 值是双引号包裹、内部含单引号
- * （`href="data:image/svg+xml,%3Csvg xmlns='…'"`），会从第一个单引号处被截断。
- */
-function attrValue(tag, name) {
-  const quoted = tag.match(new RegExp(name + "\\s*=\\s*([\"'])([\\s\\S]*?)\\1", 'i'))
-  if (quoted) return quoted[2]
-  const bare = tag.match(new RegExp(name + '\\s*=\\s*([^\\s>]+)', 'i'))
-  return bare ? bare[1] : ''
-}
-
-/**
- * 解析 `<link rel="icon">` 的 href：
- * - `data:,`（example.com 等用它抑制 favicon 请求）等于没声明，需继续回退
- * - `data:image/svg+xml,<svg…>`（tapeout.link 等）是真实内联图标，原样返回由 decodeDataUri 落盘
- */
-function resolveIconHref(href, base) {
-  const h = String(href || '').trim()
-  if (!h) return ''
-  if (h.startsWith('data:')) return isInlineImage(h) ? h : ''
-  try { return new URL(h, base).href } catch { return '' }
-}
-
-/** data: URI 是否携带真实图片载荷（`data:,`、`data:text/html,…` 都不算） */
-function isInlineImage(uri) {
-  const comma = uri.indexOf(',')
-  if (comma < 0) return false
-  if (!/^image\//i.test(uri.slice(5, comma))) return false
-  return uri.slice(comma + 1).trim().length > 0
-}
-
 /** 内联 data: 图片解码为 Buffer；非 data: 或解码失败返回 null */
 function decodeDataUri(uri) {
   const comma = uri.indexOf(',')
@@ -318,61 +260,51 @@ function decodeDataUri(uri) {
   } catch { return null }
 }
 
-function pickFavicon(html, base) {
-  const apple = html.match(/<link[^>]+rel=["'][^"']*(?:apple-touch-icon|mask-icon)[^"']*["'][^>]*>/i)
-  if (apple) {
-    const href = resolveIconHref(attrValue(apple[0], 'href'), base)
-    if (href) return href
-  }
-  for (const l of html.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)) {
-    const href = resolveIconHref(attrValue(l[0], 'href'), base)
-    if (href) return href
-  }
-  return new URL('/favicon.ico', base).href
-}
-
-// 与 AddSiteModal 的 CATEGORY_HINTS 同源，保证控制台与前端推荐一致
-const CATEGORY_HINTS = [
-  { re: /sms|jiema|接码/i, cat: 'sms' },
-  { re: /api|openai|claude|gpt|deepseek|llm|model|router|gateway|key/i, cat: 'aiapi' },
-  { re: /swap|dex|uniswap|pancake|raydium|orca|hyperliquid|perp/i, cat: 'dex' },
-  { re: /binance|okx|bybit|coinbase|bitget|gate\.io|kraken|exchange|cex/i, cat: 'cex' },
-  { re: /defi|lend|compound|aave|yield|vault/i, cat: 'defi' },
-  { re: /token|chart|data|analytics|terminal|dashboard|research/i, cat: 'data' },
-  { re: /wallet/i, cat: 'wallet' },
-  { re: /nft|opensea|magic.?eden|collectible/i, cat: 'nft' },
-  { re: /security|audit|hack|vuln/i, cat: 'security' },
-  { re: /etherscan|blockchain|explorer|chain/i, cat: 'chain' },
-  { re: /github|gitlab|code|coding|developer|deploy/i, cat: 'coding' },
-  { re: /dribbble|behance|figma|design|\bui\b|ui[-_ ]?kit/i, cat: 'design' },
-  { re: /learn|course|tutorial|school|prompt/i, cat: 'learning' },
-  { re: /airdrop|earn/i, cat: 'airdrop' },
-  { re: /media|news|feed|blog/i, cat: 'media' },
-]
-
-function suggestCategory(text) {
-  const known = readCategoryMeta()
-  for (const h of CATEGORY_HINTS) if (h.re.test(text) && known[h.cat]) return h.cat
-  return ''
-}
-
-/** 抓取标题 / 描述 / 图标地址，并给出分类建议 */
+/**
+ * 抓取并推断标题 / 描述 / 图标 / 配色 / 分类建议 —— 只填一个网址就能补全全部字段。
+ *
+ * 推断逻辑在 shared/site-infer.mjs，与线上 api/metadata.js 同源；
+ * 这里额外传入已收录站点与分类表，让「同族域名 / 品牌词命中」加权生效，
+ * 并保证推荐出的 categoryId 一定是已登记分类（否则 addSite 会直接拒绝）。
+ *
+ * 抓不到页面（403 反爬、超时、空响应）不算失败：照常按域名与分类表产出一份草稿，
+ * 并在 warning 里说明原因，让用户只需复核而不是从零手填。
+ * 抓取目标保留路径，https 失败回退 http —— 与线上接口同一套策略。
+ */
 export async function fetchMeta(rawUrl) {
-  const url = normalizeUrl(rawUrl)
-  const base = `https://${url}/`
-  const buf = await curlBuffer(base)
-  if (!buf.length) throw new Error('目标站点返回空内容')
-  const html = decodeHtml(buf.subarray(0, 256 * 1024))
-  const name = pickTitle(html)
-  const desc = pickDesc(html)
-  return {
-    url,
-    domain: url,
-    name,
-    desc,
-    faviconUrl: pickFavicon(html, base),
-    categoryId: suggestCategory(`${name} ${desc} ${url}`),
+  const url = normalizeUrl(rawUrl)   // 落库口径：只留域名
+  const target = toTarget(rawUrl)    // 抓取口径：保留路径
+  let html = ''
+  let warning = ''
+
+  const attempts = [target]
+  if (target.startsWith('https://')) attempts.push('http://' + target.slice(8))
+
+  for (const t of attempts) {
+    try {
+      const buf = await curlBuffer(t)
+      if (buf.length) {
+        html = decodeHtmlBytes(buf.subarray(0, 256 * 1024))
+        warning = ''
+        break
+      }
+      warning = '目标站点返回空内容，已按域名推断，请复核名称与分类'
+    } catch (e) {
+      warning = /exit code|curl/i.test(e.message)
+        ? '目标站点拒绝抓取（可能被反爬拦截），已按域名推断，请复核名称与分类'
+        : `抓取失败：${e.message}`
+    }
   }
+
+  const info = inferSite({
+    html,
+    url: target,
+    existingSites: loadSites(),
+    categoryMeta: readCategoryMeta(),
+  })
+  // 挑战页返回 200，抓取层看不出异常：warning 必须盖过抓取层文案
+  if (info.blocked) warning = BLOCKED_WARNING
+  return { ...info, url, domain: url, warning }
 }
 
 /* ---------------- 图标下载 ---------------- */
@@ -402,8 +334,9 @@ function isPlaceholderIcon(buf) {
 /**
  * 下载图标到 public/icons/<id>.<ext> 并回写数据文件。
  * 来源依次为：页面声明的图标（含内联 data:image）→ /favicon.ico → favicon.im 兜底。
+ * dryRun=true 时只解析来源候选，不下载、不落盘（CLI --dry-run 复用同一份来源顺序）。
  */
-export async function downloadIcon(id, { faviconUrl = '' } = {}) {
+export async function downloadIcon(id, { faviconUrl = '', dryRun = false } = {}) {
   const sites = loadSites()
   const site = sites.find(s => s.id === id)
   if (!site) throw new Error(`站点不存在：${id}`)
@@ -418,6 +351,8 @@ export async function downloadIcon(id, { faviconUrl = '' } = {}) {
     } catch { /* 页面抓不到就直接走兜底来源 */ }
   }
   candidates.push(`https://${host}/favicon.ico`, `https://favicon.im/${host}?format=png&size=128`)
+
+  if (dryRun) return { dryRun: true, icon: site.icon || null, candidates }
 
   const errors = []
   for (const c of candidates) {

@@ -3370,7 +3370,7 @@
   {
     "id": "dt17",
     "name": "Tange Stock",
-    "url": "stock.tanggestock.com/auth",
+    "url": "stock.tanggestock.com",
     "desc": "全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具。",
     "categoryId": "data",
     "color": "#f59e0b",
@@ -3378,7 +3378,7 @@
     "sortOrder": 242,
     "visitCount": 0,
     "createdAt": 1787508586045,
-    "updatedAt": 1790305625066,
+    "updatedAt": 1790356950918,
     "icon": "icons/dt17.jpg"
   },
   {
@@ -4161,5 +4161,19 @@
     "createdAt": 1790176878492,
     "updatedAt": 1790176878492,
     "icon": "icons/ex11.png"
+  },
+  {
+    "id": "dt33",
+    "name": "OpenMarket",
+    "url": "openmarket.xyz",
+    "desc": "面向全市场的行情情报终端（Market Intelligence Platform）：在一个工作区内整合图表、技术指标、画图工具与价格提醒，覆盖多类市场的行情追踪与盯盘分析。",
+    "categoryId": "data",
+    "color": "#3861fb",
+    "initial": "O",
+    "sortOrder": 299,
+    "visitCount": 0,
+    "createdAt": 1790656871393,
+    "updatedAt": 1790656883607,
+    "icon": "icons/dt33.png"
   }
 ]

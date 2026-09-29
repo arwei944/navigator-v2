@@ -294,6 +294,11 @@ async function publishToCloud() {
     }
     publishState.value = 'success'
     publishMsg.value = `发布成功！云端版本 v${data.version}，其他设备将在 30 秒内自动更新。`
+    // 发布的就是「云端基底 + 本地覆盖层」拼出的当前列表，覆盖层内容已进云端：
+    // 先用响应回填基底（避免清层后短暂回退到旧数据），再清掉覆盖层，
+    // 否则本地改动会长期遮蔽后续云端变更。
+    sitesStore.applyCloudData(data)
+    sitesStore.clearLocalOverlay()
     if (webhookUrl.value.trim()) {
       notifyWebhook(data.version, data.sites?.length || sitesStore.sites.length)
     }

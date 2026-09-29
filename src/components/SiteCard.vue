@@ -15,7 +15,7 @@
       </div>
       <div class="card-favicon" :style="{ background: site.color }">
         <span class="favicon-fallback">{{ site.initial }}</span>
-        <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+        <img v-if="iconSrc" :src="iconSrc" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
         <!-- 在线状态角标 -->
         <span class="health-dot" :class="'health-' + healthNode"
               :title="healthTip" @click.stop></span>
@@ -107,6 +107,9 @@ const categoriesStore = useCategoriesStore()
 const historyStore = useHistoryStore()
 const sidebarStore = useSidebarStore()
 const healthStore = useHealthStore()
+
+// 正式收录的站点有本地图标文件（icons/xx.png）；访客自己新增的只有远程图标地址
+const iconSrc = computed(() => props.site.icon ? '/' + props.site.icon : (props.site.iconUrl || ''))
 
 // 在线状态角标
 const healthState = computed(() => healthStore.getStatus(props.site.id))

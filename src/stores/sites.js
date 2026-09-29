@@ -3,9 +3,42 @@ import { ref, computed } from 'vue'
 import Fuse from 'fuse.js'
 import { pinyin } from 'pinyin-pro'
 import SEED_SITES from '../../api/sites-data.json'
+import { encodeStored, decodeStored } from '@/utils/storeVersioning'
+
+const OVERLAY_KEY = 'nav-sites-overlay'
+const TRASH_KEY = 'nav-sites-trash'
+
+/**
+ * 本地覆盖层：云端数据是基底，访客自己的增 / 改 / 删 / 排序叠加其上并持久化。
+ *
+ * 没有这一层时，30 秒轮询的 applyCloudData 会用云端数组整体替换 sites，
+ * 访客新增的站点、改过的字段、删掉的条目会被全部冲掉（只有 visitCount 侥幸保留）。
+ * 云端下架的站点不在基底里、也不在覆盖层里，自然从视图消失 —— 下架仍能正常传导。
+ */
+function loadOverlay() {
+  const d = decodeStored(OVERLAY_KEY, localStorage.getItem(OVERLAY_KEY), null)
+  return {
+    adds: Array.isArray(d?.adds) ? d.adds : [],
+    edits: d?.edits && typeof d.edits === 'object' ? d.edits : {},
+    deletes: Array.isArray(d?.deletes) ? d.deletes : [],
+    order: Array.isArray(d?.order) ? d.order : [],
+    visits: d?.visits && typeof d.visits === 'object' ? d.visits : {},
+  }
+}
 
 export const useSitesStore = defineStore('sites', () => {
-  const sites = ref([...SEED_SITES])
+  // 云端基底（种子数据只是首屏兜底，拉到云端后即被替换）
+  const cloudSites = ref([...SEED_SITES])
+  // 渲染用列表 = 基底 + 覆盖层，由 rebuild() 维护，不要直接改它
+  const sites = ref([])
+
+  const overlay = loadOverlay()
+  const localAdds = ref(overlay.adds)
+  const localEdits = ref(overlay.edits)
+  const localDeletes = ref(overlay.deletes)
+  const localOrder = ref(overlay.order)
+  const visitCounts = ref(overlay.visits)
+
   const cloudVersion = ref(0)
   const cloudLoaded = ref(false)
   let pollTimer = null
@@ -14,8 +47,9 @@ export const useSitesStore = defineStore('sites', () => {
   const sortBy = ref('default')
   const viewMode = ref('grid') // grid | list
 
-  // 回收站
-  const trash = ref([])
+  // 回收站（持久化，否则刷新后「恢复」就没了）
+  const storedTrash = decodeStored(TRASH_KEY, localStorage.getItem(TRASH_KEY), [])
+  const trash = ref(Array.isArray(storedTrash) ? storedTrash : [])
 
   // 批量选择
   const batchMode = ref(false)
@@ -110,50 +144,124 @@ export const useSitesStore = defineStore('sites', () => {
     return result
   })
 
+  // ── 覆盖层落盘与视图重建 ──
+  function saveOverlay() {
+    localStorage.setItem(OVERLAY_KEY, encodeStored({
+      adds: localAdds.value,
+      edits: localEdits.value,
+      deletes: localDeletes.value,
+      order: localOrder.value,
+      visits: visitCounts.value,
+    }))
+  }
+
+  function saveTrash() {
+    localStorage.setItem(TRASH_KEY, encodeStored(trash.value))
+  }
+
+  /** 用「云端基底 + 本地覆盖层」重新拼出渲染用的列表 */
+  function rebuild() {
+    const deleted = new Set(localDeletes.value)
+    const visits = visitCounts.value
+    const withVisit = s => ({ ...s, visitCount: visits[s.id] ?? s.visitCount ?? 0 })
+
+    const base = cloudSites.value
+      .filter(s => !deleted.has(s.id))
+      .map(s => withVisit(localEdits.value[s.id] ? { ...s, ...localEdits.value[s.id] } : s))
+    const adds = localAdds.value.filter(s => !deleted.has(s.id)).map(withVisit)
+
+    let list = [...base, ...adds]
+
+    // localOrder 只描述这批 id 的相对顺序，未登记的站点（如云端新收录的）保持原有位置
+    if (localOrder.value.length) {
+      const pos = new Map(localOrder.value.map((id, i) => [id, i]))
+      list = list
+        .map((site, i) => ({ site, i }))
+        .sort((a, b) => {
+          const pa = pos.has(a.site.id) ? pos.get(a.site.id) : Infinity
+          const pb = pos.has(b.site.id) ? pos.get(b.site.id) : Infinity
+          return pa === pb ? a.i - b.i : pa - pb
+        })
+        .map(x => x.site)
+    }
+
+    sites.value = list
+  }
+
   function addSite(site) {
-    sites.value.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      sortOrder: sites.value.length,
+    const now = Date.now()
+    localAdds.value.push({
+      id: now.toString(36) + Math.random().toString(36).slice(2, 6),
+      sortOrder: cloudSites.value.length + localAdds.value.length,
       visitCount: 0,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       ...site
     })
+    rebuild()
+    saveOverlay()
   }
 
   function updateSite(id, data) {
-    const idx = sites.value.findIndex(s => s.id === id)
-    if (idx !== -1) {
-      sites.value[idx] = { ...sites.value[idx], ...data, updatedAt: Date.now() }
-    }
+    const patch = { ...data, updatedAt: Date.now() }
+    const idx = localAdds.value.findIndex(s => s.id === id)
+    if (idx !== -1) localAdds.value[idx] = { ...localAdds.value[idx], ...patch }
+    else localEdits.value[id] = { ...(localEdits.value[id] || {}), ...patch }
+    rebuild()
+    saveOverlay()
   }
 
   function updateSiteField(id, key, value) {
-    const idx = sites.value.findIndex(s => s.id === id)
+    updateSite(id, { [key]: value })
+  }
+
+  /** 从本地视图移除：本地新增的连数据一起删，云端来的记一条「本地隐藏」墓碑 */
+  function removeLocally(id) {
+    const idx = localAdds.value.findIndex(s => s.id === id)
     if (idx !== -1) {
-      sites.value[idx][key] = value
-      sites.value[idx].updatedAt = Date.now()
+      localAdds.value.splice(idx, 1)
+      delete localEdits.value[id]
+      return
     }
+    if (!localDeletes.value.includes(id)) localDeletes.value.push(id)
   }
 
   function deleteSite(id) {
     const site = sites.value.find(s => s.id === id)
-    if (site) {
-      trash.value.push({ ...site, deletedAt: Date.now() })
-      sites.value = sites.value.filter(s => s.id !== id)
-    }
+    if (site) trash.value.push({ ...site, deletedAt: Date.now() })
+    removeLocally(id)
+    rebuild()
+    saveOverlay()
+    saveTrash()
   }
 
   function recordVisit(id) {
     const site = sites.value.find(s => s.id === id)
-    if (site) site.visitCount++
+    if (!site) return
+    const next = (visitCounts.value[id] ?? site.visitCount ?? 0) + 1
+    visitCounts.value[id] = next
+    site.visitCount = next
+    saveOverlay()
   }
 
   function reorderSites(newOrderedSites) {
-    sites.value = newOrderedSites.map((site, index) => ({
-      ...site,
-      sortOrder: index
-    }))
+    // 只调整这批 id 的相对位置，其余站点原地不动。渲染按数组顺序，
+    // 故不改 sortOrder —— 它是云端的全局序号，前端重排不应覆盖它。
+    const target = newOrderedSites.map(s => s.id)
+    const targetSet = new Set(target)
+    const next = []
+    let injected = false
+    for (const s of sites.value) {
+      if (targetSet.has(s.id)) {
+        if (!injected) { next.push(...target); injected = true }
+        continue
+      }
+      next.push(s.id)
+    }
+    if (!injected) next.push(...target)
+    localOrder.value = next
+    rebuild()
+    saveOverlay()
   }
 
   function setSearchQuery(q) { searchQuery.value = q }
@@ -189,44 +297,58 @@ export const useSitesStore = defineStore('sites', () => {
 
   function batchDeleteToTrash(targetIds) {
     const ids = targetIds || [...selectedIds.value]
-    ids.forEach(id => {
+    for (const id of ids) {
       const site = sites.value.find(s => s.id === id)
-      if (site) {
-        trash.value.push({ ...site, deletedAt: Date.now() })
-      }
-    })
-    sites.value = sites.value.filter(s => !ids.includes(s.id))
+      if (site) trash.value.push({ ...site, deletedAt: Date.now() })
+      removeLocally(id)
+    }
     selectedIds.value = new Set()
+    rebuild()
+    saveOverlay()
+    saveTrash()
   }
 
   // ── 回收站管理 ──
   function restoreFromTrash(id) {
     const idx = trash.value.findIndex(s => s.id === id)
-    if (idx !== -1) {
-      const site = trash.value[idx]
-      delete site.deletedAt
-      sites.value.push(site)
-      trash.value.splice(idx, 1)
-    }
+    if (idx === -1) return
+    const [site] = trash.value.splice(idx, 1)
+    delete site.deletedAt
+    const dIdx = localDeletes.value.indexOf(id)
+    // 墓碑里有 → 原本是云端站点，撤掉墓碑即可；否则是本地新增，放回本地新增层
+    if (dIdx !== -1) localDeletes.value.splice(dIdx, 1)
+    else localAdds.value.push(site)
+    rebuild()
+    saveOverlay()
+    saveTrash()
   }
 
   function permanentDelete(id) {
     trash.value = trash.value.filter(s => s.id !== id)
+    saveTrash()
   }
 
   function emptyTrash() {
     trash.value = []
+    saveTrash()
+  }
+
+  /** 管理端发布成功后调用：覆盖层内容已进入云端，清掉以免长期遮蔽后续云端变更 */
+  function clearLocalOverlay() {
+    localAdds.value = []
+    localEdits.value = {}
+    localDeletes.value = []
+    localOrder.value = []
+    rebuild()
+    saveOverlay()
   }
 
   // ── 云端热更新 ──
   function applyCloudData(data) {
     if (!data || !Array.isArray(data.sites)) return false
-    const localById = new Map(sites.value.map(s => [s.id, s]))
-    sites.value = data.sites.map(cloudSite => {
-      const local = localById.get(cloudSite.id)
-      return local ? { ...cloudSite, visitCount: local.visitCount } : cloudSite
-    })
+    cloudSites.value = data.sites
     cloudVersion.value = data.version || 0
+    rebuild()
     return true
   }
 
@@ -268,14 +390,17 @@ export const useSitesStore = defineStore('sites', () => {
     }
   }
 
+  // 首屏先用种子数据渲染，云端拉到后由 applyCloudData 重建
+  rebuild()
+
   return {
-    sites, searchQuery, currentCategory, sortBy, viewMode,
+    sites, cloudSites, searchQuery, currentCategory, sortBy, viewMode,
     filteredSites, trash, batchMode, selectedIds,
     cloudVersion, cloudLoaded,
     addSite, updateSite, updateSiteField, deleteSite, recordVisit, reorderSites,
     setSearchQuery, setCategory, setSortBy, setViewMode,
     toggleBatchMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
-    restoreFromTrash, permanentDelete, emptyTrash,
+    restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,
     initCloudSites, pollCloudSites, startPolling, stopPolling
   }
 })

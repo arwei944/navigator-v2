@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#1C2C4C"/>
+      <stop offset="1" stop-color="#080D18"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.28" cy="0.18" r="0.85">
+      <stop offset="0" stop-color="#5EEAD4" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#5EEAD4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="needleUp" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#A5F3FC"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="needleDown" x1="0" y1="0" x2="0.35" y2="1">
+      <stop offset="0" stop-color="#38BDF8" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#38BDF8" stop-opacity="0.12"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="56" fill="url(#bg)"/>
+  <rect width="256" height="256" rx="56" fill="url(#glow)"/>
+  <rect x="1.25" y="1.25" width="253.5" height="253.5" rx="54.75"
+        fill="none" stroke="#E2E8F0" stroke-opacity="0.10" stroke-width="2.5"/>
+
+  <path d="M128 38 L174 128 L128 128 Z" fill="url(#needleUp)"/>
+  <path d="M128 38 L82 128 L128 128 Z" fill="url(#needleUp)" opacity="0.72"/>
+  <path d="M128 218 L174 128 L128 128 Z" fill="url(#needleDown)"/>
+  <path d="M128 218 L82 128 L128 128 Z" fill="url(#needleDown)" opacity="0.72"/>
+
+  <circle cx="128" cy="128" r="5" fill="#F0FDFF" opacity="0.92"/>
+</svg>

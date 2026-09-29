@@ -3,6 +3,9 @@
   "private": true,
   "version": "3.0.0",
   "type": "module",
+  "bin": {
+    "nav": "tools/cli/nav.mjs"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -14,7 +17,21 @@
     "check:report": "node scripts/check-sites.mjs --only-bad --report",
     "icons": "node scripts/fetch-favicons.mjs",
     "perf": "node scripts/perf-scroll.mjs",
-    "console": "node tools/console/server.mjs"
+    "console": "node tools/console/server.mjs",
+    "console:strict": "node tools/console/server.mjs --port 5175 --strict-port",
+    "console:test": "node tools/console/test-trust.mjs",
+    "console:test:infer": "node tools/console/test-infer.mjs",
+    "console:test:guard": "node tools/console/test-guard.mjs",
+    "console:test:all": "node tools/console/test-trust.mjs && node tools/console/test-infer.mjs && node tools/console/test-guard.mjs",
+    "console:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1",
+    "console:autostart:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1 -Uninstall",
+    "console:start": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/start.ps1",
+    "console:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/stop.ps1",
+    "console:shortcuts": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/sync-shortcuts.ps1",
+    "console:icon": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/build-icon.ps1",
+    "console:service": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-service.ps1",
+    "console:service:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-service.ps1 -Uninstall",
+    "nav": "node tools/cli/nav.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

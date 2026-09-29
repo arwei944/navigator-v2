@@ -2,41 +2,33 @@
  * 站点数据体检：分类分布、图标/配色/描述缺失、sortOrder 重复与空洞、重复域名。
  * 只读本地 api/sites-data.json，不触碰云端。
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
+import { CATEGORY_GROUPS, categoryMeta } from '../../../shared/categories.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
-const CATEGORY_FILE = 'src/stores/categories.js'
 
 export function readSites() {
   return JSON.parse(readFileSync(join(ROOT, SITES_FILE), 'utf-8'))
 }
 
 /**
- * 从分类 store 源码解析分组结构（该文件结构稳定，正则足够且不引入构建依赖）。
- * 先定位分组对象（含 collapsed 字段），再在分组区间内提取分类项，避免两类对象混淆。
+ * 分类分组，供控制台下拉框渲染。
+ * 数据源是 shared/categories.mjs（与前端 store、线上接口同源），不再正则解析源码。
+ * 这里把 dotColor 映射成控制台用的 color，避免两处模板各写一套字段名。
  */
 export function categoryGroups() {
-  const file = join(ROOT, CATEGORY_FILE)
-  if (!existsSync(file)) return []
-  const text = readFileSync(file, 'utf-8')
-  const heads = [...text.matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']+)',\s*collapsed:/g)]
-  return heads.map((h, i) => {
-    const body = text.slice(h.index, i + 1 < heads.length ? heads[i + 1].index : text.length)
-    const categories = [...body.matchAll(/\{\s*id:\s*'([^']+)',\s*label:\s*'([^']+)',\s*dotColor:\s*'([^']+)'\s*\}/g)]
-      .map(m => ({ id: m[1], label: m[2], color: m[3] }))
-    return { id: h[1], label: h[2], categories }
-  })
+  return CATEGORY_GROUPS.map(g => ({
+    id: g.id,
+    label: g.label,
+    categories: g.categories.map(c => ({ id: c.id, label: c.label, color: c.dotColor })),
+  }))
 }
 
 /** 扁平分类元信息：id -> { label, color, group } */
 export function readCategoryMeta() {
-  const map = {}
-  for (const g of categoryGroups()) {
-    for (const c of g.categories) map[c.id] = { label: c.label, color: c.color, group: g.label }
-  }
-  return map
+  return categoryMeta()
 }
 
 /** 取主机名做去重比较：数据里存的是裸域名（无协议），需兼容补全后再解析 */

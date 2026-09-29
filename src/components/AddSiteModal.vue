@@ -9,20 +9,65 @@
       </div>
       <form @submit.prevent="submit" class="modal-body">
         <div class="form-group">
-          <label>网址 <span class="hint">（输入后自动抓取站点信息）</span></label>
+          <label>网址 <span class="hint">（粘贴后自动补全下方全部信息）</span></label>
           <div class="url-row">
-            <input type="url" v-model="form.url" required placeholder="例如: chat.openai.com 或 https://..." class="form-input"
-                   @blur="onUrlBlur" @keyup.enter="fetchMeta">
-            <button type="button" class="btn btn-small" :disabled="fetching" @click="fetchMeta">
-              {{ fetching ? '抓取中...' : '自动抓取' }}
+            <input type="url" v-model="form.url" required placeholder="chat.openai.com" class="form-input"
+                   @input="onUrlInput" @blur="onUrlBlur" @keyup.enter.prevent="fetchMeta">
+            <button type="button" class="btn btn-small" :disabled="fetching || !form.url.trim()" @click="fetchMeta">
+              {{ fetching ? '补全中…' : meta ? '重新补全' : '自动补全' }}
             </button>
           </div>
-          <div v-if="fetchError" class="form-error">{{ fetchError }}</div>
+          <div v-if="status" class="status-line" :class="statusKind">
+            <span class="status-dot"></span>
+            <span>{{ status }}</span>
+          </div>
         </div>
 
         <div class="form-group">
-          <label>站点名称</label>
-          <input type="text" v-model="form.name" required placeholder="例如: ChatGPT" class="form-input">
+          <label>
+            站点名称
+            <span v-if="meta && !touched.name" class="field-tag" :class="confClass('name')">自动 · {{ confText('name') }}</span>
+          </label>
+          <input type="text" v-model="form.name" required placeholder="例如: ChatGPT" class="form-input"
+                 @input="touched.name = true">
+          <div v-if="meta && !touched.name" class="field-note">{{ sourceText('name') }}</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            描述
+            <span v-if="meta && !touched.desc" class="field-tag" :class="confClass('desc')">自动 · {{ confText('desc') }}</span>
+          </label>
+          <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"
+                    @input="touched.desc = true"></textarea>
+          <div v-if="meta && !touched.desc" class="field-note">{{ sourceText('desc') }}</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            分类
+            <span v-if="meta && !touched.categoryId && meta.categoryId" class="field-tag" :class="confClass('category')">自动 · {{ confText('category') }}</span>
+            <span v-else-if="meta && !meta.categoryId" class="hint">（未识别，请手动选择）</span>
+          </label>
+          <select v-model="form.categoryId" required class="form-input" @change="touched.categoryId = true">
+            <option value="" disabled>请选择分类</option>
+            <option v-for="cat in categoriesStore.categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
+          </select>
+          <div v-if="meta && !touched.categoryId && meta.sources?.category?.length" class="field-note">
+            依据：{{ meta.sources.category.join('、') }}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            配色
+            <span v-if="meta && !touched.color" class="field-tag" :class="confClass('color')">自动 · {{ confText('color') }}</span>
+          </label>
+          <div class="color-picker-row">
+            <input type="color" v-model="form.color" class="color-input" @input="touched.color = true">
+            <span class="color-hex">{{ form.color }}</span>
+            <span v-if="meta && !touched.color" class="hint">{{ sourceText('color') }}</span>
+          </div>
         </div>
 
         <div class="form-group" v-if="faviconUrl">
@@ -31,29 +76,15 @@
             <img :src="faviconUrl" alt="favicon" class="favicon-preview"
                  @error="$event.target.src = 'https://favicon.im/' + form.url.replace(/^https?:\/\//, '').split('/')[0] + '?format=png&size=128'">
             <span class="favicon-domain">{{ form.url.replace(/^https?:\/\//, '').split('/')[0] }}</span>
-            <span class="hint">（提交后由脚本下载到本地）</span>
+            <span class="hint">（本地新增，图标按此地址直接加载）</span>
           </div>
         </div>
 
-        <div class="form-group">
-          <label>描述</label>
-          <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"></textarea>
+        <div v-if="submitError" class="status-line err">
+          <span class="status-dot"></span>
+          <span>{{ submitError }}</span>
         </div>
 
-        <div class="form-group">
-          <label>分类 <span v-if="suggestedCat" class="hint">（已按关键词推荐）</span></label>
-          <select v-model="form.categoryId" required class="form-input">
-            <option v-for="cat in categoriesStore.categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
-          </select>
-        </div>
-
-        <div class="form-group">
-          <label>颜色</label>
-          <div class="color-picker-row">
-            <input type="color" v-model="form.color" class="color-input">
-            <span class="color-hex">{{ form.color }}</span>
-          </div>
-        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-cancel" @click="$emit('close')">取消</button>
           <button type="submit" class="btn btn-primary">添加</button>
@@ -73,98 +104,190 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 
 const faviconUrl = ref('')
+// 图标是「哪个域名抓来的」：中途换网址时不能把上一站的图标存给新站
+const faviconHost = ref('')
 const fetching = ref(false)
-const fetchError = ref('')
-const suggestedCat = ref('')
+const meta = ref(null)
+const status = ref('')
+const statusKind = ref('')
+const submitError = ref('')
 
-const CATEGORY_HINTS = [
-  { re: /sms|jiema|接码/i, cat: 'sms' },
-  { re: /api|openai|claude|gpt|deepseek|llm|model|router|gateway|key/i, cat: 'aiapi' },
-  { re: /swap|dex|uniswap|pancake|raydium|orca|hyperliquid|perp/i, cat: 'dex' },
-  { re: /binance|okx|bybit|coinbase|bitget|gate\.io|kraken|exchange|cex/i, cat: 'cex' },
-  { re: /defi|lend|compound|aave|yield|vault/i, cat: 'defi' },
-  { re: /token|chart|data|analytics|terminal|dashboard|research/i, cat: 'data' },
-  { re: /wallet/i, cat: 'wallet' },
-  { re: /nft|opensea|magic.?eden|collectible/i, cat: 'nft' },
-  { re: /security|audit|hack|vuln/i, cat: 'security' },
-  { re: /etherscan|blockchain|explorer|chain/i, cat: 'chain' },
-  { re: /github|gitlab|code|coding|developer|deploy/i, cat: 'coding' },
-  { re: /dribbble|behance|figma|design|\bui\b|ui[-_ ]?kit/i, cat: 'design' },
-  { re: /learn|course|tutorial|school|prompt/i, cat: 'learning' },
-  { re: /airdrop|earn/i, cat: 'airdrop' },
-  { re: /media|news|feed|blog/i, cat: 'media' }
-]
+// 用户手动改过的字段不再被自动补全覆盖；换到另一个域名时整体重置，避免换了站还留着上一站的手改值
+const touched = reactive({ name: false, desc: false, categoryId: false, color: false })
 
 const form = reactive({
   name: '',
   url: '',
   desc: '',
-  categoryId: 'starter',
+  // 留空而不是预选 starter：未识别分类时要和「未识别，请手动选择」的提示一致，
+  // 否则下拉框显示着「入门对话」、旁边却写着未识别，用户会直接提交错分类
+  categoryId: '',
   color: '#3b82f6',
-  initial: ''
 })
 
-function autoCompleteUrl() {
-  if (form.url && !form.url.startsWith('http://') && !form.url.startsWith('https://')) {
-    form.url = 'https://' + form.url
-  }
+const CONF_TEXT = { high: '高置信', medium: '中置信', low: '低置信，请复核' }
+const NAME_SRC = { 'og:site_name': '来自 og:site_name', title: '来自页面标题', domain: '无可用标题，按域名推断', known: '沿用已收录站点的名称' }
+const DESC_SRC = {
+  meta: '来自站点官方描述', 'json-ld': '来自页面结构化数据', keywords: '来自页面关键词',
+  paragraph: '来自正文首段', generated: '无官方描述，已按站点生成',
 }
+const COLOR_SRC = { meta: '来自站点主题色', category: '取自所属分类配色', hash: '无主题色，按域名生成' }
 
-function onUrlBlur() {
-  autoCompleteUrl()
-  if (form.url.trim()) fetchMeta()
-}
-
-function suggestCategory(text) {
-  for (const h of CATEGORY_HINTS) {
-    if (h.re.test(text)) return h.cat
-  }
+function confText(field) { return CONF_TEXT[meta.value?.confidence?.[field]] || '' }
+function confClass(field) { return meta.value?.confidence?.[field] === 'low' ? 'warn' : 'ok' }
+function sourceText(field) {
+  const m = meta.value
+  if (!m) return ''
+  if (field === 'name') return NAME_SRC[m.sources?.name] || ''
+  if (field === 'desc') return DESC_SRC[m.sources?.desc] || ''
+  if (field === 'color') return COLOR_SRC[m.sources?.color] || ''
   return ''
 }
 
-async function fetchMeta() {
-  autoCompleteUrl()
-  const url = form.url.trim()
-  if (!url) return
-  fetching.value = true
-  fetchError.value = ''
-  try {
-    const res = await fetch('/api/metadata?url=' + encodeURIComponent(url))
-    const data = await res.json()
-    if (!res.ok) {
-      fetchError.value = data.error || '抓取失败'
-      return
-    }
-    if (!form.name || form.name === suggestedName.value) {
-      form.name = data.name
-    }
-    suggestedName.value = data.name
-    if (data.desc) form.desc = data.desc
-    if (data.favicon) faviconUrl.value = data.favicon
-    const cat = suggestCategory((data.name || '') + ' ' + (data.desc || '') + ' ' + data.domain)
-    if (cat) {
-      form.categoryId = cat
-      suggestedCat.value = cat
-    }
-  } catch (e) {
-    fetchError.value = '抓取失败：' + e.message
-  } finally {
-    fetching.value = false
+function normalizeUrl(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  return /^https?:\/\//i.test(s) ? s : 'https://' + s
+}
+
+function hostOf(raw) {
+  try { return new URL(normalizeUrl(raw)).hostname.replace(/^www\./, '').toLowerCase() } catch { return '' }
+}
+
+function hasCategory(id) {
+  return Boolean(id) && categoriesStore.categories.some(c => c.id === id)
+}
+
+/** 只覆盖「用户没改过」的字段；用户改过的保留，避免自动补全把人的输入冲掉 */
+function applyMeta(data) {
+  if (!touched.name && data.name) form.name = data.name
+  if (!touched.desc && data.desc) form.desc = data.desc
+  if (!touched.color && data.color) form.color = data.color
+  if (!touched.categoryId && hasCategory(data.categoryId)) form.categoryId = data.categoryId
+  if (data.faviconUrl || data.favicon) {
+    faviconUrl.value = data.faviconUrl || data.favicon
+    // 记在响应自带的域名上（而非当前输入框），响应晚到时也不会张冠李戴
+    faviconHost.value = String(data.domain || '').toLowerCase()
   }
 }
 
-const suggestedName = ref('')
+let lastHost = ''
+// 连续改网址时先发的请求可能后返回，用序号丢弃过期响应，避免把新结果覆盖成旧的
+let reqSeq = 0
+
+function resetTouched() {
+  touched.name = false
+  touched.desc = false
+  touched.categoryId = false
+  touched.color = false
+}
+
+/**
+ * 换了域名就等于换了另一个站点：清掉上一站的自动填充。
+ * 否则新站抓取失败时（meta 为 null，不会覆盖任何字段），上一站的名称/描述/分类/图标
+ * 会原样留在表单里被提交，落库成一条张冠李戴的记录。
+ */
+function resetForNewHost() {
+  resetTouched()
+  form.name = ''
+  form.desc = ''
+  form.categoryId = ''
+  form.color = '#3b82f6'
+  faviconUrl.value = ''
+  faviconHost.value = ''
+  meta.value = null
+}
+
+function summarize(data) {
+  const parts = []
+  // 分类必须是本地下拉框里真有的项，否则说「已补全分类 X」而选中项没变，用户会以为补全坏了
+  const catLabel = data.categoryLabel || categoriesStore.getCategoryLabel(data.categoryId)
+  parts.push(hasCategory(data.categoryId) ? `分类 ${catLabel}` : '分类未识别')
+  const low = Object.entries(data.confidence || {}).filter(([, v]) => v === 'low').length
+  if (low) parts.push(`${low} 项为推断值`)
+  return `已补全：${parts.join(' · ')}`
+}
+
+async function fetchMeta() {
+  const url = normalizeUrl(form.url)
+  if (!url) return
+  form.url = url
+
+  const host = hostOf(url)
+  if (lastHost && host && host !== lastHost) resetForNewHost()
+  lastHost = host
+
+  const seq = ++reqSeq
+  fetching.value = true
+  status.value = '正在抓取站点信息…'
+  statusKind.value = 'loading'
+  try {
+    const res = await fetch('/api/metadata?url=' + encodeURIComponent(url))
+    const data = await res.json()
+    if (seq !== reqSeq) return
+    if (!res.ok) {
+      meta.value = null
+      faviconUrl.value = ''
+      faviconHost.value = ''
+      status.value = data.error || '抓取失败，请手动填写'
+      statusKind.value = 'err'
+      return
+    }
+    meta.value = data
+    applyMeta(data)
+    status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
+    statusKind.value = data.warning ? 'warn' : 'ok'
+  } catch (e) {
+    if (seq !== reqSeq) return
+    meta.value = null
+    faviconUrl.value = ''
+    faviconHost.value = ''
+    status.value = '抓取失败：' + e.message + '（可手动填写）'
+    statusKind.value = 'err'
+  } finally {
+    if (seq === reqSeq) fetching.value = false
+  }
+}
+
+// 粘贴/输入网址后自动补全：停顿 600ms 再抓，避免边打边请求
+let inputTimer = null
+function onUrlInput() {
+  submitError.value = ''
+  clearTimeout(inputTimer)
+  const host = hostOf(form.url)
+  if (!host || host === lastHost) return
+  inputTimer = setTimeout(() => { if (form.url.trim()) fetchMeta() }, 600)
+}
+
+function onUrlBlur() {
+  clearTimeout(inputTimer)
+  if (form.url.trim() && hostOf(form.url) !== lastHost) fetchMeta()
+}
 
 function submit() {
-  const domain = form.url.replace(/^https?:\/\//, '').split('/')[0]
-  sitesStore.addSite({
+  const rawDomain = form.url.replace(/^https?:\/\//, '').split('/')[0]
+  const domain = rawDomain.toLowerCase().replace(/^www\./, '')
+  // 同域名已在库里就别再插一条：卡片与分类会重复，云端同步时还会被当作两个站点
+  const dup = sitesStore.sites.find(s => hostOf(s.url) === domain)
+  if (dup) {
+    submitError.value = `该域名已收录：${dup.name}（${dup.url}）。如需变更请编辑该站点，避免重复条目。`
+    return
+  }
+  submitError.value = ''
+
+  const site = {
     name: form.name,
-    url: domain,
+    url: rawDomain,
     desc: form.desc,
     categoryId: form.categoryId,
     color: form.color,
-    initial: form.name.charAt(0).toUpperCase()
-  })
+    initial: form.name.charAt(0).toUpperCase(),
+  }
+  // 本地新增的站点不会有脚本去抓图标，把远程图标地址一并存下，卡片据此直接加载。
+  // 只认「图标确实抓自这个域名」的情况：换过网址又抓取失败时，宁可让卡片回落字母块，也不挂错图
+  if (/^https?:\/\//i.test(faviconUrl.value) && faviconHost.value === domain) site.iconUrl = faviconUrl.value
+
+  sitesStore.addSite(site)
   emit('close')
 }
 </script>
@@ -212,9 +335,18 @@ function submit() {
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 .hint { font-weight: 400; font-size: 11.5px; color: var(--text-secondary); }
+.field-tag { margin-left: 6px; font-weight: 500; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; }
+.field-tag.ok { color: #047857; background: #d1fae5; }
+.field-tag.warn { color: #b45309; background: #fef3c7; }
+.field-note { margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
 .url-row { display: flex; gap: 8px; }
 .url-row .form-input { flex: 1; }
-.form-error { margin-top: 6px; font-size: 12px; color: #dc2626; }
+.status-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+.status-line.ok { color: #047857; }
+.status-line.warn { color: #b45309; }
+.status-line.err { color: #dc2626; }
+.status-line.loading { color: var(--text-secondary); }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .form-input {
   width: 100%;
   padding: 9px 12px;

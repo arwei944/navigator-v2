@@ -10,3 +10,6 @@ backups/
 tmp-payload.json
 tmp-console-payload.json
 perf-report/
+tools/console/launcher/nssm/
+tools/console/launcher/logs/
+tools/console/launcher/icon-*.png

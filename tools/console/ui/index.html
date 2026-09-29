@@ -4,6 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>nav-console · 本地运维控制台</title>
+  <script>
+    // 首屏防闪烁：在样式表解析前定下 data-theme（与 theme.js 取值规则一致）
+    (() => {
+      try {
+        const m = localStorage.getItem('nav-console-theme') || 'auto'
+        const dark = m === 'dark' || (m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch { document.documentElement.dataset.theme = 'dark' }
+    })()
+  </script>
+  <link rel="icon" type="image/svg+xml" href="/ui/app-icon.svg">
   <link rel="stylesheet" href="/ui/style.css">
 </head>
 <body>
@@ -13,7 +24,10 @@
       <strong>nav-console</strong>
       <span class="tag">本地运维</span>
     </div>
-    <div class="health" id="health">检测中…</div>
+    <div class="row-actions">
+      <div class="health" id="health">检测中…</div>
+      <button class="btn ghost small" id="btn-theme" title="主题">跟随系统</button>
+    </div>
   </header>
 
   <nav class="tabs" id="tabs">
@@ -63,7 +77,7 @@
         <h3 id="sites-form-title">新增站点</h3>
         <div class="site-form">
           <label class="fld">
-            <span>站点地址 <em>（输入后点「抓取元信息」自动填充）</em></span>
+            <span>站点地址 <em class="auto">（粘贴后自动补全下方全部信息）</em></span>
             <input class="msg-input" id="f-url" placeholder="example.com">
           </label>
           <label class="fld"><span>站点名称</span><input class="msg-input" id="f-name"></label>
@@ -73,7 +87,7 @@
         </div>
         <div class="icon-preview" id="icon-preview"></div>
         <div class="actions">
-          <button class="btn" id="btn-fetch-meta">抓取元信息</button>
+          <button class="btn" id="btn-fetch-meta">自动补全</button>
           <button class="btn primary" id="btn-save-site">保存到本地</button>
           <button class="btn ghost" id="btn-cancel-site">取消</button>
           <span class="result" id="site-form-result"></span>
@@ -218,9 +232,22 @@
       <span class="console-title">实时日志</span>
       <span class="badge idle" id="job-status">空闲</span>
       <span class="job-title" id="job-title"></span>
+      <select class="job-select" id="job-select" title="切换任务视图"></select>
       <button class="btn ghost" id="btn-toggle-console">收起</button>
       <button class="btn ghost" id="btn-kill" disabled>终止任务</button>
       <button class="btn ghost" id="btn-clear">清空</button>
+    </div>
+    <div class="log-bar">
+      <input class="msg-input mini" id="log-filter" placeholder="过滤关键字（/正则/）">
+      <div class="chips" id="log-levels">
+        <button class="chip toggle on" data-level="stdout">输出</button>
+        <button class="chip toggle on" data-level="info">信息</button>
+        <button class="chip toggle on" data-level="success">成功</button>
+        <button class="chip toggle on" data-level="stderr">错误</button>
+      </div>
+      <span class="dim log-count" id="log-count"></span>
+      <label class="chk"><input type="checkbox" id="log-follow" checked> 跟随</label>
+      <button class="btn ghost small" id="btn-copy-log">复制</button>
     </div>
     <div class="log-view" id="log-view">
       <div class="log-empty">暂无日志。运行自检或提交 / 推送后，这里会实时输出。</div>

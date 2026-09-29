@@ -247,7 +247,7 @@ nav-v2/
 | `cd10` | MetalForge | `metalforge.xyz` | coding | 227 | 为 SwiftUI 与 React Native 生成 shader 效果的可视化工具，无需写 Metal 代码，调滑块即可预览并导出真实 .metal 文件或 Skia shader，内置 49 种炫丽效果，免费编辑、Pro 导出代码 |
 | `cd11` | Pi Packages | `pi.dev/packages` | coding | 236 | Pi 编码智能体的官方包市场，聚合 5000+ 扩展、技能、提示模板与主题，发布到 npm 生态，通过 `pi install` 一键安装；涵盖 MCP 适配器、多模型 Provider、子代理编排、沙箱安全、代码审查等各类插件，适合为 Pi AI 编程助手扩展功能 |
 | `ac13` | Minara | `minara.ai` | aicrypto | 228 | AI 原生的加密金融交易操作系统，内置 AI Copilot、策略生成与回测、实时行情/链上数据（巨鲸/代币解锁/聪明钱）、Polymarket 预测、衍生品资金费率与清算监控、DeFi 数据，并支持工作流自动化与价格/地址提醒，帮你随时交易任何资产 |
-| `dt17` | Tange Stock | `stock.tanggestock.com/auth` | data | 229 | 全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具 |
+| `dt17` | Tange Stock | `stock.tanggestock.com` | data | 229 | 全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具 |
 | `aiapi12` | GoRouter | `gorouter.app` | aiapi | 230 | AI 应用基础设施与统一 API 网关，通过标准统一 API 协议接入海量 AI 模型（OpenAI/Claude/Gemini/DeepSeek/Qwen/Llama 等），支持 NewAPI 多协议一键配置、负载均衡、限流、成本追踪与多用户权限管理，开源可自托管，适合团队与开发者统一管理 AI 调用 |
 | `sc7` | Hackers Arise | `hackers-arise.com` | security | 231 | 知名黑客与渗透测试在线学习平台（OccupyTheWeb 出品），提供渗透测试、网络攻击与防御、Metasploit、Python 黑客、移动设备黑客、信息收集、网络战争、社会工程等系统的安全教程与付费课程，适合从零入门网络安全与渗透测试的攻防学习 |
 | `dt18` | Derivatives Monkey | `www.derivativesmonkey.com` | data | 232 | 领先的加密货币期权分析平台，跨多交易所（Derive/Deribit/Bybit/OKX/Binance/Thalex/Paradex/Aevo/Delta）统一呈现实时期权链、Greeks 希腊值、GEX 做市商 delta 曝险、隐含波动率微笑与期限结构，支持策略回测与对冲模拟，数据均标注交易所与时间戳，免费使用 |
@@ -938,3 +938,390 @@ npm run icons        # 抓取/补抓 favicon
 处理方式：**清空 `icon` 字段**（不写空串、直接删键），前端 `SiteCard.vue` 回落为「分类色块 + 首字母」（`@error` 亦会摘掉加载失败的 `<img>`），不会出现破图或假图标。
 
 **验收**：`npm run validate` 通过（9 条 `缺少 icon` 为预期警告）；图标文件 289 个，占位图 0 / 孤儿 0 / 悬空引用 0；`api/sites-data.json` 相对 HEAD 仅 **14 条** `icon` 字段变化（9 条清空 + 5 条换真实图标），无增删站点。
+
+### 21.8 控制台浅色模式 + 下一版方向调研（2026-09-25）
+
+**需求**：为本地运维控制台新增浅色模式；同时调研该工具下一版的升级方向。
+
+**实现（浅色模式）**：
+
+| 文件 | 改动 |
+|------|------|
+| `tools/console/ui/theme.js` | 新增：三态主题（`auto` / `light` / `dark`），持久化到 `localStorage['nav-console-theme']`，仅 `auto` 时响应系统偏好变化 |
+| `tools/console/ui/style.css` | `:root` 保持深色为默认，新增 `[data-theme="light"]` 覆盖同一组语义变量；把 20 处硬编码色（日志区 `#0f1116`、diff 行前景 `#a7f3d0`/`#fecaca`、时间戳 `#555b68`、滚动条 `#2e333d`、各类半透明 tint）全部提为变量 |
+| `tools/console/ui/index.html` | head 内联首屏防闪烁脚本（样式表解析前定下 `data-theme`）；顶栏右侧加 `#btn-theme` 三态按钮 |
+| `tools/console/ui/app.js` | 引入并调用 `initTheme()` |
+
+**关键取舍**：
+
+- **默认 `auto`（跟随系统）**：控制台首次打开不再是「永远深色」，而是随系统偏好；用户手选后不再被系统覆盖
+- **单一变量层**：深/浅两套只替换取值、不动选择器；新增元素只要用语义变量即自动获得双主题
+- **浅色下加深语义色**：`--accent` `#5b7cfa`→`#3055c8`、`--ok` `#34d399`→`#0a8159`、`--log-ts` `#555b68`→`#8f97a5`，避免浅底上对比度不足
+
+**验收（WCAG 对比度实测）**：浅色下正文 16.68、次要文字 5.21、强调色文字 6.44、白字/强调底 6.44、diff 新增行 8.06、删除行 8.99、日志 stdout 12.98 —— 均 ≥ 4.5:1；日志时间戳刻意弱化为 2.84（深色基线 2.77，保持一致的视觉层级）。
+
+**浏览器端到端验证**：浅色 / 深色切换后 `data-theme` 与按钮文案一致；F5 刷新后仍保持手选模式（持久化生效，未被 `auto` 覆盖）；`/ui/theme.js` 返回 200；无主题相关 JS 报错。
+
+**调研产出**：新增 `docs/nav-console-next-plan.md`（控制台 M8+ 方向），要点：
+
+- **P0 安全缺口**：写操作已有 `Origin` + `X-Nav-Console` 双重校验，但 **GET 读接口零校验、`Host` 头从未校验** —— DNS rebinding 场景下可被同源读取 `/api/sites/list`、`/api/env`、`/api/git/status`；仅监听 `127.0.0.1` 不足以防护（Jupyter 的做法是默认拒绝 Host 不指向本地的请求，并默认启用 token）
+- **候选方向（按性价比排序）**：① 安全收口（Host 校验 + 读接口鉴权）② 日志过滤 / 搜索 / 多任务切换 ③ 发布门禁 + 一键回滚（`vercel rollback`）④ 站点可用性看板 ⑤ 操作审计持久化 ⑥ hunk 级暂存 / 取消暂存 ⑦ 多环境 staging → promote
+- **里程碑建议**：M8 = ① + ②（低成本高收益、零新增依赖）；M9 = ③ + ⑤；M10 = ④ + ⑥
+- **明确不做**：不引入前端框架 / 构建步骤、不上 WebSocket（SSE 已足够）、不把控制台部署到公网
+
+### 21.9 M8 落地：安全收口 + 日志增强（2026-09-25）
+
+按 `docs/nav-console-next-plan.md` 的性价比排序，先做 M8（① 安全收口 + ② 日志增强），两项零新增依赖、互不耦合，同批交付。
+
+#### ① 安全收口（DNS rebinding 防护）
+
+| 文件 | 改动 |
+|------|------|
+| `tools/console/lib/api.mjs` | 重写 `isTrusted(req)`：新增 Host 头回环白名单校验（`hostNameOf()` 剥离端口 + 兼容 `[::1]:5175` IPv6 字面量）、Origin 主机名同源校验、非 GET 强制 `X-Nav-Console: 1`；删掉原先只在 POST 分支做的零散校验 |
+| `tools/console/server.mjs` | 请求入口统一调用 `isTrusted(req)`，静态资源（`/`、`/ui/*`、`/icons/*`）与读接口一并覆盖，不留旁路 |
+
+关键认知：**仅监听 `127.0.0.1` 挡不住 DNS rebinding** —— 攻击者页面可让自身域名解析到 `127.0.0.1`，此时浏览器发出的 `Host` 仍是攻击者域名，服务端必须校验 `Host` 才是核心防线。本机 `curl` / 脚本调试天然满足「Host 回环 + 无 Origin」，不受影响；调写接口需自行加 `-H "X-Nav-Console: 1"`，因此无需任何豁免路径。
+
+**新增自动化用例**：`tools/console/test-trust.mjs` + `package.json` 的 `console:test` 脚本。零依赖，用 `node:http`（而非 `fetch`，因 `fetch` 会忽略 `Host` 头）精确控制请求头，在独立端口拉起真实服务进程跑 13 条断言。
+
+**验收**：`npm run console:test` → **13/13 通过**（端口 5399）。放行 4 条：本机 Host / `localhost` / `[::1]` / 同源 Origin；拒绝 7 条：`Host=evil.com` 读接口与静态资源、跨站 Origin、POST 缺自定义头、跨站 Origin 带自定义头、伪造 Host 带自定义头；兜底 2 条：目录穿越尝试 404、未知接口 404。
+
+> 排障提醒：`server.mjs` / `lib/*.mjs` 是**启动时加载**的，改完必须重启控制台进程才生效；`ui/*.js`、`ui/style.css` 由 `serveFrom` 每次请求现读磁盘（`Cache-Control: no-store`），刷新页面即可。本次首轮 curl 实测仍是旧错误文案，即因进程未重启。
+
+#### ② 日志增强（过滤 / 搜索 / 多任务切换）
+
+| 文件 | 改动 |
+|------|------|
+| `tools/console/ui/core.js` | 日志模块重写：按任务 id 分桶的前端缓冲、关键字过滤 + `<mark>` 高亮（支持 `/正则/`）、四级流筛选、任务下拉、跟随开关、复制可见日志 |
+| `tools/console/ui/index.html` | 控制台新增 `.log-bar`（`#log-filter` / `#log-levels` 四枚 chip / `#log-count` / `#log-follow` / `#btn-copy-log`）；`#job-select` 任务切换下拉 |
+| `tools/console/ui/style.css` | `.log-bar` / `.job-select` / `.chip.toggle[.on]` / `.log-line mark` 样式；新增语义变量 `--mark-bg`（深浅两套取值）；收起态改为 `height: auto` 并隐藏 `.log-bar`（原 41px 魔法数在加入下拉后会裁切按钮） |
+| `tools/console/ui/app.js` | 改为调用 `initLogConsole()` 统一绑定日志区交互（原先散在 app.js 的清空/终止监听已内聚） |
+
+关键实现：
+
+- **切任务不串行**：前端 `Map<id, {title, status, lines}>` 各留缓冲；切换时经 SSE 重放服务端环形缓冲重建，故**先清掉该任务的非本地行再回放**（否则重复），本地行（如「已提交 abc」）标 `local: true` 保留
+- **多任务可见性**：每 15s 轮询 `/api/jobs` 同步状态，**控制台之外启动的任务也能出现在下拉里**；`isBusy()` 与「终止任务」按「是否存在运行中任务」判定，而非仅看当前打开的流（切换视图不会误判为空闲）
+- **安全渲染**：高亮用 `DocumentFragment` + `createTextNode` 拼装，不经 `innerHTML`，避免日志内容注入
+- **性能**：命中行增量追加 O(1)，仅切任务 / 改过滤条件时全量重绘，避免长日志 O(n²)
+
+**验收（浏览器端到端）**：自检任务 5 行 → 过滤「检查」得 `显示 4 / 5 行` + 4 处 `<mark>` → 清空恢复 5 行 → 关「输出」chip 可见行归零、再开恢复 → 任务下拉含 2 个任务且切换内容随之变化、无串行 → 浅色与深色两态日志区（时间戳 / 分级 chip / `<mark>` / 计数）均清晰可读、无「浅字压浅底」 → 「收起」后仅剩标题行且按钮不被裁切。
+
+**遗留观察（非回归）**：页面加载时 `/api/changes/summary` 与 `/api/sync/status` 偶现 `net::ERR_ABORTED`。复测为**页面重载中断了在途的慢请求**（两者都要起 git 子进程），直接请求（含同源 Origin 头）均 200。
+
+#### 文档同步
+
+`README.md`（控制台日志区能力、`console:test` 命令、安全边界描述、项目结构）、`docs/nav-console-next-plan.md`（① ② 标记已落地 + 新增「八、M8 实施记录」）、本文件。
+
+### 21.10 M9 落地：智能体 CLI（2026-09-25）
+
+控制台是给人看的（浏览器 + SSE），智能体需要的是**可被程序解析的命令行入口**。新增 `tools/cli`，覆盖四个命令域共 **28 条命令**。
+
+#### 交付物
+
+| 文件 | 说明 |
+|------|------|
+| `tools/cli/nav.mjs` | 入口：命令注册表（按 `path` 自动建表，重复或前缀不匹配直接抛错）、分发、`help`/`schema` 元命令、退出码 |
+| `tools/cli/lib/core.mjs` | 内核：输出信封、退出码映射、全局参数剥离、命令参数解析、长任务等待、宽字符表格渲染、预演信封 |
+| `tools/cli/commands/sites.mjs` | 站点管理 9 条：list / get / add / update / remove / categories / meta / icon / check |
+| `tools/cli/commands/publish.mjs` | 发布与云端 5 条：status / run / verify / sync-data / deployments |
+| `tools/cli/commands/git.mjs` | Git 工作流 9 条：status / diff / log / suggest / stage / unstage / commit / push / remote |
+| `tools/cli/commands/data.mjs` | 数据体检与环境 5 条：stats / integrity / diff / validate / doctor |
+| `tools/cli/README.md` | 输出契约、退出码、命令清单、预演语义、新增命令的写法 |
+| `package.json` | 新增 `bin.nav` 与 `nav` 脚本 |
+
+#### 关键实现要点
+
+- **输出契约**：stdout 只有一份结果文档（默认单行 JSON `{ok,command,data,meta}`，`--pretty` 转文本），进度与子进程日志一律走 stderr，因此 stdout 可直接 `JSON.parse`。`note()` 仅在 `--quiet` 时静默（原先 `--pretty` 也会静默，导致预演模式下 `sites check` 的进度条完全不可见）
+- **退出码语义化**：0 成功 / 1 内部 / 2 用法 / 3 环境缺失 / 4 远端失败 / 5 业务拒绝。`toCliError()` 按消息特征兜底归类，命令也可显式返回 `{ ok:false, exitCode, error }` 自行判定（如 `sites check --strict`、`data validate`、`data doctor`）
+- **零业务重复**：所有命令复用 `tools/console/lib/*`（sites / data / changes / git / jobs / sync / vercel / env），控制台与 CLI 共用同一套逻辑；`data validate` 直接 `execFileSync(process.execPath, [scripts/validate-data.mjs])`，与发布门禁、CI 同口径
+- **长任务同进程**：复用 `jobs.mjs` 但**不经 SSE** —— CLI 与 job 同进程，直接轮询内存 job 对象的 `events[]` 实时把日志打到 stderr，结束返回 `steps[]` / `logs[]` / `cloudVersion` / `deploymentUrl`；超时默认 15 分钟（`--timeout` 可调），超时按退出码 4 返回并 `killJob`
+- **写操作可预演**：`--dry-run` 为全局选项，但**预演不另写一套校验** —— 在 `sites.mjs` 的 `addSite` / `updateSite` / `removeSite` / `downloadIcon` 上加 `{ dryRun }` 参数，走完全部校验与 ID 计算后提前返回。因此预演出的 `id` / `sortOrder` / 报错与实写完全一致（实测 `sites add --dry-run` 返回 `id=l15 / sortOrder=299`，落盘前后数据文件 MD5 不变）。`publish run --dry-run` 额外给出 `blockers[]`，直接说明「为什么真跑会失败」
+- **表格对齐**：中文表格用 `displayWidth()`（东亚宽字符与 emoji 记 2 列）计算列宽，原先 `padEnd` 按字符数补齐会让中文列全部错位
+
+#### 验收结果（28 条命令全部实测通过）
+
+| 项目 | 结果 |
+|------|------|
+| 元命令 | `--version` / `version` → `3.0.0`；`schema` 输出完整清单；`help` / `help sites` / `help sites add` / `nav sites` / `nav sites add --help` 五种帮助路径正常 |
+| 只读命令 | `sites list/get/categories/meta/check`、`publish status/verify/deployments`、`git status/diff/log/suggest/remote`、`data stats/integrity/diff/validate/doctor` 全部 exit 0 |
+| 写命令 | `sites add/update/remove/icon`、`git commit/stage/unstage/push`、`publish run/sync-data` 的 `--dry-run` 全部 exit 0；`git stage` → `git unstage` 往返后索引回到 0 暂存 |
+| 预演不落盘 | `sites add/update/remove --dry-run` 前后 `api/sites-data.json` MD5 一致（`7386737D…`） |
+| 错误路径 | 未知命令域 / 未知子命令 / 缺必填参数 / 缺位置参数 / 未知选项 / 非数字 `--timeout` 均 exit 2 且 `hint` 给出用法；`sites add` 重复域名 exit 5（`REJECTED`） |
+| 只读 + `--dry-run` | 提示「只读命令，--dry-run 无效果」到 stderr，不影响 stdout JSON |
+| 环境自检 | `data doctor` → 正常 10 / 告警 0 / 失败 0（Node v22.16.0、git 2.55、curl 8.19、`SITES_ADMIN_KEY` 与 `VERCEL_TOKEN` 已配置、298 站点 / 289 图标、origin 正常） |
+| 云端链路 | `publish status` → 本地 298 / 云端 298（v96）已收敛；`publish verify` 第 1 次轮询即收敛；`publish deployments` 正确关联提交 |
+
+> 排障提醒：`data doctor` 只检查**本地命令真正依赖**的东西。`BLOB_READ_WRITE_TOKEN` 只在 Vercel 运行时需要（本地热更新走管理接口），故不作为检查项，避免在健康环境里报无意义的告警。
+
+#### 文档同步
+
+新增 `tools/cli/README.md`；`README.md`（新增「智能体 CLI」小节、`nav` 命令、项目结构条目）、本文件。
+
+### 21.11 M9 修订：预演不再需要管理密钥（2026-09-25）
+
+**问题**：`publish run` / `publish sync-data` 的 `requireAdminKey()` 写在 `if (ctx.dryRun)` 分支**之前**，导致「只想看看会发什么」的预演也必须先配好 `SITES_ADMIN_KEY`，缺密钥时直接以退出码 3 中止。预演本身不触碰云端，这个前置校验与「`--dry-run` 是零成本前置检查」的定位相矛盾 —— 智能体在无凭据环境里做发布前自检会被无谓拦住。
+
+**改动**（`tools/cli/commands/publish.mjs`）：
+
+- `runCmd` / `syncDataCmd` 的 `requireAdminKey()` 与 `guardRunning()` 下移到 `if (ctx.dryRun)` 分支**之后**，只在真正要启动 job 时才校验
+- `publish run --dry-run` 的 `blockers[]` 新增一条：缺 `SITES_ADMIN_KEY` 时列出「实际发布会中止在热更新前（用 data doctor 确认环境）」—— 预演放行但仍如实告知真跑会失败，避免制造「预演通过 = 可发布」的假象
+
+**安全性未削弱**：真跑路径的密钥校验位置不变，缺密钥依旧退出码 3；`sync-data` 真跑实测 `{"ok":false,"code":"ENV_MISSING"}` exit 3 且未启动 job。
+
+**实测**（把 `SITES_ADMIN_KEY` 置空构造缺密钥环境；`env.mjs#loadEnv()` 不覆盖已存在的环境变量，故可稳定复现）：
+
+| 场景 | 结果 |
+|------|------|
+| 无密钥 · `publish run --dry-run` | exit 0，`ok:true`，`blockers` 含缺密钥一条 |
+| 无密钥 · `publish sync-data --dry-run` | exit 0，`ok:true` |
+| 无密钥 · `publish sync-data --no-commit --no-push`（真跑） | exit 3，`ENV_MISSING`，未启动 job |
+| 有密钥 · `publish run --dry-run` | exit 0，`blockers` 为空 |
+
+**文档同步**：`tools/cli/README.md`（预演语义补「不需要密钥」）、`nav-cli-agent-guide/nav-cli-agent-guide.html`（第五章原先写的「预演仍需密钥」已改为反向结论，配方 2 注释同步）。
+
+### 21.12 Nav V5 方向调研（2026-09-25）
+
+**诉求**：M9（智能体 CLI）代码先不提交，继续调研下一个版本往哪走。方法为「三路外部调研 + 本地能力盘点」，产出 `docs/NAV-v5-upgrade-plan.md`。
+
+**关键发现（驱动整份方案的洞）**：**云端数据没有历史。** `api/sites.js` 写入 Blob 用的是 `addRandomSuffix: false` + `allowOverwrite: true`，并维护一个只增不减的 `version` 计数 —— 覆盖即丢失；Vercel Blob 本身也没有对象版本控制（只有 `allowOverwrite` / `addRandomSuffix` / `ifMatch` 乐观锁，后者只防冲突不存历史）。唯一的恢复源是本机 `backups/sites-data-*.json`（现有 25 份），既不上云也无版本语义。于是：**代码能回滚一步（Hobby 限制），数据却回不来。**
+
+**本地能力盘点**（写进方案「现状体检」）：控制台 24 条路由（13 读 + 11 写）+ 5 面板 + SSE 日志；CLI 28 命令 / 4 域（sites 9 · publish 5 · git 9 · data 5）；发布链路 6 步；数据脚本 6 个。
+
+**V5 候选方向（按性价比排序）**：
+
+| 方向 | 成本/风险 | 要点 |
+|------|-----------|------|
+| ① MCP 服务化 | 中低 / 低 | 用官方 `@modelcontextprotocol/sdk`（stdio）包一层；**28 命令不一对一映射**，收敛为 4 个域级网关工具 + 1 个 `nav_status`，合计 5 个；写操作要求 `confirm: true` |
+| ② 云端数据快照 + 发布门禁 + 回滚 | 中 / 中 | 快照优先（补上面的洞）；门禁走 Hobby 可行的 `deploy --prod --skip-domain` → 人工放行 → `promote` → `cache purge`；**回滚写入时 `version` 必须继续递增**，回退计数会让收敛轮询误判 |
+| ③ 操作审计日志 | 低 / 低 | 新增 `tools/console/.data/audit.jsonl`（当前无 `.data/` 目录） |
+| ④ 站点可用性看板 | 中 / 低 | 复用 `check-sites.mjs` 分级；**连续 N 次失败才判 down**，429/403/405/401 归 `limited`；历史先落 JSONL，不引 SQLite |
+| ⑤ hunk 级暂存 | 中 / 中 | `git diff` 取 hunk → `git apply --cached`（无上下文补丁配 `--unidiff-zero`）；失败用 `git restore --staged <file>` 收尾；hunk 边界手写解析，不引 `jsdiff` |
+| ⑥ 多环境 staging | 高 / 中高 | 技术上 Hobby 可用 CLI 自定义环境，但单人导航站收益有限，**后置** |
+
+**建议先做 V5-M1（MCP）+ V5-M2（快照/门禁/回滚）**：M1 复用 M9 成果、成本集中在「工具收敛」这一处设计决策；M2 的云端快照是唯一「不做会持续暴露数据丢失风险」的项，且与 M1 无耦合。③ 体量最小，搭 M2 一起交付。
+
+**编号关系**：`nav-console-next-plan.md` 原定 M9 = 发布门禁 + 审计、M10 = 看板 + hunk 暂存，但 **M9 实际被智能体 CLI 占用**；本方案以 `V5-M*` 重新编号，原 ③④⑤⑥ 顺延至 V5-M2 / M4 / M3 / M5。
+
+**来源核实**：方案内 35 条来源全部带 URL，其中关键 5 条已逐条打开验证 —— `vercel rollback`（Hobby 仅上一个生产部署，更早报 `upgrade to pro`）、MCP 版本页（`2026-07-28` 为 Current）、工具数膨胀分析（58 工具 ≈ 55k token，30–50 阈值）、Deployment Checks（「等检查通过」而非「等人点确认」）、`vercel deploy --skip-domain`（须与 `--prod` 同用，关闭生产域名自动分配）均与方案描述一致。另经脚本校验：引用编号无越界、无「引用无来源」、无「来源未被引用」。
+
+**文档同步**：新增 `docs/NAV-v5-upgrade-plan.md`；`README.md`（M9/M10 说明改为「M9 被 CLI 占用」+ 补 V5 方案链接、项目结构补三份 docs 条目）、本文件。
+
+### 21.13 M10 落地：控制台开机自启 + 桌面快捷方式（2026-09-25）
+
+**诉求**：参照 `TokenRhythm-Batch-Manager`（TRBM）的前后端处理方式，给控制台加开机自启与桌面快捷方式。当时确定的口径是「只自启运维控制台 / NSSM 服务·当前用户+密码 / Chrome app 模式快捷方式」。
+
+**交付物**（新增 `tools/console/launcher/`，共 8 个脚本 + 1 个图标）：
+
+| 文件 | 作用 |
+|------|------|
+| `install-autostart.ps1` | 注册/移除「登录自启 + 保活」计划任务，并同步快捷方式（**实际落地路线**） |
+| `ensure-console.ps1` | 幂等保活：探活健康则秒退，否则拉起（计划任务的动作） |
+| `start.ps1` / `stop.ps1` | 启用并启动 / 停用并停止（stop 会同时停用任务） |
+| `sync-shortcuts.ps1` | 桌面 + 任务栏 Chrome app 快捷方式 |
+| `build-icon.ps1` + `make-icon.mjs` | 源图居中裁切去水印 → 256×256 → 打包 `app.ico`（零依赖 PNG-in-ICO） |
+| `install-service.ps1` / `set-service-account.ps1` | NSSM 服务路线（需账户有密码；日志轮转 / 崩溃重启 / 账户重绑） |
+| `lib.ps1` | 共享工具：node 定位 / 健康探测 / 原生调用（PS 5.1 引号修正） |
+
+配套改动：`server.mjs` 新增 `--strict-port`（钉死端口，默认仍可漂移）；`package.json` 新增 8 条 `console:*` 脚本；`.gitignore` 忽略 `nssm/`、`logs/`、`icon-256.png`（`app.ico` 入库）。
+
+**关键实现要点**：
+
+- **端口必须钉死**：原 `server.mjs` 在 `EADDRINUSE` 时自动 `+1` 顺延（最多到 5185）。服务化/快捷方式场景下端口漂移会让快捷方式指向空端口，故新增 `--strict-port`：占用即 `exit 1` 并打印「严格端口模式下不会自动漂移」。实测：strict 第二实例 `exit=1`、无 strict 的实例顺延到 5176。
+- **保活做成幂等一次性任务，而不是常驻看门狗**：任务动作是 `ensure-console.ps1`（先探活，健康直接退出），同一任务挂两个触发器 —— `AtLogOn` + 每 5 分钟兜底。这样不需要常驻进程，也不必处理「看门狗自己卡死」。
+- **`stop.ps1` 必须同时停用任务**：否则 5 分钟后的保活会把进程拉回来，出现「停了又活」。TRBM 用一个自过期维护锁解决同类问题，这里直接停用任务更简单。
+- **图标三处细节**：AI 生成源图右下角带水印，故 `build-icon.ps1` 先做居中裁切（默认 1400×1400）再高质量缩放；ICO 用「PNG 内嵌进 ICO 容器」写法（Vista+ 支持），避免 `Bitmap.GetHicon()` 掉 alpha；ICO 目录项只有 1 字节存尺寸，故强制 ≤256×256。
+- **坚持「当前用户」而非 `LocalSystem` 的唯一理由是 git 凭据**：控制台的 Git 面板要 `git push` 到 `https://github.com/arwei944/navigator-v2.git`，凭据由 Git Credential Manager 存在当前用户凭据管理器里；`LocalSystem` 走 `systemprofile`，拿不到。
+
+**验收结果**（实测）：
+
+| 项 | 证据 |
+|----|------|
+| 计划任务 | `nav-console`：触发器 2 个（`MSFT_TaskLogonTrigger` user=Administrator + `MSFT_TaskTimeTrigger` Repetition=`PT5M`），`LastTaskResult=0` |
+| 控制台可达 | `curl http://127.0.0.1:5175/` → `200`；页面标题 `nav-console · 本地运维控制台` |
+| 运行身份 | `node.exe` PID 7772，`DESKTOP-90S2RHI\Administrator`；命令行 `"…\node.exe" "…\server.mjs" --port 5175 --strict-port` |
+| 保活真实生效 | 强杀控制台 → 探活 `000` → 触发任务 → `200`（修复慢查询后 **5.9s**，修复前 35s）；**任务退出后子进程仍存活**（任务托管子进程不会被回收） |
+| git 凭据可用 | `git config --get credential.helper` = `manager`；`cmdkey /list` 含 `gh:github.com:arwei944` |
+| 快捷方式 | 桌面 + 任务栏 `.lnk` 均指向 `chrome.exe --app=http://127.0.0.1:5175`，图标 `app.ico`；实际打开 Chrome 窗口标题 `nav-console · 本地运维控制台` |
+| 图标 | `app.ico` 72789 字节 / 256×256 |
+
+**排障记录（五条，都会反复踩）**：
+
+1. **`.ps1` 必须 UTF-8 with BOM**。首次运行报 `Unexpected token 'app=$url"'` + `The '--' operator works only on variables`：PowerShell 5.1 对**无 BOM** 的 `.ps1` 按 GBK 解码，中文多字节序列被拆坏后直接破坏语法。TRBM 的脚本开头都带 BOM 正是为此。修法：`[System.IO.File]::WriteAllText($f, $text, (New-Object System.Text.UTF8Encoding($true)))`。**用 Write/Edit 工具改完 `.ps1` 后要重新补 BOM**，并可用 `[System.Management.Automation.Language.Parser]::ParseFile()` 做无副作用语法校验。
+2. **PS 5.1 调用原生程序会吞掉内嵌引号**。`& $nssm set svc AppParameters "`"$path`" --port 5175"` 存进去变成不带引号的路径，`AppDirectory` 无法兜住，node 报 `Cannot find module 'C:\work\solo'`（仓库路径含空格 `C:\work\solo work\…`）。这与本项目既有的教训同源（`publish.mjs` 必须用 `execFileSync(process.execPath, [scriptPath])` 而非 shell 拼接）。修法：用 `System.Diagnostics.ProcessStartInfo` 自己拼命令行（`Invoke-Native`，空串也要包成 `""`），已抽到 `lib.ps1`。
+3. **空密码账户无法做服务登录**（决定了路线从「服务」改为「计划任务」）。`Administrator` 账户 `Password required: No`，NSSM 直接拒绝空密码（`Setting "ObjectName" requires both a username and password!`）；改用 `sc.exe config obj= .\Administrator password= ""` 可写入，但 `sc start` 报 **`1069 The service did not start due to a logon failure`**。进一步排查：`SeServiceLogonRight` 原本不含该账户（用 NSSM 设 `ObjectName` 可借它自动授予，已成功），**但授予后 1069 依旧** —— 即空密码本身被 Windows 拒绝（`LimitBlankPasswordUse` 语义：非控制台登录一律挡）。**结论：要走 NSSM 服务必须先给账户设密码**（会改变用户每次登录体验），而控制台只监听 `127.0.0.1`、登录前无人能用，故最终选「登录自启」——可用性等价且不必动账户。失败的服务实例已用 `nssm remove nav-console confirm` 清理，`install-service.ps1` 保留备用。
+4. **`Get-NetTCPConnection` 在本机要 34~40 秒**（走 CIM/WMI）。保活脚本用它做「端口是否被占」，导致控制台一旦掉线，要 35 秒才被拉起来。实测对比：`Get-NetTCPConnection` 33.8s / 40.6s，`netstat -ano` **0.41s**，`TcpClient.Connect` **0.04s**。修法：`lib.ps1` 新增 `Get-PortListener`（解析 `netstat -ano`，能拿到 PID）与 `Test-PortListening`（TcpClient 一次性连接探测），`ensure-console.ps1` / `stop.ps1` 全部替换。修复后冷启动拉起 **35s → 5.9s**（其中 2.1s 是 PowerShell 冷启动）。**结论：本机任何「查端口占用」都不要用 `Get-NetTCPConnection`。**
+5. **从终端 `Start-Process` 拉起 node 会让 `pnpm run` 卡死**。node 会继承调用方的 stdout 管道句柄，`pnpm run console:start` / `console:autostart` 里 npm 永远等不到 EOF —— 命令看起来「卡住」（实测 150s 超时未返回）。更糟的是 `install-autostart.ps1` 的「立即拉起」在**快捷方式同步之前**，所以卡死会连带快捷方式根本不生成。修法：新增 `lib.ps1#Start-NavTaskNow`（`schtasks /run` + 探活轮询），`start.ps1` / `install-autostart.ps1` 的「立即拉起」改走计划任务 —— 进程由任务计划服务派生，完全脱离终端句柄。`ensure-console.ps1` 内的 `Start-Process` 保留（它只在任务上下文里跑，那里没有 npm 管道）。修复后 `console:start` 19.5s 返回、`console:autostart` 20.8s 返回且快捷方式正常同步。
+
+**文档同步**：`README.md`（常用命令补 `console:autostart`；控制台章节新增「开机自启与桌面快捷方式」小节 + launcher 脚本表 + BOM 警告；项目结构补 `launcher/`）、本文件。
+
+### 21.14 M11 落地：新增站点「只填网址即自动补全」（2026-09-25）
+
+**诉求**：把「新增站点」做智能 —— 用户只给一个网址，名称 / 描述 / 分类 / 配色 / 图标全部自动补好，且不得覆盖用户已经手改过的字段。线上前端弹窗与本地控制台两个入口都要。
+
+**交付物**：
+
+| 文件 | 作用 |
+|------|------|
+| `shared/site-infer.mjs` | **新增**，唯一的推断引擎：标题清洗 / 描述兜底 / 分类打分 / 配色推断 / 图标候选 / 多编码解码 |
+| `api/metadata.js` | 改为调用共享引擎；抓取失败不再报错，改为产出域名草稿 + `warning` |
+| `tools/console/lib/sites.mjs` | 删除本地重复的 `CATEGORY_HINTS`，改调共享引擎，并额外传入已收录站点与分类表 |
+| `src/components/AddSiteModal.vue` | 重写为「粘贴即补全」：状态行 + 来源/置信度小标签 + 图标预览 |
+| `tools/console/ui/sitespanel.js` `ui/index.html` `ui/style.css` | 粘贴网址自动补全、自动字段描边、`result warn` 样式 |
+| `tools/console/test-infer.mjs` | **新增**，66 条断言覆盖推断引擎 |
+
+**关键实现要点**：
+
+- **一份引擎两处复用**：线上 Serverless（`api/metadata.js`）与控制台（`lib/sites.mjs`）都走 `shared/site-infer.mjs`，避免两边口径漂移。控制台额外传 `existingSites` + `categoryMeta`，让「同域名 / 同族域名 / 品牌词」加权与分类白名单生效。
+- **ASCII 与中文关键词分区匹配**：`CATEGORY_HINTS` 编译成 `COMPILED_HINTS`，纯 ASCII 词（`account`/`api`/`data`…）**只**匹配站名+关键词+域名+路径，含中文词才允许连同描述一起匹配。否则 `Sign in to your account` 会把 AI 站点判成账号类。
+- **分类是白名单**：`categoryMeta` 里没登记的分类一律丢弃，保证推荐出的 `categoryId` 一定能通过 `addSite` 校验，不会写脏数据。
+- **抓不到页面也出草稿**：403 反爬 / 超时 / 空响应都不算失败，按域名与分类表生成草稿并回 `warning`；若该域名（或同族域名）已收录，**直接沿用已收录站名** —— `chat.openai.com` 得到「ChatGPT」而不是拼出来的「Openai」。
+- **不覆盖用户手改**：前端/控制台各维护一份 `touched` 标记，用户碰过的字段永不自动写入；换到**另一个域名**时整体重置（换了站就该重填），同域名重抓保留手改值。自动写入的字段加描边，一改动即摘掉。
+- **请求序号守卫**：连续改网址时先发的慢请求可能后返回，用 `reqSeq` 丢弃过期响应，避免把新结果覆盖成旧的。
+
+**验收结果**（实测）：
+
+| 项 | 证据 |
+|----|------|
+| 引擎单测 | `node tools/console/test-infer.mjs` → **66 条断言全通过** |
+| 控制台端到端 | `uniswap.org` → 名称 `Uniswap Interface` / 分类 `dex` / 配色 `#ff007a` / 状态行 `result ok`；改 `chat.openai.com` → 名称沿用为 `ChatGPT`、分类 `入门对话`、状态行 `result warn`（降级提示） |
+| 前端端到端 | `github.com` → 名称 `GitHub` / 分类 `coding` / 配色 `#1e2327` / 图标预览有图 / 四个字段均带「自动 · 置信度」标签 |
+| 手改优先 | 手改「站点名称」为 `我手改的名字TEST` 后点「重新补全」→ 名称保持手改值且标签消失，其余字段被刷新 |
+| 构建 | `npx vite build` 通过 |
+
+**排障记录（三条）**：
+
+1. **用例 c7 失败不是匹配逻辑的问题**，而是测试夹具的 `CATEGORY_META` 没登记 `cex`，被分类白名单直接丢掉。修法是补夹具，而不是改引擎 —— 记住「分类白名单」这一层会先于打分生效，用例的期望分类必须先登记。
+2. **浏览器实测「换域名不触发补全」是假象**。报告说把网址从 `github.com` 换成 `www.zhihu.com` 后没反应，实际是测试脚本的 `Ctrl+A` 没清空输入框，值被拼成了 `zhihu.comwww.zhihu.com`；证据是浏览器控制台出现了 `https://www.zhihu.comwww.zhihu.com/favicon.ico` 的请求 —— **补全确实被触发了**，只是域名是坏的。判定这类问题时，先看「有没有向新域名发出请求」，再看字段值。
+3. **图标预览对部分站点为空属预期**：预览用的是页面声明的图标 URL，被热链保护拦下时 `@error` 会把 img 摘掉。真实下载由 `downloadIcon` 的多来源链（页面声明 → `/favicon.ico` → `favicon.im`，含占位图识别）负责，与预览无关。
+
+### 21.15 M11 补丁：本地覆盖层修复「云端轮询冲掉本地改动」（2026-09-25）
+
+**缺陷**：前端每 30 秒轮询 `/api/sites`，`applyCloudData` 直接 `sites.value = data.sites` 整体替换。访客在本地新增的站点、改过的字段、删掉的条目，下一轮轮询就被云端数据冲掉（只有 `visitCount` 因单独记账侥幸保留）。M11 让「新增站点」变得很顺手之后，这个缺陷的暴露面被显著放大 —— 用户刚补全并提交的站点，30 秒后自己消失。
+
+**修法：本地覆盖层（overlay）**。`src/stores/sites.js` 拆成「云端基底 + 本地覆盖层」，用 `rebuild()` 拼出渲染列表：
+
+| 覆盖层字段 | 语义 |
+|-----------|------|
+| `adds[]` | 本地新增的整条站点 |
+| `edits{}` | 对云端站点的字段级补丁（按 id） |
+| `deletes[]` | 「本地隐藏」墓碑（按 id），用于删掉云端站点 |
+| `order[]` | 本地排序后的 id 序列，只描述这批 id 的相对次序 |
+| `visits{}` | 访问计数 |
+
+要点：
+
+- **渲染列表不再等于云端数组**。`sites` 是 `rebuild()` 的产物，任何改动只写覆盖层再 `rebuild()`，不直接改 `sites`。云端下架的站点不在基底、也不在覆盖层，自然消失 —— 下架仍能正常传导。
+- **`cloudSites` 只存云端基底**，`applyCloudData` 只换基底再 `rebuild()`，覆盖层原样保留。这是修复的核心：轮询不再有破坏性。
+- **排序不写 `sortOrder`**。`reorderSites` 只记录 id 相对次序到 `order[]`；`sortOrder` 是云端全局序号，前端重排不该覆盖它。未登记的 id 排在其后且保持原相对位置（云端新收录的站点不会被挤乱）。
+- **删除分两种**：本地新增的连数据一起删（从 `adds` 摘除）；云端来的只记墓碑（`deletes`），回收站恢复时撤墓碑即可，不需要重建数据。
+- **发布后清层**：`AdminView.vue` 发布成功后先 `applyCloudData(data)` 用响应回填基底，再 `clearLocalOverlay()` —— 覆盖层内容此时已进云端，若不清掉会长期遮蔽后续云端变更（本地看到的水远是发布那一刻的快照）。顺序不能反，否则清层瞬间会回退到旧基底。
+
+**验收结果**（临时联调服务实测，托管 `dist` + 可变云端数据 + `/api/_harness/bump` 抬高版本号）：
+
+| 场景 | 证据 |
+|----|------|
+| 基线 | 清 SW/缓存/覆盖层后：云端 v100 / 298 站点，`nav-sites-overlay` 为 `null` |
+| 本地新增 | 添加 `example.com` → 299 站点，覆盖层 `adds` 含 1 条 |
+| 刷新保持 | F5 后仍 299，`adds` 完整 |
+| **轮询不冲掉新增** | bump 到 v101 并等 40s 轮询 → **仍 299**，`adds` 未被清空 |
+| **轮询不恢复已删** | 右键删除 `GitHub Copilot`（`cd2`）→ 298，`deletes: ["cd2"]`；F5 后仍 298；bump 到 v102 等 40s → **仍 298**，墓碑仍在 |
+| 引擎单测 | `node tools/console/test-infer.mjs` → 66 条断言全通过 |
+| 控制台信任边界 | `npm run console:test` → 13 条断言全通过 |
+| 数据门禁 | `npm run validate` → 通过（9 条已知无图标站点为预期警告） |
+
+**排障记录**：
+
+1. **验证前必须清 Service Worker 与 Cache**。PWA 会把旧的 `dist` 资产长期缓存，直接访问会命中旧代码，表现为「改了没生效」。清理 `navigator.serviceWorker.getRegistrations()` + `caches.keys()` 后 reload 才可信。
+2. **联调服务要托管构建产物而非 dev server**。dev server 不做 SW 注册，无法复现轮询与缓存行为；用 `dist` 才能验证到真实运行形态。
+3. **临时联调服务不属于仓库产物**，验证完即删（`%TEMP%\nav-e2e\`），避免污染仓库。
+
+### 21.16 M11 补丁 2：自动补全的「残留字段」与分类下拉错位（2026-09-26）
+
+**背景**：按要求复查「只填网址即自动补全」链路（本轮未发布）。逐入口核对后确认上一轮修复均在位，另发现两个会写脏数据的缺陷。
+
+**缺陷 A：换网址后抓取失败 → 上一站的字段被提交给新站**
+
+`AddSiteModal` 只在抓取**成功**时 `applyMeta` 覆盖字段，失败分支仅把 `meta` 置空。于是「先补全 A 站成功 → 改成 B 站 → B 抓取失败/超时 → 提交」会把 A 的名称、描述、分类、图标原样存给 B。更常见的路径是：改完网址直接点「添加」，`blur` 触发的补全尚未返回，`submit()` 已拿上一站的 `faviconUrl` 落库。
+控制台 `sitespanel.js` 同构：`saveSite` 把 `state.faviconUrl` 交给 `fetchIcon`，换网址后抓取失败时会把上一站的图标下载进新站的图标文件。
+
+**修法**：
+
+- 新增 `resetForNewHost()`：换域名即清空 `name / desc / categoryId / color / faviconUrl / faviconHost`，新域名从空白开始，抓取失败也不继承上一站。
+- 新增 `faviconHost`：图标绑定在**响应自带的 `domain`**（而非当前输入框，避免响应晚到张冠李戴）；`submit()` 仅在 `faviconHost === 提交域名` 时才写 `iconUrl` —— 宁可让卡片回落字母块，也不挂错图。
+- 两个失败分支（`!res.ok` 与 `catch`）显式清空图标，避免预览继续显示上一站的图。
+- 控制台加 `state.faviconHost` 守卫，`openForm` 一并重置。
+
+**缺陷 B：分类下拉预选 `starter`，与「未识别，请手动选择」自相矛盾**
+
+`form.categoryId` 初值为 `'starter'`。补全返回未识别分类时 `applyMeta` 不覆盖（`hasCategory('')` 为假），下拉框仍显示「入门对话」，旁边却写着「未识别，请手动选择」—— 用户会静默提交错分类。
+
+**修法**：初值改为 `''`，下拉框加 `<option value="" disabled>请选择分类</option>`。已识别时自动选中；未识别或抓取失败时由 `required` 拦住提交，迫使做一次显式选择，与上一轮「分类未生效就说未识别」的口径对齐。
+
+**验收**：
+
+| 项 | 结果 |
+|----|----|
+| 引擎断言 | `node tools/console/test-infer.mjs` → 76 条全通过 |
+| SSRF 断言 | `node tools/console/test-guard.mjs` → 27 条全通过 |
+| 信任边界 | `npm run console:test` → 13 条全通过 |
+| 数据门禁 | `npm run validate` → 298 站点通过（9 条已知无图标为预期警告） |
+| 构建 | `npm run build` → 通过 |
+| 线上处理器实测 | 直连真实站点：`github.com` → GitHub / coding / `#1e2327` / fluidicon.png，无 warning；`zhihu.com` → 知乎 + 真实描述、分类留空（白名单宁缺毋滥）；`chat.openai.com` 本机超时 → 沿用已收录站名 ChatGPT + 生成描述 + 复核 warning；`127.0.0.1` 与 `169.254.169.254` → 400「该地址指向内网或本机」 |
+
+**遗留观察（未改，待定夺）**：`api/sites-data.json` 有 20 条 `url` 带 `www.` 前缀（如 `www.stepfun.com`），其中 `www.kuaikejm.com/kk/index.html` 还带路径，与「只存域名」的约定不符。控制台 `normalizeUrl` 保留 www、前端弹窗剥掉 www，两个入口落库口径不同；去重走 `hostOf`（两侧都剥 www）故不会产生重复条目，仅存量数据不齐。统一需改数据文件并发布，本轮按「先不发布」未动。
+
+---
+
+## 二十二、更新：Tange Stock（dt17）URL 指向主域名（2026-09-26）
+
+用户提交 `https://stock.tanggestock.com/`。经确认该**主机名已收录**（`dt17`），但存量 `url` 带 `/auth` 子路径 —— 按规则「同一域名更新而非新增，导航指向主域名」，不重复建条目，仅把 URL 收敛到根域名：
+
+- 旧：`stock.tanggestock.com/auth`（子页）
+- 新：`stock.tanggestock.com`（根域名；实测 HTTP 200 且无重定向，`num_redirects=0`）
+- 名称 / 描述 / 分类（`data`）/ 配色（`#f59e0b`）/ 图标（`icons/dt17.jpg`，12KB 真实 JPEG）**均未改动**，`updatedAt` 同步刷新
+- 命令：`nav sites update dt17 --url stock.tanggestock.com`（先 `--dry-run` 预演确认仅 `url` 一个字段变化）
+- 验收：`nav sites check --ids dt17` → `200 ok`；`npm run validate` → 298 条通过（9 条已知无图标为预期警告）
+- **已发布**：v97（2026-09-29）上线；线上 `/api/sites` 中 `stock.tanggestock.com/auth` 残留 0 处
+
+**待确认**：该站当前 `<title>` 与 `og:site_name` 均为「Super View — 交易级数据工作台」，与存量名称「Tange Stock」不一致（域名仍是 `tanggestock.com`）。改名属既有条目的命名决策，本次未擅自改动，如需改可 `nav sites update dt17 --name "Super View"`。
+
+---
+
+## 二十三、站点收录：OpenMarket（2026-09-29）
+
+新增站点 `dt33`（data 数据与研究分类，前缀 `dt`）：
+
+| 字段 | 值 |
+|------|----|
+| id | `dt33` |
+| name | `OpenMarket` |
+| url | `openmarket.xyz`（根域名，未收 `/chart/rCYAmLvm` 图表子页） |
+| desc | 面向全市场的行情情报终端（Market Intelligence Platform）：在一个工作区内整合图表、技术指标、画图工具与价格提醒，覆盖多类市场的行情追踪与盯盘分析。 |
+| categoryId | `data`（数据与研究） |
+| color | `#3861fb`（站点未声明 theme-color，回落分类色） |
+| sortOrder | 299（全局递增，追加到数组末尾） |
+| icon | `icons/dt33.png`（8156 字节真实 PNG，`nav sites icon dt33` 抓取） |
+
+- 数据源：用户在 `https://openmarket.xyz/chart/rCYAmLvm` 提交（具体图表分享页），按「导航指向主域名」规则收录**根域名**；`normalizeUrl` 本身也只保留主机名
+- 抓取结果：根域名 HTTP 200，`<title>` = `OpenMarket - Market Intelligence Platform`；站点声明 `/apple-touch-icon.png`（180×180，8156 字节），图标自动探测命中该地址（与 `/favicon.ico` 1150 字节相比更清晰）
+- 分类归属：跨市场行情情报终端，与同分类既有 `dt17`（Tange Stock，同为交易数据工作台）口径一致，归入 `data`
+- 描述口径：站点 meta 为英文（`OpenMarket is the market-intelligence terminal for all: charts, indicators, drawings and alerts for every market in one workspace.`），库内描述统一中文，已按站点实况改写
+- 校验：`nav sites check --ids dt33` → `200 ok`；`npm run validate` → 299 条 / 29 分类通过（9 条已知无图标为预期警告）
+- 发布：v97（2026-09-29）上线；云端 `version=97` / 299 站点 / 290 图标，第 1 次轮询即收敛；线上 `/icons/dt33.png` → 200 `image/png` 8156 字节（与本地一致）
+
+---
+
+## 二十四、核实：mcp-api.trader.dev 与 ac12 同产品，不新增（2026-09-29）
+
+用户提交 `https://mcp-api.trader.dev/browse`。经核实该主机属**已收录产品** Trader.dev（`ac12`，`url` = `trader.dev`），按「同一产品不重复收录」规则**不新增条目**，`api/sites-data.json` 未改动：
+
+| 域名 | 标题 | 体积 | 说明 |
+|------|------|------|------|
+| `trader.dev`（已收录 `ac12`） | `trader.dev — vibe trading, automated` | 1224 B | 品牌落地页，点击可进应用 |
+| `mcp-api.trader.dev/` | `TraderDev -- Sign in` | 55308 B | 应用本体，根页为登录墙 |
+| `mcp-api.trader.dev/browse` | `Browse Strategies — TraderDev` | 33386 B | 公开策略榜，免登录 |
+
+- 同源证据：落地页 meta 的「one-click deploys to Bybit, Blofin, Toobit, and WeeX」与 `ac12.desc` 的部署目标完全一致，`/browse` 标题亦为 TraderDev
+- 未收 `/browse` 子页：按「导航指向主域名、不收子页」规则处理（`normalizeUrl` 本身也只保留主机名）
+- 决策：用户确认「不新增，保持现状」——保留落地页作为品牌入口，避免导航出现两张 Trader.dev 卡片
+- 影响：无数据变更、无需发布

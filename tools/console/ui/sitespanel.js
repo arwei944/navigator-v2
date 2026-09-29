@@ -5,8 +5,9 @@ const STATUS_LABEL = { pending: '待执行', running: '进行中', success: '完
 
 const state = {
   sites: [], categories: [], total: 0, matched: 0,
-  q: '', category: '', editing: null, faviconUrl: '',
+  q: '', category: '', editing: null, faviconUrl: '', faviconHost: '',
   steps: [], cloud: null, loading: false,
+  meta: null, lastHost: '', reqSeq: 0, touched: { name: false, desc: false, categoryId: false, color: false },
 }
 
 function el(tag, cls, text) {
@@ -151,12 +152,18 @@ function renderIconPreview(src) {
 function openForm(site) {
   state.editing = site || null
   state.faviconUrl = ''
+  state.faviconHost = ''
+  state.meta = null
+  state.lastHost = ''
+  resetTouched()
   $('#sites-form-title').textContent = site ? `编辑站点 ${site.id}` : '新增站点'
   $('#f-url').value = site ? site.url : ''
   $('#f-name').value = site ? site.name : ''
   $('#f-desc').value = site ? site.desc || '' : ''
   $('#f-category').value = site ? site.categoryId : ($('#f-category').value || '')
   $('#f-color').value = site?.color || '#3b82f6'
+  $('#btn-fetch-meta').textContent = '自动补全'
+  clearAutoMarks()
   setResult('#site-form-result', '', '')
   renderIconPreview(site?.icon || '')
   $('#sites-form-card').hidden = false
@@ -166,27 +173,94 @@ function openForm(site) {
 function closeForm() {
   state.editing = null
   state.faviconUrl = ''
+  state.meta = null
   $('#sites-form-card').hidden = true
 }
 
-async function doFetchMeta() {
+/* ---------- 自动补全 ---------- */
+
+const CONF_TEXT = { high: '高置信', medium: '中置信', low: '低置信请复核' }
+
+function resetTouched() {
+  state.touched = { name: false, desc: false, categoryId: false, color: false }
+}
+
+function hostOf(raw) {
+  const s = String(raw || '').trim()
+  if (!s) return ''
+  try { return new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s).hostname.replace(/^www\./, '').toLowerCase() } catch { return '' }
+}
+
+/** 推断出的分类必须是已登记分类，否则 addSite 会直接拒绝 */
+function knownCategory(id) {
+  return Boolean(id) && state.categories.some(g => g.categories.some(c => c.id === id))
+}
+
+/** 自动写入的字段加描边；用户一改动即摘掉，表示这格不再归自动补全管 */
+function markAuto(sel, on) {
+  $(sel).classList.toggle('autofilled', Boolean(on))
+}
+
+function clearAutoMarks() {
+  for (const sel of ['#f-name', '#f-desc', '#f-color', '#f-category']) markAuto(sel, false)
+}
+
+/** 只覆盖「用户没改过」的字段，避免把人的输入冲掉 */
+function applyMeta(m) {
+  const t = state.touched
+  if (!t.name && m.name) { $('#f-name').value = m.name; markAuto('#f-name', true) }
+  if (!t.desc && m.desc) { $('#f-desc').value = m.desc; markAuto('#f-desc', true) }
+  if (!t.color && m.color) { $('#f-color').value = m.color; markAuto('#f-color', true) }
+  if (!t.categoryId && knownCategory(m.categoryId)) { $('#f-category').value = m.categoryId; markAuto('#f-category', true) }
+  state.faviconUrl = m.faviconUrl || ''
+  // 图标记在它被抓取的域名上：换网址后抓取失败时，不能把上一站的图标下载给新站
+  state.faviconHost = hostOf(m.url || m.domain)
+  renderIconPreview(state.faviconUrl)
+}
+
+function summarizeMeta(m) {
+  const parts = []
+  // 只有本地下拉框里真有的分类才算补全成功，否则要说「未识别」，不然用户会以为补全坏了
+  parts.push(knownCategory(m.categoryId)
+    ? `分类 ${m.categoryLabel || m.categoryId}（${CONF_TEXT[m.confidence?.category] || '已推断'}）`
+    : '分类未识别，请手动选择')
+  const low = Object.entries(m.confidence || {}).filter(([, v]) => v === 'low').length
+  if (low) parts.push(`${low} 项为推断值`)
+  return `已自动补全 · ${parts.join(' · ')}`
+}
+
+async function doFetchMeta({ auto = false } = {}) {
   const raw = $('#f-url').value.trim()
-  if (!raw) { setResult('#site-form-result', 'err', '请先填写站点地址'); return }
+  if (!raw) {
+    if (!auto) setResult('#site-form-result', 'err', '请先填写站点地址')
+    return
+  }
+  const host = hostOf(raw)
+  if (state.lastHost && host && host !== state.lastHost) resetTouched()
+  state.lastHost = host
+
   const btn = $('#btn-fetch-meta')
+  // 连续改网址时先发的请求可能后返回，用序号丢弃过期响应，避免把新结果覆盖成旧的
+  const seq = ++state.reqSeq
   btn.disabled = true
+  btn.textContent = '补全中…'
   setResult('#site-form-result', '', '抓取中…（超时 15s）')
   try {
     const m = await api('/api/sites/meta?url=' + encodeURIComponent(raw))
-    if (m.name) $('#f-name').value = m.name
-    if (m.desc) $('#f-desc').value = m.desc
-    if (m.categoryId) $('#f-category').value = m.categoryId
-    state.faviconUrl = m.faviconUrl || ''
-    renderIconPreview(state.faviconUrl)
-    setResult('#site-form-result', 'ok', `已抓取 ${m.domain}${m.categoryId ? ` · 分类建议 ${m.categoryId}` : ''}`)
+    if (seq !== state.reqSeq) return
+    state.meta = m
+    applyMeta(m)
+    const text = summarizeMeta(m)
+    setResult('#site-form-result', m.warning ? 'warn' : 'ok', m.warning ? `${text}；${m.warning}` : text)
   } catch (e) {
+    if (seq !== state.reqSeq) return
+    state.meta = null
     setResult('#site-form-result', 'err', `抓取失败：${e.message}（可手动填写后保存）`)
   } finally {
-    btn.disabled = false
+    if (seq === state.reqSeq) {
+      btn.disabled = false
+      btn.textContent = state.meta ? '重新补全' : '自动补全'
+    }
   }
 }
 
@@ -216,7 +290,8 @@ async function saveSite() {
       await refresh()
       closeForm()
       setResult('#sites-sync-result', '', `本地已新增 ${site.id} ${site.name} · 点「同步到云端」即时生效`)
-      if (faviconUrl) fetchIcon(site, faviconUrl)
+      // 只有图标确实抓自这个域名才下载，避免把上一站的图标写进新站
+      if (faviconUrl && state.faviconHost === hostOf(site.url)) fetchIcon(site, faviconUrl)
     }
   } catch (e) {
     setResult('#site-form-result', 'err', e.message)
@@ -345,6 +420,7 @@ export async function refresh() {
 }
 
 let searchTimer = null
+let urlTimer = null
 
 export function initSitesPanel() {
   $('#btn-sites-refresh').addEventListener('click', () => refresh())
@@ -353,6 +429,26 @@ export function initSitesPanel() {
   $('#btn-fetch-meta').addEventListener('click', () => doFetchMeta())
   $('#btn-save-site').addEventListener('click', () => saveSite())
   $('#btn-sites-sync').addEventListener('click', () => doSync())
+
+  // 手改过的字段不再被自动补全覆盖：打上标记 + 摘掉描边
+  const markTouched = (sel, key, evt = 'input') => {
+    $(sel).addEventListener(evt, () => { state.touched[key] = true; markAuto(sel, false) })
+  }
+  markTouched('#f-name', 'name')
+  markTouched('#f-desc', 'desc')
+  markTouched('#f-color', 'color')
+  markTouched('#f-category', 'categoryId', 'change')
+
+  // 粘贴网址即自动补全：停顿 600ms 再抓，避免边打边请求；同一域名不重复抓
+  const maybeFetch = () => {
+    const host = hostOf($('#f-url').value)
+    if ($('#f-url').value.trim() && host && host !== state.lastHost) doFetchMeta({ auto: true })
+  }
+  $('#f-url').addEventListener('input', () => {
+    clearTimeout(urlTimer)
+    urlTimer = setTimeout(maybeFetch, 600)
+  })
+  $('#f-url').addEventListener('blur', () => { clearTimeout(urlTimer); maybeFetch() })
 
   $('#sites-search').addEventListener('input', e => {
     state.q = e.target.value

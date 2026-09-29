@@ -1,87 +1,117 @@
 /**
- * 站点元信息代理 API：抓取 URL 的标题/描述/favicon
+ * 站点元信息代理 API：抓取目标页，推断出收录一个站点所需的全部字段。
  * GET /api/metadata?url=https://example.com
- * 返回 { name, desc, favicon, domain }
+ *
+ * 返回 { name, desc, favicon, faviconUrl, domain, url, color, categoryId, categoryLabel,
+ *        blocked, confidence, sources, warning }
+ *
+ * 推断逻辑全部在 shared/site-infer.mjs，分类白名单在 shared/categories.mjs ——
+ * 与本地控制台 tools/console/lib/sites.mjs 同源，两个「新增站点」入口的推荐口径永远一致。
+ * 这里只负责网络抓取、编码回退与安全校验。
  */
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { inferSite, decodeHtmlBytes, BLOCKED_WARNING } from '../shared/site-infer.mjs'
+import { categoryMeta } from '../shared/categories.mjs'
+
+// 已收录站点作为「像不像已有某站」的参照（域名同族 / 品牌词命中）。
+// 用构建期快照即可：它只影响推荐权重，实时数据仍在 Vercel Blob。
+const SEED_SITES = JSON.parse(
+  readFileSync(fileURLToPath(new URL('./sites-data.json', import.meta.url)), 'utf-8')
+)
+const CATEGORY_META = categoryMeta()
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const MAX_BYTES = 256 * 1024 // 最多读取 256KB HTML
+const MAX_BYTES = 256 * 1024 // 最多读取 256KB HTML，避免超大页面拖垮函数
+const MAX_REDIRECTS = 4
 
-function decodeHtmlEntities(str) {
-  return str
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+/* ---------------- SSRF 防护 ---------------- */
+
+// 这是面向公网的抓取代理，若不校验目标，用户可用它探测内网/本机服务
+// （云元数据 169.254.169.254、内网管理口等）。域名交给 URL 解析后已归一化，
+// 十进制/十六进制写的 IP（如 http://2130706433/）会被 WHATWG URL 还原成点分十进制。
+const PRIVATE_V4 = [
+  /^0\./, /^10\./, /^127\./, /^169\.254\./, /^192\.168\./, /^192\.0\.0\./,
+  /^192\.0\.2\./, /^198\.18\./, /^198\.51\.100\./, /^203\.0\.113\./,
+]
+
+function isPrivateV4(ip) {
+  if (PRIVATE_V4.some(re => re.test(ip))) return true
+  const [a, b] = ip.split('.').map(Number)
+  if (a === 172 && b >= 16 && b <= 31) return true   // 172.16.0.0/12
+  if (a === 100 && b >= 64 && b <= 127) return true  // 100.64.0.0/10 运营商级 NAT
+  if (a >= 224) return true                          // 组播与保留段
+  return false
 }
 
-function pickTitle(html) {
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)
-  if (og) return decodeHtmlEntities(og[1]).trim()
-  const m = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)
-  if (m) {
-    return decodeHtmlEntities(m[1].replace(/\s+/g, ' ').trim()).slice(0, 120)
+export function isBlockedHost(hostname) {
+  const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
+  if (!h) return true
+  if (h === 'localhost' || h.endsWith('.localhost')) return true
+  if (h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.home.arpa')) return true
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(h)) return isPrivateV4(h)
+  if (h.includes(':')) {
+    if (h === '::1' || h === '::') return true
+    if (/^f[cd][0-9a-f]{2}:/.test(h)) return true      // fc00::/7 唯一本地地址
+    if (/^fe[89ab][0-9a-f]:/.test(h)) return true      // fe80::/10 链路本地
+    const mapped = h.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)
+    if (mapped) return isPrivateV4(mapped[1])
   }
-  const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
-  if (h1) return decodeHtmlEntities(h1[1].replace(/<[^>]+>/g, '').trim()).slice(0, 120)
-  return ''
+  return false
 }
 
-function pickDesc(html) {
-  const patterns = [
-    /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/i,
-    /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i
-  ]
-  for (const p of patterns) {
-    const m = html.match(p)
-    if (m && m[1]) return decodeHtmlEntities(m[1]).trim().slice(0, 200)
+/* ---------------- 抓取 ---------------- */
+
+async function readCapped(resp) {
+  const reader = resp.body.getReader()
+  const chunks = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    total += value.byteLength
+    if (total > MAX_BYTES) {
+      reader.cancel().catch(() => {})
+      break
+    }
   }
-  return ''
+  return Buffer.concat(chunks).subarray(0, MAX_BYTES)
 }
 
 /**
- * 取标签属性值，按定界引号配对。
- * 不能用 `[^"']+`：内联 SVG 的 href 值是双引号包裹、内部含单引号
- * （`href="data:image/svg+xml,%3Csvg xmlns='…'"`），会从第一个单引号处被截断。
+ * 手动跟重定向：每跳都重新校验主机，否则「公网 URL 302 到内网」就能绕过上面的检查
+ * （fetch 的 redirect:'follow' 不会给我们插话的机会）。
  */
-function attrValue(tag, name) {
-  const quoted = tag.match(new RegExp(name + "\\s*=\\s*([\"'])([\\s\\S]*?)\\1", 'i'))
-  if (quoted) return quoted[2]
-  const bare = tag.match(new RegExp(name + '\\s*=\\s*([^\\s>]+)', 'i'))
-  return bare ? bare[1] : ''
-}
-
-/**
- * 解析 `<link rel="icon">` 的 href：
- * - `data:,`（example.com 等用它抑制 favicon 请求）等于没声明，需继续回退
- * - `data:image/svg+xml,<svg…>` 是真实内联图标，直接返回给前端预览
- */
-function resolveIconHref(href, base) {
-  const h = String(href || '').trim()
-  if (!h) return ''
-  if (h.startsWith('data:')) {
-    const comma = h.indexOf(',')
-    if (comma < 0 || !/^image\//i.test(h.slice(5, comma))) return ''
-    return h.slice(comma + 1).trim() ? h : ''
+async function fetchHtml(startHref, signal) {
+  let href = startHref
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const u = new URL(href)
+    if (isBlockedHost(u.hostname)) {
+      const err = new Error('该地址指向内网或本机')
+      err.code = 'BLOCKED_HOST'
+      throw err
+    }
+    const resp = await fetch(href, {
+      headers: {
+        'user-agent': UA,
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'accept': 'text/html,application/xhtml+xml'
+      },
+      redirect: 'manual',
+      signal
+    })
+    if (resp.status >= 300 && resp.status < 400) {
+      const loc = resp.headers.get('location')
+      if (!loc) return resp
+      href = new URL(loc, href).href
+      continue
+    }
+    return resp
   }
-  try { return new URL(h, base).href } catch { return '' }
-}
-
-function pickFavicon(html, base) {
-  // 优先高分辨率 apple-touch-icon，其次标准 icon，最后 /favicon.ico
-  const apple = html.match(/<link[^>]+rel=["'][^"']*(?:apple-touch-icon|mask-icon)[^"']*["'][^>]*>/i)
-  if (apple) {
-    const href = resolveIconHref(attrValue(apple[0], 'href'), base)
-    if (href) return href
-  }
-  for (const l of html.matchAll(/<link[^>]+rel=["'][^"']*icon[^"']*["'][^>]*>/gi)) {
-    const href = resolveIconHref(attrValue(l[0], 'href'), base)
-    if (href) return href
-  }
-  return new URL('/favicon.ico', base).href
+  const err = new Error('重定向次数过多')
+  err.code = 'TOO_MANY_REDIRECTS'
+  throw err
 }
 
 export default async function handler(req, res) {
@@ -105,81 +135,52 @@ export default async function handler(req, res) {
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)
+  let html = ''
+  let warning = ''
   try {
-    const resp = await fetch(target.href, {
-      headers: {
-        'user-agent': UA,
-        'accept-language': 'zh-CN,zh;q=0.9',
-        'accept': 'text/html,application/xhtml+xml'
-      },
-      redirect: 'follow',
-      signal: controller.signal
-    })
-    if (!resp.ok) {
-      res.status(502).json({ error: `目标站点返回 ${resp.status}` })
-      return
-    }
-
-    // 截断读取，避免超大页面拖垮函数
-    const reader = resp.body.getReader()
-    const chunks = []
-    let total = 0
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      chunks.push(value)
-      total += value.byteLength
-      if (total > MAX_BYTES) {
-        reader.cancel().catch(() => {})
-        break
+    let resp
+    try {
+      resp = await fetchHtml(target.href, controller.signal)
+    } catch (e) {
+      if (e.code === 'BLOCKED_HOST') {
+        res.status(400).json({ error: e.message })
+        return
       }
+      // https 抓不到时回退 http：少数站点只在 http 上响应，直接判定失败会让用户白填一遍
+      if (target.protocol !== 'https:') throw e
+      const httpTarget = new URL(target.href)
+      httpTarget.protocol = 'http:'
+      resp = await fetchHtml(httpTarget.href, controller.signal)
     }
-    const buf = Buffer.concat(chunks)
-
-    // 多编码回退：utf-8 → gbk/gb2312 → gb18030 → big5 → latin1(min 保底)
-    const encoders = ['utf-8', 'gbk', 'gb18030', 'big5', 'latin1']
-    let html = buf.toString('utf-8')
-    let name = pickTitle(html)
-    if (!name) {
-      const charsetDecl = (html.match(/charset=["']?([\w-]+)/i) || [])[1]?.toLowerCase()
-      let order = encoders
-      if (charsetDecl && encoders.includes(charsetDecl)) {
-        order = [charsetDecl, ...encoders.filter(e => e !== charsetDecl)]
-      }
-      for (const enc of order) {
-        try {
-          const decoded = new TextDecoder(enc).decode(buf)
-          const t = pickTitle(decoded)
-          if (t) {
-            html = decoded
-            name = t
-            break
-          }
-        } catch { /* 该编码不可用则尝试下一个 */ }
-      }
+    if (resp.ok) {
+      html = decodeHtmlBytes(await readCapped(resp))
+    } else {
+      warning = `目标站点返回 ${resp.status}，已按域名推断，请复核名称与分类`
     }
-    if (!name) {
-      res.status(502).json({
-        error: '无法解析页面标题（页面可能为 JS 渲染或正文无 <title>）'
-      })
-      return
-    }
-
-    const desc = pickDesc(html)
-    const favicon = pickFavicon(html, target.origin)
-    const domain = target.hostname.replace(/^www\./, '')
-
-    res.status(200).json({
-      name,
-      desc,
-      favicon,
-      domain,
-      url: target.href
-    })
   } catch (e) {
-    const msg = e.name === 'AbortError' ? '抓取超时' : '抓取失败: ' + e.message
-    res.status(502).json({ error: msg })
+    if (e.code === 'BLOCKED_HOST') {
+      res.status(400).json({ error: e.message })
+      return
+    }
+    warning = e.name === 'AbortError'
+      ? '抓取超时，已按域名推断，请复核名称与分类'
+      : '抓取失败（可能被反爬拦截），已按域名推断，请复核名称与分类'
   } finally {
     clearTimeout(timer)
   }
+
+  // 抓不到页面不算失败：照常产出一份按域名推断的草稿，让用户只需复核而不是从零手填
+  const info = inferSite({
+    html,
+    url: target.href,
+    existingSites: SEED_SITES,
+    categoryMeta: CATEGORY_META,
+  })
+
+  // 挑战页返回 200，抓取层看不出异常，只有内容层知道这是拦截页：warning 必须盖过抓取层文案
+  if (info.blocked) warning = BLOCKED_WARNING
+
+  // 抓取结果随目标页变动，不缓存，避免同域名二次抓取拿到旧标题
+  res.setHeader('Cache-Control', 'no-store')
+  res.status(200).json({ ...info, favicon: info.faviconUrl, warning })
 }

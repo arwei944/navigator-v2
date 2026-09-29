@@ -9,17 +9,22 @@ import { readFile } from 'node:fs/promises'
 import { join, extname, normalize, sep } from 'node:path'
 import { parseArgs } from 'node:util'
 import { ROOT, loadEnv } from './lib/env.mjs'
-import { handleApi, sendJson } from './lib/api.mjs'
+import { handleApi, sendJson, isTrusted } from './lib/api.mjs'
 import * as jobs from './lib/jobs.mjs'
 
 loadEnv()
 
 const args = parseArgs({
   args: process.argv.slice(2),
-  options: { port: { type: 'string', short: 'p' } },
+  options: {
+    port: { type: 'string', short: 'p' },
+    'strict-port': { type: 'boolean' },
+  },
   allowPositionals: false,
 })
 const START_PORT = Number(args.values.port) || 5175
+// 服务化/快捷方式场景必须钉死端口：端口漂移会让快捷方式指向空端口
+const STRICT_PORT = args.values['strict-port'] === true
 const UI_DIR = join(ROOT, 'tools', 'console', 'ui')
 const ICON_DIR = join(ROOT, 'public', 'icons')
 
@@ -84,6 +89,12 @@ const server = createServer(async (req, res) => {
   const path = url.pathname
 
   try {
+    // 统一来源校验：Host 必须是回环地址（阻断 DNS rebinding），跨站 Origin 与缺自定义头的写操作一并拒绝
+    if (!isTrusted(req)) {
+      sendJson(res, 403, { error: '请求来源不受信任：Host 或 Origin 不是本机回环地址' })
+      return
+    }
+
     if (req.method === 'GET' && path === '/') {
       await serveFrom(res, UI_DIR, 'index.html')
       return
@@ -117,11 +128,18 @@ const server = createServer(async (req, res) => {
 
 let port = START_PORT
 server.on('error', err => {
-  if (err.code === 'EADDRINUSE' && port < START_PORT + 10) {
+  if (err.code === 'EADDRINUSE' && !STRICT_PORT && port < START_PORT + 10) {
     port += 1
     server.listen(port, '127.0.0.1')
   } else {
     console.error('❌ 控制台启动失败:', err.message)
+    if (err.code === 'EADDRINUSE') {
+      console.error(
+        STRICT_PORT
+          ? `   端口 ${port} 已被占用，严格端口模式下不会自动漂移（请先释放该端口）`
+          : `   端口 ${port} 已被占用`
+      )
+    }
     process.exit(1)
   }
 })
@@ -129,5 +147,6 @@ server.on('error', err => {
 server.listen(port, '127.0.0.1', () => {
   console.log(`\n  nav-console 已启动  →  http://localhost:${port}\n`)
   console.log(`  项目根目录: ${ROOT}`)
+  console.log(`  端口策略: ${STRICT_PORT ? '严格固定（不漂移）' : '占用则顺延 +1'}`)
   console.log('  仅监听 127.0.0.1，Ctrl+C 退出\n')
 })
