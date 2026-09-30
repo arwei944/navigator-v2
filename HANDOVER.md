@@ -1533,3 +1533,21 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 
 本地实测（`nav sites meta https://huarun.win/platform/windows`）：名称/描述均取根页口径
 （166 款 / 7 平台），`scope={name:root,desc:root}`，分类 `proxy`（high），图标取根页。
+
+---
+
+## 二十八、站点收录：OpenChainBench（2026-09-30）
+
+- **dt34 · OpenChainBench · openchainbench.com · 分类 数据与研究（`data`）**
+- 定位：加密货币基础设施的公开基准测试站 —— 实时对比主流链的 RPC 延迟、跨链桥费用、
+  L2 最终性与价格喂价准确度，方法论公开、数据持续更新。
+- 来源：用户提交 `https://openchainbench.com/`；`nav sites meta` 识别名称 `OpenChainBench`
+  （og:site_name · high）、描述（meta · medium），**分类未识别**（low），人工归入 `data`。
+- 卡片主色 `#7a2e1f`：取自站点 `manifest.webmanifest` 的 `theme_color`。页面 `<head>` 未声明
+  meta theme-color，故引擎回退到 hash 色 `#313db9`；此处按品牌真实色落库。
+- 图标：`icons/dt34.png`（180×180 PNG，14977 B），源 `https://openchainbench.com/apple-icon`。
+- 验收：`nav data validate` → 301 条通过（9 条已知无图标为预期警告）；`nav sites check --ids dt34` → `200 ok`。
+
+> 引擎待办（本次未改）：`pickColor` 只读页面 `<meta name="theme-color">`，不读 `manifest.webmanifest`
+> 的 `theme_color`，遇到「主题色只写在 manifest」的站点会退化为 hash 色。本次已手工修正，
+> 后续可考虑把 manifest 纳入取值来源（三处同源，需同步 `site-infer.mjs`）。
