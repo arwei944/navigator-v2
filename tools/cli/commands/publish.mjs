@@ -50,9 +50,11 @@ const statusCmd = {
 const runCmd = {
   path: 'publish run',
   summary: '一键发布流水线：检查改动 → 提交 → 推送 → 备份 → 数据门禁 → 构建 → 部署 → 热更新 → 一致性验证',
-  usage: 'nav publish run [--message <提交消息>] [--skip-build] [--no-push] [--dry-run]',
+  usage: 'nav publish run (--gate <放行凭证> | --no-gate) [--message <提交消息>] [--skip-build] [--no-push] [--dry-run]',
   mutating: true,
   flags: {
+    gate: { desc: '预检产出的放行凭证 id（用 publish preflight 获取）' },
+    'no-gate': { type: 'boolean', desc: '显式绕过发布门禁（自动化用，会在日志留痕）' },
     message: { desc: '存在已暂存改动时必填的提交消息', short: 'm' },
     'skip-build': { type: 'boolean', desc: '跳过前端构建，仅热更新云端数据' },
     'no-push': { type: 'boolean', desc: '跳过 git push（本地演练）' },
@@ -70,19 +72,21 @@ const runCmd = {
       else if (!st.branch) blockers.push('处于 detached HEAD，无法推送')
       if (staged > 0 && !message) blockers.push(`存在 ${staged} 个已暂存文件但未提供 --message，实际发布会中止`)
       if (!getAdminKey()) blockers.push('缺少 SITES_ADMIN_KEY，实际发布会中止在热更新前（用 data doctor 确认环境）')
+      if (!values.gate && !values['no-gate']) blockers.push('未提供放行凭证：先跑 publish preflight，再带 --gate <id>（或显式 --no-gate）')
       return dryRunResult({
         branch: st?.branch || '',
         stagedFiles: staged,
         ahead: st?.ahead || 0,
         push: !values['no-push'],
         skipBuild: Boolean(values['skip-build']),
+        gate: values.gate || (values['no-gate'] ? '(绕过)' : null),
         plan: [
           '检查本地改动',
           staged > 0 ? `提交 ${staged} 个已暂存文件` : '提交（无已暂存改动，跳过）',
           values['no-push'] ? '推送（已按 --no-push 跳过）' : `推送 ${st?.ahead || 0} 个领先提交`,
           '备份数据 → schema 门禁',
           values['skip-build'] ? '构建（已按 --skip-build 跳过）' : '前端构建',
-          'Vercel 部署 → Blob 热更新 → 一致性验证',
+          'Vercel 部署 → Blob 热更新（写入前自动落云端快照）→ 一致性验证',
         ],
         blockers,
       })
@@ -91,13 +95,18 @@ const runCmd = {
     requireAdminKey('热更新云端数据')
     guardRunning(sync.PUBLISH_JOB_TITLE)
 
+    // 门禁核销放在起任务之前：凭证无效就不该留下一个注定失败的任务
+    const g = await sync.resolveGate({ gateId: values.gate, allowUngated: Boolean(values['no-gate']) })
+
     const job = sync.startPublish({
       message: values.message || '',
       skipBuild: Boolean(values['skip-build']),
       push: !values['no-push'],
+      gateId: g.gateId,
     })
     const res = await runJob(job, ctx, { label: '一键发布' })
     res.data.steps = res.data.steps.map(s => ({ ...s }))
+    res.data.gate = { id: g.gateId, bypassed: g.bypassed }
     return res
   },
 }

@@ -10,7 +10,8 @@ import { ROOT, envSummary } from '../../console/lib/env.mjs'
 import * as data from '../../console/lib/data.mjs'
 import * as changes from '../../console/lib/changes.mjs'
 import * as git from '../../console/lib/git.mjs'
-import { EXIT, parseCommandArgs, table } from '../lib/core.mjs'
+import * as audit from '../../console/lib/audit.mjs'
+import { EXIT, buildOptions, parseCommandArgs, table } from '../lib/core.mjs'
 
 const pExecFile = promisify(execFile)
 
@@ -185,4 +186,40 @@ const doctorCmd = {
   },
 }
 
-export const commands = [statsCmd, integrityCmd, diffCmd, validateCmd, doctorCmd]
+const auditCmd = {
+  path: 'data audit',
+  summary: '操作审计日志查询：提交 / 推送 / 发布 / 放行 / 回滚 / 校验失败等关键动作（新 → 旧）',
+  usage: 'nav data audit [--limit <n>] [--action <动作>] [--result ok|fail|rejected] [--q <关键词>]',
+  flags: {
+    limit: { desc: '最多返回多少条，默认 50' },
+    action: { desc: '按动作过滤，如 gate.approve / publish.done / rollback.apply' },
+    result: { desc: '按结果过滤：ok / fail / rejected' },
+    q: { desc: '关键词，匹配动作/目标/详情' },
+  },
+  async run(argv) {
+    const { values } = parseCommandArgs(argv, buildOptions(auditCmd.flags), { usage: auditCmd.usage })
+    const r = audit.list({
+      limit: Number(values.limit) || 50,
+      action: values.action || '',
+      result: values.result || '',
+      q: values.q || '',
+    })
+    const s = audit.summary()
+    const RESULT_MARK = { ok: '✓', fail: '✖', rejected: '⊘' }
+    return {
+      data: { ...r, summary: s, actions: audit.ACTIONS },
+      render: d => [
+        `审计文件：${audit.AUDIT_FILE}`,
+        `累计 ${d.summary.total} 条 · 非成功 ${d.summary.failures} 条 · 最近一条 ${d.summary.lastAt || '—'}`,
+        d.summary.lastApprove ? `最近一次放行：${d.summary.lastApprove.action} · ${d.summary.lastApprove.ts} · ${d.summary.lastApprove.detail}` : '最近一次放行：无',
+        '',
+        `匹配 ${d.total} 条（显示 ${d.items.length} 条）：`,
+        table(['时间', '', '动作', '目标', '详情'], d.items.map(it => [
+          it.ts, RESULT_MARK[it.result] || '·', audit.actionLabel(it.action), it.target, it.detail,
+        ])),
+      ].join('\n'),
+    }
+  },
+}
+
+export const commands = [statsCmd, integrityCmd, diffCmd, validateCmd, doctorCmd, auditCmd]

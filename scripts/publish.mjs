@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, rmSyn
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { record } from '../tools/console/lib/audit.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(root, 'api', 'sites-data.json')
@@ -44,6 +45,9 @@ if (!key) {
   process.exit(1)
 }
 
+const actor = process.env.NAV_AUDIT_ACTOR || 'publish.mjs'
+record({ action: 'publish.start', actor, target: skipBuild ? '跳过构建' : '含构建', detail: '启动发布流水线' })
+
 function step(msg) {
   console.log('\n=== ' + msg + ' ===')
 }
@@ -74,6 +78,7 @@ try {
   console.log('✅ 数据校验通过，继续发布')
 } catch (e) {
   console.error('❌ 数据校验失败，已中止发布。请先修复 sites-data.json 中列出的数据问题。')
+  record({ action: 'validate.fail', actor, result: 'rejected', target: 'api/sites-data.json', detail: '数据 schema 校验失败，已中止发布' })
   process.exit(1)
 }
 
@@ -94,6 +99,23 @@ try {
   const out = execFileSync('curl.exe', ['-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`, '-H', 'Content-Type: application/json', '-H', `Authorization: Bearer ${key}`, '--data-binary', '@' + payload], { encoding: 'utf8' })
   const j = JSON.parse(out)
   console.log(`发布成功: version=${j.version} count=${j.sites.length} withIcons=${j.sites.filter(s => s.icon).length}`)
+  record({
+    action: 'hotupdate', actor, target: `v${j.version}`,
+    detail: `${j.sites.length} 站点 · ${j.sites.filter(s => s.icon).length} 带图标`,
+  })
+
+  // 云端快照由服务端在写入前自动落盘；这里只回报结果，失败必须显式告警 —— 否则
+  // 用户会以为「有快照可回退」，实际上这次发布没有任何兜底。
+  if (j.snapshot && j.snapshot.ok && j.snapshot.pathname) {
+    console.log(`快照已保存: ${j.snapshot.pathname}`)
+    record({ action: 'publish.snapshot', actor, target: j.snapshot.pathname, detail: `发布前数据已存快照（v${j.version} 之前）` })
+  } else if (j.snapshot && j.snapshot.ok === false) {
+    console.warn(`⚠️ 快照保存失败（本次发布无云端回退点）: ${j.snapshot.error}`)
+    record({ action: 'publish.snapshotFail', actor, result: 'fail', target: `v${j.version}`, detail: `快照保存失败：${j.snapshot.error}` })
+  } else {
+    console.log('快照: 无前值可快照（首次发布）')
+  }
+  if (j.pruned && j.pruned.deleted) console.log(`快照保留策略: 已裁剪 ${j.pruned.deleted} 份旧快照`)
 
   // 可选 webhook 通知（--webhook=URL）
   if (webhook) {
@@ -106,6 +128,7 @@ try {
   }
 } catch (e) {
   console.error('发布失败: ' + e.message)
+  record({ action: 'publish.fail', actor, result: 'fail', target: '热更新阶段', detail: String(e.message).slice(0, 300) })
   if (existsSync(payload)) rmSync(payload, { force: true })
   process.exit(1)
 } finally {
@@ -131,7 +154,9 @@ for (let i = 1; i <= 5; i++) {
 }
 if (converged) {
   console.log('\n✅ 发布完成: ' + SITE_URL + `（${expectedCount} 站点已同步）`)
+  record({ action: 'publish.done', actor, target: SITE_URL, detail: `${expectedCount} 站点已同步` })
 } else {
   console.error('\n⚠️ 云端数据未收敛，请检查')
+  record({ action: 'publish.fail', actor, result: 'fail', target: '一致性验证', detail: `云端未收敛，期望 ${expectedCount} 站点` })
   process.exit(1)
 }

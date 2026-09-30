@@ -2,11 +2,12 @@
  * Git 封装：直接调用 git CLI（零新增依赖）。
  * 结构化查询用 execFile 取输出；长任务（push / publish）交给 jobs.mjs 的 spawn 接管。
  */
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
+import { assertIndexesInRange, buildSubsetPatch, hunkStats, splitHunks } from '../../../shared/hunk-patch.mjs'
 
 const pExecFile = promisify(execFile)
 const MAX_DIFF_BYTES = 256 * 1024
@@ -19,10 +20,10 @@ export class GitError extends Error {
   }
 }
 
-async function git(args, { allowNonZero = false } = {}) {
+async function git(args, { allowNonZero = false, cwd = ROOT } = {}) {
   try {
     const { stdout } = await pExecFile('git', args, {
-      cwd: ROOT,
+      cwd,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
       windowsHide: true,
@@ -157,20 +158,46 @@ function buildUntrackedDiff(relPath) {
   return truncate(body + '\n')
 }
 
-/** 单文件 diff：已跟踪走 git diff，未跟踪按新增文件构造 */
-export async function getDiff(relPath, staged = false) {
-  assertSafePath(relPath)
+function diffArgs(relPath, staged) {
   const args = ['diff', '--no-color', '--patch', '--find-renames']
   if (staged) args.push('--cached')
   args.push('--', relPath)
-  const text = await git(args)
-  if (text.trim()) return { path: relPath, staged, untracked: false, ...truncate(text) }
+  return args
+}
+
+/** 把解析结果附到 diff 上：UI 靠 hunks 渲染逐块操作，纯文本调用方继续读 text */
+function withHunks(relPath, staged, raw, truncated) {
+  const parsed = splitHunks(raw)
+  // 截断后的文本无法切出完整 hunk，二进制/多文件差异也不能做子集补丁
+  const usable = !truncated && !parsed.binary && !parsed.multiFile && parsed.hunks.length > 0
+  return {
+    path: relPath,
+    staged,
+    untracked: false,
+    header: parsed.header,
+    hunks: parsed.hunks.map(h => ({ ...h, ...hunkStats(h) })),
+    hunksUsable: usable,
+    binary: parsed.binary,
+    multiFile: parsed.multiFile,
+  }
+}
+
+/** 单文件 diff：已跟踪走 git diff，未跟踪按新增文件构造 */
+export async function getDiff(relPath, staged = false) {
+  assertSafePath(relPath)
+  const raw = await git(diffArgs(relPath, staged))
+  if (raw.trim()) {
+    const t = truncate(raw)
+    return { ...withHunks(relPath, staged, raw, t.truncated), text: t.text, truncated: t.truncated }
+  }
 
   const abs = join(ROOT, relPath)
   let tracked = true
   try { statSync(abs) } catch { tracked = false }
-  if (!tracked) return { path: relPath, staged, untracked: false, text: '', truncated: false }
-  return { path: relPath, staged, untracked: true, ...buildUntrackedDiff(relPath) }
+  const empty = { path: relPath, staged, untracked: false, text: '', truncated: false, header: [], hunks: [], hunksUsable: false, binary: false, multiFile: false }
+  if (!tracked) return empty
+  // 未跟踪文件整份都是新增，没有「部分暂存」的语义，因此不提供 hunk 操作
+  return { ...empty, untracked: true, ...buildUntrackedDiff(relPath) }
 }
 
 export async function stagePaths(paths) {
@@ -189,6 +216,88 @@ export async function unstagePaths(paths) {
   if (await hasHead()) await git(['reset', '-q', 'HEAD', '--', ...list])
   else await git(['rm', '--cached', '-r', '--force', '--', ...list])
   return list
+}
+
+/* ---------------- hunk 级暂存 / 取消暂存 ---------------- */
+
+/** 把补丁经 stdin 喂给 git apply：execFile 没有 input 选项，这里用 spawn 直接写管道 */
+function gitApply(args, patch, cwd = ROOT) {
+  return new Promise((resolve, reject) => {
+    const p = spawn('git', args, { cwd, windowsHide: true })
+    let out = ''
+    let err = ''
+    p.stdout.on('data', d => { out += d })
+    p.stderr.on('data', d => { err += d })
+    p.on('error', e => reject(new GitError(e.message)))
+    p.on('close', code => {
+      if (code === 0) { resolve(out); return }
+      const msg = String(err || out).trim().split('\n').slice(0, 8).join('\n')
+      reject(new GitError(msg || `git ${args.join(' ')} 退出码 ${code}`))
+    })
+    p.stdin.end(patch, 'utf-8')
+  })
+}
+
+/** 索引中该文件的 blob（mode + sha），用于失败兜底回退 */
+async function indexEntry(relPath, cwd = ROOT) {
+  const out = await git(['ls-files', '-s', '--', relPath], { allowNonZero: true, cwd })
+  const line = out.split('\n').find(Boolean)
+  if (!line) return null
+  const m = line.match(/^(\d+)\s+([0-9a-f]+)\s+\d+\t/)
+  return m ? { mode: m[1], sha: m[2] } : null
+}
+
+/**
+ * hunk 级暂存 / 取消暂存。
+ *
+ * 两侧语义：`staged:false` 取「索引 → 工作区」差异，补丁正向应用即把选中块搬进索引；
+ * `staged:true` 取「HEAD → 索引」差异，补丁反向应用即把选中块退回工作区。
+ * 两个方向都只动索引（`--cached`），工作区文件本身不被改写。
+ *
+ * `cwd` 仅用于测试时指向临时仓库，默认即项目根。
+ */
+export async function applyHunks(relPath, indexes, { staged = false, cwd = ROOT } = {}) {
+  assertSafePath(relPath)
+  const list = Array.isArray(indexes) ? indexes.map(Number) : []
+  if (list.length === 0) throw new GitError('未指定 hunk 序号')
+
+  const raw = await git(diffArgs(relPath, staged), { cwd })
+  if (!raw.trim()) {
+    throw new GitError(staged ? `没有已暂存差异可取消：${relPath}` : `没有未暂存差异可暂存：${relPath}`)
+  }
+  const parsed = splitHunks(raw)
+  if (parsed.multiFile) throw new GitError(`多文件差异不支持 hunk 级操作：${relPath}`)
+  if (parsed.binary) throw new GitError(`二进制文件不支持 hunk 级操作：${relPath}`)
+  const range = assertIndexesInRange(list, parsed.hunks.length)
+  if (!range.ok) throw new GitError(range.error)
+
+  const patch = buildSubsetPatch(parsed, list)
+  const before = await indexEntry(relPath, cwd)
+  const args = ['apply', '--cached']
+  if (staged) args.push('--reverse')
+
+  try {
+    await gitApply(args, patch, cwd)
+  } catch (e) {
+    // git apply 先全量校验再落盘，正常失败不会留下脏索引；这里仍比对 blob 兜底，
+    // 把任何意外半应用收敛回操作前状态（不用 git restore --staged，避免误伤已暂存的其它块）。
+    const after = await indexEntry(relPath, cwd)
+    const drifted = (after?.sha || null) !== (before?.sha || null)
+    if (drifted && before) await git(['update-index', '--cacheinfo', `${before.mode},${before.sha},${relPath}`], { cwd })
+    throw new GitError(`补丁应用失败：${e.message}${drifted && before ? '（索引已回退到操作前状态）' : ''}`)
+  }
+
+  const [unstaged, stagedText] = await Promise.all([
+    git(diffArgs(relPath, false), { cwd }),
+    git(diffArgs(relPath, true), { cwd }),
+  ])
+  return {
+    path: relPath,
+    mode: staged ? 'unstage' : 'stage',
+    applied: list,
+    total: parsed.hunks.length,
+    remaining: splitHunks(staged ? stagedText : unstaged).hunks.length,
+  }
 }
 
 /** 提交：指定 paths 时只提交这些文件（git commit -- <paths>） */
@@ -232,6 +341,20 @@ export async function remoteShas(upstream, limit = 300) {
   if (!upstream) return new Set()
   const out = await git(['log', `-${limit}`, upstream, '--pretty=%H'], { allowNonZero: true })
   return new Set(out.trim().split('\n').filter(Boolean))
+}
+
+/** 待推送的本地提交（upstream..HEAD）：发布预检要展示「推上去的是哪些提交」 */
+export async function pendingCommits(limit = 20) {
+  const st = await getStatus()
+  if (!st.upstream) {
+    // 无上游时「待推送」等于本地全部提交，取最近 limit 条即可
+    return getLog(limit)
+  }
+  const out = await git(['log', `${st.upstream}..HEAD`, `-${limit}`, '--pretty=%H%x1f%h%x1f%an%x1f%cI%x1f%s'], { allowNonZero: true })
+  return out.trim().split('\n').filter(Boolean).map(line => {
+    const [sha, short, author, date, subject] = line.split('\x1f')
+    return { sha, short, author, date, subject }
+  })
 }
 
 export async function getRemoteUrl() {

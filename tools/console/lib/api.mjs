@@ -10,6 +10,11 @@ import * as sync from './sync.mjs'
 import * as history from './history.mjs'
 import * as data from './data.mjs'
 import * as sites from './sites.mjs'
+import * as gate from './gate.mjs'
+import * as snapshots from './snapshots.mjs'
+import * as audit from './audit.mjs'
+import * as health from './health.mjs'
+import { record } from './audit.mjs'
 
 export function sendJson(res, code, obj) {
   const body = JSON.stringify(obj)
@@ -174,6 +179,60 @@ export async function handleApi(req, res, path, url) {
     return true
   }
 
+  if (method === 'GET' && path === '/api/publish/preflight') {
+    try {
+      sendJson(res, 200, await gate.preflight({ kind: 'publish', message: url.searchParams.get('message') || '' }))
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/publish/gates') {
+    sendJson(res, 200, { gates: gate.listGates() })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/publish/snapshots') {
+    try {
+      sendJson(res, 200, await snapshots.listSnapshots())
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/audit') {
+    sendJson(res, 200, {
+      ...audit.list({
+        limit: Number(url.searchParams.get('limit')) || 200,
+        action: url.searchParams.get('action') || '',
+        result: url.searchParams.get('result') || '',
+        q: url.searchParams.get('q') || '',
+      }),
+      summary: audit.summary(),
+      actions: audit.ACTIONS,
+    })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/health/latest') {
+    sendJson(res, 200, {
+      latest: health.latest(),
+      runs: health.runs({ limit: 12 }),
+      ...health.recentTrends({ limit: 12 }),
+      labels: health.STATUS_LABEL,
+    })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/health/history') {
+    const id = url.searchParams.get('id') || ''
+    if (!id) { sendJson(res, 400, { error: '缺少 id' }); return true }
+    sendJson(res, 200, { id, history: health.history(id, { limit: Number(url.searchParams.get('limit')) || 20 }) })
+    return true
+  }
+
   if (method === 'GET' && path === '/api/history') {
     sendJson(res, 200, await history.history({ limit: Number(url.searchParams.get('limit')) || 25 }))
     return true
@@ -202,6 +261,23 @@ export async function handleApi(req, res, path, url) {
   }
 
   if (method === 'POST') {
+    if (path === '/api/health/probe') {
+      const body = await readJsonBody(req)
+      if (jobs.listJobs().some(j => j.title.startsWith('可用性探活') && j.status === 'running')) {
+        sendJson(res, 409, { error: '已有探活任务在运行中，请等待完成。' })
+        return true
+      }
+      const job = health.startProbe({
+        ids: Array.isArray(body.ids) ? body.ids : null,
+        limit: Number(body.limit) || 0,
+        timeout: Number(body.timeout) || 12,
+        concurrency: Number(body.concurrency) || 12,
+        attempts: Number(body.attempts) || 2,
+      })
+      sendJson(res, 200, { jobId: job.id })
+      return true
+    }
+
     if (path === '/api/jobs/selfcheck') {
       const job = startSelfCheck()
       sendJson(res, 200, { jobId: job.id })
@@ -223,12 +299,25 @@ export async function handleApi(req, res, path, url) {
       return true
     }
 
+    if (path === '/api/git/hunks') {
+      const body = await readJsonBody(req)
+      try {
+        const r = await git.applyHunks(String(body.path || ''), body.indexes, { staged: body.staged === true })
+        sendJson(res, 200, { ok: true, ...r })
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
     if (path === '/api/git/commit') {
       const body = await readJsonBody(req)
       try {
         const result = await git.commit(body.message, body.paths)
+        record({ action: 'commit', target: result.sha || '', detail: `${(body.paths || []).length} 个文件 · ${body.message || ''}` })
         sendJson(res, 200, { ok: true, ...result })
       } catch (e) {
+        record({ action: 'commit', result: 'fail', target: '提交失败', detail: e.message })
         sendJson(res, 400, { ok: false, error: e.message })
       }
       return true
@@ -238,8 +327,10 @@ export async function handleApi(req, res, path, url) {
       const body = await readJsonBody(req)
       try {
         const { job, branch } = await startPush({ dryRun: body.dryRun === true })
+        record({ action: 'push', target: `origin/${branch}`, detail: body.dryRun ? '预演（--dry-run）' : '已发起推送' })
         sendJson(res, 200, { jobId: job.id, branch })
       } catch (e) {
+        record({ action: 'push', result: 'fail', target: '推送失败', detail: e.message })
         sendJson(res, 400, { error: e.message })
       }
       return true
@@ -251,12 +342,56 @@ export async function handleApi(req, res, path, url) {
         sendJson(res, 409, { error: '已有发布任务在运行中，请等待完成或终止后再试。' })
         return true
       }
+      let g
+      try {
+        g = await sync.resolveGate({ gateId: body.gateId, allowUngated: body.noGate === true })
+      } catch (e) {
+        sendJson(res, 403, { error: e.message })
+        return true
+      }
       const job = sync.startPublish({
         message: body.message,
         push: body.push !== false,
         skipBuild: body.skipBuild === true,
+        gateId: g.gateId,
       })
-      sendJson(res, 200, { jobId: job.id, steps: job.steps.map(s => s.key) })
+      sendJson(res, 200, { jobId: job.id, steps: job.steps.map(s => s.key), gate: g })
+      return true
+    }
+
+    if (path === '/api/publish/rollback') {
+      const body = await readJsonBody(req)
+      const pathname = String(body.snapshot || '')
+      if (!pathname) { sendJson(res, 400, { error: '缺少快照 pathname' }); return true }
+      try {
+        const preview = await snapshots.previewRollback(pathname)
+        record({
+          action: 'rollback.preview', target: pathname,
+          detail: `v${preview.currentVersion}(${preview.currentCount}) → v${preview.snapshotVersion}(${preview.snapshotCount}) · 移除 ${preview.willRemove.length} / 恢复 ${preview.willRestore.length} / 改回 ${preview.willRevert.length}`,
+        })
+        if (body.dryRun === true) {
+          sendJson(res, 200, { ok: true, dryRun: true, preview })
+          return true
+        }
+        const r = await snapshots.rollbackTo(pathname)
+        record({
+          action: 'rollback.apply', target: pathname,
+          detail: `云端 v${r.previousVersion} → v${r.version} · ${r.sites.length} 站点；回滚前数据已存快照 ${r.snapshot?.pathname || '(无)'}`,
+        })
+        sendJson(res, 200, {
+          ok: true,
+          preview,
+          restoredFrom: r.restoredFrom,
+          previousVersion: r.previousVersion,
+          version: r.version,
+          count: r.sites.length,
+          withIcons: r.sites.filter(s => s.icon).length,
+          safetySnapshot: r.snapshot,
+        })
+      } catch (e) {
+        record({ action: 'rollback.apply', result: 'fail', target: pathname, detail: e.message })
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
       return true
     }
 
@@ -273,8 +408,11 @@ export async function handleApi(req, res, path, url) {
     if (path === '/api/sites/add') {
       const body = await readJsonBody(req)
       try {
-        sendJson(res, 200, { ok: true, site: sites.addSite(body) })
+        const site = sites.addSite(body)
+        record({ action: 'sites.add', target: `${site.id} ${site.name}`, detail: site.url || '' })
+        sendJson(res, 200, { ok: true, site })
       } catch (e) {
+        record({ action: 'sites.add', result: 'fail', target: body.url || '', detail: e.message })
         sendJson(res, 400, { ok: false, error: e.message })
       }
       return true
@@ -283,8 +421,11 @@ export async function handleApi(req, res, path, url) {
     if (path === '/api/sites/update') {
       const body = await readJsonBody(req)
       try {
-        sendJson(res, 200, { ok: true, site: sites.updateSite(body.id, body.patch || {}) })
+        const site = sites.updateSite(body.id, body.patch || {})
+        record({ action: 'sites.update', target: `${site.id} ${site.name}`, detail: `字段：${Object.keys(body.patch || {}).join('/')}` })
+        sendJson(res, 200, { ok: true, site })
       } catch (e) {
+        record({ action: 'sites.update', result: 'fail', target: String(body.id || ''), detail: e.message })
         sendJson(res, 400, { ok: false, error: e.message })
       }
       return true
@@ -293,8 +434,11 @@ export async function handleApi(req, res, path, url) {
     if (path === '/api/sites/remove') {
       const body = await readJsonBody(req)
       try {
-        sendJson(res, 200, { ok: true, site: sites.removeSite(body.id) })
+        const site = sites.removeSite(body.id)
+        record({ action: 'sites.remove', target: `${site.id} ${site.name}`, detail: site.url || '' })
+        sendJson(res, 200, { ok: true, site })
       } catch (e) {
+        record({ action: 'sites.remove', result: 'fail', target: String(body.id || ''), detail: e.message })
         sendJson(res, 400, { ok: false, error: e.message })
       }
       return true
@@ -303,6 +447,7 @@ export async function handleApi(req, res, path, url) {
     if (path === '/api/sites/icon') {
       const body = await readJsonBody(req)
       if (!body.id) { sendJson(res, 400, { error: '缺少 id' }); return true }
+      record({ action: 'icon.fetch', target: body.id, detail: body.faviconUrl ? `指定来源 ${body.faviconUrl}` : '自动来源' })
       const job = startIconFetch(body.id, body.faviconUrl || '')
       sendJson(res, 200, { jobId: job.id })
       return true
@@ -316,8 +461,10 @@ export async function handleApi(req, res, path, url) {
           push: body.push !== false,
           message: body.message,
         })
+        record({ action: 'sites.sync', target: 'api/sites-data.json', detail: `提交=${body.commit !== false} 推送=${body.push !== false}` })
         sendJson(res, 200, { jobId: job.id, steps: job.steps.map(s => s.key) })
       } catch (e) {
+        record({ action: 'sites.sync', result: 'fail', target: 'api/sites-data.json', detail: e.message })
         sendJson(res, 409, { error: e.message })
       }
       return true

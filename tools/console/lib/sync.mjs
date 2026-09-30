@@ -9,13 +9,17 @@ import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
+import { SITE_URL, fetchCloud } from './cloud.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as vercel from './vercel.mjs'
+import { consumeGate } from './gate.mjs'
+import { record } from './audit.mjs'
 
 const pExecFile = promisify(execFile)
 
-export const SITE_URL = 'https://navigator-v2-two.vercel.app'
+export { SITE_URL, fetchCloud }
+
 export const PUBLISH_JOB_TITLE = '一键发布'
 
 const STEP_DEFS = [
@@ -74,27 +78,6 @@ function runStep(job, command, cmdArgs, opts = {}) {
 
 /* ---------------- 云端读取 ---------------- */
 
-/** 读取云端站点数据（带缓存穿透参数，绕过 CDN 缓存） */
-export async function fetchCloud() {
-  try {
-    const { stdout } = await pExecFile('curl.exe', [
-      '-s', '--max-time', '30', `${SITE_URL}/api/sites?t=${Date.now()}`,
-    ], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true })
-    const j = JSON.parse(stdout)
-    const sites = Array.isArray(j.sites) ? j.sites : []
-    return {
-      ok: true,
-      version: j.version ?? null,
-      count: sites.length,
-      withIcons: sites.filter(s => s.icon).length,
-      updatedAt: j.updatedAt || null,
-      fetchedAt: Date.now(),
-    }
-  } catch (e) {
-    return { ok: false, error: e.message, fetchedAt: Date.now() }
-  }
-}
-
 function localSitesCount() {
   try { return JSON.parse(readFileSync(join(ROOT, 'api', 'sites-data.json'), 'utf-8')).length } catch { return null }
 }
@@ -140,11 +123,38 @@ export async function status() {
 
 /* ---------------- 一键发布流水线 ---------------- */
 
+/**
+ * 发布门禁：默认要求先预检再放行。
+ *
+ * 三种放行方式（按优先级）：
+ *   ① gateId：核销一张有效的预检凭证（推荐，工作区变动即失效）
+ *   ② allowUngated：显式绕过（自动化脚本用，会在日志与审计里留痕）
+ * 两者都没有则直接拒绝，不进入流水线。
+ */
+export async function resolveGate({ gateId, allowUngated = false } = {}) {
+  if (gateId) {
+    const r = await consumeGate(gateId, { kind: 'publish' })
+    if (!r.ok) throw new Error(r.reason)
+    return { gateId: r.gate.id, bypassed: false }
+  }
+  if (allowUngated) {
+    record({ action: 'gate.bypass', result: 'rejected', target: 'publish', detail: '显式绕过发布门禁（未经预检放行）' })
+    return { gateId: null, bypassed: true }
+  }
+  throw new Error('发布需要放行凭证：请先执行预检（nav publish preflight），确认无误后带 --gate <id> 放行；确需跳过请显式使用 --no-gate')
+}
+
 export function startPublish(opts = {}) {
   const job = jobs.createJob(PUBLISH_JOB_TITLE)
   const steps = newSteps()
   job.steps = steps
+  job.gate = opts.gateId ? { id: opts.gateId, bypassed: false } : { id: null, bypassed: true }
   jobs.emitEvent(job, 'steps', steps.map(s => ({ ...s })))
+  jobs.log(
+    job,
+    opts.gateId ? `发布门禁：已核销放行凭证 ${opts.gateId}` : '发布门禁：已按 --no-gate 显式绕过（本次发布未经预检放行）',
+    opts.gateId ? 'info' : 'stderr',
+  )
 
   runPipeline(job, steps, opts).catch(e => {
     jobs.log(job, `发布流程异常：${e.message}`, 'stderr')
@@ -162,6 +172,10 @@ async function runPipeline(job, steps, opts) {
     if (k) mark(k, { status: 'failed', detail })
     for (const s of steps) if (s.status === 'pending') markStep(job, s, { status: 'skipped', detail: '未执行' })
     jobs.log(job, `❌ 发布中止：${detail}`, 'stderr')
+    // 本地阶段失败由控制台记录；构建之后的阶段由 publish.mjs 记录，两边分工避免重复
+    if (['check', 'commit', 'push'].includes(k)) {
+      record({ action: 'publish.fail', result: 'fail', target: `本地阶段：${k}`, detail })
+    }
     jobs.finish(job, code)
   }
 
@@ -192,6 +206,7 @@ async function runPipeline(job, steps, opts) {
       const r = await git.commit(message, staged.map(f => f.path))
       jobs.log(job, `已提交 ${r.sha}：${message}`, 'success')
       mark('commit', { status: 'success', detail: `${r.sha} · ${staged.length} 个文件` })
+      record({ action: 'commit', target: r.sha, detail: `${staged.length} 个文件 · ${message}` })
     } catch (e) {
       return fail('commit', e.message)
     }
@@ -209,6 +224,7 @@ async function runPipeline(job, steps, opts) {
     })
     if (code !== 0) return fail('push', `git push 退出码 ${code}`)
     mark('push', { status: 'success', detail: `origin/${branch}` })
+    record({ action: 'push', target: `origin/${branch}`, detail: `推送成功（退出码 0）` })
   }
 
   /* 4~9. 交给 publish.mjs（构建 → 部署 → 热更新 → 验证） */
@@ -230,7 +246,7 @@ async function runPipeline(job, steps, opts) {
 
   const code = await runStep(job, process.execPath, args, {
     cwd: ROOT,
-    env: { SITES_ADMIN_KEY: getAdminKey() },
+    env: { SITES_ADMIN_KEY: getAdminKey(), NAV_AUDIT_ACTOR: 'console' },
     stderrMode: 'info',
     timeoutMs: 15 * 60 * 1000,
     onLine: line => {
@@ -251,6 +267,14 @@ async function runPipeline(job, steps, opts) {
       if (hot) {
         job.cloudVersion = Number(hot[1])
         mark('hotupdate', { status: 'success', detail: `version ${hot[1]} · ${hot[2]} 站点` })
+      }
+
+      // 云端快照由服务端在写入前落盘，这里把结果透出给 UI/CLI，失败要显式可见
+      const snap = line.match(/快照已保存:\s*(\S+)/)
+      if (snap) { job.snapshot = snap[1]; jobs.emitEvent(job, 'snapshot', { ok: true, pathname: snap[1] }) }
+      if (/快照保存失败/.test(line)) {
+        job.snapshotError = line
+        jobs.emitEvent(job, 'snapshot', { ok: false, error: line.replace(/^.*快照保存失败[^：:]*[：:]\s*/, '') })
       }
 
       const poll = line.match(/poll\s+(\d+):\s*count=(\d+)\s*version=(\d+)/)

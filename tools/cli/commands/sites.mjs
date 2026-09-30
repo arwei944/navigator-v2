@@ -2,42 +2,10 @@
  * 站点管理命令：复用 tools/console/lib/sites.mjs 与 data.mjs，
  * 与控制台「站点」面板、scripts/*.mjs 共用同一套业务逻辑，避免三处实现漂移。
  */
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import * as sites from '../../console/lib/sites.mjs'
 import * as data from '../../console/lib/data.mjs'
+import { probeMany } from '../../../shared/health-probe.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, note, parseCommandArgs, requirePositional, table } from '../lib/core.mjs'
-
-const pExecFile = promisify(execFile)
-
-/* ---------------- 探活 ---------------- */
-
-/** 与 scripts/check-sites.mjs 同口径：限流/反爬/方法误用/鉴权算「可忽略」，站点实际可用 */
-const IGNORABLE = new Set(['429', '405', '403', '401'])
-
-function verdictOf(code) {
-  if (code === 'ERR' || code === '000') return 'down'
-  const n = Number(code)
-  if (n >= 400) return IGNORABLE.has(code) ? 'limited' : 'down'
-  return 'ok'
-}
-
-/** 先 HEAD 再回落 GET：部分站点不支持 HEAD，只发 HEAD 会误判为 000 */
-async function probe(url, timeout) {
-  const target = url.includes('://') ? url : 'https://' + url
-  const call = args => pExecFile('curl.exe', args, { encoding: 'utf8', timeout: (timeout + 5) * 1000, windowsHide: true })
-  try {
-    const head = await call(['-s', '-o', 'NUL', '-w', '%{http_code}', '-I', '-L', '--max-time', String(timeout), target])
-    let code = head.stdout.trim()
-    if (!code || code === '000') {
-      const get = await call(['-s', '-o', 'NUL', '-w', '%{http_code}', '-L', '--max-time', String(timeout), target])
-      code = get.stdout.trim()
-    }
-    return code || 'ERR'
-  } catch {
-    return 'ERR'
-  }
-}
 
 /* ---------------- 命令定义 ---------------- */
 
@@ -239,13 +207,13 @@ const checkCmd = {
 
     const timeout = values.timeout !== undefined ? Number(values.timeout) : 15
     const conc = values.concurrency !== undefined ? Number(values.concurrency) : 12
-    const results = []
-    for (let i = 0; i < targets.length; i += conc) {
-      const chunk = targets.slice(i, i + conc)
-      const codes = await Promise.all(chunk.map(s => probe(s.url, timeout)))
-      chunk.forEach((s, k) => results.push({ id: s.id, name: s.name, url: s.url, code: codes[k], verdict: verdictOf(codes[k]) }))
-      note(`已检查 ${results.length}/${targets.length}`, ctx)
-    }
+    const probed = await probeMany(targets, {
+      timeout,
+      concurrency: conc,
+      onProgress: ({ done, total }) => note(`已检查 ${done}/${total}`, ctx),
+    })
+    // verdict 是 CLI 既有契约字段，保持与 status 同名同义，不改调用方
+    const results = probed.map(r => ({ id: r.id, name: r.name, url: r.url, code: r.code, verdict: r.status, ms: r.ms }))
 
     const down = results.filter(r => r.verdict === 'down')
     const limited = results.filter(r => r.verdict === 'limited')

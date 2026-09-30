@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { IGNORABLE as IGNORABLE_CODES } from '../shared/health-probe.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const sites = JSON.parse(readFileSync(join(root, 'api', 'sites-data.json'), 'utf-8'))
@@ -50,7 +51,8 @@ async function check(site) {
 }
 
 // 真失效：连不上或页面不存在；可忽略：限流(429)/反爬(403)/方法误用(405)/鉴权(401)
-const IGNORABLE = new Set(['429', '405', '403', '401'])
+// 可忽略码取自 shared/health-probe.mjs，与控制台看板、CLI sites check 同源
+const IGNORABLE = new Set([...IGNORABLE_CODES].map(String))
 
 function isBad(code) {
   const n = Number(code)

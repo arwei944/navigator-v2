@@ -13,3 +13,5 @@ perf-report/
 tools/console/launcher/nssm/
 tools/console/launcher/logs/
 tools/console/launcher/icon-*.png
+# 控制台运行时数据：审计日志与探活快照，属本机状态，不入库
+tools/console/.data/
