@@ -66,7 +66,7 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 
 `nav schema` 是智能体自述入口 —— 每条命令都带 `mutating` 标记，据此决定是否需要先 `--dry-run`。
 
-## 命令清单（28 条）
+## 命令清单（35 条）
 
 ### 站点管理 `sites`
 
@@ -94,6 +94,16 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 | `publish verify` | 轮询云端直到站点数与本地一致（只读，不触发发布） | |
 | `publish sync-data` | 只同步站点数据：差异检查 → 提交 → 推送 → 门禁 → 热更新 → 验证 | ● |
 | `publish deployments` | 最近 Vercel 部署（状态机 / 环境 / 关联提交），需 `VERCEL_TOKEN` | |
+| `publish preflight` | 发布预检：将提交文件 / 待推送提交 / 云端版本对比 / 数据增删统计，产出绑定工作区指纹的放行凭证（10 分钟有效） | |
+| `publish snapshots` | 云端数据快照清单（新 → 旧），并对照本机 `backups/` | |
+| `publish rollback` | 把指定快照写回生产数据，`version` 继续递增不回退；`--dry-run` 只预演差异 | ● |
+
+`publish preflight` 只读：不改工作区、不写云端。放行凭证与工作区指纹强绑定 —— 分支、HEAD、
+改动路径集合或数据文件摘要任一变化，凭证立即作废，避免「预检时看的是 A，放行时提交的是 B」。
+
+`publish rollback` 前会先算「当前云端 → 目标快照」的站点增删改差异供确认；实际回滚时会把
+「回滚前的当前数据」也存一份快照，因此**回滚本身可撤销**。注意：该命令依赖线上已部署 V5 代码
+（`/api/sites` 的快照接口），线上仍是旧版本时会直接以退出码 4 提示「先发布 V5 代码」。
 
 ### Git 工作流 `git`
 
@@ -101,15 +111,23 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 |------|------|----|
 | `git status` | 分支、领先/落后、文件列表（含增删行数） | |
 | `git diff <path>` | 单文件 diff（未跟踪文件按新增构造；超限截断） | |
+| `git hunks <path>` | 列出单个文件的 hunk 边界与序号（0 起），供分块暂存 | |
 | `git log` | 提交历史，`--limit`（默认 20） | |
 | `git suggest` | 按改动生成 Conventional Commits 提交消息 + 站点数据差异摘要 | |
-| `git stage <path...>` | 暂存指定文件 | |
-| `git unstage <path...>` | 取消暂存 | |
+| `git stage <path...>` | 暂存指定文件 | ● |
+| `git unstage <path...>` | 取消暂存 | ● |
+| `git stage-hunks <path>` | 只暂存指定 hunk（`--hunks 0,2`），其余块留在工作区 | ● |
+| `git unstage-hunks <path>` | 只取消暂存指定 hunk，其余块留在索引 | ● |
 | `git commit` | 提交：`-m <消息>`，`--paths a,b` 只提交这些文件 | ● |
 | `git push` | 推送 origin，`--branch` 指定分支 | ● |
 | `git remote` | origin 地址与上游分支 | |
 
 路径参数一律经 `assertSafePath` 校验，**拒绝绝对路径与目录穿越**。
+
+分块暂存等价于终端的 `git add -p`：先用 `git hunks` 拿序号，再把序号传给 `stage-hunks`。
+实现是手写 unified diff 解析 + `git apply --cached`，**只改索引，工作区文件不动**。
+二进制文件、未跟踪文件、跨多文件的 diff 以及超出展示上限的差异不支持分块（显式拒绝而非静默降级）。
+补丁应用失败时会把索引回退到操作前状态，避免留下半暂存的中间态。
 
 ### 数据体检与环境 `data`
 
@@ -120,6 +138,7 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 | `data diff` | 站点数据工作区 vs HEAD 的结构化差异 |
 | `data validate` | schema 门禁（与 `npm run validate` / 发布门禁 / CI 同一脚本） |
 | `data doctor` | 环境自检：Node/git/curl/密钥/数据文件/图标目录 |
+| `data audit` | 操作审计日志查询（`--limit` / `--action` / `--result`），新 → 旧 |
 
 `data doctor` 是排障首选 —— 某条命令跑不动时先跑它，输出 `checks[].level`（`ok`/`warn`/`fail`），
 存在 `fail` 项时退出码为 3，`hint` 里直接给出缺什么、影响哪些命令。
@@ -159,18 +178,55 @@ nav publish sync-data --dry-run                # 数据差异 + 计划
 - 超时默认 15 分钟，`--timeout <ms>` 可调；超时按退出码 4 返回并终止子进程
 - 同一时刻只允许一个同名发布任务，并发调用会以退出码 5 拒绝
 
+## MCP 服务（智能体原生接入）
+
+CLI 是给人（和脚本）用的；MCP 是给**智能体**用的同一套能力的另一种暴露方式。
+`tools/mcp/server.mjs` 通过官方 `@modelcontextprotocol/sdk` 以 stdio 传输提供服务：
+
+```bash
+pnpm run mcp          # 启动 MCP 服务（stdio，供 MCP 客户端拉起）
+pnpm run mcp:test     # 端到端用例：真实 stdio 握手 + 逐条断言工具契约
+```
+
+**工具收敛到 5 个域级工具**，而不是把 35 条命令平铺成 35 个工具 —— 工具数膨胀会显著拉低
+智能体的选择准确率：
+
+| 工具 | 覆盖 | 代表动作 |
+|------|------|----------|
+| `nav_status` | 智能体第一问 | 环境自检、本地/云端版本、分支状态、工作区概况 |
+| `nav_sites` | 站点域 | `list` / `get` / `add` / `update` / `remove` / `meta` / `icon` / `check` |
+| `nav_publish` | 发布域 | `status` / `run` / `verify` / `sync-data` / `preflight` / `snapshots` / `rollback` |
+| `nav_git` | Git 域 | `status` / `diff` / `hunks` / `log` / `suggest` / `stage` / `stage-hunks` / `commit` / `push` |
+| `nav_data` | 数据域 | `stats` / `integrity` / `diff` / `validate` / `audit` |
+
+**写操作闸门**：所有写操作（`add` / `update` / `remove` / `icon` / `stage` / `stage-hunks` /
+`commit` / `push` / `publish run` / `sync-data` / `rollback`）默认**只预演**，返回 `gate.preview = true`
+与将要发生的变化；必须显式传 `confirm: true` 才真正执行。这挡住了智能体最常见的两类事故：
+把「看一眼会怎样」当成「已经做了」，以及在没确认的情况下真的改了生产数据。
+
+预演同样走完整校验：预演阶段被拒绝的请求（未登记分类、域名重复、缺名称）在真跑时也一样会被拒绝，
+不存在「预演放行、真跑翻车」。测试用一条不存在的 id 触发业务拒绝，验证带 `confirm` 后确实进入了
+执行路径，而不是又返回了一份预演结果。
+
 ## 目录结构
 
 ```
 tools/cli/
-├── nav.mjs              # 入口：命令注册表、分发、help/schema、退出码
-├── lib/core.mjs         # 内核：输出契约、退出码、参数解析、长任务等待、表格渲染
+├── nav.mjs              # 入口：分发、help/schema、退出码（命令清单来自 lib/registry.mjs）
+├── lib/
+│   ├── core.mjs         # 内核：输出契约、退出码、参数解析、长任务等待、表格渲染
+│   └── registry.mjs     # 命令注册表：命令域 → 命令列表（CLI 与 MCP 共用的唯一真相源）
 └── commands/
     ├── sites.mjs        # 站点管理（9）
     ├── publish.mjs      # 发布与云端（5）
-    ├── git.mjs          # Git 工作流（9）
-    └── data.mjs         # 数据体检与环境（5）
+    ├── snapshots.mjs    # 云端快照与回滚（3）
+    ├── git.mjs          # Git 工作流（12）
+    └── data.mjs         # 数据体检与环境（6）
 ```
+
+`lib/registry.mjs` 是「有哪些命令」的唯一真相源，两个消费方都从它取：CLI 入口（help / schema / 分发）
+与 MCP 服务（把命令映射成智能体工具）。新增命令只需在 `commands/*.mjs` 里定义并加入该文件的
+`commands` 数组，CLI 与 MCP 同时可见，不会出现两边清单漂移。
 
 ## 新增一条命令
 

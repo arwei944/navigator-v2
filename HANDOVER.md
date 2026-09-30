@@ -1325,3 +1325,122 @@ npm run icons        # 抓取/补抓 favicon
 - 未收 `/browse` 子页：按「导航指向主域名、不收子页」规则处理（`normalizeUrl` 本身也只保留主机名）
 - 决策：用户确认「不新增，保持现状」——保留落地页作为品牌入口，避免导航出现两张 Trader.dev 卡片
 - 影响：无数据变更、无需发布
+
+---
+
+## 二十五、Nav V5 升级：MCP 服务化 · 发布可回退 · 审计与看板 · 分块暂存（2026-09-30）
+
+V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v5-upgrade-plan.md`](docs/NAV-v5-upgrade-plan.md)。
+五个里程碑 M1–M5 全部落地，共同的主线是：**把「能干活」升级为「敢交给智能体干」** ——
+能力不变，但每一处有副作用的地方都补上了可预演、可回退、可追溯的约束。
+
+### M1 · MCP 服务化：35 条命令 → 5 个域级工具
+
+| 文件 | 作用 |
+|------|------|
+| `tools/mcp/server.mjs` | MCP 服务主体：工具定义（zod schema）、写操作闸门、stdio 传输 |
+| `tools/mcp/lib/bridge.mjs` | 复用 CLI 命令层：把工具动作映射到 `commands/*.mjs` 的 `run()` |
+| `tools/mcp/test-mcp.mjs` | 端到端用例：真实 stdio 握手，**65 条断言** |
+| `tools/cli/lib/registry.mjs` | 命令注册表：**CLI 与 MCP 共用的唯一真相源** |
+
+- **工具收敛而非平铺**：把 35 条命令平铺成 35 个工具会显著拉低智能体的选择准确率，
+  因此收敛为 5 个域级工具 —— `nav_status` / `nav_sites` / `nav_publish` / `nav_git` / `nav_data`，
+  每个工具用 `action` 枚举再分流。用例断言**恰好 5 个工具**且动作数受控（`nav_sites ≤ 12`）。
+- **写操作闸门**：写动作默认**只预演**，返回 `gate.preview = true` + 将要发生的变化；
+  必须显式传 `confirm: true` 才真正执行。用例覆盖两类事故：
+  ① 不带 confirm 时数据文件字节数不变、git 索引计数不变（**确实没写**）；
+  ② 带 confirm 时用一个不存在的 id 触发**业务拒绝**，证明真的进入了执行路径（而不是又返回一份预演）。
+- **预演不降级校验**：未登记分类、域名重复、缺名称在预演阶段同样被拒 —— 不存在「预演放行、真跑翻车」。
+- **不泄露密钥**：`nav_status` 只报「是否配置」，用例断言输出中匹配不到 `SITES_ADMIN_KEY=<值>`。
+- 启动：`pnpm run mcp`；自测：`pnpm run mcp:test`。
+
+### M2 · 云端数据快照 + 发布门禁 + 一键回滚
+
+| 文件 | 作用 |
+|------|------|
+| `shared/snapshots.mjs` | 快照命名与保留策略（**纯函数**，无 IO）：命名、反解、裁剪 |
+| `api/sites.js` | 云端侧：写前落快照、`GET ?snapshots` / `?snapshot=`、`POST {action:'rollback'}` |
+| `tools/console/lib/snapshots.mjs` | 控制台侧快照编排（对照本机 `backups/`） |
+| `tools/console/lib/gate.mjs` | 发布门禁：预检产出凭证 + 核销 |
+| `tools/cli/commands/snapshots.mjs` | CLI：`publish snapshots` / `publish rollback` |
+
+- **为什么要快照**：Blob 上的 `sites.json` 用 `allowOverwrite: true` 覆盖写，**没有对象版本控制**，
+  写坏就是永久丢失。因此每次热更新前先把「将被覆盖的当前数据」另存一份，形成可回退的链。
+- **命名必须零填充**：`sites-data.snapshots/<6位零填充version>-<ISO时间>.json`。
+  零填充是关键 —— 这样 pathname 的**字典序 == 时间序**，否则 `v9` 会排在 `v10` 之后，按字典序裁剪会误删最新快照。
+- **回滚不回退计数**：回滚把快照写回主 pathname，但 `version` 继续递增（`prevVersion + 1`），
+  并记录 `restoredFrom` / `restoredAt`。计数单调递增，避免「版本号回退」引发的下游误判。
+- **回滚本身可撤销**：回滚前先把「回滚前的当前数据」也存一份快照，所以误回滚还能再回滚回去。
+- **保留最近 20 份**，超出自动裁剪；裁剪只删**合法快照名**，不会误删同前缀下的无关对象。
+- **发布门禁 = 预检 → 人工放行**：预检只读（不改工作区、不写云端），展示将提交文件、待推送提交、
+  云端版本对比、数据增删统计，并产出一枚**绑定工作区指纹**的放行凭证（10 分钟有效）。
+  指纹由分支、HEAD、改动路径集合、数据文件内容摘要构成 —— 任一变化凭证立即作废，
+  杜绝「预检时看的是 A，放行时提交的是 B」。
+- **线上依赖**：`publish snapshots` / `rollback` 需要线上已部署 V5 代码；线上仍是旧版时会直接以
+  退出码 4 提示「先发布 V5 代码」，不会静默失败（**这正是首次发布前的预期行为**）。
+
+### M3 · 操作审计日志
+
+| 文件 | 作用 |
+|------|------|
+| `tools/console/lib/audit.mjs` | 审计落盘、查询、轮转 |
+| `tools/console/ui/auditpanel.js` | 控制台「审计」面板（按动作 / 结果筛选） |
+| `tools/cli/commands/data.mjs` | `nav data audit --limit/--action/--result` |
+
+- 落盘 `tools/console/.data/audit.jsonl`（JSONL 追加），超过 **2MB 自动轮转、保留最近 20 份**。
+- 覆盖提交、推送、发布、放行 / 拒绝、回滚、站点增删改、校验失败等关键动作；
+  **只记录已发生的事实，写入失败绝不阻断主流程**（审计是旁路，不能反过来把主流程搞挂）。
+- 与发布门禁形成闭环：门禁放行/拒绝都留痕，事后可回答「这次发布是谁、什么时候、基于哪个工作区指纹放行的」。
+
+### M4 · 站点可用性看板
+
+| 文件 | 作用 |
+|------|------|
+| `shared/health-probe.mjs` | 探活与分级口径（**唯一真相源**） |
+| `tools/console/lib/health.mjs` | 快照落盘、历史查询、探活任务编排 |
+| `tools/console/ui/healthpanel.js` | 看板：状态徽标 + 响应时间趋势 + 探活轮次 |
+
+- **口径同源**：控制台看板、CLI `nav sites check`、`scripts/check-sites.mjs` 共用 `shared/health-probe.mjs`，
+  避免三处各写一套判定导致结论漂移。2xx/3xx 正常；**429/403/405/401 归「可忽略」**（限流/反爬，站点实际可用）；
+  其余 4xx 与连接失败归「需处理」。
+- **抑制 WAF 假宕机**：判定「需处理」前自动重试一次，连续失败才落 `down`，避免反爬抖动把正常站点标成宕机。
+- 结果按天落盘 `tools/console/.data/health/YYYY-MM-DD.jsonl`，**保留 30 天**自动清理；
+  趋势条按「左旧右新」排列（接口按新→旧返回，前端反转）。
+
+### M5 · hunk 级暂存 / 取消暂存
+
+| 文件 | 作用 |
+|------|------|
+| `shared/hunk-patch.mjs` | unified diff 的 hunk 边界解析 + 子集补丁生成（纯函数） |
+| `tools/console/lib/git.mjs` | `applyHunks()`：`git apply --cached` 实现部分暂存 |
+| `tools/cli/commands/git.mjs` | `git hunks` / `git stage-hunks` / `git unstage-hunks` |
+| `tools/console/ui/diffview.js` | 每块一条工具条，右侧挂「暂存此块 / 取消暂存此块」 |
+| `tools/console/test-hunks.mjs` | 用例：临时仓库实测，**72 条断言** |
+
+- 等价于终端的 `git add -p`，但不必离开控制台：**只改索引，工作区文件不动**。
+- **拒绝而非静默降级**：二进制文件、未跟踪文件、跨多文件的 diff、超出展示上限的差异一律显式报错。
+- **失败回退**：补丁应用失败时把索引回退到操作前状态（`git update-index --cacheinfo`），不留半暂存中间态。
+- **部分暂存的文件两侧都要出现**：一个文件可能同时有「已暂存的块」和「工作区的块」，
+  若只在一侧显示，分块暂存后就再也进不去另一侧看剩余差异。故 `onStagedSide` / `onWorktreeSide` 分开判定。
+
+### 本次修复
+
+- **控制台「可用性」面板是死的**：`healthpanel.js` 功能完整、DOM id 全部对得上，但 `ui/app.js`
+  从未 import 它 —— 面板渲染、按钮绑定、30 秒轮询全都没接上，点进标签页只有空白。
+  已补 `initHealthPanel()`、标签切换 `refreshHealth()`、轮询分支三处接线。
+  **教训**：新增面板时「文件建好 + DOM 写好」不等于「接线完成」，`app.js` 的 import / init / tab / poll 四处都要动。
+
+### 验收
+
+| 用例 | 断言数 | 命令 |
+|------|--------|------|
+| 控制台来源校验 | 13 | `pnpm run console:test` |
+| 站点元信息推断 | 76 | `pnpm run console:test:infer` |
+| metadata SSRF 防护 | 27 | `pnpm run console:test:guard` |
+| hunk 分块暂存 | 72 | `pnpm run console:test:hunks` |
+| MCP 端到端 | 65 | `pnpm run mcp:test` |
+
+合计 **253 条断言全绿**；`pnpm run console:test:all` 一次跑完前四项。
+
+> **发布提示**：M2 的云端快照 / 回滚依赖线上 V5 代码，**必须先发布一次**（`pnpm run publish`）
+> 才能在线上使用 `publish snapshots` / `rollback`；发布前这两个命令会以退出码 4 明确提示。

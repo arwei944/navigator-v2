@@ -73,9 +73,12 @@ pnpm run dev         # 本地开发
 pnpm run build       # 构建
 pnpm run console     # 本地运维控制台 → http://localhost:5175（仅监听 127.0.0.1）
 pnpm run console:autostart  # 控制台登录自启 + 保活任务 + 桌面/任务栏快捷方式
-pnpm run nav         # 智能体 CLI：站点/发布/Git/数据 四域 28 条命令（pnpm run nav help）
+pnpm run nav         # 智能体 CLI：站点/发布/Git/数据 四域 35 条命令（pnpm run nav help）
+pnpm run mcp         # MCP 服务：把同一套能力收敛成 5 个域级工具，供智能体原生调用（stdio）
+pnpm run mcp:test    # MCP 端到端用例：真实 stdio 握手 + 工具契约与写操作闸门断言
 pnpm run publish     # 一键发布：备份 → 数据校验 → 构建 → 部署 → 云端热更新 → 轮询验证
 pnpm run console:test # 控制台来源校验用例（Host/Origin/自定义头，13 条断言）
+pnpm run console:test:all # 控制台全量用例：来源校验 + 元信息推断 + SSRF 防护 + hunk 分块
 pnpm run validate    # 站点数据 schema 校验（发布门禁与 CI 会自动调用）
 pnpm run check       # 健康检查：探测所有站点可访问性
 pnpm run check:report # 健康检查并生成 Markdown 报告
@@ -120,11 +123,13 @@ pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知
 |------|------|
 | 概览 | 运行环境、环境变量是否就绪、SSE 与子进程日志管道自检 |
 | 站点 | 站点增删改（写 `api/sites-data.json`）、元信息抓取、图标抓取落盘、一键同步云端（提交→推送→备份→门禁→热更新→收敛） |
-| 改动 | 文件列表（含增删行数）、单文件 diff 行级高亮、暂存 / 取消暂存 |
+| 改动 | 文件列表（含增删行数）、单文件 diff 行级高亮、暂存 / 取消暂存、**按 hunk 分块暂存**（等价 `git add -p`，只搬选中的块） |
 | 提交 | 规则式变更摘要 + 建议提交消息（Conventional Commits）、提交 / 提交并推送 / 预演推送 |
-| 同步 | 一键发布全链路时间线（检查→提交→推送→备份→门禁→构建→部署→热更新→验证）、云端版本对比 |
+| 同步 | 发布门禁（预检 → 放行，凭证绑定工作区指纹）、一键发布全链路时间线、**云端数据快照与一键回滚**、云端版本对比 |
 | 历史 | 提交记录 + 「已推送 / 仅本地」标注 + 按 commit SHA 关联 Vercel 部署状态 |
 | 数据 | 工作区 vs HEAD 站点数据 diff、分类分布、完整性体检（图标/配色/描述缺失、sortOrder 重复与空洞、域名重复） |
+| 可用性 | 站点可用性看板：状态徽标 + 响应时间趋势 + 探活轮次，口径与 `nav sites check` 同源，结果按天落盘 |
+| 审计 | 操作审计留痕：提交 / 推送 / 发布 / 放行 / 拒绝 / 回滚 / 站点增删改，支持按动作与结果筛选 |
 
 实时日志区（底部）：
 
@@ -140,8 +145,9 @@ pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知
 - **图标宁缺勿错**：图标来源依次为「页面声明 → `/favicon.ico` → `favicon.im`」；`data:,`（抑制请求）视为未声明，`data:image/…` 内联图标则本地解码落盘，并识别拒收 `favicon.im` 的灰色占位图，避免把假图标落盘（无图标时前端回落为分类色首字母块）
 - **主题可切换**：深色 / 浅色 / 跟随系统三态（顶栏按钮循环切换，选择存 `localStorage`）。两套配色共用同一组语义变量（`--bg` / `--text` / `--tint-*` / `--diff-*-fg` …），`<html data-theme>` 只切换取值；首屏有内联防闪烁脚本，浅色下正文对比度均 ≥ 4.5:1（WCAG AA）
 
-> M8（安全收口 + 日志增强）已落地；控制台原定的 M9/M10 方向与验收定义见 [`docs/nav-console-next-plan.md`](docs/nav-console-next-plan.md)。
-> M9 实际被**智能体 CLI** 占用；下一版（V5）方向调研见 [`docs/NAV-v5-upgrade-plan.md`](docs/NAV-v5-upgrade-plan.md)。
+> M8（安全收口 + 日志增强）已落地；V5 又补上发布门禁、云端快照回滚、操作审计、可用性看板与 hunk 分块暂存。
+> 控制台原定的 M9/M10 方向与验收定义见 [`docs/nav-console-next-plan.md`](docs/nav-console-next-plan.md)。
+> M9 实际被**智能体 CLI** 占用；V5 方案见 [`docs/NAV-v5-upgrade-plan.md`](docs/NAV-v5-upgrade-plan.md)。
 
 ### 开机自启与桌面快捷方式
 
@@ -184,7 +190,7 @@ pnpm run console:service              # 改走 NSSM 真服务（需账户有密�
 
 ## 智能体 CLI（nav）
 
-控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖四个命令域共 **28 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/*`）。
+控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖四个命令域共 **35 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/*`）。
 
 ```bash
 pnpm run nav                       # 全部命令总览
@@ -193,20 +199,27 @@ pnpm run nav data doctor           # 环境自检：Node/git/curl/密钥/数据�
 pnpm run nav sites list --category data
 pnpm run nav sites add --url example.com --name 示例 --desc 描述 --category learning --dry-run
 pnpm run nav publish run --dry-run  # 发布前检查前置条件（blockers 直接说明为什么会失败）
+pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunks 只暂存其中几块
 ```
 
 | 命令域 | 命令 |
 |--------|------|
 | `sites` | list / get / add / update / remove / categories / meta / icon / check |
-| `publish` | status / run / verify / sync-data / deployments |
-| `git` | status / diff / log / suggest / stage / unstage / commit / push / remote |
-| `data` | stats / integrity / diff / validate / doctor |
+| `publish` | status / run / verify / sync-data / deployments / preflight / snapshots / rollback |
+| `git` | status / diff / hunks / log / suggest / stage / unstage / stage-hunks / unstage-hunks / commit / push / remote |
+| `data` | stats / integrity / diff / validate / doctor / audit |
 
 **输出契约**：stdout 只有一份结果文档（默认单行 JSON `{ok,command,data,meta}`，`--pretty` 转人类可读文本），进度与长任务日志一律走 stderr，因此 stdout 可直接 `JSON.parse`。
 
 **退出码**：`0` 成功 / `1` 内部错误 / `2` 用法错误 / `3` 环境缺失 / `4` 远端失败 / `5` 业务拒绝 —— 可直接作为智能体的判定依据。
 
 **写操作可预演**：`add` / `update` / `remove` / `icon` / `commit` / `push` / `publish run` / `sync-data` 默认直接执行，加 `--dry-run` 则只校验并展示将要发生的变化，不落盘、不推送。预演走的是与实写**同一套校验与 ID 计算**（`lib/sites.mjs` 的 `{ dryRun }` 参数），因此预演结果与真实执行完全一致。
+
+### MCP 服务（智能体原生接入）
+
+`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 5 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_git` / `nav_data`），而不是把 35 条命令平铺成 35 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
+
+**写操作闸门**：MCP 侧的写操作默认**只预演**，返回 `gate.preview = true` 与将要发生的变化；必须显式传 `confirm: true` 才真正执行。命令清单的唯一真相源是 `tools/cli/lib/registry.mjs`，CLI 与 MCP 都从它取，因此两边不会出现清单漂移。
 
 > 详见 [`tools/cli/README.md`](tools/cli/README.md)。
 
@@ -242,11 +255,15 @@ pnpm run nav publish run --dry-run  # 发布前检查前置条件（blockers 直
 ```
 nav-v2/
 ├── api/
-│   ├── sites.js           # Serverless：站点数据 GET/POST（Blob 真相源，POST 走 header 鉴权）
+│   ├── sites.js           # Serverless：站点数据 GET/POST（Blob 真相源，POST 走 header 鉴权）+ 云端快照清单 / 回滚
 │   ├── session.js         # Serverless：用户会话数据读写（Blob session/<key>，密钥隔离）
 │   └── metadata.js        # Serverless：URL 元信息抓取代理（调 shared/site-infer.mjs，回名称/描述/分类/配色/图标）
 ├── shared/
-│   └── site-infer.mjs     # 站点元信息推断引擎（线上 Serverless 与控制台同源复用）
+│   ├── site-infer.mjs     # 站点元信息推断引擎（线上 Serverless / 控制台 / CLI 同源复用）
+│   ├── categories.mjs     # 分类白名单与元数据（分类推断的唯一真相源）
+│   ├── snapshots.mjs      # 云端快照命名与保留策略（纯函数：命名、反解、裁剪）
+│   ├── health-probe.mjs   # 站点探活与分级口径（控制台看板 / CLI check / check-sites.mjs 共用）
+│   └── hunk-patch.mjs     # unified diff 的 hunk 边界解析与子集补丁生成（分块暂存用）
 ├── public/
 │   ├── icons/             # 真实网站 favicon（按站点 id 存储）
 │   └── ...
@@ -256,16 +273,22 @@ nav-v2/
 │   ├── check-sites.mjs    # 全站点健康检查
 │   └── fetch-favicons.mjs # favicon 批量抓取（支持 --only <id>）
 ├── tools/
-│   ├── cli/               # 智能体 CLI（28 条命令，复用 console/lib，JSON 输出契约）
-│   │   ├── nav.mjs        # 入口：命令注册表 / 分发 / help / schema
+│   ├── cli/               # 智能体 CLI（35 条命令，复用 console/lib，JSON 输出契约）
+│   │   ├── nav.mjs        # 入口：分发 / help / schema（命令清单取自 lib/registry.mjs）
 │   │   ├── lib/core.mjs   # 内核：输出信封、退出码、参数解析、长任务等待、预演
-│   │   └── commands/      # sites / publish / git / data 四域命令
+│   │   ├── lib/registry.mjs # 命令注册表：CLI 与 MCP 共用的唯一真相源
+│   │   └── commands/      # sites / publish / snapshots / git / data 五组命令
+│   ├── mcp/               # MCP 服务（stdio，官方 SDK）：35 条命令收敛成 5 个域级工具
+│   │   ├── server.mjs     # 工具定义与写操作 confirm 闸门
+│   │   ├── lib/bridge.mjs # 复用 CLI 命令层，把命令映射成工具动作
+│   │   └── test-mcp.mjs   # 端到端用例：真实 stdio 握手 + 工具契约断言
 │   └── console/           # 本地运维控制台（仅 127.0.0.1，绝不可部署）
 │       ├── server.mjs     # node:http 入口 + 来源校验 + SSE 端点（--strict-port 钉死端口）
 │       ├── test-trust.mjs # 来源校验用例（Host/Origin/自定义头，零依赖）
+│       ├── test-hunks.mjs # hunk 分块用例（临时仓库实测暂存 / 取消暂存）
 │       ├── launcher/      # 登录自启 + 保活 + Chrome app 快捷方式（PowerShell，UTF-8 BOM）
-│       ├── lib/           # git / jobs / changes / sync / vercel / history / data / sites
-│       └── ui/            # 单页 UI（7 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
+│       ├── lib/           # git / jobs / changes / sync / vercel / history / data / sites / snapshots / gate / audit / health
+│       └── ui/            # 单页 UI（9 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
 ├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
 ├── docs/
