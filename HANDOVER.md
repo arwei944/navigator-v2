@@ -1548,6 +1548,42 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 - 图标：`icons/dt34.png`（180×180 PNG，14977 B），源 `https://openchainbench.com/apple-icon`。
 - 验收：`nav data validate` → 301 条通过（9 条已知无图标为预期警告）；`nav sites check --ids dt34` → `200 ok`。
 
-> 引擎待办（本次未改）：`pickColor` 只读页面 `<meta name="theme-color">`，不读 `manifest.webmanifest`
-> 的 `theme_color`，遇到「主题色只写在 manifest」的站点会退化为 hash 色。本次已手工修正，
-> 后续可考虑把 manifest 纳入取值来源（三处同源，需同步 `site-infer.mjs`）。
+> 引擎待办（已于同日晚修复）：原 `pickColor` 只读页面 `<meta name="theme-color">`，不读
+> `manifest.webmanifest` 的 `theme_color`，遇到「主题色只写在 manifest」的站点会退化为 hash 色。
+> 本次收录时手工落库，随后已在下一节完成引擎修复（现可自动识别 `#7a2e1f`）。
+
+---
+
+## 二十九、引擎修复：pickColor 支持 manifest theme_color + 发布（v102，2026-09-30）
+
+`dt34`（OpenChainBench）暴露的问题：品牌色只写在 `manifest.webmanifest` 的 `theme_color` 里，
+页面 `<head>` 仅声明了按配色方案区分的两条 `meta theme-color`（light `#ffffff` / dark `#0a0b0d`），
+两者都被 `normalizeColor` 判为「无辨识度」。旧逻辑只取文档**第一条** theme-color 且只判**存在性**，
+于是拿到白色、进而退化成分类色 / hash 色。
+
+| 改动 | 说明 |
+|------|------|
+| 新增 `pickThemeColor(html)` | 遍历**全部** `meta theme-color`（兼容 `name`/`property`），返回**第一条可用**值；都不可用返回空串，交由调用方继续找 manifest |
+| 新增 `manifestHref(html, base)` | 解析 `<link rel="manifest">` 并相对化，跳过 `data:` 内联声明 |
+| 新增 `manifestThemeColor(text)` | 从 manifest JSON 取 `theme_color`，解析失败 / 字段缺失返回空串 |
+| `inferColor` 新增 `manifestTheme` | 优先级：`meta theme-color` → manifest `theme_color` → `msapplication-TileColor` → 分类色 → 散列色 |
+| `inferSite` 透传 `manifestTheme` | `manifest` 来源与 `meta` 同为 `high` 置信度 |
+
+- 两个入口同步：`api/metadata.js`（复用带逐跳 SSRF 校验的 `fetchHtml`）与
+  `tools/console/lib/sites.mjs`（走 `curl.exe`）。**仅在页面无可用 meta 主题色时才抓 manifest**，
+  避免为绝大多数站点平白多一次请求。
+- 前端 `AddSiteModal.vue` 新增配色来源文案「来自站点 manifest 主题色」。
+- `test-infer.mjs` 新增 16 条断言（92 → **108**），覆盖多 theme-color 取用、manifest 地址解析、
+  主题色优先级（白色 meta 回退 manifest、manifest 优先于 tile 色）。
+
+**发布记录：v102（2026-09-30）**
+
+- `nav publish preflight` → 凭证 `93c2db03`（分支 master · HEAD 182cc7b · 云端 v101/301）
+  → `nav publish run --gate 93c2db03` → 9 步全绿：推送 → 备份 → 数据门禁 → 构建 → Vercel 部署 →
+  Blob 热更新 → 一致性验证。
+  - 结果：**version 102 · 301 站点 · 292 带图标**；第 1 次轮询即收敛。
+  - 快照：`sites-data.snapshots/000101-2026-09-30T12-49-20-725Z.json`（发布前数据，可一键回滚）。
+- 提交：`182cc7b fix(infer): 支持读取 manifest theme_color，修复仅声明在 webmanifest 的站点配色退化`
+  （已推送 origin/master）。
+- 线上实测（`/api/metadata?url=https://openchainbench.com/`）：`color=#7a2e1f`、
+  `sources.color=manifest`、`confidence.color=high` ✅（修复前为 hash 色 `#313db9`）。
