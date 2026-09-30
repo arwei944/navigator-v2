@@ -10,7 +10,7 @@
  * 这样「放行」放行的就是被看过的那一份东西，而不是「随便一个时刻的工作区」。
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
 import { fetchCloud } from './cloud.mjs'
@@ -19,9 +19,40 @@ import * as changes from './changes.mjs'
 import { record } from './audit.mjs'
 
 const GATE_TTL_MS = 10 * 60 * 1000
-const gates = new Map()
+const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
+const GATE_FILE = join(DATA_DIR, 'gates.json')
 
 const SITES_FILE = 'api/sites-data.json'
+
+/**
+ * 凭证必须落盘，不能只放进程内存。
+ *
+ * 原因：CLI 是「一次调用一个进程」——`nav publish preflight` 产出的凭证随进程退出
+ * 就没了，紧接着的 `nav publish run --gate <id>` 是另一个进程，内存表是空的，
+ * 于是永远核销不了。控制台内之所以看不出这个问题，是因为预检与发布都在同一个
+ * 常驻进程里，共享内存表。
+ *
+ * 写入失败不阻断主流程（与 audit 同口径）：持久化不可用时凭证退化为进程内有效，
+ * 控制台路径照常工作，只是跨进程放行会失败并要求重新预检。
+ */
+function loadGates() {
+  try {
+    const arr = JSON.parse(readFileSync(GATE_FILE, 'utf-8'))
+    if (!Array.isArray(arr)) return new Map()
+    return new Map(arr.filter(g => g && g.id).map(g => [g.id, g]))
+  } catch {
+    return new Map()
+  }
+}
+
+function saveGates(gates) {
+  try {
+    mkdirSync(DATA_DIR, { recursive: true })
+    const tmp = `${GATE_FILE}.tmp`
+    writeFileSync(tmp, JSON.stringify([...gates.values()]), 'utf-8')
+    renameSync(tmp, GATE_FILE)
+  } catch { /* 落盘失败不影响本次放行判定 */ }
+}
 
 function dataDigest() {
   try { return createHash('sha256').update(readFileSync(join(ROOT, SITES_FILE))).digest('hex').slice(0, 16) } catch { return 'no-data' }
@@ -52,9 +83,10 @@ export async function currentFingerprint() {
   return fingerprintOf(st, head)
 }
 
-function pruneExpired() {
+function pruneExpired(gates) {
   const now = Date.now()
   for (const [id, g] of gates) if (g.expiresAt <= now) gates.delete(id)
+  return gates
 }
 
 /**
@@ -62,7 +94,7 @@ function pruneExpired() {
  * 不触碰云端、不写盘、不提交。
  */
 export async function preflight({ kind = 'publish', message = '' } = {}) {
-  pruneExpired()
+  const gates = pruneExpired(loadGates())
   const [st, head, sites, cloud, pending] = await Promise.all([
     git.getStatus(),
     git.headCommit(),
@@ -96,6 +128,7 @@ export async function preflight({ kind = 'publish', message = '' } = {}) {
   const id = randomUUID().slice(0, 8)
   const gate = { id, kind, createdAt: Date.now(), expiresAt: Date.now() + GATE_TTL_MS, fingerprint }
   gates.set(id, gate)
+  saveGates(gates)
 
   record({
     action: 'gate.preflight',
@@ -162,7 +195,7 @@ export async function preflight({ kind = 'publish', message = '' } = {}) {
  * 真正拦住误操作的是指纹 —— 工作区一变，凭证立即作废。
  */
 export async function consumeGate(id) {
-  pruneExpired()
+  const gates = pruneExpired(loadGates())
   const gate = gates.get(String(id || ''))
   if (!gate) {
     record({ action: 'gate.reject', result: 'rejected', target: String(id || ''), detail: '放行凭证不存在或已过期' })
@@ -177,19 +210,20 @@ export async function consumeGate(id) {
     return { ok: false, reason: '预检后工作区已变动，放行凭证作废，请重新预检' }
   }
   gates.delete(gate.id)
+  saveGates(gates)
   record({ action: 'gate.approve', target: gate.id, detail: `凭证核销放行（指纹 ${gate.fingerprint}）` })
   return { ok: true, gate: { id: gate.id, kind: gate.kind, createdAt: gate.createdAt, fingerprint: gate.fingerprint } }
 }
 
 /** 当前有效的放行凭证（控制台展示用） */
 export function listGates() {
-  pruneExpired()
-  return [...gates.values()].map(g => ({ id: g.id, kind: g.kind, createdAt: g.createdAt, expiresAt: g.expiresAt, fingerprint: g.fingerprint }))
+  return [...pruneExpired(loadGates()).values()]
+    .map(g => ({ id: g.id, kind: g.kind, createdAt: g.createdAt, expiresAt: g.expiresAt, fingerprint: g.fingerprint }))
 }
 
 /** 测试用：清空凭证表 */
 export function clearGates() {
-  gates.clear()
+  saveGates(new Map())
 }
 
 export { GATE_TTL_MS, fingerprintOf }
