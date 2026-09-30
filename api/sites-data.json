@@ -3369,16 +3369,16 @@
   },
   {
     "id": "dt17",
-    "name": "Tange Stock",
+    "name": "Super View",
     "url": "stock.tanggestock.com",
     "desc": "全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具。",
     "categoryId": "data",
     "color": "#f59e0b",
-    "initial": "T",
+    "initial": "S",
     "sortOrder": 242,
     "visitCount": 0,
     "createdAt": 1787508586045,
-    "updatedAt": 1790356950918,
+    "updatedAt": 1790763376177,
     "icon": "icons/dt17.jpg"
   },
   {
