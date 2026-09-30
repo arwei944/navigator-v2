@@ -1465,3 +1465,29 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 | MCP 端到端 | `pnpm run mcp:test` | 65 条断言全绿 |
 
 **顺带修复**：`gate.mjs` 的放行凭证原先只存进程内存，导致 `preflight` 与 `run --gate` 分属两个进程时永远核销不了（控制台内因常驻进程共享内存而看不出）。已改为落盘 `.data/gates.json`（原子写 tmp + rename，写入失败不阻断主流程），跨进程放行恢复正常。
+
+---
+
+## 二十六、站点收录：华润赢（2026-09-30）
+
+用户提交 `https://huarun.win/platform/windows`。核实结果：
+
+- **主域名未收录**（`nav sites list --q huarun` → 0 条），故新增条目 `bs9`（代理/VPN 分类，前缀 `bs`）。
+- **按规则指向主域名而非子页**：`/platform/windows` 是主站的 Windows 分栏（51 款客户端），主站 `huarun.win` 本身即完整产品（166 款、覆盖 7 个平台），符合「特定子页不单独收录，导航指向主域名」。
+- 实测两页均 `HTTP 200`：根页 675KB、子页 384KB，无重定向。
+
+| 字段 | 取值 | 来源 |
+|------|------|------|
+| `id` | `bs9` | 自动递增 |
+| `name` | 华润赢 | `og:site_name`（根页 `title` 为「华润赢 · 翻墙应用商店与代理客户端大全」） |
+| `url` | `huarun.win` | 收敛到根域名 |
+| `desc` | 翻墙应用商店与代理客户端大全，收录 166 款 Android/iOS/Windows/macOS/Linux/HarmonyOS/OpenWrt 代理客户端… | 人工依根页 `meta description` 重写 |
+| `categoryId` | `proxy` | 推断置信度 high（命中 proxy/vpn/机场/科学上网/代理工具 品牌词+关键词） |
+| `color` | `#a855f7` | 分类色 |
+| `initial` | 华 | 取名称首字 |
+| `icon` | `icons/bs9.png` | `apple-touch-icon.png?v=huayun-1`，真实 **180×180 PNG / 2685B** |
+
+- **描述口径修正**：`nav sites meta` 抓子页时给出的是「51 款 Windows 代理客户端」，但收录的是主域名，故改用根页口径（166 款 / 7 平台），并在描述里保留「Windows 单平台 51 款（40 款开源）」作为具体佐证。
+- 命令：`nav sites add --url huarun.win --name "华润赢" --desc "…" --category proxy --color "#a855f7"`（先 `--dry-run` 预演确认 id/字段，再实际写入）→ `nav sites icon bs9`
+- 验收：`nav data validate` → 300 条通过（9 条已知无图标为预期警告）；`nav sites check --ids bs9` → `200 ok`
+- **待发布**：本地 300 条，云端 v98 仍为 299 条，需一次发布收敛。

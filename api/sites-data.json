@@ -4175,5 +4175,19 @@
     "createdAt": 1790656871393,
     "updatedAt": 1790656883607,
     "icon": "icons/dt33.png"
+  },
+  {
+    "id": "bs9",
+    "name": "华润赢",
+    "url": "huarun.win",
+    "desc": "翻墙应用商店与代理客户端大全，收录 166 款 Android/iOS/Windows/macOS/Linux/HarmonyOS/OpenWrt 代理客户端，支持按平台、内核、代码状态与价格多维比较，并标注维护状态、代码公开程度与官方来源；其中 Windows 单平台即收录 51 款（40 款开源），适合按需选型与交叉核对",
+    "categoryId": "proxy",
+    "color": "#a855f7",
+    "initial": "华",
+    "sortOrder": 300,
+    "visitCount": 0,
+    "createdAt": 1790764565600,
+    "updatedAt": 1790764574546,
+    "icon": "icons/bs9.png"
   }
 ]
