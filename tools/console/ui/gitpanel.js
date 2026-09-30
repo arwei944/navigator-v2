@@ -27,6 +27,14 @@ function stagedPaths() {
   return (state.status?.files || []).filter(f => f.staged).map(f => f.path)
 }
 
+/**
+ * 文件在两侧的归属。
+ * 一个文件可能同时有「已暂存的块」和「工作区里的块」（部分暂存），此时两侧都要出现，
+ * 否则分块暂存之后就没法再从列表进到工作区那一侧去看剩余差异。
+ */
+const onStagedSide = f => f.index !== null
+const onWorktreeSide = f => f.index === null || f.worktree !== null
+
 /* ---------- 渲染 ---------- */
 
 function renderRepoInfo() {
@@ -114,8 +122,8 @@ function renderFiles() {
   staged.innerHTML = ''
   unstaged.innerHTML = ''
   const files = state.status?.files || []
-  renderGroup(staged, '已暂存', files.filter(f => f.staged), true)
-  renderGroup(unstaged, '未暂存 / 未跟踪', files.filter(f => !f.staged), false)
+  renderGroup(staged, '已暂存', files.filter(onStagedSide), true)
+  renderGroup(unstaged, '未暂存 / 未跟踪', files.filter(onWorktreeSide), false)
   scroller.scrollTop = keepScroll
   renderStagedChips()
 }
@@ -178,17 +186,54 @@ function renderSuggestion() {
 
 /* ---------- 交互 ---------- */
 
-async function selectFile(f, staged) {
-  state.selected = { path: f.path, staged }
+async function openDiff(path, staged) {
+  state.selected = { path, staged }
   renderFiles()
   $('#diff-pane').classList.add('loading')
   try {
-    renderDiff(await api(`/api/git/diff?path=${encodeURIComponent(f.path)}&staged=${staged ? 1 : 0}`))
+    renderDiff(await api(`/api/git/diff?path=${encodeURIComponent(path)}&staged=${staged ? 1 : 0}`), { onHunk })
   } catch (e) {
     clearDiff(`读取 diff 失败：${e.message}`)
   } finally {
     $('#diff-pane').classList.remove('loading')
   }
+}
+
+function selectFile(f, staged) {
+  return openDiff(f.path, staged)
+}
+
+/** 分块暂存 / 取消暂存：只搬选中的块，其余块留在原侧 */
+async function onHunk(indexes, staged) {
+  const sel = state.selected
+  if (!sel) return
+  try {
+    const r = await api('/api/git/hunks', { method: 'POST', body: { path: sel.path, indexes, staged } })
+    appendLocal(
+      `${staged ? '取消暂存' : '暂存'} ${sel.path} 的 hunk ${r.applied.join('、')}（该侧剩余 ${r.remaining} 块）`,
+      'success',
+    )
+  } catch (e) {
+    appendLocal(`分块操作失败：${e.message}`, 'stderr')
+    return
+  }
+  await refresh()
+  await reopenSelected()
+}
+
+/** 操作后重新定位当前文件：原侧已无差异就自动翻到另一侧，两侧都干净则清空 */
+async function reopenSelected() {
+  const sel = state.selected
+  if (!sel) return
+  const f = (state.status?.files || []).find(x => x.path === sel.path)
+  if (!f) {
+    state.selected = null
+    renderFiles()
+    clearDiff()
+    return
+  }
+  const sameSide = sel.staged ? onStagedSide(f) : onWorktreeSide(f)
+  await openDiff(sel.path, sameSide ? sel.staged : !sel.staged)
 }
 
 async function doCommit({ push = false } = {}) {

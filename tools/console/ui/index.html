@@ -38,6 +38,8 @@
     <button class="tab" data-panel="sync">同步</button>
     <button class="tab" data-panel="history">历史</button>
     <button class="tab" data-panel="data">数据</button>
+    <button class="tab" data-panel="health">可用性</button>
+    <button class="tab" data-panel="audit">审计</button>
   </nav>
 
   <main class="content">
@@ -52,6 +54,10 @@
           <dl class="kv" id="env-vars"></dl>
           <p class="hint">仅显示是否已配置，不显示具体值。</p>
         </div>
+      </div>
+      <div class="card">
+        <h3>站点可用性</h3>
+        <div id="overview-health"></div>
       </div>
       <div class="card">
         <h3>控制台自检</h3>
@@ -134,6 +140,11 @@
           <pre class="diff-view" id="diff-view"></pre>
         </div>
       </div>
+      <p class="hint">
+        diff 按 hunk 分块展示，每块右侧可「暂存此块 / 取消暂存此块」——只搬选中的块，其余块留在原侧，
+        等价于终端的 <code>git add -p</code> 而不必离开控制台。部分暂存的文件会同时出现在「已暂存」与「未暂存」两侧，
+        分别对应索引侧与工作区侧的差异。二进制、未跟踪文件以及超出展示上限的差异不支持分块。
+      </p>
     </section>
 
     <section class="panel" id="panel-commit">
@@ -170,16 +181,29 @@
       </div>
 
       <div class="card">
-        <h3>一键发布 · 全链路时间线</h3>
+        <h3>一键发布 · 预检 → 放行 → 全链路时间线</h3>
         <div class="publish-form">
           <input class="msg-input" id="sync-message" placeholder="提交消息（有已暂存改动时必填）">
           <label class="chk"><input type="checkbox" id="sync-push" checked> 推送远端</label>
           <label class="chk"><input type="checkbox" id="sync-skip-build"> 跳过构建</label>
-          <button class="btn primary" id="btn-sync-publish">一键发布</button>
+          <button class="btn ghost" id="btn-gate-preflight">执行预检</button>
+          <button class="btn primary" id="btn-sync-publish" disabled>放行并发布</button>
+          <button class="btn ghost danger" id="btn-gate-bypass" title="跳过门禁直接发布，会在日志与审计留痕">绕过门禁发布</button>
         </div>
+        <div class="gate-report" id="gate-report"></div>
         <div class="result" id="sync-result"></div>
         <ol class="timeline" id="sync-timeline"></ol>
-        <p class="hint">发布复用 <code>scripts/publish.mjs</code>（单一发布入口），控制台只做编排与可视化。</p>
+        <p class="hint">预检只读：不改工作区、不写云端。放行凭证绑定当前工作区指纹，工作区一变即作废（10 分钟内有效）。发布复用 <code>scripts/publish.mjs</code>（单一发布入口），控制台只做编排与可视化。</p>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3>云端数据快照 · 一键回滚</h3>
+          <button class="btn ghost" id="btn-snap-refresh">刷新快照</button>
+        </div>
+        <div class="snapshot-list" id="snapshot-list"></div>
+        <div class="result" id="snap-result"></div>
+        <p class="hint">每次热更新前自动落盘一份快照（保留最近 20 份）。回滚会把指定快照写回生产数据，<code>version</code> 继续递增不回退；回滚前的当前数据也会自动存一份，回滚本身可撤销。</p>
       </div>
 
       <div class="card">
@@ -223,6 +247,61 @@
           <h3>完整性检查</h3>
           <div id="data-integrity"></div>
         </div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-health">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="health-summary"></div>
+          <div class="row-actions">
+            <select class="msg-input mini" id="health-scope">
+              <option value="problems">需处理 + 可忽略</option>
+              <option value="all">全部站点</option>
+            </select>
+            <button class="btn ghost" id="btn-health-refresh">刷新</button>
+            <button class="btn ghost" id="btn-health-probe-bad">仅探异常</button>
+            <button class="btn primary" id="btn-health-probe">开始探活</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>可用性看板 · 状态徽标 + 响应时间趋势</h3>
+        <div class="result" id="health-progress"></div>
+        <div class="health-list" id="health-list"></div>
+        <p class="hint">
+          口径与 <code>nav sites check</code> 同源：2xx / 3xx 正常；429 / 403 / 405 / 401 归「可忽略」（限流、反爬，站点实际可用）；
+          其余 4xx 与连接失败归「需处理」。判定为需处理前会自动重试一次，抑制 WAF 抖动造成的假宕机。
+          结果按天落盘 <code>tools/console/.data/health/YYYY-MM-DD.jsonl</code>（保留 30 天），趋势条按「左旧右新」排列。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>探活轮次</h3>
+        <div class="run-list" id="health-runs"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-audit">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="audit-summary"></div>
+          <div class="row-actions">
+            <input class="msg-input mini" id="audit-search" placeholder="搜索动作 / 目标 / 详情">
+            <select class="msg-input mini" id="audit-action"></select>
+            <select class="msg-input mini" id="audit-result"></select>
+            <button class="btn ghost" id="btn-audit-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>操作审计 · 关键动作留痕 <span class="dim" id="audit-count"></span></h3>
+        <div class="audit-list" id="audit-list"></div>
+        <p class="hint">
+          审计落盘于 <code>tools/console/.data/audit.jsonl</code>，超过 2MB 自动轮转（保留最近 20 份）。
+          覆盖提交、推送、发布、放行 / 拒绝、回滚、站点增删改等关键动作；只记录已发生的事实，写入失败绝不阻断主流程。
+        </p>
       </div>
     </section>
   </main>

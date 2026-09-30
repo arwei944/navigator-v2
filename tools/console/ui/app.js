@@ -6,6 +6,8 @@ import { initSyncPanel, refresh as refreshSync } from './syncpanel.js'
 import { initHistoryPanel, refresh as refreshHistory } from './historypanel.js'
 import { initDataPanel, refresh as refreshData } from './datapanel.js'
 import { initSitesPanel, refresh as refreshSites } from './sitespanel.js'
+import { initAuditPanel, refresh as refreshAudit } from './auditpanel.js'
+import { initHealthPanel, refresh as refreshHealth } from './healthpanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -18,6 +20,8 @@ $('#tabs').addEventListener('click', e => {
   if (btn.dataset.panel === 'sync') refreshSync()
   if (btn.dataset.panel === 'history') refreshHistory()
   if (btn.dataset.panel === 'data') refreshData()
+  if (btn.dataset.panel === 'audit') refreshAudit()
+  if (btn.dataset.panel === 'health') refreshHealth()
 })
 
 /* ---------- 概览 ---------- */
@@ -68,6 +72,8 @@ initSyncPanel()
 initHistoryPanel()
 initDataPanel()
 initSitesPanel()
+initAuditPanel()
+initHealthPanel()
 loadHealth()
 loadEnv()
 
@@ -76,4 +82,6 @@ setInterval(() => {
   const active = $('.panel.active')?.id
   if (active === 'panel-changes' || active === 'panel-commit') refresh()
   if (active === 'panel-sync') refreshSync()
+  if (active === 'panel-audit') refreshAudit()
+  if (active === 'panel-health') refreshHealth()
 }, 30000)
