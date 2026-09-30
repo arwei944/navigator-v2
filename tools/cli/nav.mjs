@@ -14,32 +14,13 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from '../console/lib/env.mjs'
 import { CliError, EXIT, EXIT_CODES, GLOBAL_FLAGS, emitResult, note, splitGlobals, table, toCliError } from './lib/core.mjs'
-import { commands as siteCommands } from './commands/sites.mjs'
-import { commands as publishCommands } from './commands/publish.mjs'
-import { commands as gitCommands } from './commands/git.mjs'
-import { commands as dataCommands } from './commands/data.mjs'
-
-const GROUPS = [
-  { id: 'sites', label: '站点管理', desc: '站点数据增删改查、分类、元信息抓取、图标、批量探活', commands: siteCommands },
-  { id: 'publish', label: '发布与云端', desc: '本地/云端一致性、一键发布、数据同步、部署记录', commands: publishCommands },
-  { id: 'git', label: 'Git 工作流', desc: '状态、差异、历史、提交消息建议、暂存、提交、推送', commands: gitCommands },
-  { id: 'data', label: '数据体检与环境', desc: '统计、完整性体检、改动对比、schema 门禁、环境自检', commands: dataCommands },
-]
+import { GROUPS, findCommand } from './lib/registry.mjs'
 
 const META_HELP = [
   ['nav help [命令路径]', '查看总览，或单个命令的完整用法'],
   ['nav schema', '输出机器可读清单（命令 / 选项 / 退出码），供智能体自述'],
   ['nav version', '输出版本号'],
 ]
-
-const REGISTRY = new Map()
-for (const g of GROUPS) {
-  for (const c of g.commands) {
-    if (!c.path.startsWith(g.id + ' ')) throw new Error(`命令路径与命令域不匹配：${c.path} ∉ ${g.id}`)
-    if (REGISTRY.has(c.path)) throw new Error(`命令路径重复：${c.path}`)
-    REGISTRY.set(c.path, c)
-  }
-}
 
 function projectVersion() {
   try { return JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8')).version || '0.0.0' } catch { return '0.0.0' }
@@ -166,7 +147,7 @@ async function main() {
 
   if (head === 'help') {
     const group = sub ? GROUPS.find(g => g.id === sub) : null
-    const target = group && tail[0] ? REGISTRY.get(`${sub} ${tail[0]}`) : null
+    const target = group && tail[0] ? findCommand(`${sub} ${tail[0]}`) : null
     if (target) process.stdout.write(commandHelp(target) + '\n')
     else if (group) process.stdout.write(groupHelp(group) + '\n')
     else process.stdout.write(globalHelp() + '\n')
@@ -183,7 +164,7 @@ async function main() {
     return EXIT.OK
   }
 
-  const cmd = REGISTRY.get(`${head} ${sub}`)
+  const cmd = findCommand(`${head} ${sub}`)
   if (!cmd) {
     const hint = `该命令域可用：${group.commands.map(c => c.path.split(' ')[1]).join('、')}`
     return emitError(`${head} ${sub}`, new CliError(`未知子命令：${head} ${sub}`, { code: 'USAGE', exitCode: EXIT.USAGE, hint }), ctx)

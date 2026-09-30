@@ -22,7 +22,8 @@
     "console:test": "node tools/console/test-trust.mjs",
     "console:test:infer": "node tools/console/test-infer.mjs",
     "console:test:guard": "node tools/console/test-guard.mjs",
-    "console:test:all": "node tools/console/test-trust.mjs && node tools/console/test-infer.mjs && node tools/console/test-guard.mjs",
+    "console:test:hunks": "node tools/console/test-hunks.mjs",
+    "console:test:all": "node tools/console/test-trust.mjs && node tools/console/test-infer.mjs && node tools/console/test-guard.mjs && node tools/console/test-hunks.mjs",
     "console:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1",
     "console:autostart:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1 -Uninstall",
     "console:start": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/start.ps1",
@@ -31,7 +32,9 @@
     "console:icon": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/build-icon.ps1",
     "console:service": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-service.ps1",
     "console:service:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-service.ps1 -Uninstall",
-    "nav": "node tools/cli/nav.mjs"
+    "nav": "node tools/cli/nav.mjs",
+    "mcp": "node tools/mcp/server.mjs",
+    "mcp:test": "node tools/mcp/test-mcp.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",
@@ -47,10 +50,12 @@
     "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.31.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "vite": "^5.0.0",
     "vite-plugin-pwa": "^0.17.0",
-    "workbox-window": "^7.4.1"
+    "workbox-window": "^7.4.1",
+    "zod": "^4.6.5"
   },
   "packageManager": "pnpm@11.18.0+sha512.33d83c77da82f49fba836925c6f1b841181ec3132b670639bd012f7075f5c7cf634c5f870147c19aae7478fac01df09d8892e880454896edd23ee9b33757563c"
 }
