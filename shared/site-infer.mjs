@@ -125,6 +125,14 @@ export function domainTokens(host) {
 const TITLE_SPLIT = /\s*[|｜丨/·・]\s*|\s*[:：]\s*|\s+[-–—]\s+|>>/
 const GENERIC_NAME = /^(首页|主页|官网|官方网站|官方|登录|注册|home|homepage|index|welcome|official|official site|login|sign in|中文|中文站|网站首页)$/i
 
+/**
+ * 错误页 / 占位页标题。这类 <title> 语法上完全正常，但它描述的是「这个页面不存在」而不是站点本身，
+ * 且长度、形态都像品牌名（"404 Not Found"），会被打分逻辑当成好候选写进导航卡片。
+ * 所以必须直接剔除而不是扣分 —— 扣分在「没有竞争者」时仍会胜出。
+ * 数字状态码要求独立成词，避免误伤名字里本来带数字的站点。
+ */
+const ERROR_TITLE = /(?:^|[\s\-–—|·:：（(])(?:4\d{2}|5\d{2})(?:$|[\s\-–—|·:：)）])|not\s*found|页面不存在|找不到(?:该)?页面|网页不存在|无法(?:访问|打开|显示)|访问受限|access\s*denied|^\s*forbidden\s*$|error\s*(?:page|code)|出错了|系统错误/i
+
 function cleanName(s) {
   return decodeEntities(String(s))
     .replace(/\s+/g, ' ')
@@ -160,6 +168,7 @@ export function pickName(html, host, { skipTitle = false } = {}) {
       const value = cleanName(part)
       const key = value.toLowerCase()
       if (!value || seen.has(key)) continue
+      if (ERROR_TITLE.test(value)) continue
       seen.add(key)
       cands.push({ value, bonus, source })
     }
@@ -226,6 +235,14 @@ function firstParagraph(html) {
 
 const DESC_NOISE = /^(欢迎访问|欢迎来到|本站|这是一个|welcome to|this site|loading|请开启\s*javascript)/i
 
+/**
+ * 「官方 meta」这一组内部的取值顺序不再由文档顺序决定。
+ * 原实现用 metaContent 一次传多个键，返回的是**文档里最先出现**的那个 —— 同一页面
+ * 把 og:description 写在 description 之前，取到的就是社交分享文案而非页面摘要。
+ * 现在改为固定优先级，并在同组内取最长的一条（更长的通常信息量更大，短的常是被压缩的标语）。
+ */
+const DESC_META_KEYS = ['description', 'og:description', 'twitter:description', 'og:summary', 'weibo:description']
+
 // 长度下限用来滤掉 "Home"、"首页"、"Loading" 这类噪声。中文信息密度高，
 // 不能按英文字符数一刀切，12 个汉字已是一句完整的站点简介。
 function usable(text, min = 12, name = '') {
@@ -254,8 +271,12 @@ function generatedDesc({ name, host, categoryLabel }) {
  */
 export function pickDesc(html, { name = '', host = '', categoryLabel = '', blocked = false } = {}) {
   if (!blocked) {
-    const meta = metaContent(html, ['description', 'og:description', 'twitter:description', 'og:summary', 'weibo:description'])
-    if (usable(meta, 12, name)) return { desc: clip(meta), source: 'meta' }
+    let meta = ''
+    for (const key of DESC_META_KEYS) {
+      const v = metaContent(html, [key])
+      if (usable(v, 12, name) && v.length > meta.length) meta = v
+    }
+    if (meta) return { desc: clip(meta), source: 'meta' }
 
     const ld = pickJsonLdField(html, 'description')
     if (usable(ld, 12, name)) return { desc: clip(ld), source: 'json-ld' }
@@ -303,6 +324,20 @@ export function pickFavicon(html, base) {
     || resolved(/<link[^>]+rel=["'][^"']*(?:shortcut\s+)?icon[^"']*["'][^>]*>/gi)
     || resolved(/<link[^>]+rel=["'][^"']*mask-icon[^"']*["'][^>]*>/gi)
     || new URL('/favicon.ico', base).href
+}
+
+/**
+ * 多页取图标：子页声明优先（更具体），子页没声明时才看根页。
+ * pickFavicon 永远会返回一个地址（兜底 /favicon.ico），所以「有没有声明」要靠
+ * 「返回值是否等于那个兜底地址」来判断 —— 否则根页声明的 apple-touch-icon 永远轮不到。
+ */
+export function pickFaviconPrefer(htmls, base) {
+  const bare = new URL('/favicon.ico', base).href
+  for (const html of htmls) {
+    const href = pickFavicon(html, base)
+    if (href && href !== bare) return href
+  }
+  return bare
 }
 
 /* ---------------- 配色 ---------------- */
@@ -514,8 +549,12 @@ function knownSiteFor(host, existingSites) {
 /**
  * 由 HTML 与地址推出收录所需的全部字段。
  * existingSites / categoryMeta 用于「像不像已收录的某站」这类推断，缺失时退化为纯关键词。
+ *
+ * rootHtml：目标地址是子页时，调用方额外抓来的主域名首页。**收录的永远是主域名**
+ * （两个入口都把地址收敛成域名），所以站点级元信息应以主域名为准 —— 否则贴一个
+ * `/platform/windows` 会把整站描述写成「51 款 Windows 客户端」，而卡片链接指向主域名。
  */
-export function inferSite({ html, url, existingSites = [], categoryMeta = {}, fallbackCategory = '' }) {
+export function inferSite({ html, rootHtml = '', url, existingSites = [], categoryMeta = {}, fallbackCategory = '' }) {
   const raw = String(url || '').trim()
   let target
   try { target = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw) } catch { throw new Error(`地址无法解析：${url}`) }
@@ -523,31 +562,62 @@ export function inferSite({ html, url, existingSites = [], categoryMeta = {}, fa
 
   const host = target.hostname.replace(/^www\./, '').toLowerCase()
   const base = target.origin + '/'
-  const source = String(html || '')
+  const pageSource = String(html || '')
+  const rootSource = String(rootHtml || '')
 
-  const blocked = looksBlocked(source)
-  let nameInfo = pickName(source, host, { skipTitle: blocked })
+  // 根页在前、子页兜底；两者内容相同（子页 302 回首页）或没传根页时不重复计算
+  const hasRoot = Boolean(rootSource) && rootSource !== pageSource
+  const pages = (hasRoot
+    ? [{ html: rootSource, scope: 'root' }, { html: pageSource, scope: 'page' }]
+    : [{ html: pageSource, scope: 'page' }]
+  ).map(p => ({ ...p, blocked: looksBlocked(p.html) }))
+
+  // 只有「所有页都被拦截」才算被拦截：根页正常时我们手上是有真实内容的，不该提示反爬
+  const blocked = pages.every(p => p.blocked)
+  const pool = blocked ? pages : pages.filter(p => !p.blocked)
+
+  let nameInfo = null
+  for (const p of pool) {
+    const r = pickName(p.html, host, { skipTitle: p.blocked })
+    if (r.source !== 'domain') { nameInfo = { ...r, scope: p.scope }; break }
+  }
+  if (!nameInfo) nameInfo = { ...pickName('', host, {}), scope: pool[0]?.scope || 'page' }
+
   // 页面抓不到（反爬/超时）时名字只能靠域名拼，如 chat.openai.com → "Openai"。
   // 若这个域名已收录过，直接沿用已收录的名字（ChatGPT）比拼域名靠谱得多。
   if (nameInfo.source === 'domain') {
     const known = knownSiteFor(host, existingSites)
     if (known?.site?.name) {
-      nameInfo = { name: known.site.name, source: 'known', confidence: known.exact ? 'high' : 'medium' }
+      nameInfo = { ...nameInfo, name: known.site.name, source: 'known', confidence: known.exact ? 'high' : 'medium' }
     }
   }
+
+  // 分类把各页文本合起来判断：子页常带栏目关键词，根页常带整站定性词，合起来信号更全
+  const joinMeta = keys => pool.map(p => metaContent(p.html, keys)).filter(Boolean).join(' ')
   const category = inferCategory({
     name: nameInfo.name,
-    desc: metaContent(source, ['description', 'og:description']),
-    keywords: metaContent(source, ['keywords', 'og:keywords']),
+    desc: joinMeta(['description', 'og:description']),
+    keywords: joinMeta(['keywords', 'og:keywords']),
     domain: host,
     path: target.pathname,
   }, existingSites, categoryMeta, { fallback: fallbackCategory })
 
   const categoryLabel = categoryMeta[category.categoryId]?.label || ''
-  const descInfo = pickDesc(source, { name: nameInfo.name, host, categoryLabel, blocked })
+
+  let descInfo = null
+  for (const p of pool) {
+    const r = pickDesc(p.html, { name: nameInfo.name, host, categoryLabel, blocked: p.blocked })
+    if (r.source !== 'generated') { descInfo = { ...r, scope: p.scope }; break }
+  }
+  if (!descInfo) descInfo = { ...pickDesc('', { name: nameInfo.name, host, categoryLabel }), scope: pool[0]?.scope || 'page' }
+
+  const themeColor = metaContent(pageSource, ['theme-color'])
+    || (hasRoot ? metaContent(rootSource, ['theme-color']) : '')
+  const tileColor = metaContent(pageSource, ['msapplication-tilecolor', 'msapplication-navbutton-color'])
+    || (hasRoot ? metaContent(rootSource, ['msapplication-tilecolor', 'msapplication-navbutton-color']) : '')
   const colorInfo = inferColor({
-    themeColor: metaContent(source, ['theme-color']),
-    tileColor: metaContent(source, ['msapplication-tilecolor', 'msapplication-navbutton-color']),
+    themeColor,
+    tileColor,
     categoryColor: categoryMeta[category.categoryId]?.color || '',
     seed: host,
   })
@@ -557,11 +627,13 @@ export function inferSite({ html, url, existingSites = [], categoryMeta = {}, fa
     domain: host,
     name: nameInfo.name,
     desc: descInfo.desc,
-    faviconUrl: pickFavicon(source, base),
+    faviconUrl: pickFaviconPrefer(hasRoot ? [pageSource, rootSource] : [pageSource], base),
     color: colorInfo.color,
     categoryId: category.categoryId,
     categoryLabel,
     blocked,
+    // 该字段取自根页还是子页：贴子页时 UI 要说明「描述来自主域名」，否则用户对不上当前页面
+    scope: { name: nameInfo.scope, desc: descInfo.scope },
     sources: {
       name: nameInfo.source,
       desc: descInfo.source,

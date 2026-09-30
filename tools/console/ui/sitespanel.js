@@ -224,6 +224,13 @@ function summarizeMeta(m) {
   parts.push(knownCategory(m.categoryId)
     ? `分类 ${m.categoryLabel || m.categoryId}（${CONF_TEXT[m.confidence?.category] || '已推断'}）`
     : '分类未识别，请手动选择')
+  // 贴子页时名称/描述可能取自主域名（收录的也永远是主域名）：必须说明，
+  // 否则用户看到描述与当前子页对不上，会以为补全错了
+  const fromRoot = ['name', 'desc'].filter(k => m.scope?.[k] === 'root')
+  if (fromRoot.length) {
+    const who = fromRoot.length === 2 ? '名称与描述' : fromRoot[0] === 'name' ? '名称' : '描述'
+    parts.push(`${who}取自主域名（非当前子页）`)
+  }
   const low = Object.entries(m.confidence || {}).filter(([, v]) => v === 'low').length
   if (low) parts.push(`${low} 项为推断值`)
   return `已自动补全 · ${parts.join(' · ')}`

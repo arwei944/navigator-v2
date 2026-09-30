@@ -3,7 +3,7 @@
  * 运行：node tools/console/test-infer.mjs   （或 npm run console:test:infer）
  */
 import {
-  inferSite, pickName, pickDesc, pickFavicon, inferCategory, inferColor,
+  inferSite, pickName, pickDesc, pickFavicon, pickFaviconPrefer, inferCategory, inferColor,
   normalizeColor, hashColor, domainTokens, decodeHtmlBytes, looksBlocked, metaContent,
   BLOCKED_WARNING,
 } from '../../shared/site-infer.mjs'
@@ -61,6 +61,33 @@ const F = {
     <meta name="description" content="Dupe">
     <meta name="keywords" content="去中心化交易所聚合器，跨链兑换与流动性路由">
   </head><body></body></html>`,
+
+  // 错误页：<title> 语法正常、长度也像品牌名，但描述的是「页面不存在」
+  errTitle: `<!doctype html><html><head><title>404 Not Found</title></head><body></body></html>`,
+
+  // 同一份 meta，只是书写顺序颠倒：取值不应再受文档顺序影响
+  descOrderA: `<!doctype html><html><head><title>Order</title>
+    <meta property="og:description" content="社交分享用的短标语。">
+    <meta name="description" content="页面摘要写得详细得多，用来验证取值不再由文档顺序决定。">
+  </head><body></body></html>`,
+  descOrderB: `<!doctype html><html><head><title>Order</title>
+    <meta name="description" content="页面摘要写得详细得多，用来验证取值不再由文档顺序决定。">
+    <meta property="og:description" content="社交分享用的短标语。">
+  </head><body></body></html>`,
+
+  // 子页 + 主域名首页：收录的永远是主域名，站点级元信息应以主域名为准
+  subPage: `<!doctype html><html><head>
+    <title>Windows 代理客户端推荐与对比：51 款工具 | 华润赢</title>
+    <meta property="og:site_name" content="华润赢·翻墙应用商店">
+    <meta name="description" content="浏览并比较 51 款 Windows 代理客户端，其中 40 款开源。">
+  </head><body></body></html>`,
+  subRoot: `<!doctype html><html><head>
+    <title>华润赢 · 翻墙应用商店与代理客户端大全</title>
+    <meta property="og:site_name" content="华润赢">
+    <meta name="description" content="华润赢代理客户端大全收录 166 款 Android、iOS、Windows、macOS、Linux 工具，可按平台与内核比较。">
+    <meta name="theme-color" content="#a855f7">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  </head><body></body></html>`,
 }
 
 // 分类表是「白名单」：推断出的分类必须登记在这里才会被采纳（防止写进脏 categoryId）。
@@ -94,6 +121,13 @@ eq(n3.confidence, 'low', '域名兜底 → low')
 const n4 = pickName(F.blocked, 'protected.example.com', { skipTitle: true })
 eq(n4.name, 'Protected', '挑战页跳过 <title>，退回域名取名')
 
+// 错误页 <title> 语法正常、长度也像品牌名（"404 Not Found"），不加过滤会被当成好候选写进卡片
+const nErr = pickName(F.errTitle, 'errpage.xyz')
+eq(nErr.name, 'Errpage', '错误页标题被剔除，退回域名取名')
+eq(nErr.source, 'domain', '错误页标题不进入候选，来源为 domain')
+const nOk = pickName('<title>Proxy404</title>', 'proxy404.example')
+eq(nOk.name, 'Proxy404', '数字粘在词上的站名（Proxy404）不被状态码规则误伤')
+
 /* ---------------- 描述 ---------------- */
 
 eq(pickDesc(F.og, { name: 'OpenAI', host: 'chat.openai.com' }).source, 'meta', 'meta description 首选')
@@ -114,12 +148,25 @@ eq(dBlocked.source, 'generated', 'blocked 时短路到生成兜底，不采信�
 ok(!/enable javascript/i.test(dBlocked.desc), 'blocked 生成的描述不含拦截页文案')
 ok(BLOCKED_WARNING.length > 0 && BLOCKED_WARNING.includes('复核'), 'BLOCKED_WARNING 文案可导出且要求复核')
 
+// 同一份 meta 只调换书写顺序：取值应固定按 description > og:description，且同组取最长，
+// 不再由「文档里谁先出现」决定（否则社交分享短标语会盖掉信息量更大的页面摘要）
+const dOrderA = pickDesc(F.descOrderA, { name: 'Order' })
+const dOrderB = pickDesc(F.descOrderB, { name: 'Order' })
+eq(dOrderA.desc, dOrderB.desc, '描述取值不受 meta 标签书写顺序影响')
+eq(dOrderA.desc, '页面摘要写得详细得多，用来验证取值不再由文档顺序决定。', 'description 优先于 og:description')
+
 /* ---------------- 图标 ---------------- */
 
 eq(pickFavicon(F.og, 'https://chat.openai.com/'), 'https://chat.openai.com/apple-touch-icon.png', 'apple-touch-icon 优先')
 eq(pickFavicon(F.inlineIcon, 'https://inline.example/'), "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3C/svg%3E", '内联 data:image 原样返回')
 eq(pickFavicon(F.suppressedIcon, 'https://sup.example/'), 'https://sup.example/favicon.ico', 'data:, 视为未声明，回退 /favicon.ico')
 eq(pickFavicon('<html></html>', 'https://none.example/'), 'https://none.example/favicon.ico', '完全无声明时回退 /favicon.ico')
+
+// 多页取图标：pickFavicon 永远返回兜底 /favicon.ico，所以「有没有声明」要靠「是否等于兜底」判断，
+// 否则子页没声明时根页声明的 apple-touch-icon 永远轮不到
+eq(pickFaviconPrefer([F.bare, F.og], 'https://chat.openai.com/'), 'https://chat.openai.com/apple-touch-icon.png', '子页未声明图标时回退根页声明的图标')
+eq(pickFaviconPrefer([F.og, F.bare], 'https://chat.openai.com/'), 'https://chat.openai.com/apple-touch-icon.png', '子页声明了图标则优先用子页的')
+eq(pickFaviconPrefer([F.bare, F.bare], 'https://bare.example/'), 'https://bare.example/favicon.ico', '两页都无声明时回退 /favicon.ico')
 
 /* ---------------- 配色 ---------------- */
 
@@ -211,6 +258,21 @@ ok(!/enable javascript/i.test(e2b.desc), '端到端：挑战页描述不含拦�
 const e3 = inferSite({ html: F.whiteTheme, url: 'whitey.example', categoryMeta: CATEGORY_META, fallbackCategory: 'data' })
 eq(e3.color, '#3861fb', '端到端：白色主题色回退到分类色')
 eq(e3.categoryId, 'data', '端到端：无信号走兜底分类')
+eq(e3.scope.desc, 'page', '端到端：未传根页时字段来源标记为子页')
+
+// 贴子页时补抓主域名首页：收录的永远是主域名，站点级元信息应以主域名为准，
+// 否则 /platform/windows 会把整站描述写成「51 款 Windows 客户端」，而卡片链接指向主域名
+const eSub = inferSite({ html: F.subPage, rootHtml: F.subRoot, url: 'https://huarun.win/platform/windows', categoryMeta: CATEGORY_META })
+eq(eSub.name, '华润赢', '端到端：站名取根页 og:site_name（非子页长标题）')
+eq(eSub.scope.name, 'root', '端到端：站名来源标记为根页')
+eq(eSub.desc, '华润赢代理客户端大全收录 166 款 Android、iOS、Windows、macOS、Linux 工具，可按平台与内核比较。', '端到端：描述取根页整站口径而非子页窄化描述')
+eq(eSub.scope.desc, 'root', '端到端：描述来源标记为根页')
+eq(eSub.faviconUrl, 'https://huarun.win/apple-touch-icon.png', '端到端：子页未声明图标时回退根页声明的图标')
+
+// 只有「所有页都被拦截」才算被拦截：根页挑战页、子页正常时手上仍有真实内容
+const eMix = inferSite({ html: F.og, rootHtml: F.blocked, url: 'https://chat.openai.com', categoryMeta: CATEGORY_META })
+eq(eMix.blocked, false, '端到端：仅根页被拦截时不判整体 blocked')
+eq(eMix.name, 'OpenAI', '端到端：根页被拦截时改用子页取名')
 
 /* ---------------- 抓不到页面时沿用已收录站名 ---------------- */
 

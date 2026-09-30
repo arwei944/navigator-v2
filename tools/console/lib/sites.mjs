@@ -275,29 +275,47 @@ export async function fetchMeta(rawUrl) {
   const url = normalizeUrl(rawUrl)   // 落库口径：只留域名
   const target = toTarget(rawUrl)    // 抓取口径：保留路径
   let html = ''
+  let rootHtml = ''
   let warning = ''
 
-  const attempts = [target]
-  if (target.startsWith('https://')) attempts.push('http://' + target.slice(8))
-
-  for (const t of attempts) {
-    try {
-      const buf = await curlBuffer(t)
-      if (buf.length) {
-        html = decodeHtmlBytes(buf.subarray(0, 256 * 1024))
-        warning = ''
-        break
+  const grab = async (t) => {
+    const attempts = [t]
+    if (t.startsWith('https://')) attempts.push('http://' + t.slice(8))
+    let last = ''
+    for (const a of attempts) {
+      try {
+        const buf = await curlBuffer(a)
+        if (buf.length) return { html: decodeHtmlBytes(buf.subarray(0, 256 * 1024)), warning: '' }
+        last = '目标站点返回空内容，已按域名推断，请复核名称与分类'
+      } catch (e) {
+        last = /exit code|curl/i.test(e.message)
+          ? '目标站点拒绝抓取（可能被反爬拦截），已按域名推断，请复核名称与分类'
+          : `抓取失败：${e.message}`
       }
-      warning = '目标站点返回空内容，已按域名推断，请复核名称与分类'
-    } catch (e) {
-      warning = /exit code|curl/i.test(e.message)
-        ? '目标站点拒绝抓取（可能被反爬拦截），已按域名推断，请复核名称与分类'
-        : `抓取失败：${e.message}`
     }
+    return { html: '', warning: last }
   }
+
+  // 贴的是子页时并行补抓主域名首页：落库口径永远是主域名，元信息也应以主域名为准，
+  // 否则贴一个 /platform/windows 会把整站描述写成「51 款 Windows 客户端」。
+  let rootTarget = ''
+  try {
+    const u = new URL(target)
+    if (u.pathname && u.pathname !== '/') rootTarget = u.origin + '/'
+  } catch { /* 地址异常时只用原目标 */ }
+
+  const [pageR, rootR] = await Promise.all([
+    grab(target),
+    rootTarget ? grab(rootTarget) : Promise.resolve({ html: '', warning: '' }),
+  ])
+  html = pageR.html
+  rootHtml = rootR.html
+  // 子页抓不到但根页拿到了，就不算失败
+  warning = html || rootHtml ? '' : pageR.warning
 
   const info = inferSite({
     html,
+    rootHtml,
     url: target,
     existingSites: loadSites(),
     categoryMeta: readCategoryMeta(),

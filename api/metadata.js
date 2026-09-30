@@ -135,27 +135,43 @@ export default async function handler(req, res) {
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 8000)
+
+  // https 抓不到时回退 http：少数站点只在 http 上响应，直接判定失败会让用户白填一遍
+  const grab = async (u) => {
+    try {
+      const resp = await fetchHtml(u.href, controller.signal)
+      if (!resp.ok) return { html: '', status: resp.status }
+      return { html: decodeHtmlBytes(await readCapped(resp)), status: resp.status }
+    } catch (e) {
+      if (e.code === 'BLOCKED_HOST' || u.protocol !== 'https:') throw e
+      const httpU = new URL(u.href)
+      httpU.protocol = 'http:'
+      const resp = await fetchHtml(httpU.href, controller.signal)
+      if (!resp.ok) return { html: '', status: resp.status }
+      return { html: decodeHtmlBytes(await readCapped(resp)), status: resp.status }
+    }
+  }
+
+  // 贴的是子页时并行补抓主域名首页：落库口径永远是主域名，元信息也应以主域名为准。
+  // 并行而非串行 —— 两跳共享同一个 8s AbortController，串行会白吃掉一倍的超时预算。
+  const wantsRoot = Boolean(target.pathname) && target.pathname !== '/'
+
   let html = ''
+  let rootHtml = ''
   let warning = ''
   try {
-    let resp
-    try {
-      resp = await fetchHtml(target.href, controller.signal)
-    } catch (e) {
-      if (e.code === 'BLOCKED_HOST') {
-        res.status(400).json({ error: e.message })
-        return
-      }
-      // https 抓不到时回退 http：少数站点只在 http 上响应，直接判定失败会让用户白填一遍
-      if (target.protocol !== 'https:') throw e
-      const httpTarget = new URL(target.href)
-      httpTarget.protocol = 'http:'
-      resp = await fetchHtml(httpTarget.href, controller.signal)
-    }
-    if (resp.ok) {
-      html = decodeHtmlBytes(await readCapped(resp))
+    const [pageR, rootR] = await Promise.allSettled([
+      grab(target),
+      wantsRoot ? grab(new URL(target.origin + '/')) : Promise.resolve(null),
+    ])
+    if (rootR.status === 'fulfilled' && rootR.value?.html) rootHtml = rootR.value.html
+
+    if (pageR.status === 'rejected') {
+      // 子页抓失败但根页拿到了 → 按根页推断，不必再报「抓取失败」
+      if (!rootHtml) throw pageR.reason
     } else {
-      warning = `目标站点返回 ${resp.status}，已按域名推断，请复核名称与分类`
+      html = pageR.value.html
+      if (!html && !rootHtml) warning = `目标站点返回 ${pageR.value.status}，已按域名推断，请复核名称与分类`
     }
   } catch (e) {
     if (e.code === 'BLOCKED_HOST') {
@@ -172,6 +188,7 @@ export default async function handler(req, res) {
   // 抓不到页面不算失败：照常产出一份按域名推断的草稿，让用户只需复核而不是从零手填
   const info = inferSite({
     html,
+    rootHtml,
     url: target.href,
     existingSites: SEED_SITES,
     categoryMeta: CATEGORY_META,

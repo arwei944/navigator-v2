@@ -138,10 +138,13 @@ function confClass(field) { return meta.value?.confidence?.[field] === 'low' ? '
 function sourceText(field) {
   const m = meta.value
   if (!m) return ''
-  if (field === 'name') return NAME_SRC[m.sources?.name] || ''
-  if (field === 'desc') return DESC_SRC[m.sources?.desc] || ''
-  if (field === 'color') return COLOR_SRC[m.sources?.color] || ''
-  return ''
+  const base = field === 'name' ? NAME_SRC[m.sources?.name]
+    : field === 'desc' ? DESC_SRC[m.sources?.desc]
+      : field === 'color' ? COLOR_SRC[m.sources?.color] : ''
+  if (!base) return ''
+  // 贴的是子页时名称/描述可能取自主域名（收录的也永远是主域名），必须说明，
+  // 否则用户会以为补全错了 —— 描述对不上当前页面，其实是对的
+  return m.scope?.[field] === 'root' ? `${base}（取自主域名，非当前子页）` : base
 }
 
 function normalizeUrl(raw) {
