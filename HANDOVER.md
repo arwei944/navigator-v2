@@ -1435,12 +1435,12 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 | 用例 | 断言数 | 命令 |
 |------|--------|------|
 | 控制台来源校验 | 13 | `pnpm run console:test` |
-| 站点元信息推断 | 76 | `pnpm run console:test:infer` |
+| 站点元信息推断 | 92 | `pnpm run console:test:infer` |
 | metadata SSRF 防护 | 27 | `pnpm run console:test:guard` |
 | hunk 分块暂存 | 72 | `pnpm run console:test:hunks` |
 | MCP 端到端 | 65 | `pnpm run mcp:test` |
 
-合计 **253 条断言全绿**；`pnpm run console:test:all` 一次跑完前四项。
+合计 **269 条断言全绿**；`pnpm run console:test:all` 一次跑完前四项。
 
 > **发布提示**：M2 的云端快照 / 回滚依赖线上 V5 代码，**必须先发布一次**（`pnpm run publish`）
 > 才能在线上使用 `publish snapshots` / `rollback`；发布前这两个命令会以退出码 4 明确提示。
@@ -1490,4 +1490,46 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 - **描述口径修正**：`nav sites meta` 抓子页时给出的是「51 款 Windows 代理客户端」，但收录的是主域名，故改用根页口径（166 款 / 7 平台），并在描述里保留「Windows 单平台 51 款（40 款开源）」作为具体佐证。
 - 命令：`nav sites add --url huarun.win --name "华润赢" --desc "…" --category proxy --color "#a855f7"`（先 `--dry-run` 预演确认 id/字段，再实际写入）→ `nav sites icon bs9`
 - 验收：`nav data validate` → 300 条通过（9 条已知无图标为预期警告）；`nav sites check --ids bs9` → `200 ok`
-- **待发布**：本地 300 条，云端 v98 仍为 299 条，需一次发布收敛。
+- **已发布**：`bs9` 随 v99 上线（云端 300 条），见下节发布记录。
+
+---
+
+## 二十七、自动抓取引擎升级 + 发布收敛（2026-09-30）
+
+用户提交子页 `https://huarun.win/platform/windows` 时，`nav sites meta` 给出的是**子页口径**描述
+（「51 款 Windows 代理客户端」），而收录的永远是主域名 —— 信息被窄化，与卡片指向的整站对不上。
+本次针对「添加站点」的自动抓取引擎做四项升级，两个入口（线上 `api/metadata.js` / 控制台
+`tools/console/lib/sites.mjs`）共享同一份 `shared/site-infer.mjs`，口径同步。
+
+| 升级项 | 说明 |
+|--------|------|
+| 根页信息补全 | 贴子页时**并行**补抓主域名首页（共享同一超时预算），名称/描述优先取站点级信息；响应新增 `scope` 字段标注字段取自 `root` 还是 `page` |
+| 错误页标题剔除 | 新增 `ERROR_TITLE` 正则，`4xx/5xx`、`Not Found`、`页面不存在` 等不再被当成站名（数字状态码须独立成词，不误伤 `Proxy404` 这类站名） |
+| 描述优先级固定 | `description > og:description > twitter:description …` 固定优先级，同组取最长，取值不再受 meta 标签书写顺序影响 |
+| 多页图标回退 | `pickFaviconPrefer`：子页未声明图标时回退根页声明的图标（`pickFavicon` 恒返回兜底 `/favicon.ico`，故以「是否等于兜底」判断有无声明） |
+
+- 前端 `AddSiteModal.vue` 与控制台 `sitespanel.js` 同步标注「名称/描述取自主域名（非当前子页）」，
+  避免用户看到描述与当前子页不符时误以为补全出错。
+- `test-infer.mjs` 新增 16 条断言（76 → **92**），覆盖错误页标题、描述顺序无关性、子页/根页融合、
+  多页图标回退、仅根页被拦截时不判整体 blocked。
+
+**发布记录：v99 / v100（2026-09-30）**
+
+- v99：`bs9` 收敛（本地 300 → 云端 300）。
+- v100（引擎升级）：`nav publish preflight` → 凭证 `54a54110`（分支 master · HEAD f0e1c1d · 云端 v99/300）
+  → `nav publish run --gate 54a54110` → 9 步全绿：备份 → 数据门禁 → 构建 → Vercel 部署 → Blob 热更新 → 一致性验证。
+  - 结果：**version 100 · 300 站点 · 291 带图标**；第 1 次轮询即收敛。
+  - 快照：`sites-data.snapshots/000099-2026-09-30T10-55-00-622Z.json`（发布前数据，可一键回滚）。
+- 提交：`7369982 feat(infer): 升级站点元信息抓取引擎`（已推送 origin/master）。
+  - 注：`publish run` 只提交**已暂存**文件，本次先发布后补提交，故发布流水线的「提交」步骤被跳过；
+    代码经工作区直接构建部署，与提交内容一致。
+
+线上实测（`https://navigator-v2-two.vercel.app/api/metadata`）：
+
+| 目标 | 结果 |
+|------|------|
+| `https://vercel.com/docs`（子页） | `name=Vercel`、`desc=The autonomous stack for every app and agent.`、`scope={name:root,desc:root}`、图标取根页 apple-touch-icon ✅ |
+| `https://huarun.win/platform/windows`（子页） | 目标对 Vercel 出口 IP 返回 403 → 按已收录 `bs9` 沿用站名 `华润赢`，`warning` 提示复核（目标侧限流，非引擎问题） |
+
+本地实测（`nav sites meta https://huarun.win/platform/windows`）：名称/描述均取根页口径
+（166 款 / 7 平台），`scope={name:root,desc:root}`，分类 `proxy`（high），图标取根页。
