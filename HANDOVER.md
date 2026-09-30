@@ -247,7 +247,7 @@ nav-v2/
 | `cd10` | MetalForge | `metalforge.xyz` | coding | 227 | 为 SwiftUI 与 React Native 生成 shader 效果的可视化工具，无需写 Metal 代码，调滑块即可预览并导出真实 .metal 文件或 Skia shader，内置 49 种炫丽效果，免费编辑、Pro 导出代码 |
 | `cd11` | Pi Packages | `pi.dev/packages` | coding | 236 | Pi 编码智能体的官方包市场，聚合 5000+ 扩展、技能、提示模板与主题，发布到 npm 生态，通过 `pi install` 一键安装；涵盖 MCP 适配器、多模型 Provider、子代理编排、沙箱安全、代码审查等各类插件，适合为 Pi AI 编程助手扩展功能 |
 | `ac13` | Minara | `minara.ai` | aicrypto | 228 | AI 原生的加密金融交易操作系统，内置 AI Copilot、策略生成与回测、实时行情/链上数据（巨鲸/代币解锁/聪明钱）、Polymarket 预测、衍生品资金费率与清算监控、DeFi 数据，并支持工作流自动化与价格/地址提醒，帮你随时交易任何资产 |
-| `dt17` | Tange Stock | `stock.tanggestock.com` | data | 229 | 全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具 |
+| `dt17` | Super View | `stock.tanggestock.com` | data | 229 | 全球实时行情与交易数据工作台，聚合加密货币/美股/贵金属实时行情，收录 113 标的、52 内置指标与实时数据流，专业级 K 线工作台支持多周期切换、指标叠加与画图工具，从看盘到复盘的一站式盯盘工具 |
 | `aiapi12` | GoRouter | `gorouter.app` | aiapi | 230 | AI 应用基础设施与统一 API 网关，通过标准统一 API 协议接入海量 AI 模型（OpenAI/Claude/Gemini/DeepSeek/Qwen/Llama 等），支持 NewAPI 多协议一键配置、负载均衡、限流、成本追踪与多用户权限管理，开源可自托管，适合团队与开发者统一管理 AI 调用 |
 | `sc7` | Hackers Arise | `hackers-arise.com` | security | 231 | 知名黑客与渗透测试在线学习平台（OccupyTheWeb 出品），提供渗透测试、网络攻击与防御、Metasploit、Python 黑客、移动设备黑客、信息收集、网络战争、社会工程等系统的安全教程与付费课程，适合从零入门网络安全与渗透测试的攻防学习 |
 | `dt18` | Derivatives Monkey | `www.derivativesmonkey.com` | data | 232 | 领先的加密货币期权分析平台，跨多交易所（Derive/Deribit/Bybit/OKX/Binance/Thalex/Paradex/Aevo/Delta）统一呈现实时期权链、Greeks 希腊值、GEX 做市商 delta 曝险、隐含波动率微笑与期限结构，支持策略回测与对冲模拟，数据均标注交易所与时间戳，免费使用 |
@@ -1283,7 +1283,7 @@ npm run icons        # 抓取/补抓 favicon
 - 验收：`nav sites check --ids dt17` → `200 ok`；`npm run validate` → 298 条通过（9 条已知无图标为预期警告）
 - **已发布**：v97（2026-09-29）上线；线上 `/api/sites` 中 `stock.tanggestock.com/auth` 残留 0 处
 
-**待确认**：该站当前 `<title>` 与 `og:site_name` 均为「Super View — 交易级数据工作台」，与存量名称「Tange Stock」不一致（域名仍是 `tanggestock.com`）。改名属既有条目的命名决策，本次未擅自改动，如需改可 `nav sites update dt17 --name "Super View"`。
+**已确认并改名（2026-09-30）**：该站 `<title>` 与 `og:site_name` 均为「Super View — 交易级数据工作台」，与存量名称「Tange Stock」不一致（域名仍是 `tanggestock.com`）。用户确认以站点自称为准，执行 `nav sites update dt17 --name "Super View" --initial S`，首字母同步由 `T` 改为 `S`；`url` / 描述 / 分类 / 配色 / 图标均未改动。已随 v98（2026-09-30）上线，线上 `/api/sites` 中 `dt17.name === "Super View"`、`initial === "S"`。
 
 ---
 
@@ -1444,3 +1444,24 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 
 > **发布提示**：M2 的云端快照 / 回滚依赖线上 V5 代码，**必须先发布一次**（`pnpm run publish`）
 > 才能在线上使用 `publish snapshots` / `rollback`；发布前这两个命令会以退出码 4 明确提示。
+
+### 发布记录：v98（2026-09-30）
+
+首次以**发布门禁**方式上线 V5（预检 → 放行凭证 → 核销 → 发布），全链路一次通过：
+
+- `nav publish preflight` → 凭证 `a3f420f3`（分支 master · HEAD 4f8103b · 领先 7 · 云端 v97/299）
+- `nav publish run --gate a3f420f3` → 9 步全绿：推送 `7746ec4..4f8103b` → 备份 → 数据门禁 → 构建 → Vercel 部署 → Blob 热更新 → 一致性验证
+- 结果：**version 98 · 299 站点 · 290 带图标**；第 1 次轮询即收敛（`useCache:false` 生效）
+- 云端快照落盘：`sites-data.snapshots/000097-2026-09-30T10-24-53-641Z.json`（发布前数据，可一键回滚）
+
+发布后逐项实测：
+
+| 能力 | 命令 | 结果 |
+|------|------|------|
+| 快照清单 | `nav publish snapshots` | 云端 1 份 + 本机 `backups/` 26 份对照 |
+| 回滚预演 | `nav publish rollback <pathname> --dry-run` | 正确算出 `willRevert: [dt17 的 name/initial]`，未写入 |
+| 审计查询 | `nav data audit --limit 8` | 11 条留痕，含预检 / 放行（指纹 `80d7dc67bdbd81d2`）/ 推送 / 快照 / 热更新 / 发布完成 |
+| 线上收敛 | `nav publish status` | 本地 299 · 云端 299 ✅ · 云端 v98 |
+| MCP 端到端 | `pnpm run mcp:test` | 65 条断言全绿 |
+
+**顺带修复**：`gate.mjs` 的放行凭证原先只存进程内存，导致 `preflight` 与 `run --gate` 分属两个进程时永远核销不了（控制台内因常驻进程共享内存而看不出）。已改为落盘 `.data/gates.json`（原子写 tmp + rename，写入失败不阻断主流程），跨进程放行恢复正常。
