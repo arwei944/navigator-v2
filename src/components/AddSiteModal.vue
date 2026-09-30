@@ -131,7 +131,7 @@ const DESC_SRC = {
   meta: '来自站点官方描述', 'json-ld': '来自页面结构化数据', keywords: '来自页面关键词',
   paragraph: '来自正文首段', generated: '无官方描述，已按站点生成',
 }
-const COLOR_SRC = { meta: '来自站点主题色', category: '取自所属分类配色', hash: '无主题色，按域名生成' }
+const COLOR_SRC = { meta: '来自站点主题色', manifest: '来自站点 manifest 主题色', category: '取自所属分类配色', hash: '无主题色，按域名生成' }
 
 function confText(field) { return CONF_TEXT[meta.value?.confidence?.[field]] || '' }
 function confClass(field) { return meta.value?.confidence?.[field] === 'low' ? 'warn' : 'ok' }

@@ -380,9 +380,65 @@ export function hashColor(seed) {
   return hslToHex(Math.abs(h) % 360, 0.58, 0.46)
 }
 
-export function inferColor({ themeColor = '', tileColor = '', categoryColor = '', seed = '' } = {}) {
-  const brand = normalizeColor(themeColor) || normalizeColor(tileColor)
-  if (brand) return { color: brand, source: 'meta' }
+/**
+ * 页面声明的品牌色（`<meta name="theme-color">`），返回**第一条可用**的值。
+ *
+ * 现代站点常按配色方案声明多条（light `#ffffff` / dark `#0a0b0d`），而这两个值都会被
+ * normalizeColor 判为「没辨识度」而不适合做卡片底色。只取文档里第一条会拿到不可用的白色，
+ * 于是白白错过后面可能存在的品牌色。这里遍历全部声明取第一条可用的；
+ * 都不可用则返回空串，让调用方继续去找 manifest 的 theme_color。
+ */
+export function pickThemeColor(html) {
+  for (const m of String(html).matchAll(/<meta\b[^>]*>/gi)) {
+    const key = (attrValue(m[0], 'name') || attrValue(m[0], 'property') || '').toLowerCase()
+    if (key !== 'theme-color') continue
+    const v = decodeEntities(attrValue(m[0], 'content')).trim()
+    if (v && normalizeColor(v)) return v
+  }
+  return ''
+}
+
+/**
+ * 页面声明的 webmanifest 地址（`<link rel="manifest" href="…">`）。
+ * 不少站点只把品牌色写在 manifest 的 `theme_color` 里，页面 `<head>` 并不声明
+ * `<meta name="theme-color">`（OpenChainBench 即如此），只读 meta 会退化成散列色。
+ * 返回空串表示页面没声明 manifest 或地址不可解析。
+ */
+export function manifestHref(html, base) {
+  for (const m of String(html).matchAll(/<link\b[^>]*>/gi)) {
+    const rel = attrValue(m[0], 'rel').toLowerCase()
+    if (!/(?:^|\s)manifest(?:\s|$)/.test(rel)) continue
+    const raw = attrValue(m[0], 'href').trim()
+    if (!raw || raw.startsWith('data:')) continue
+    try { return new URL(raw, base).href } catch { /* 坏地址忽略，继续找下一个 */ }
+  }
+  return ''
+}
+
+/** 从 manifest JSON 文本里取 `theme_color`；解析失败或字段缺失返回空串 */
+export function manifestThemeColor(text) {
+  try {
+    const j = JSON.parse(String(text || ''))
+    return typeof j?.theme_color === 'string' ? j.theme_color : ''
+  } catch { return '' }
+}
+
+/**
+ * 品牌色取值优先级：页面 `meta theme-color` → manifest `theme_color` → `msapplication-TileColor`。
+ * 前两者都是站点自声明的品牌色，但页面 meta 是逐页声明、更贴近当前视图，故排最前；
+ * manifest 是应用级品牌色，补上「只写在 manifest」的站点；tile 是 IE/Windows 磁贴遗留字段，排最后。
+ * 三者都没有才退回分类色 / 散列色。
+ */
+export function inferColor({ themeColor = '', manifestTheme = '', tileColor = '', categoryColor = '', seed = '' } = {}) {
+  const candidates = [
+    ['meta', themeColor],
+    ['manifest', manifestTheme],
+    ['meta', tileColor],
+  ]
+  for (const [source, raw] of candidates) {
+    const color = normalizeColor(raw)
+    if (color) return { color, source }
+  }
   if (categoryColor) return { color: categoryColor, source: 'category' }
   return { color: hashColor(seed), source: 'hash' }
 }
@@ -553,8 +609,11 @@ function knownSiteFor(host, existingSites) {
  * rootHtml：目标地址是子页时，调用方额外抓来的主域名首页。**收录的永远是主域名**
  * （两个入口都把地址收敛成域名），所以站点级元信息应以主域名为准 —— 否则贴一个
  * `/platform/windows` 会把整站描述写成「51 款 Windows 客户端」，而卡片链接指向主域名。
+ *
+ * manifestTheme：调用方从页面声明的 webmanifest 里抓到的 `theme_color`（本模块无 I/O）。
+ * 仅在页面未声明 `meta theme-color` 时才需要传，作为品牌色的次级来源。
  */
-export function inferSite({ html, rootHtml = '', url, existingSites = [], categoryMeta = {}, fallbackCategory = '' }) {
+export function inferSite({ html, rootHtml = '', manifestTheme = '', url, existingSites = [], categoryMeta = {}, fallbackCategory = '' }) {
   const raw = String(url || '').trim()
   let target
   try { target = new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw) } catch { throw new Error(`地址无法解析：${url}`) }
@@ -611,12 +670,15 @@ export function inferSite({ html, rootHtml = '', url, existingSites = [], catego
   }
   if (!descInfo) descInfo = { ...pickDesc('', { name: nameInfo.name, host, categoryLabel }), scope: pool[0]?.scope || 'page' }
 
-  const themeColor = metaContent(pageSource, ['theme-color'])
-    || (hasRoot ? metaContent(rootSource, ['theme-color']) : '')
+  const themeColor = pickThemeColor(pageSource)
+    || (hasRoot ? pickThemeColor(rootSource) : '')
   const tileColor = metaContent(pageSource, ['msapplication-tilecolor', 'msapplication-navbutton-color'])
     || (hasRoot ? metaContent(rootSource, ['msapplication-tilecolor', 'msapplication-navbutton-color']) : '')
+  // manifestTheme 由调用方抓取后传入（本模块无 I/O）：页面 meta 已声明主题色时调用方会跳过抓取，
+  // 所以这里的值通常只在「主题色只写在 manifest」的站点上非空
   const colorInfo = inferColor({
     themeColor,
+    manifestTheme,
     tileColor,
     categoryColor: categoryMeta[category.categoryId]?.color || '',
     seed: host,
@@ -645,7 +707,7 @@ export function inferSite({ html, rootHtml = '', url, existingSites = [], catego
       desc: descInfo.source === 'generated' ? 'low' : 'medium',
       category: category.confidence,
       // 分类色只是「没有品牌色时的兜底」，不该和站点自己声明的 theme-color 同档
-      color: colorInfo.source === 'meta' ? 'high' : colorInfo.source === 'category' ? 'medium' : 'low',
+      color: colorInfo.source === 'meta' || colorInfo.source === 'manifest' ? 'high' : colorInfo.source === 'category' ? 'medium' : 'low',
     },
   }
 }

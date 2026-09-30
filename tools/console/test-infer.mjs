@@ -5,6 +5,7 @@
 import {
   inferSite, pickName, pickDesc, pickFavicon, pickFaviconPrefer, inferCategory, inferColor,
   normalizeColor, hashColor, domainTokens, decodeHtmlBytes, looksBlocked, metaContent,
+  manifestHref, manifestThemeColor,
   BLOCKED_WARNING,
 } from '../../shared/site-infer.mjs'
 
@@ -60,6 +61,28 @@ const F = {
   nameAsDesc: `<!doctype html><html><head><title>Dupe</title>
     <meta name="description" content="Dupe">
     <meta name="keywords" content="去中心化交易所聚合器，跨链兑换与流动性路由">
+  </head><body></body></html>`,
+
+  // 品牌色只写在 manifest 里：页面 <head> 无 meta theme-color，只能靠抓 manifest 拿到
+  manifestPage: `<!doctype html><html><head><title>Benchly</title>
+    <link rel="manifest" href="/manifest.webmanifest">
+  </head><body></body></html>`,
+  manifestPageAbs: `<!doctype html><html><head><title>Benchly</title>
+    <link rel="manifest" href="https://cdn.example.com/app.webmanifest">
+  </head><body></body></html>`,
+  manifestData: `<!doctype html><html><head><title>Benchly</title>
+    <link rel="manifest" href="data:application/json,%7B%7D">
+  </head><body></body></html>`,
+
+  // 按配色方案声明多条 theme-color：两条都不可用（白/近黑），只取第一条会拿到白色
+  themeMulti: `<!doctype html><html><head><title>Multi</title>
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0b0d" media="(prefers-color-scheme: dark)">
+  </head><body></body></html>`,
+  // 第一条不可用、第二条才是品牌色：应取到第二条
+  themeSecondUsable: `<!doctype html><html><head><title>Multi2</title>
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#10a37f" media="(prefers-color-scheme: dark)">
   </head><body></body></html>`,
 
   // 错误页：<title> 语法正常、长度也像品牌名，但描述的是「页面不存在」
@@ -183,6 +206,25 @@ eq(inferColor({ themeColor: '#10a37f', categoryColor: '#2563eb', seed: 'x' }).so
 eq(inferColor({ themeColor: '#ffffff', categoryColor: '#2563eb', seed: 'x' }).color, '#2563eb', '白色 theme-color 弃用后回退分类色')
 eq(inferColor({ categoryColor: '', seed: 'x' }).source, 'hash', '无任何线索时用散列色')
 
+/* ---------------- manifest 取色 ---------------- */
+
+eq(manifestHref(F.manifestPage, 'https://benchly.example/'), 'https://benchly.example/manifest.webmanifest', '定位并解析相对 manifest 地址')
+eq(manifestHref(F.manifestPageAbs, 'https://benchly.example/'), 'https://cdn.example.com/app.webmanifest', '保留 manifest 的绝对地址')
+eq(manifestHref(F.manifestData, 'https://benchly.example/'), '', 'data: 形式的 manifest 被忽略')
+eq(manifestHref(F.bare, 'https://bare.example/'), '', '未声明 manifest 时返回空')
+
+eq(manifestThemeColor('{"theme_color":"#7a2e1f"}'), '#7a2e1f', '解析 manifest theme_color')
+eq(manifestThemeColor('{"name":"x"}'), '', 'manifest 无 theme_color 时返回空')
+eq(manifestThemeColor('<html>not json</html>'), '', 'manifest 非 JSON 时返回空')
+eq(manifestThemeColor(''), '', '空 manifest 返回空')
+
+// meta theme-color 仍是第一优先；只有它缺失（或为白色被弃用）时才轮到 manifest
+eq(inferColor({ manifestTheme: '#7a2e1f', categoryColor: '#2563eb', seed: 'x' }).source, 'manifest', '无 meta theme-color 时用 manifest 主题色')
+eq(inferColor({ themeColor: '#10a37f', manifestTheme: '#7a2e1f', categoryColor: '#2563eb', seed: 'x' }).color, '#10a37f', 'meta theme-color 优先于 manifest')
+eq(inferColor({ themeColor: '#ffffff', manifestTheme: '#7a2e1f', categoryColor: '#2563eb', seed: 'x' }).color, '#7a2e1f', '白色 meta theme-color 弃用后回退 manifest 主题色')
+eq(inferColor({ manifestTheme: '#7a2e1f', tileColor: '#1a1a1a', categoryColor: '#2563eb', seed: 'x' }).color, '#7a2e1f', 'manifest 主题色优先于 msapplication tile 色')
+eq(inferColor({ manifestTheme: '#ffffff', categoryColor: '#2563eb', seed: 'x' }).color, '#2563eb', '白色 manifest 主题色同样被弃用，回退分类色')
+
 /* ---------------- 分类 ---------------- */
 
 eq(domainTokens('chat.openai.com').join(','), 'chat,openai', '域名拆词去掉 TLD')
@@ -259,6 +301,12 @@ const e3 = inferSite({ html: F.whiteTheme, url: 'whitey.example', categoryMeta: 
 eq(e3.color, '#3861fb', '端到端：白色主题色回退到分类色')
 eq(e3.categoryId, 'data', '端到端：无信号走兜底分类')
 eq(e3.scope.desc, 'page', '端到端：未传根页时字段来源标记为子页')
+
+// 页面无 meta theme-color、品牌色只在 manifest 里（调用方抓 manifest 后传入 theme_color）
+const eManifest = inferSite({ html: F.manifestPage, manifestTheme: '#7a2e1f', url: 'https://benchly.example/', categoryMeta: CATEGORY_META })
+eq(eManifest.color, '#7a2e1f', '端到端：manifest 主题色落库为卡片主色')
+eq(eManifest.sources.color, 'manifest', '端到端：配色来源标记为 manifest')
+eq(eManifest.confidence.color, 'high', '端到端：manifest 主题色置信度为 high')
 
 // 贴子页时补抓主域名首页：收录的永远是主域名，站点级元信息应以主域名为准，
 // 否则 /platform/windows 会把整站描述写成「51 款 Windows 客户端」，而卡片链接指向主域名

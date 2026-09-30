@@ -14,7 +14,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
-import { inferSite, decodeHtmlBytes, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
+import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
 import { diffSites } from './changes.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
@@ -313,9 +313,26 @@ export async function fetchMeta(rawUrl) {
   // 子页抓不到但根页拿到了，就不算失败
   warning = html || rootHtml ? '' : pageR.warning
 
+  // 品牌色只写在 webmanifest 里的站点：页面没有「可用」的 meta theme-color 时补抓 manifest 取 theme_color。
+  // 判据是「可用」而非「存在」—— light #ffffff / dark #0a0b0d 这类声明两条都不可用，
+  // 只判存在会跳过 manifest。manifest 抓不到不影响主流程。
+  let manifestTheme = ''
+  if (!pickThemeColor(html) && !pickThemeColor(rootHtml)) {
+    let base = ''
+    try { base = new URL(target).origin + '/' } catch { /* 地址异常时无从解析相对路径 */ }
+    const mHref = base && (manifestHref(html, base) || (rootHtml ? manifestHref(rootHtml, base) : ''))
+    if (mHref) {
+      try {
+        const buf = await curlBuffer(mHref, { maxTime: 10 })
+        if (buf.length) manifestTheme = manifestThemeColor(decodeHtmlBytes(buf.subarray(0, 256 * 1024)))
+      } catch { /* manifest 抓不到不影响主流程，色值退回其它来源 */ }
+    }
+  }
+
   const info = inferSite({
     html,
     rootHtml,
+    manifestTheme,
     url: target,
     existingSites: loadSites(),
     categoryMeta: readCategoryMeta(),

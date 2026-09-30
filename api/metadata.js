@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { inferSite, decodeHtmlBytes, BLOCKED_WARNING } from '../shared/site-infer.mjs'
+import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../shared/site-infer.mjs'
 import { categoryMeta } from '../shared/categories.mjs'
 
 // 已收录站点作为「像不像已有某站」的参照（域名同族 / 品牌词命中）。
@@ -83,7 +83,7 @@ async function readCapped(resp) {
  * 手动跟重定向：每跳都重新校验主机，否则「公网 URL 302 到内网」就能绕过上面的检查
  * （fetch 的 redirect:'follow' 不会给我们插话的机会）。
  */
-async function fetchHtml(startHref, signal) {
+async function fetchHtml(startHref, signal, accept = 'text/html,application/xhtml+xml') {
   let href = startHref
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const u = new URL(href)
@@ -96,7 +96,7 @@ async function fetchHtml(startHref, signal) {
       headers: {
         'user-agent': UA,
         'accept-language': 'zh-CN,zh;q=0.9',
-        'accept': 'text/html,application/xhtml+xml'
+        'accept': accept
       },
       redirect: 'manual',
       signal
@@ -158,6 +158,7 @@ export default async function handler(req, res) {
 
   let html = ''
   let rootHtml = ''
+  let manifestTheme = ''
   let warning = ''
   try {
     const [pageR, rootR] = await Promise.allSettled([
@@ -172,6 +173,20 @@ export default async function handler(req, res) {
     } else {
       html = pageR.value.html
       if (!html && !rootHtml) warning = `目标站点返回 ${pageR.value.status}，已按域名推断，请复核名称与分类`
+    }
+
+    // 品牌色只写在 webmanifest 里的站点：页面没有「可用」的 meta theme-color 时补抓 manifest 取 theme_color。
+    // 注意判据是「可用」而非「存在」—— 按配色方案声明 light #ffffff / dark #0a0b0d 的页面
+    // 两条都不可用，只判存在会白白跳过 manifest，拿不到真正的品牌色。
+    if (!pickThemeColor(html) && !pickThemeColor(rootHtml)) {
+      const base = target.origin + '/'
+      const mHref = manifestHref(html, base) || (rootHtml ? manifestHref(rootHtml, base) : '')
+      if (mHref) {
+        try {
+          const mr = await fetchHtml(mHref, controller.signal, 'application/manifest+json,application/json,text/plain,*/*')
+          if (mr.ok) manifestTheme = manifestThemeColor(decodeHtmlBytes(await readCapped(mr)))
+        } catch { /* manifest 抓不到不影响主流程，色值退回其它来源 */ }
+      }
     }
   } catch (e) {
     if (e.code === 'BLOCKED_HOST') {
@@ -189,6 +204,7 @@ export default async function handler(req, res) {
   const info = inferSite({
     html,
     rootHtml,
+    manifestTheme,
     url: target.href,
     existingSites: SEED_SITES,
     categoryMeta: CATEGORY_META,
