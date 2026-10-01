@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * nav-mcp —— 把 nav CLI 的 28 条命令包成智能体原生工具（MCP，stdio 传输）。
+ * nav-mcp —— 把 nav CLI 的命令包成智能体原生工具（MCP，stdio 传输）。
  *
- * 工具数刻意收敛到 5 个：社区实测工具数超过 30–50 后模型选择准确率明显下降，
+ * 工具数刻意收敛：社区实测工具数超过 30–50 后模型选择准确率明显下降，
  * 而工具定义本身也占上下文。因此按「命令域」做网关（nav_sites / nav_publish /
- * nav_git / nav_data），再加一个聚合读工具 nav_status 作为智能体的「第一问」。
+ * nav_ops / nav_git / nav_data），再加一个聚合读工具 nav_status 作为智能体的「第一问」。
  *
  * 语义不重复实现：参数翻译与结果信封都在 lib/bridge.mjs，业务逻辑仍走 tools/cli/commands/*。
  * 写操作默认只预演 —— 必须显式 confirm: true 才真跑（见 bridge.mjs 的 WRITE_REASON）。
@@ -92,7 +92,7 @@ server.registerTool(
 
 /* ---------------- nav_sites：站点域网关 ---------------- */
 
-const SITES_ACTIONS = ['list', 'get', 'add', 'update', 'remove', 'categories', 'meta', 'icon', 'check']
+const SITES_ACTIONS = ['list', 'get', 'add', 'update', 'remove', 'batch', 'categories', 'meta', 'icon', 'check']
 
 const SITES_DOC = [
   '站点数据增删改查与探活。action 取值：',
@@ -100,13 +100,17 @@ const SITES_DOC = [
   '- get         读单个站点完整字段（需 id）',
   '- update      改站点字段（需 id，至少给一个待改字段）',
   '- remove      删除站点（需 id）',
+  '- batch       批量操作多个站点（需 op + ids；op 见下）',
   '- categories  列出分类树与各分类站点数（新增前用它确认 category）',
   '- meta        抓取目标网址的标题/描述/图标/分类建议（需 url，只读）',
   '- check       批量探活（可选 ids/limit/timeout/concurrency/strict）',
   '- add         新增站点（需 url/name/desc/category）',
   '- icon        抓取并落盘站点图标（需 id，可选 faviconUrl）',
   '',
-  '写操作（add / update / remove / icon）默认只预演并返回将要发生的改动；',
+  'batch 的 op 取值：category（需 category）/ color（需 color）/ aliasAdd、aliasSet（需 aliases）',
+  '/ icon（清空图标）/ remove（删除，不可撤销，需 yes: true）。',
+  '',
+  '写操作（add / update / remove / batch / icon）默认只预演并返回将要发生的改动；',
   '确认无误后带 confirm: true 重新调用才会真正写入。',
 ].join('\n')
 
@@ -116,15 +120,18 @@ const sitesSchema = {
   url: z.string().optional().describe('站点地址或域名'),
   name: z.string().optional().describe('站点名称'),
   desc: z.string().optional().describe('站点描述'),
-  category: z.string().optional().describe('分类 ID；list 时作为过滤条件'),
-  color: z.string().optional().describe('卡片主色，如 #3b82f6'),
+  category: z.string().optional().describe('分类 ID；list 时作为过滤条件，batch op=category 时为目标分类'),
+  color: z.string().optional().describe('卡片主色，如 #3b82f6；batch op=color 时为统一配色'),
   initial: z.string().optional().describe('卡片首字母'),
   icon: z.string().optional().describe('图标相对路径，如 icons/dt33.png'),
   sortOrder: z.number().optional().describe('排序权重'),
   faviconUrl: z.string().optional().describe('显式指定图标地址，跳过页面声明探测'),
+  op: z.enum(['category', 'color', 'aliasAdd', 'aliasSet', 'icon', 'remove']).optional().describe('batch 的批量操作类型'),
+  aliases: z.string().optional().describe('batch op=aliasAdd / aliasSet 的别名，逗号分隔（aliasAdd 不覆盖既有）'),
+  yes: z.boolean().optional().describe('batch op=remove 必须显式传 true 才执行删除'),
   q: z.string().optional().describe('list 的关键字：匹配名称/描述/域名/精确 ID'),
   limit: z.number().optional().describe('list / check 的条数上限'),
-  ids: z.string().optional().describe('check 只检查这些站点，逗号分隔'),
+  ids: z.string().optional().describe('check / batch 的目标站点，逗号分隔'),
   timeout: z.number().optional().describe('check 单站点超时秒数，默认 15'),
   concurrency: z.number().optional().describe('check 并发数，默认 12'),
   strict: z.boolean().optional().describe('check 时存在需处理站点则返回 ok=false'),
@@ -154,6 +161,13 @@ server.registerTool(
         },
       },
       remove: { path: 'sites remove', positionals: [args.id] },
+      batch: {
+        path: 'sites batch',
+        flags: {
+          op: args.op, ids: args.ids, category: args.category, color: args.color,
+          aliases: args.aliases, yes: args.yes,
+        },
+      },
       categories: { path: 'sites categories' },
       meta: { path: 'sites meta', positionals: [args.url] },
       icon: { path: 'sites icon', positionals: [args.id], flags: { 'favicon-url': args.faviconUrl } },
@@ -215,6 +229,63 @@ server.registerTool(
     }
     const plan = map[action]
     if (!plan) return reply({ ok: false, command: 'nav_publish', data: null, error: { code: 'USAGE', message: `未知 action：${action}`, hint: `可用：${PUBLISH_ACTIONS.join('、')}` }, exitCode: 2, meta: {} })
+    const res = await invokeGated(plan.path, { flags: plan.flags }, { confirm: args.confirm })
+    return reply(res)
+  },
+)
+
+/* ---------------- nav_ops：运维事件与通知 ---------------- */
+
+const OPS_ACTIONS = ['history', 'notify', 'notify-read', 'notify-clear', 'webhook', 'webhook-set', 'inspect']
+
+const OPS_DOC = [
+  '运维事件：发布历史、通知中心、可用性巡检。action 取值：',
+  '- history       发布历史（新 → 旧），含成功率概览与云端版本（只读）',
+  '- notify        通知中心列表（发布/批量/回滚/巡检事件），含未读统计（只读）',
+  '- webhook       查看通知 Webhook 配置（只读）',
+  '- inspect       立即执行一次全站巡检，识别「新失效 / 已恢复」并落通知',
+  '- notify-read   标记通知已读（需 ids 或省略=全部）',
+  '- notify-clear  清空全部通知（不可撤销）',
+  '- webhook-set   设置 Webhook 地址与最低推送级别',
+  '',
+  '建议流程：先 notify 看「哪些事还没人管」，需要复验时用 nav_sites 的 check。',
+  '写操作（inspect / notify-read / notify-clear / webhook-set）默认只预演；',
+  '确认后带 confirm: true 才真正执行。',
+].join('\n')
+
+const opsSchema = {
+  action: z.enum(OPS_ACTIONS).describe('要执行的动作'),
+  ok: z.enum(['ok', 'fail']).optional().describe('history 结果过滤：ok=只看成功 / fail=只看失败'),
+  trigger: z.enum(['manual', 'schedule', 'cli', 'admin']).optional().describe('history 触发来源过滤'),
+  severity: z.enum(['error', 'warn', 'info']).optional().describe('notify 级别过滤'),
+  kind: z.string().optional().describe('notify 类型过滤，如 publish.fail / health.down'),
+  unread: z.boolean().optional().describe('notify 只看未读'),
+  q: z.string().optional().describe('history / notify 关键词'),
+  limit: z.number().optional().describe('history 默认 30 / notify 默认 50'),
+  ids: z.string().optional().describe('notify-read 只标记这些通知 id，逗号分隔；省略=全部已读'),
+  url: z.string().optional().describe('webhook-set 的 Webhook 地址'),
+  minSeverity: z.enum(['error', 'warn', 'info']).optional().describe('webhook-set 最低推送级别，默认 warn'),
+  clear: z.boolean().optional().describe('webhook-set 清空地址以停用推送'),
+  confirm: z.boolean().optional().describe('写操作必须显式传 true 才真正执行'),
+}
+
+server.registerTool(
+  'nav_ops',
+  { title: '运维事件与通知', description: OPS_DOC, inputSchema: opsSchema, annotations: WRITES },
+  async (args) => {
+    const { action } = args
+    const num = v => (v === undefined ? undefined : String(v))
+    const map = {
+      history: { path: 'ops history', flags: { ok: args.ok, trigger: args.trigger, q: args.q, limit: num(args.limit) } },
+      notify: { path: 'ops notify', flags: { severity: args.severity, kind: args.kind, q: args.q, unread: args.unread, limit: num(args.limit) } },
+      'notify-read': { path: 'ops notify-read', flags: { ids: args.ids } },
+      'notify-clear': { path: 'ops notify-clear' },
+      webhook: { path: 'ops webhook' },
+      'webhook-set': { path: 'ops webhook-set', flags: { url: args.url, 'min-severity': args.minSeverity, clear: args.clear } },
+      inspect: { path: 'ops inspect' },
+    }
+    const plan = map[action]
+    if (!plan) return reply({ ok: false, command: 'nav_ops', data: null, error: { code: 'USAGE', message: `未知 action：${action}`, hint: `可用：${OPS_ACTIONS.join('、')}` }, exitCode: 2, meta: {} })
     const res = await invokeGated(plan.path, { flags: plan.flags }, { confirm: args.confirm })
     return reply(res)
   },

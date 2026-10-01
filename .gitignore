@@ -15,3 +15,9 @@ tools/console/launcher/logs/
 tools/console/launcher/icon-*.png
 # 控制台运行时数据：审计日志与探活快照，属本机状态，不入库
 tools/console/.data/
+# 探针产物：报告 / 运行日志 / 截图由脚本生成，只作本机验收证据，不入库
+_probe-report*.json
+_chrome-report.json
+probe/_*.json
+probe/_*.txt
+probe/_*.png

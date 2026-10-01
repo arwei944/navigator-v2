@@ -79,6 +79,37 @@ export function categoryList() {
   return CATEGORY_GROUPS.flatMap(g => g.categories)
 }
 
+/**
+ * 域（分组）列表。域是导航的一级方向，子分类是域内的二级筛选，
+ * 两者共用同一个「当前范围」取值：'all' | 域 id | 子分类 id。
+ * 域 id（ai/crypto/tools/basics）与子分类 id 无重名，同轴不会歧义。
+ */
+export function domainList() {
+  return CATEGORY_GROUPS.map(g => ({ id: g.id, label: g.label }))
+}
+
+/** 该取值是否是「整域」（而非具体子分类） */
+export function isDomainScope(value) {
+  return CATEGORY_GROUPS.some(g => g.id === value)
+}
+
+/** 该取值归属于哪个域：域 id 返回自身，子分类 id 返回所属域，'all'/未知返回 'all' */
+export function domainOfScope(value) {
+  if (!value || value === 'all') return 'all'
+  for (const g of CATEGORY_GROUPS) {
+    if (g.id === value) return g.id
+    if (g.categories.some(c => c.id === value)) return g.id
+  }
+  return 'all'
+}
+
+/** 某域下的子分类；'all' 返回全部子分类 */
+export function categoriesOfDomain(domainId) {
+  if (!domainId || domainId === 'all') return categoryList()
+  const g = CATEGORY_GROUPS.find(g => g.id === domainId)
+  return g ? g.categories : []
+}
+
 /** id -> { label, color, group }，分类白名单与配色都从这里取 */
 export function categoryMeta() {
   const map = {}

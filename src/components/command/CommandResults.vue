@@ -45,15 +45,16 @@
           </svg>
           <span>{{ item.name }}</span>
         </div>
-        <!-- 分类 -->
+        <!-- 方向 / 分类 -->
         <div
-          v-else-if="group.type === 'category'"
+          v-else-if="group.type === 'category' || group.type === 'domain'"
           class="cp-item"
           :class="{ active: getIndex(group.type, i) === selectedIndex }"
           @click="emit('select', item)"
           @mouseenter="emit('hover', getIndex(group.type, i))"
         >
-          <span class="cp-dot" :style="{ background: item.dotColor }"></span>
+          <span v-if="item.dotColor" class="cp-dot" :style="{ background: item.dotColor }"></span>
+          <span v-else class="cp-dot cp-dot-hollow"></span>
           <span>{{ item.label }}</span>
         </div>
         <!-- 站点 -->
@@ -70,7 +71,8 @@
           </span>
           <div class="cp-site-info">
             <span class="cp-site-name">{{ item.name }}</span>
-            <span class="cp-site-url">{{ item.url }}</span>
+            <span class="cp-site-url"><span
+              v-if="aliasOf(item)" class="cp-site-alias">别名 · {{ aliasOf(item) }}</span>{{ item.url }}</span>
           </div>
         </div>
       </template>
@@ -80,7 +82,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { matchedAlias } from '@/utils/search'
+
+const props = defineProps({
   query: { type: String, default: '' },
   groups: { type: Array, default: () => [] },
   selectedIndex: { type: Number, default: 0 },
@@ -88,6 +92,11 @@ defineProps({
   getIndex: { type: Function, required: true }
 })
 const emit = defineEmits(['select', 'hover'])
+
+/** 命中的别名（未命中返回 ''），用于解释该条为何出现 */
+function aliasOf(item) {
+  return matchedAlias(item, props.query)
+}
 </script>
 
 <style scoped>
@@ -102,11 +111,14 @@ const emit = defineEmits(['select', 'hover'])
 .cp-item:hover, .cp-item.active { background: var(--accent-light); color: var(--accent); }
 .cp-item svg { width: 16px; height: 16px; flex-shrink: 0; }
 .cp-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+/* 方向（域）没有单一分类色，用空心点与子分类的实心点区分 */
+.cp-dot-hollow { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-secondary); opacity: .55; }
 .cp-site-icon { width: 24px; height: 24px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; position: relative; overflow: hidden; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 1px; background: #fff; box-sizing: border-box; }
 .cp-site-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .cp-site-name { font-size: 13px; font-weight: 500; line-height: 1.3; }
 .cp-site-url { font-size: 11px; color: var(--text-secondary); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-site-alias { color: var(--accent); font-weight: 500; margin-right: 6px; }
 .cp-empty { text-align: center; padding: 32px 16px; color: var(--text-secondary); font-size: 14px; }
 </style>

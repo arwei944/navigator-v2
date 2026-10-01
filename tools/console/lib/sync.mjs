@@ -6,8 +6,6 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
 import { SITE_URL, fetchCloud } from './cloud.mjs'
 import * as jobs from './jobs.mjs'
@@ -15,57 +13,93 @@ import * as git from './git.mjs'
 import * as vercel from './vercel.mjs'
 import { consumeGate } from './gate.mjs'
 import { record } from './audit.mjs'
-
-const pExecFile = promisify(execFile)
+import { append as appendHistory } from './publishlog.mjs'
+import { push as notifyPush } from './notify.mjs'
+import {
+  FULL_PIPELINE, createSteps, markStep as markStepCore, settlePending, settleRunning,
+  stepFromMarker, advanceTo as advanceToCore, pipelineVerdict,
+} from '../../../shared/ops/pipeline.mjs'
 
 export { SITE_URL, fetchCloud }
 
 export const PUBLISH_JOB_TITLE = '一键发布'
 
-const STEP_DEFS = [
-  { key: 'check', label: '本地改动检查', phase: 'local' },
-  { key: 'commit', label: '提交', phase: 'local' },
-  { key: 'push', label: '推送到远端', phase: 'local' },
-  { key: 'backup', label: '数据备份', phase: 'publish' },
-  { key: 'validate', label: '数据门禁', phase: 'publish' },
-  { key: 'build', label: '构建', phase: 'publish' },
-  { key: 'deploy', label: 'Vercel 部署', phase: 'publish' },
-  { key: 'hotupdate', label: 'Blob 热更新', phase: 'publish' },
-  { key: 'verify', label: '一致性验证', phase: 'publish' },
-]
-const PUBLISH_ORDER = STEP_DEFS.filter(s => s.phase === 'publish').map(s => s.key)
-
-const TERMINAL = ['success', 'failed', 'skipped']
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-function markerToKey(text) {
-  if (/备份数据/.test(text)) return 'backup'
-  if (/schema\s*校验|数据校验/.test(text)) return 'validate'
-  if (/构建/.test(text)) return 'build'
-  if (/部署到\s*Vercel|部署/.test(text)) return 'deploy'
-  if (/热更新/.test(text)) return 'hotupdate'
-  if (/轮询验证|一致性/.test(text)) return 'verify'
-  return null
+/** 步骤表由内核给出（与线上后台同源）；控制台只执行自己能跑的那几步，其余由内核标 skipped 并说明原因 */
+function newSteps(opts = {}) {
+  return createSteps(FULL_PIPELINE, 'console', opts)
 }
 
-function newSteps() {
-  return STEP_DEFS.map(d => ({
-    key: d.key, label: d.label, phase: d.phase,
-    status: 'pending', startedAt: null, endedAt: null, duration: null, detail: '',
-  }))
-}
-
+/** 就地更新状态并广播给 UI；耗时计算与同态去重由内核状态机负责 */
 function markStep(job, step, patch) {
-  // 同状态重复标记且无新细节时跳过，避免覆盖已记录的耗时
-  if (patch.status === step.status && patch.detail === undefined && Object.keys(patch).length === 1) return step
-  Object.assign(step, patch)
-  if (patch.status === 'running' && !step.startedAt) step.startedAt = Date.now()
-  if (TERMINAL.includes(patch.status)) {
-    step.endedAt = Date.now()
-    step.duration = step.startedAt ? step.endedAt - step.startedAt : 0
-  }
+  markStepCore(step, patch)
   jobs.emitEvent(job, 'step', { ...step })
   return step
+}
+
+/**
+ * 批量收尾并广播。状态转移由内核（settlePending / settleRunning）负责，
+ * 控制台只把「真的变了」的那几条推给 UI，避免无谓的重绘。
+ */
+function settleSteps(job, steps, patch, which = 'pending') {
+  const before = steps.map(s => s.status)
+  if (which === 'running') settleRunning(steps, patch)
+  else settlePending(steps, patch)
+  steps.forEach((s, i) => { if (s.status !== before[i]) jobs.emitEvent(job, 'step', { ...s }) })
+  return steps
+}
+
+/**
+ * 发布收尾：落一条发布历史 + 记一条审计 + 结束任务。
+ * 历史与审计都是旁路，写失败不影响任务结果本身。
+ */
+function finishPublish(job, steps, code, opts, reason = '') {
+  const verdict = pipelineVerdict(steps)
+  const ok = code === 0 && verdict.ok
+  appendHistory({
+    runner: 'console',
+    trigger: opts.trigger || 'manual',
+    ok,
+    reason: ok ? '' : (reason || verdict.reason),
+    duration: job.startedAt ? Date.now() - job.startedAt : null,
+    steps,
+    commit: job.commitInfo || null,
+    deployment: job.deployment
+      ? { url: job.deployment.url, state: job.deployment.state }
+      : (job.deploymentUrl ? { url: job.deploymentUrl, state: '' } : null),
+    cloud: Number.isFinite(job.cloudVersion) ? { version: job.cloudVersion, count: job.cloudCount || 0 } : null,
+    snapshot: job.snapshot
+      ? { pathname: job.snapshot, ok: true }
+      : (job.snapshotError ? { pathname: '', ok: false } : null),
+    counts: { sites: localSitesCount() },
+    note: opts.message || '',
+  })
+  record({
+    action: ok ? 'publish.done' : 'publish.fail',
+    result: ok ? 'ok' : 'fail',
+    target: '一键发布',
+    detail: ok
+      ? `云端 v${job.cloudVersion || '-'} · ${job.cloudCount || 0} 站点`
+      : (reason || verdict.reason || `退出码 ${code}`),
+  })
+  // 通知是旁路：与审计/历史同批落，但只挑「需要人知道」的结果推
+  notifyPush({
+    kind: ok ? 'publish.done' : 'publish.fail',
+    title: ok ? `发布完成 · v${job.cloudVersion || '-'}` : '发布失败',
+    body: ok
+      ? `${job.cloudCount || 0} 站点已热更新到云端${job.deployment?.url ? ` · ${job.deployment.url}` : ''}`
+      : (reason || verdict.reason || `退出码 ${code}`),
+    meta: { cloud: job.cloudVersion || null, count: job.cloudCount || 0, snapshot: job.snapshot || '' },
+  })
+  if (job.snapshotError) {
+    notifyPush({
+      kind: 'snapshot.fail',
+      title: '云端快照保存失败',
+      body: String(job.snapshotError).slice(0, 300),
+    })
+  }
+  jobs.finish(job, code)
 }
 
 /** 子进程执行一步，流式日志并入同一任务，不结束任务本身 */
@@ -146,7 +180,7 @@ export async function resolveGate({ gateId, allowUngated = false } = {}) {
 
 export function startPublish(opts = {}) {
   const job = jobs.createJob(PUBLISH_JOB_TITLE)
-  const steps = newSteps()
+  const steps = newSteps(opts)
   job.steps = steps
   job.gate = opts.gateId ? { id: opts.gateId, bypassed: false } : { id: null, bypassed: true }
   jobs.emitEvent(job, 'steps', steps.map(s => ({ ...s })))
@@ -158,8 +192,8 @@ export function startPublish(opts = {}) {
 
   runPipeline(job, steps, opts).catch(e => {
     jobs.log(job, `发布流程异常：${e.message}`, 'stderr')
-    for (const s of steps) if (s.status === 'running') markStep(job, s, { status: 'failed', detail: e.message })
-    jobs.finish(job, -1)
+    settleSteps(job, steps, { status: 'failed', detail: e.message }, 'running')
+    finishPublish(job, steps, -1, opts, e.message)
   })
   return job
 }
@@ -170,13 +204,10 @@ async function runPipeline(job, steps, opts) {
 
   const fail = (k, detail, code = -1) => {
     if (k) mark(k, { status: 'failed', detail })
-    for (const s of steps) if (s.status === 'pending') markStep(job, s, { status: 'skipped', detail: '未执行' })
+    settleSteps(job, steps, { status: 'skipped', detail: '未执行' }, 'pending')
     jobs.log(job, `❌ 发布中止：${detail}`, 'stderr')
-    // 本地阶段失败由控制台记录；构建之后的阶段由 publish.mjs 记录，两边分工避免重复
-    if (['check', 'commit', 'push'].includes(k)) {
-      record({ action: 'publish.fail', result: 'fail', target: `本地阶段：${k}`, detail })
-    }
-    jobs.finish(job, code)
+    // 发布结果的审计与历史统一在 finishPublish 里落一次，避免本地阶段与 publish.mjs 重复记账
+    finishPublish(job, steps, code, opts, detail)
   }
 
   jobs.log(job, `开始一键发布 · ${new Date().toLocaleString('zh-CN')}`, 'info')
@@ -204,6 +235,7 @@ async function runPipeline(job, steps, opts) {
     mark('commit', { status: 'running' })
     try {
       const r = await git.commit(message, staged.map(f => f.path))
+      job.commitInfo = { sha: r.sha, message }
       jobs.log(job, `已提交 ${r.sha}：${message}`, 'success')
       mark('commit', { status: 'success', detail: `${r.sha} · ${staged.length} 个文件` })
       record({ action: 'commit', target: r.sha, detail: `${staged.length} 个文件 · ${message}` })
@@ -234,14 +266,8 @@ async function runPipeline(job, steps, opts) {
   if (opts.skipBuild) args.push('--skip-build')
 
   const advanceTo = key => {
-    for (const k of PUBLISH_ORDER) {
-      const s = byKey(k)
-      if (k === key) {
-        if (s.status === 'pending') mark(k, { status: 'running', detail: '进行中…' })
-        return
-      }
-      if (s.status === 'running') mark(k, { status: 'success' })
-    }
+    advanceToCore(steps, key)
+    for (const s of steps) jobs.emitEvent(job, 'step', { ...s })
   }
 
   const code = await runStep(job, process.execPath, args, {
@@ -251,7 +277,7 @@ async function runPipeline(job, steps, opts) {
     timeoutMs: 15 * 60 * 1000,
     onLine: line => {
       const m = line.match(/^===\s*(.+?)\s*===\s*$/)
-      if (m) { const key = markerToKey(m[1]); if (key) advanceTo(key); return }
+      if (m) { const key = stepFromMarker(m[1]); if (key) advanceTo(key); return }
 
       if (/跳过构建/.test(line)) mark('build', { status: 'skipped', detail: '--skip-build' })
       if (/数据校验通过/.test(line)) mark('validate', { status: 'success', detail: 'schema 通过' })
@@ -266,6 +292,7 @@ async function runPipeline(job, steps, opts) {
       const hot = line.match(/发布成功:\s*version=(\d+)\s*count=(\d+)/)
       if (hot) {
         job.cloudVersion = Number(hot[1])
+        job.cloudCount = Number(hot[2])
         mark('hotupdate', { status: 'success', detail: `version ${hot[1]} · ${hot[2]} 站点` })
       }
 
@@ -282,9 +309,8 @@ async function runPipeline(job, steps, opts) {
     },
   })
 
-  const running = steps.filter(s => s.status === 'running')
-  for (const s of running) markStep(job, s, code === 0 ? { status: 'success' } : { status: 'failed', detail: `退出码 ${code}` })
-  for (const s of steps) if (s.status === 'pending') markStep(job, s, { status: 'skipped', detail: '未执行' })
+  settleSteps(job, steps, code === 0 ? { status: 'success' } : { status: 'failed', detail: `退出码 ${code}` }, 'running')
+  settleSteps(job, steps, { status: 'skipped', detail: '未执行' }, 'pending')
 
   /* 部署状态机补全：仅在配置了 VERCEL_TOKEN 时可用 */
   if (code === 0 && vercel.available()) {
@@ -303,7 +329,7 @@ async function runPipeline(job, steps, opts) {
   }
 
   jobs.log(job, code === 0 ? '✅ 一键发布完成' : `❌ 一键发布失败（退出码 ${code}）`, code === 0 ? 'success' : 'stderr')
-  jobs.finish(job, code)
+  finishPublish(job, steps, code, opts, code === 0 ? '' : `退出码 ${code}`)
 }
 
 /* ---------------- 独立云端验证 ---------------- */

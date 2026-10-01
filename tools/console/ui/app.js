@@ -8,6 +8,7 @@ import { initDataPanel, refresh as refreshData } from './datapanel.js'
 import { initSitesPanel, refresh as refreshSites } from './sitespanel.js'
 import { initAuditPanel, refresh as refreshAudit } from './auditpanel.js'
 import { initHealthPanel, refresh as refreshHealth } from './healthpanel.js'
+import { initNotifyPanel, refresh as refreshNotify, refreshBadge } from './notifypanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -22,6 +23,7 @@ $('#tabs').addEventListener('click', e => {
   if (btn.dataset.panel === 'data') refreshData()
   if (btn.dataset.panel === 'audit') refreshAudit()
   if (btn.dataset.panel === 'health') refreshHealth()
+  if (btn.dataset.panel === 'notify') refreshNotify()
 })
 
 /* ---------- 概览 ---------- */
@@ -74,8 +76,10 @@ initDataPanel()
 initSitesPanel()
 initAuditPanel()
 initHealthPanel()
+initNotifyPanel()
 loadHealth()
 loadEnv()
+refreshBadge()
 
 // 改动面板可见时轻量轮询，捕捉控制台之外的编辑；有任务在跑时不打扰
 setInterval(() => {
@@ -84,4 +88,8 @@ setInterval(() => {
   if (active === 'panel-sync') refreshSync()
   if (active === 'panel-audit') refreshAudit()
   if (active === 'panel-health') refreshHealth()
+  if (active === 'panel-notify') refreshNotify()
 }, 30000)
+
+// 未读角标与当前面板无关，独立轮询（比面板刷新更轻）
+setInterval(refreshBadge, 30000)

@@ -47,4 +47,13 @@ const site = computed(() => sidebarStore.hoveredSite)
 .empty-icon svg { width: 24px; height: 24px; }
 .empty-title { font-size: 14px; font-weight: 600; color: var(--text-primary); margin: 0; }
 .empty-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.6; margin: 0; opacity: 0.7; }
+
+/* ≤1024 收起（不再占用宽度），≤768 直接隐藏 —— 触屏无 hover，详情面板在此区间没有入口 */
+@media (max-width: 1024px) {
+  .right-sidebar { width: 0; min-width: 0; border-left: none; overflow: hidden; }
+  .right-collapse-toggle { display: none; }
+}
+@media (max-width: 768px) {
+  .right-sidebar { display: none; }
+}
 </style>

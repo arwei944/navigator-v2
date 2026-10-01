@@ -11,7 +11,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s1.webp"
+    "icon": "icons/s1.webp",
+    "aliases": [
+      "GPT",
+      "chat gpt",
+      "聊天GPT"
+    ]
   },
   {
     "id": "s2",
@@ -25,7 +30,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s2.png"
+    "icon": "icons/s2.png",
+    "aliases": [
+      "克劳德"
+    ]
   },
   {
     "id": "s3",
@@ -39,7 +47,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s3.png"
+    "icon": "icons/s3.png",
+    "aliases": [
+      "深度求索",
+      "deep seek"
+    ]
   },
   {
     "id": "s4",
@@ -53,7 +65,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s4.png"
+    "icon": "icons/s4.png",
+    "aliases": [
+      "月之暗面",
+      "Moonshot"
+    ]
   },
   {
     "id": "s5",
@@ -67,7 +83,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s5.png"
+    "icon": "icons/s5.png",
+    "aliases": [
+      "字节豆包"
+    ]
   },
   {
     "id": "p1",
@@ -109,7 +128,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/p3.ico"
+    "icon": "icons/p3.ico",
+    "aliases": [
+      "Flow GPT"
+    ]
   },
   {
     "id": "w1",
@@ -193,7 +215,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd2.png"
+    "icon": "icons/cd2.png",
+    "aliases": [
+      "Copilot"
+    ]
   },
   {
     "id": "cd3",
@@ -221,7 +246,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd4.png"
+    "icon": "icons/cd4.png",
+    "aliases": [
+      "Vercel v0"
+    ]
   },
   {
     "id": "cd5",
@@ -277,7 +305,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g1.png"
+    "icon": "icons/g1.png",
+    "aliases": [
+      "MJ"
+    ]
   },
   {
     "id": "g2",
@@ -291,7 +322,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g2.webp"
+    "icon": "icons/g2.webp",
+    "aliases": [
+      "SD"
+    ]
   },
   {
     "id": "g3",
@@ -333,7 +367,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g5.png"
+    "icon": "icons/g5.png",
+    "aliases": [
+      "11Labs"
+    ]
   },
   {
     "id": "g6",
@@ -347,7 +384,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g6.ico"
+    "icon": "icons/g6.ico",
+    "aliases": [
+      "可画"
+    ]
   },
   {
     "id": "f1",
@@ -375,7 +415,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f2.ico"
+    "icon": "icons/f2.ico",
+    "aliases": [
+      "Integromat"
+    ]
   },
   {
     "id": "f3",
@@ -403,7 +446,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f4.png"
+    "icon": "icons/f4.png",
+    "aliases": [
+      "扣子",
+      "Coze AI"
+    ]
   },
   {
     "id": "f5",
@@ -417,7 +464,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f5.png"
+    "icon": "icons/f5.png",
+    "aliases": [
+      "Lang Chain"
+    ]
   },
   {
     "id": "f6",
@@ -431,7 +481,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f6.ico"
+    "icon": "icons/f6.ico",
+    "aliases": [
+      "抱抱脸",
+      "HF"
+    ]
   },
   {
     "id": "f7",
@@ -458,7 +512,10 @@
     "sortOrder": 33,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
+    "updatedAt": 1787184000000,
+    "aliases": [
+      "fastai"
+    ]
   },
   {
     "id": "l2",
@@ -486,7 +543,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l3.ico"
+    "icon": "icons/l3.ico",
+    "aliases": [
+      "谷歌Colab"
+    ]
   },
   {
     "id": "l4",
@@ -556,7 +616,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l8.ico"
+    "icon": "icons/l8.ico",
+    "aliases": [
+      "Product Hunt"
+    ]
   },
   {
     "id": "l9",
@@ -570,7 +633,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l9.png"
+    "icon": "icons/l9.png",
+    "aliases": [
+      "GitHub热榜"
+    ]
   },
   {
     "id": "ex1",
@@ -584,7 +650,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex1.png"
+    "icon": "icons/ex1.png",
+    "aliases": [
+      "币安"
+    ]
   },
   {
     "id": "ex2",
@@ -598,7 +667,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex2.png"
+    "icon": "icons/ex2.png",
+    "aliases": [
+      "欧易",
+      "OKEx"
+    ]
   },
   {
     "id": "ex3",
@@ -640,7 +713,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex5.png"
+    "icon": "icons/ex5.png",
+    "aliases": [
+      "库币"
+    ]
   },
   {
     "id": "ex6",
@@ -654,7 +730,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex6.ico"
+    "icon": "icons/ex6.ico",
+    "aliases": [
+      "芝麻开门",
+      "芝麻交易所"
+    ]
   },
   {
     "id": "ex7",
@@ -668,7 +748,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex7.png"
+    "icon": "icons/ex7.png",
+    "aliases": [
+      "海妖"
+    ]
   },
   {
     "id": "ex8",
@@ -682,7 +765,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex8.png"
+    "icon": "icons/ex8.png",
+    "aliases": [
+      "抹茶"
+    ]
   },
   {
     "id": "ex9",
@@ -696,7 +782,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex9.png"
+    "icon": "icons/ex9.png",
+    "aliases": [
+      "火币",
+      "Huobi"
+    ]
   },
   {
     "id": "dx1",
@@ -724,7 +814,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx2.png"
+    "icon": "icons/dx2.png",
+    "aliases": [
+      "薄饼"
+    ]
   },
   {
     "id": "dx3",
@@ -780,7 +873,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx6.png"
+    "icon": "icons/dx6.png",
+    "aliases": [
+      "寿司"
+    ]
   },
   {
     "id": "dx7",
@@ -906,7 +1002,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt1.png"
+    "icon": "icons/dt1.png",
+    "aliases": [
+      "CMC"
+    ]
   },
   {
     "id": "dt2",
@@ -920,7 +1019,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt2.png"
+    "icon": "icons/dt2.png",
+    "aliases": [
+      "壁虎",
+      "币虎"
+    ]
   },
   {
     "id": "dt3",
@@ -948,7 +1051,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt4.ico"
+    "icon": "icons/dt4.ico",
+    "aliases": [
+      "羊驼",
+      "Defi Llama"
+    ]
   },
   {
     "id": "dt5",
@@ -1032,7 +1139,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl1.svg"
+    "icon": "icons/wl1.svg",
+    "aliases": [
+      "小狐狸"
+    ]
   },
   {
     "id": "wl2",
@@ -1046,7 +1156,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl2.png"
+    "icon": "icons/wl2.png",
+    "aliases": [
+      "幻影",
+      "幻影钱包"
+    ]
   },
   {
     "id": "wl3",
@@ -1060,7 +1174,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl3.png"
+    "icon": "icons/wl3.png",
+    "aliases": [
+      "Rabby Wallet"
+    ]
   },
   {
     "id": "wl4",
@@ -1074,7 +1191,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl4.png"
+    "icon": "icons/wl4.png",
+    "aliases": [
+      "信任钱包"
+    ]
   },
   {
     "id": "wl5",
@@ -1088,7 +1208,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl5.png"
+    "icon": "icons/wl5.png",
+    "aliases": [
+      "欧易钱包",
+      "OKX Web3"
+    ]
   },
   {
     "id": "wl6",
@@ -1116,7 +1240,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch1.png"
+    "icon": "icons/ch1.png",
+    "aliases": [
+      "以太坊浏览器"
+    ]
   },
   {
     "id": "ch2",
@@ -1130,7 +1257,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch2.png"
+    "icon": "icons/ch2.png",
+    "aliases": [
+      "SOL浏览器"
+    ]
   },
   {
     "id": "ch3",
@@ -1144,7 +1274,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch3.png"
+    "icon": "icons/ch3.png",
+    "aliases": [
+      "BSC浏览器",
+      "币安智能链浏览器"
+    ]
   },
   {
     "id": "ch4",
@@ -1158,7 +1292,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch4.ico"
+    "icon": "icons/ch4.ico",
+    "aliases": [
+      "Arbitrum浏览器"
+    ]
   },
   {
     "id": "ch5",
@@ -1213,7 +1350,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in1.ico"
+    "icon": "icons/in1.ico",
+    "aliases": [
+      "以太坊"
+    ]
   },
   {
     "id": "in2",
@@ -1227,7 +1367,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in2.png"
+    "icon": "icons/in2.png",
+    "aliases": [
+      "索拉纳"
+    ]
   },
   {
     "id": "in3",
@@ -1269,7 +1412,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in5.ico"
+    "icon": "icons/in5.ico",
+    "aliases": [
+      "Base链",
+      "Coinbase Base"
+    ]
   },
   {
     "id": "in6",
@@ -1395,7 +1542,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc2.ico"
+    "icon": "icons/sc2.ico",
+    "aliases": [
+      "慢雾"
+    ]
   },
   {
     "id": "sc3",
@@ -1409,7 +1559,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc3.ico"
+    "icon": "icons/sc3.ico",
+    "aliases": [
+      "DeFi Safety"
+    ]
   },
   {
     "id": "sc4",
@@ -1493,7 +1646,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1789881991356,
-    "icon": "icons/md5.ico"
+    "icon": "icons/md5.ico",
+    "aliases": [
+      "吴说",
+      "WuShuo"
+    ]
   },
   {
     "id": "md6",
@@ -1507,7 +1664,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md6.ico"
+    "icon": "icons/md6.ico",
+    "aliases": [
+      "Foresight"
+    ]
   },
   {
     "id": "st1",
@@ -1535,7 +1695,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/st2.png"
+    "icon": "icons/st2.png",
+    "aliases": [
+      "火箭池"
+    ]
   },
   {
     "id": "st3",
@@ -1577,7 +1740,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sb1.ico"
+    "icon": "icons/sb1.ico",
+    "aliases": [
+      "Maker",
+      "DAI"
+    ]
   },
   {
     "id": "sb2",
@@ -1689,7 +1856,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac5.ico"
+    "icon": "icons/ac5.ico",
+    "aliases": [
+      "文件币"
+    ]
   },
   {
     "id": "ac6",
@@ -1731,7 +1901,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s6.png"
+    "icon": "icons/s6.png",
+    "aliases": [
+      "xAI"
+    ]
   },
   {
     "id": "s7",
@@ -1745,7 +1918,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s7.svg"
+    "icon": "icons/s7.svg",
+    "aliases": [
+      "通义",
+      "千问",
+      "Qwen"
+    ]
   },
   {
     "id": "s8",
@@ -1759,7 +1937,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s8.png"
+    "icon": "icons/s8.png",
+    "aliases": [
+      "谷歌Gemini"
+    ]
   },
   {
     "id": "s9",
@@ -1773,7 +1954,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s9.ico"
+    "icon": "icons/s9.ico",
+    "aliases": [
+      "文心",
+      "百度文心",
+      "ERNIE"
+    ]
   },
   {
     "id": "s10",
@@ -1787,7 +1973,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s10.png"
+    "icon": "icons/s10.png",
+    "aliases": [
+      "智谱",
+      "GLM"
+    ]
   },
   {
     "id": "s11",
@@ -1801,7 +1991,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/s11.ico"
+    "icon": "icons/s11.ico",
+    "aliases": [
+      "讯飞",
+      "星火",
+      "Spark"
+    ]
   },
   {
     "id": "p4",
@@ -1871,7 +2066,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g8.png"
+    "icon": "icons/g8.png",
+    "aliases": [
+      "可灵"
+    ]
   },
   {
     "id": "g9",
@@ -1927,7 +2125,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g12.jpg"
+    "icon": "icons/g12.jpg",
+    "aliases": [
+      "DESIGN MD Editor"
+    ]
   },
   {
     "id": "g13",
@@ -1983,7 +2184,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f10.png"
+    "icon": "icons/f10.png",
+    "aliases": [
+      "Auto GPT"
+    ]
   },
   {
     "id": "l10",
@@ -1997,7 +2201,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l10.ico"
+    "icon": "icons/l10.ico",
+    "aliases": [
+      "DeepLearning AI",
+      "吴恩达"
+    ]
   },
   {
     "id": "l11",
@@ -2025,7 +2233,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l12.png"
+    "icon": "icons/l12.png",
+    "aliases": [
+      "智源",
+      "BAAI"
+    ]
   },
   {
     "id": "adl1",
@@ -2053,7 +2265,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/adl2.ico"
+    "icon": "icons/adl2.ico",
+    "aliases": [
+      "Get Cheap AI",
+      "便宜AI"
+    ]
   },
   {
     "id": "adl3",
@@ -2067,7 +2283,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/adl3.ico"
+    "icon": "icons/adl3.ico",
+    "aliases": [
+      "AIbase"
+    ]
   },
   {
     "id": "adl4",
@@ -2081,7 +2300,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/adl4.svg"
+    "icon": "icons/adl4.svg",
+    "aliases": [
+      "Price AI"
+    ]
   },
   {
     "id": "ex10",
@@ -2095,7 +2317,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex10.png"
+    "icon": "icons/ex10.png",
+    "aliases": [
+      "Bit Get"
+    ]
   },
   {
     "id": "dx9",
@@ -2151,7 +2376,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df7.png"
+    "icon": "icons/df7.png",
+    "aliases": [
+      "JustLend DAO",
+      "波场借贷"
+    ]
   },
   {
     "id": "df8",
@@ -2164,7 +2393,10 @@
     "sortOrder": 155,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
+    "updatedAt": 1787184000000,
+    "aliases": [
+      "维纳斯"
+    ]
   },
   {
     "id": "df9",
@@ -2220,7 +2452,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt12.png"
+    "icon": "icons/dt12.png",
+    "aliases": [
+      "Arkham Intelligence"
+    ]
   },
   {
     "id": "dt13",
@@ -2275,7 +2510,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl7.png"
+    "icon": "icons/wl7.png",
+    "aliases": [
+      "Coinbase钱包"
+    ]
   },
   {
     "id": "wl8",
@@ -2387,7 +2625,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in11.svg"
+    "icon": "icons/in11.svg",
+    "aliases": [
+      "雪崩"
+    ]
   },
   {
     "id": "in12",
@@ -2401,7 +2642,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in12.png"
+    "icon": "icons/in12.png",
+    "aliases": [
+      "马蹄链"
+    ]
   },
   {
     "id": "in13",
@@ -2457,7 +2701,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc6.png"
+    "icon": "icons/sc6.png",
+    "aliases": [
+      "派盾"
+    ]
   },
   {
     "id": "md7",
@@ -2471,7 +2718,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md7.png"
+    "icon": "icons/md7.png",
+    "aliases": [
+      "律动"
+    ]
   },
   {
     "id": "md8",
@@ -2485,7 +2735,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md8.svg"
+    "icon": "icons/md8.svg",
+    "aliases": [
+      "星球日报",
+      "Odaily星球日报"
+    ]
   },
   {
     "id": "md9",
@@ -2583,7 +2837,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1790263671045,
-    "icon": "icons/fd1.jpg"
+    "icon": "icons/fd1.jpg",
+    "aliases": [
+      "Root Data"
+    ]
   },
   {
     "id": "fd2",
@@ -2597,7 +2854,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd2.ico"
+    "icon": "icons/fd2.ico",
+    "aliases": [
+      "Crypto Fundraising"
+    ]
   },
   {
     "id": "fd3",
@@ -2611,7 +2871,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd3.ico"
+    "icon": "icons/fd3.ico",
+    "aliases": [
+      "Chain Broker"
+    ]
   },
   {
     "id": "fd4",
@@ -2625,7 +2888,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd4.png"
+    "icon": "icons/fd4.png",
+    "aliases": [
+      "ICO"
+    ]
   },
   {
     "id": "fd5",
@@ -2639,7 +2905,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd5.ico"
+    "icon": "icons/fd5.ico",
+    "aliases": [
+      "Crypto Rank"
+    ]
   },
   {
     "id": "fd6",
@@ -2653,7 +2922,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1790306876649,
-    "icon": "icons/fd6.png"
+    "icon": "icons/fd6.png",
+    "aliases": [
+      "Coin List"
+    ]
   },
   {
     "id": "fd7",
@@ -2681,7 +2953,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd8.png"
+    "icon": "icons/fd8.png",
+    "aliases": [
+      "Token Unlocks",
+      "代币解锁"
+    ]
   },
   {
     "id": "ad2",
@@ -2709,7 +2985,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad3.png"
+    "icon": "icons/ad3.png",
+    "aliases": [
+      "Airdrop Alert"
+    ]
   },
   {
     "id": "ad4",
@@ -2737,7 +3016,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad5.png"
+    "icon": "icons/ad5.png",
+    "aliases": [
+      "Airdrop King"
+    ]
   },
   {
     "id": "ad6",
@@ -2751,7 +3033,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad6.webp"
+    "icon": "icons/ad6.webp",
+    "aliases": [
+      "99 Airdrops"
+    ]
   },
   {
     "id": "ad7",
@@ -2765,7 +3050,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad7.png"
+    "icon": "icons/ad7.png",
+    "aliases": [
+      "Drops Earn"
+    ]
   },
   {
     "id": "ad8",
@@ -2779,7 +3067,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad8.png"
+    "icon": "icons/ad8.png",
+    "aliases": [
+      "Earn Drop"
+    ]
   },
   {
     "id": "ad9",
@@ -2793,7 +3084,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad9.png"
+    "icon": "icons/ad9.png",
+    "aliases": [
+      "CMC Airdrop"
+    ]
   },
   {
     "id": "ad10",
@@ -2835,7 +3129,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad12.png"
+    "icon": "icons/ad12.png",
+    "aliases": [
+      "Crypto Airdrops"
+    ]
   },
   {
     "id": "sm1",
@@ -2849,7 +3146,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm1.png"
+    "icon": "icons/sm1.png",
+    "aliases": [
+      "鲁班"
+    ]
   },
   {
     "id": "sm2",
@@ -2863,7 +3163,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm2.png"
+    "icon": "icons/sm2.png",
+    "aliases": [
+      "疾驰"
+    ]
   },
   {
     "id": "sm3",
@@ -2890,7 +3193,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm4.png"
+    "icon": "icons/sm4.png",
+    "aliases": [
+      "SMS Activate"
+    ]
   },
   {
     "id": "sm5",
@@ -2932,7 +3238,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/aiapi2.png"
+    "icon": "icons/aiapi2.png",
+    "aliases": [
+      "启悟"
+    ]
   },
   {
     "id": "aiapi3",
@@ -2946,7 +3255,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/aiapi3.svg"
+    "icon": "icons/aiapi3.svg",
+    "aliases": [
+      "AMD Token Factory"
+    ]
   },
   {
     "id": "sm6",
@@ -2960,7 +3272,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm6.ico"
+    "icon": "icons/sm6.ico",
+    "aliases": [
+      "SMS Pool"
+    ]
   },
   {
     "id": "sm7",
@@ -2974,7 +3289,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm7.png"
+    "icon": "icons/sm7.png",
+    "aliases": [
+      "Receive SMS",
+      "免费接码"
+    ]
   },
   {
     "id": "sm8",
@@ -2988,7 +3307,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm8.png"
+    "icon": "icons/sm8.png",
+    "aliases": [
+      "Hero SMS"
+    ]
   },
   {
     "id": "bs1",
@@ -3002,7 +3324,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/bs1.png"
+    "icon": "icons/bs1.png",
+    "aliases": [
+      "良心云机场"
+    ]
   },
   {
     "id": "bs2",
@@ -3029,7 +3354,10 @@
     "sortOrder": 217,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
+    "updatedAt": 1787184000000,
+    "aliases": [
+      "三毛"
+    ]
   },
   {
     "id": "fd9",
@@ -3099,7 +3427,10 @@
     "visitCount": 0,
     "createdAt": 1787314647317,
     "updatedAt": 1787314647321,
-    "icon": "icons/sm9.png"
+    "icon": "icons/sm9.png",
+    "aliases": [
+      "233"
+    ]
   },
   {
     "id": "sm10",
@@ -3113,7 +3444,10 @@
     "visitCount": 0,
     "createdAt": 1787314901209,
     "updatedAt": 1787314901212,
-    "icon": "icons/sm10.ico"
+    "icon": "icons/sm10.ico",
+    "aliases": [
+      "闪电"
+    ]
   },
   {
     "id": "sm11",
@@ -3127,7 +3461,11 @@
     "visitCount": 0,
     "createdAt": 1787315160573,
     "updatedAt": 1787315160577,
-    "icon": "icons/sm11.png"
+    "icon": "icons/sm11.png",
+    "aliases": [
+      "USAPI",
+      "美卡接码"
+    ]
   },
   {
     "id": "sm12",
@@ -3141,7 +3479,10 @@
     "visitCount": 0,
     "createdAt": 1787315226903,
     "updatedAt": 1787315226906,
-    "icon": "icons/sm12.ico"
+    "icon": "icons/sm12.ico",
+    "aliases": [
+      "快客"
+    ]
   },
   {
     "id": "sm13",
@@ -3183,7 +3524,11 @@
     "visitCount": 0,
     "createdAt": 1787320225692,
     "updatedAt": 1787320225696,
-    "icon": "icons/aiapi6.svg"
+    "icon": "icons/aiapi6.svg",
+    "aliases": [
+      "阶跃星辰",
+      "跃问"
+    ]
   },
   {
     "id": "aiapi7",
@@ -3197,7 +3542,10 @@
     "visitCount": 0,
     "createdAt": 1787320225696,
     "updatedAt": 1787320225696,
-    "icon": "icons/aiapi7.png"
+    "icon": "icons/aiapi7.png",
+    "aliases": [
+      "Agnes"
+    ]
   },
   {
     "id": "acc1",
@@ -3211,7 +3559,11 @@
     "visitCount": 0,
     "createdAt": 1787349323601,
     "updatedAt": 1787349323606,
-    "icon": "icons/acc1.png"
+    "icon": "icons/acc1.png",
+    "aliases": [
+      "牛牛",
+      "苹果ID"
+    ]
   },
   {
     "id": "acc2",
@@ -3225,7 +3577,10 @@
     "visitCount": 0,
     "createdAt": 1787350303011,
     "updatedAt": 1787350303017,
-    "icon": "icons/acc2.png"
+    "icon": "icons/acc2.png",
+    "aliases": [
+      "苹果ID"
+    ]
   },
   {
     "id": "aiapi8",
@@ -3239,7 +3594,10 @@
     "visitCount": 0,
     "createdAt": 1787352370281,
     "updatedAt": 1787352370285,
-    "icon": "icons/aiapi8.ico"
+    "icon": "icons/aiapi8.ico",
+    "aliases": [
+      "云码平台"
+    ]
   },
   {
     "id": "dx13",
@@ -3309,7 +3667,10 @@
     "visitCount": 0,
     "createdAt": 1787425889329,
     "updatedAt": 1787425889334,
-    "icon": "icons/aiapi10.png"
+    "icon": "icons/aiapi10.png",
+    "aliases": [
+      "BAI"
+    ]
   },
   {
     "id": "sm14",
@@ -3323,7 +3684,10 @@
     "visitCount": 0,
     "createdAt": 1787427679789,
     "updatedAt": 1787427679793,
-    "icon": "icons/sm14.ico"
+    "icon": "icons/sm14.ico",
+    "aliases": [
+      "Mail td"
+    ]
   },
   {
     "id": "aiapi11",
@@ -3337,7 +3701,10 @@
     "visitCount": 0,
     "createdAt": 1787498481591,
     "updatedAt": 1787498481596,
-    "icon": "icons/aiapi11.png"
+    "icon": "icons/aiapi11.png",
+    "aliases": [
+      "AI Hub Mix"
+    ]
   },
   {
     "id": "cd10",
@@ -3393,7 +3760,10 @@
     "visitCount": 0,
     "createdAt": 1787521935374,
     "updatedAt": 1787521935380,
-    "icon": "icons/aiapi12.ico"
+    "icon": "icons/aiapi12.ico",
+    "aliases": [
+      "Go Router"
+    ]
   },
   {
     "id": "sc7",
@@ -3449,7 +3819,10 @@
     "visitCount": 0,
     "createdAt": 1787667566481,
     "updatedAt": 1787667566485,
-    "icon": "icons/aiapi13.png"
+    "icon": "icons/aiapi13.png",
+    "aliases": [
+      "GMI"
+    ]
   },
   {
     "id": "aiapi14",
@@ -3505,7 +3878,10 @@
     "visitCount": 0,
     "createdAt": 1787762982367,
     "updatedAt": 1787762982374,
-    "icon": "icons/bs5.webp"
+    "icon": "icons/bs5.webp",
+    "aliases": [
+      "挂梯"
+    ]
   },
   {
     "id": "bs6",
@@ -3519,7 +3895,10 @@
     "visitCount": 0,
     "createdAt": 1787764554408,
     "updatedAt": 1787764554412,
-    "icon": "icons/bs6.jpg"
+    "icon": "icons/bs6.jpg",
+    "aliases": [
+      "一分"
+    ]
   },
   {
     "id": "bs7",
@@ -3631,7 +4010,10 @@
     "visitCount": 0,
     "createdAt": 1788000915211,
     "updatedAt": 1788000915215,
-    "icon": "icons/dt21.png"
+    "icon": "icons/dt21.png",
+    "aliases": [
+      "熊猫寨"
+    ]
   },
   {
     "id": "cd14",
@@ -3645,7 +4027,10 @@
     "visitCount": 0,
     "createdAt": 1788002365681,
     "updatedAt": 1788002365685,
-    "icon": "icons/cd14.png"
+    "icon": "icons/cd14.png",
+    "aliases": [
+      "LinuxDo"
+    ]
   },
   {
     "id": "dt22",
@@ -3659,7 +4044,11 @@
     "visitCount": 0,
     "createdAt": 1788007568384,
     "updatedAt": 1788007568388,
-    "icon": "icons/dt22.jpg"
+    "icon": "icons/dt22.jpg",
+    "aliases": [
+      "呱呱助手",
+      "呱呱"
+    ]
   },
   {
     "id": "dt23",
@@ -3687,7 +4076,11 @@
     "visitCount": 0,
     "createdAt": 1788099598401,
     "updatedAt": 1788099598405,
-    "icon": "icons/sm16.ico"
+    "icon": "icons/sm16.ico",
+    "aliases": [
+      "四方接码",
+      "四方"
+    ]
   },
   {
     "id": "acc3",
@@ -3700,7 +4093,11 @@
     "sortOrder": 265,
     "visitCount": 0,
     "createdAt": 1788183404767,
-    "updatedAt": 1788183404771
+    "updatedAt": 1788183404771,
+    "aliases": [
+      "车久",
+      "X Premium"
+    ]
   },
   {
     "id": "bs8",
@@ -3714,7 +4111,12 @@
     "visitCount": 0,
     "createdAt": 1788195731593,
     "updatedAt": 1789881991356,
-    "icon": "icons/bs8.png"
+    "icon": "icons/bs8.png",
+    "aliases": [
+      "极点云",
+      "PolarNode",
+      "内网穿透"
+    ]
   },
   {
     "id": "l13",
@@ -3756,7 +4158,10 @@
     "visitCount": 0,
     "createdAt": 1788276255089,
     "updatedAt": 1788276255093,
-    "icon": "icons/acc4.svg"
+    "icon": "icons/acc4.svg",
+    "aliases": [
+      "RON"
+    ]
   },
   {
     "id": "cd15",
@@ -3798,7 +4203,11 @@
     "visitCount": 0,
     "createdAt": 1788354864781,
     "updatedAt": 1788354864786,
-    "icon": "icons/sm17.png"
+    "icon": "icons/sm17.png",
+    "aliases": [
+      "HeroSMS",
+      "Hero SMS"
+    ]
   },
   {
     "id": "aiapi17",
@@ -3812,7 +4221,10 @@
     "visitCount": 0,
     "createdAt": 1788357056676,
     "updatedAt": 1788357056680,
-    "icon": "icons/aiapi17.svg"
+    "icon": "icons/aiapi17.svg",
+    "aliases": [
+      "免费Token"
+    ]
   },
   {
     "id": "acc5",
@@ -3854,7 +4266,10 @@
     "visitCount": 0,
     "createdAt": 1788565219134,
     "updatedAt": 1788565219140,
-    "icon": "icons/dt25.png"
+    "icon": "icons/dt25.png",
+    "aliases": [
+      "X榜"
+    ]
   },
   {
     "id": "dt26",
@@ -3868,7 +4283,10 @@
     "visitCount": 0,
     "createdAt": 1788566113651,
     "updatedAt": 1788566113657,
-    "icon": "icons/dt26.png"
+    "icon": "icons/dt26.png",
+    "aliases": [
+      "AI价格雷达"
+    ]
   },
   {
     "id": "dt27",
@@ -3882,7 +4300,10 @@
     "visitCount": 0,
     "createdAt": 1788711061491,
     "updatedAt": 1788711061499,
-    "icon": "icons/dt27.svg"
+    "icon": "icons/dt27.svg",
+    "aliases": [
+      "听风"
+    ]
   },
   {
     "id": "sc8",
@@ -3896,7 +4317,10 @@
     "visitCount": 0,
     "createdAt": 1788799564113,
     "updatedAt": 1788799564128,
-    "icon": "icons/sc8.svg"
+    "icon": "icons/sc8.svg",
+    "aliases": [
+      "腾讯安全"
+    ]
   },
   {
     "id": "aiapi19",
@@ -3910,7 +4334,10 @@
     "visitCount": 0,
     "createdAt": 1788802134313,
     "updatedAt": 1788802134318,
-    "icon": "icons/aiapi19.ico"
+    "icon": "icons/aiapi19.ico",
+    "aliases": [
+      "Orca Router"
+    ]
   },
   {
     "id": "dt28",
@@ -3938,7 +4365,10 @@
     "visitCount": 0,
     "createdAt": 1788893345070,
     "updatedAt": 1788893345076,
-    "icon": "icons/aiapi20.png"
+    "icon": "icons/aiapi20.png",
+    "aliases": [
+      "Kira"
+    ]
   },
   {
     "id": "f11",
@@ -3966,7 +4396,10 @@
     "visitCount": 0,
     "createdAt": 1788976188608,
     "updatedAt": 1788976188612,
-    "icon": "icons/cd16.svg"
+    "icon": "icons/cd16.svg",
+    "aliases": [
+      "DESIGN MD"
+    ]
   },
   {
     "id": "nf6",
@@ -4021,7 +4454,11 @@
     "sortOrder": 288,
     "visitCount": 0,
     "createdAt": 1789336337140,
-    "updatedAt": 1789336337145
+    "updatedAt": 1789336337145,
+    "aliases": [
+      "双盲训练器",
+      "K线训练"
+    ]
   },
   {
     "id": "ac14",
@@ -4062,7 +4499,10 @@
     "visitCount": 0,
     "createdAt": 1789717398598,
     "updatedAt": 1789717398598,
-    "icon": "icons/dt31.png"
+    "icon": "icons/dt31.png",
+    "aliases": [
+      "Traderax"
+    ]
   },
   {
     "id": "dx14",
@@ -4104,7 +4544,10 @@
     "visitCount": 0,
     "createdAt": 1790077870933,
     "updatedAt": 1790077870933,
-    "icon": "icons/pj2.png"
+    "icon": "icons/pj2.png",
+    "aliases": [
+      "jev"
+    ]
   },
   {
     "id": "ac16",
@@ -4187,7 +4630,7 @@
     "sortOrder": 300,
     "visitCount": 0,
     "createdAt": 1790764565600,
-    "updatedAt": 1790764574546,
+    "updatedAt": 1790862256572,
     "icon": "icons/bs9.png"
   },
   {
@@ -4201,7 +4644,10 @@
     "sortOrder": 301,
     "visitCount": 0,
     "createdAt": 1790770836778,
-    "updatedAt": 1790770854334,
-    "icon": "icons/dt34.png"
+    "updatedAt": 1790862256572,
+    "icon": "icons/dt34.png",
+    "aliases": [
+      "OpenChain Bench"
+    ]
   }
 ]

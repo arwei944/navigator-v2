@@ -14,6 +14,7 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
+import { AUDIT_ACTIONS, normalizeEntry, filterEntries, summarizeEntries, actionLabel } from '../../../shared/ops/audit-core.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
 const ACTIVE = join(DATA_DIR, 'audit.jsonl')
@@ -22,32 +23,10 @@ const MAX_BYTES = 2 * 1024 * 1024
 const MAX_ARCHIVES = 20
 const SCAN_LINE_CAP = 20000
 
-/** 动作目录：既是展示标签，也是 UI 筛选的取值来源 */
-export const ACTIONS = {
-  'gate.preflight': '发布预检',
-  'gate.approve': '发布放行',
-  'gate.bypass': '绕过门禁',
-  'gate.reject': '门禁拒绝',
-  'publish.start': '发布启动',
-  'publish.done': '发布完成',
-  'publish.fail': '发布失败',
-  'publish.snapshot': '云端快照落盘',
-  'publish.snapshotFail': '云端快照失败',
-  'hotupdate': '云端热更新',
-  'rollback.preview': '回滚预演',
-  'rollback.apply': '回滚执行',
-  'commit': '提交',
-  'push': '推送',
-  'validate.fail': '校验失败',
-  'sites.add': '新增站点',
-  'sites.update': '更新站点',
-  'sites.remove': '删除站点',
-  'sites.sync': '站点同步',
-  'icon.fetch': '抓取图标',
-  'health.probe': '可用性探活',
-}
+/** 动作目录来自内核（与线上后台同源），控制台不再自维护一份，避免同一动作两种叫法 */
+export const ACTIONS = AUDIT_ACTIONS
 
-export const actionLabel = key => ACTIONS[key] || key
+export { actionLabel }
 
 function rotateIfNeeded() {
   let size = 0
@@ -72,15 +51,7 @@ export function record({ action, target = '', result = 'ok', detail = '', actor 
   try {
     mkdirSync(DATA_DIR, { recursive: true })
     rotateIfNeeded()
-    const line = JSON.stringify({
-      ts: new Date().toISOString(),
-      actor,
-      action,
-      target: String(target || ''),
-      result,
-      detail: String(detail || '').slice(0, 500),
-    })
-    appendFileSync(ACTIVE, `${line}\n`, 'utf-8')
+    appendFileSync(ACTIVE, `${JSON.stringify(normalizeEntry({ action, target, result, detail, actor }))}\n`, 'utf-8')
     return true
   } catch {
     return false
@@ -110,30 +81,13 @@ function readAll() {
 
 /** 审计查询：按动作 / 结果 / 关键词过滤，返回新 → 旧 */
 export function list({ limit = 200, action = '', result = '', q = '' } = {}) {
-  const kw = String(q || '').trim().toLowerCase()
-  const items = readAll().filter(it => {
-    if (action && it.action !== action) return false
-    if (result && it.result !== result) return false
-    if (kw) {
-      const hay = `${it.action} ${actionLabel(it.action)} ${it.target} ${it.detail}`.toLowerCase()
-      if (!hay.includes(kw)) return false
-    }
-    return true
-  })
+  const items = filterEntries(readAll(), { action, result, q })
   return { total: items.length, items: items.slice(0, Math.max(1, Math.min(Number(limit) || 200, 2000))) }
 }
 
 /** 概览统计：总数 / 失败数 / 最近一次放行，供概览面板使用 */
 export function summary() {
-  const items = readAll()
-  const fail = items.filter(it => it.result !== 'ok')
-  const lastApprove = items.find(it => it.action === 'gate.approve' || it.action === 'gate.bypass') || null
-  return {
-    total: items.length,
-    failures: fail.length,
-    lastAt: items[0]?.ts || null,
-    lastApprove: lastApprove ? { ts: lastApprove.ts, action: lastApprove.action, target: lastApprove.target, detail: lastApprove.detail } : null,
-  }
+  return summarizeEntries(readAll())
 }
 
 export const AUDIT_FILE = ACTIVE

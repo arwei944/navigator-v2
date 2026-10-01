@@ -13,7 +13,10 @@ import * as sites from './sites.mjs'
 import * as gate from './gate.mjs'
 import * as snapshots from './snapshots.mjs'
 import * as audit from './audit.mjs'
+import * as publishlog from './publishlog.mjs'
 import * as health from './health.mjs'
+import * as notify from './notify.mjs'
+import * as schedule from './schedule.mjs'
 import { record } from './audit.mjs'
 
 export function sendJson(res, code, obj) {
@@ -24,6 +27,11 @@ export function sendJson(res, code, obj) {
     'Cache-Control': 'no-store',
   })
   res.end(body)
+}
+
+/** 批量结果里 `next` 是整份站点数组（300+ 条），只对落盘有意义，不回传给前端 */
+function stripNext({ next, ...rest }) {
+  return rest
 }
 
 async function readJsonBody(req) {
@@ -193,6 +201,16 @@ export async function handleApi(req, res, path, url) {
     return true
   }
 
+  if (method === 'GET' && path === '/api/publish/history') {
+    sendJson(res, 200, publishlog.list({
+      ok: url.searchParams.get('ok') || '',
+      trigger: url.searchParams.get('trigger') || '',
+      q: url.searchParams.get('q') || '',
+      limit: Number(url.searchParams.get('limit')) || 30,
+    }))
+    return true
+  }
+
   if (method === 'GET' && path === '/api/publish/snapshots') {
     try {
       sendJson(res, 200, await snapshots.listSnapshots())
@@ -230,6 +248,30 @@ export async function handleApi(req, res, path, url) {
     const id = url.searchParams.get('id') || ''
     if (!id) { sendJson(res, 400, { error: '缺少 id' }); return true }
     sendJson(res, 200, { id, history: health.history(id, { limit: Number(url.searchParams.get('limit')) || 20 }) })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/notify/list') {
+    sendJson(res, 200, {
+      ...notify.list({
+        severity: url.searchParams.get('severity') || '',
+        kind: url.searchParams.get('kind') || '',
+        q: url.searchParams.get('q') || '',
+        limit: Number(url.searchParams.get('limit')) || 100,
+        unreadOnly: url.searchParams.get('unread') === '1',
+      }),
+      webhook: notify.webhookConfig(),
+    })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/notify/badge') {
+    sendJson(res, 200, { unread: notify.unreadCount() })
+    return true
+  }
+
+  if (method === 'GET' && path === '/api/schedule/status') {
+    sendJson(res, 200, { ...schedule.status(), jobRunning: jobs.listJobs().some(j => j.title === schedule.JOB_TITLE && j.status === 'running') })
     return true
   }
 
@@ -280,6 +322,56 @@ export async function handleApi(req, res, path, url) {
 
     if (path === '/api/jobs/selfcheck') {
       const job = startSelfCheck()
+      sendJson(res, 200, { jobId: job.id })
+      return true
+    }
+
+    if (path === '/api/notify/read') {
+      const body = await readJsonBody(req)
+      const r = notify.markRead({ ids: Array.isArray(body.ids) ? body.ids : null })
+      sendJson(res, 200, r)
+      return true
+    }
+
+    if (path === '/api/notify/clear') {
+      sendJson(res, 200, notify.clear())
+      return true
+    }
+
+    if (path === '/api/notify/webhook') {
+      const body = await readJsonBody(req)
+      const cfg = notify.saveWebhookConfig({ url: body.url, minSeverity: body.minSeverity })
+      record({ action: 'notify.webhook', target: cfg.url || '(清空)', detail: `最低级别 ${cfg.minSeverity}` })
+      sendJson(res, 200, { ok: true, webhook: cfg })
+      return true
+    }
+
+    if (path === '/api/notify/test') {
+      const r = await notify.testWebhook()
+      sendJson(res, r.ok ? 200 : 400, r)
+      return true
+    }
+
+    if (path === '/api/schedule/config') {
+      const body = await readJsonBody(req)
+      const st = schedule.saveConfig({
+        enabled: body.enabled,
+        intervalMs: Number(body.intervalMs) || undefined,
+        timeout: Number(body.timeout) || undefined,
+        concurrency: Number(body.concurrency) || undefined,
+        attempts: Number(body.attempts) || undefined,
+      })
+      record({ action: 'schedule.config', target: st.enabled ? '启用' : '停用', detail: `间隔 ${st.intervalLabel}` })
+      sendJson(res, 200, { ok: true, ...st })
+      return true
+    }
+
+    if (path === '/api/schedule/run') {
+      if (jobs.listJobs().some(j => j.title === schedule.JOB_TITLE && j.status === 'running')) {
+        sendJson(res, 409, { error: '已有巡检任务在运行中，请等待完成。' })
+        return true
+      }
+      const job = schedule.startInspection({ trigger: 'manual' })
       sendJson(res, 200, { jobId: job.id })
       return true
     }
@@ -378,6 +470,12 @@ export async function handleApi(req, res, path, url) {
           action: 'rollback.apply', target: pathname,
           detail: `云端 v${r.previousVersion} → v${r.version} · ${r.sites.length} 站点；回滚前数据已存快照 ${r.snapshot?.pathname || '(无)'}`,
         })
+        notify.push({
+          kind: 'rollback.done',
+          title: `云端数据已回滚 · v${r.previousVersion} → v${r.version}`,
+          body: `${r.sites.length} 站点；回滚前数据已存快照 ${r.snapshot?.pathname || '(无)'}`,
+          meta: { from: r.previousVersion, to: r.version, count: r.sites.length, safetySnapshot: r.snapshot?.pathname || '' },
+        })
         sendJson(res, 200, {
           ok: true,
           preview,
@@ -439,6 +537,44 @@ export async function handleApi(req, res, path, url) {
         sendJson(res, 200, { ok: true, site })
       } catch (e) {
         record({ action: 'sites.remove', result: 'fail', target: String(body.id || ''), detail: e.message })
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
+    if (path === '/api/sites/batch/preview') {
+      const body = await readJsonBody(req)
+      try {
+        sendJson(res, 200, { ok: true, ...stripNext(sites.previewBatch({ ids: body.ids, op: body.op, patch: body.patch })) })
+      } catch (e) {
+        sendJson(res, 400, { ok: false, error: e.message })
+      }
+      return true
+    }
+
+    if (path === '/api/sites/batch') {
+      const body = await readJsonBody(req)
+      try {
+        const r = sites.batchOp({ ids: body.ids, op: body.op, patch: body.patch })
+        if (!r.ok) {
+          record({ action: 'sites.batch', result: 'rejected', target: `${body.op} · ${(body.ids || []).length} 个`, detail: r.errors.join('；') })
+          sendJson(res, 400, { ok: false, error: r.errors.join('；'), ...stripNext(r) })
+          return true
+        }
+        record({
+          action: 'sites.batch',
+          target: `${r.op} · ${(body.ids || []).length} 个`,
+          detail: `${r.summary}；字段 ${[...new Set(r.changes.flatMap(c => c.labels))].join('/') || '无'}`,
+        })
+        notify.push({
+          kind: 'sites.batch',
+          title: `批量操作：${r.op}`,
+          body: `${r.summary}；字段 ${[...new Set(r.changes.flatMap(c => c.labels))].join('/') || '无'}（本地已改，需同步到云端才生效）`,
+          meta: { op: r.op, ids: body.ids || [], summary: r.summary },
+        })
+        sendJson(res, 200, { ok: true, ...stripNext(r) })
+      } catch (e) {
+        record({ action: 'sites.batch', result: 'fail', target: String(body.op || ''), detail: e.message })
         sendJson(res, 400, { ok: false, error: e.message })
       }
       return true

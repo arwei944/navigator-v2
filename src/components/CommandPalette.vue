@@ -28,8 +28,7 @@ import { useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { usePreferencesStore } from '@/stores/preferences'
-import { useSidebarStore } from '@/stores/sidebar'
-import Fuse from 'fuse.js'
+import { rankSites } from '@/utils/search'
 import CommandSearchBar from '@/components/command/CommandSearchBar.vue'
 import CommandResults from '@/components/command/CommandResults.vue'
 
@@ -38,7 +37,6 @@ const router = useRouter()
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const preferencesStore = usePreferencesStore()
-const sidebarStore = useSidebarStore()
 
 const visible = ref(false)
 const query = ref('')
@@ -58,29 +56,22 @@ const actions = [
 const pageResults = computed(() =>
   pages.filter(p => p.name.toLowerCase().includes(query.value.toLowerCase()))
 )
+// 方向（域）与子分类共用「当前范围」这一轴，都能直接路由过去
+const domainResults = computed(() =>
+  categoriesStore.domains.filter(d => d.label.toLowerCase().includes(query.value.toLowerCase()))
+)
 const categoryResults = computed(() =>
   categoriesStore.categories.filter(c => c.label.toLowerCase().includes(query.value.toLowerCase()))
 )
-const siteResults = computed(() => {
-  if (!query.value) return []
-  const q = query.value.toLowerCase()
-  const exact = sitesStore.filteredSites.filter(s =>
-    s.name.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q)
-  )
-  if (exact.length > 0) return exact.slice(0, 8)
-  try {
-    const fuse = new Fuse(sitesStore.filteredSites, { keys: ['name', 'desc'], threshold: 0.4 })
-    return fuse.search(q).map(r => r.item).slice(0, 8)
-  } catch {
-    return sitesStore.filteredSites.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8)
-  }
-})
+// 命令面板是全局检索：始终搜全量站点，不受当前分类与页面搜索词影响
+const siteResults = computed(() => rankSites(sitesStore.sites, query.value, { limit: 8 }))
 const actionResults = computed(() =>
   actions.filter(a => a.name.toLowerCase().includes(query.value.toLowerCase()))
 )
 
 const groupDefs = [
   { type: 'page', label: '页面', source: pageResults },
+  { type: 'domain', label: '方向', source: domainResults },
   { type: 'category', label: '分类', source: categoryResults },
   { type: 'site', label: '站点', source: siteResults },
   { type: 'action', label: '操作', source: actionResults },
@@ -118,7 +109,8 @@ function close() {
 function execute(item) {
   if (item.action) { item.action(); close(); return }
   if (item.url) { window.open('https://' + item.url, '_blank'); close(); return }
-  if (item.id) { sitesStore.setCategory(item.id); sidebarStore.setActiveNav('categories'); close(); return }
+  // 方向 / 分类：命令面板是全局跳转，统一落到「全部」范围再套上筛选
+  if (item.id) { router.push({ name: 'Home', query: { c: item.id } }); close(); return }
   close()
 }
 

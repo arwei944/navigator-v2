@@ -66,7 +66,7 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 
 `nav schema` 是智能体自述入口 —— 每条命令都带 `mutating` 标记，据此决定是否需要先 `--dry-run`。
 
-## 命令清单（35 条）
+## 命令清单（43 条）
 
 ### 站点管理 `sites`
 
@@ -77,6 +77,7 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 | `sites add` | 新增站点：`--url --name --desc --category`（`--color --initial --icon` 可选） | ● |
 | `sites update <id>` | 改字段，仅传入的字段生效；`--sort-order` 调权重 | ● |
 | `sites remove <id>` | 删除（返回被删条目，可从 git 历史恢复） | ● |
+| `sites batch` | 批量操作：`--op category\|color\|aliasAdd\|aliasSet\|icon\|remove` + `--ids` | ● |
 | `sites categories` | 分类树 + 各分类站点数（选 `--category` 用） | |
 | `sites meta <url>` | 抓标题/描述/图标地址 + 分类建议 | |
 | `sites icon <id>` | 抓图标落盘 `public/icons` 并回写 `icon` 字段；`--favicon-url` 指定来源 | ● |
@@ -84,6 +85,19 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 
 `sites check` 分级与 `scripts/check-sites.mjs` 同口径：**429/405/403/401 视为「可忽略」**（限流/反爬，站点实际可用），
 `ERR`/404/402/410 才算「需处理」。加 `--strict` 时存在需处理站点即以退出码 5 结束，可直接做 CI / 智能体门禁。
+
+`sites batch` 与本地控制台「站点」面板的批量操作、线上 `/admin` 的批量操作共用内核 `shared/ops/site-ops.mjs#applyBatch`，
+因此**预览到什么，执行就是什么**（预演与实写走同一条路径）：
+
+```bash
+nav sites batch --op aliasAdd --ids cex1,dex1 --aliases "币安,小狐狸" --dry-run
+nav sites batch --op category --ids dt33,dt34 --category ai        # 未给 --color 时跟随新分类主题色
+nav sites batch --op icon --ids bs9 --dry-run                      # 清空图标，前端回落分类色块 + 首字母
+nav sites batch --op remove --ids bs9 --yes                        # 删除不可撤销，必须显式 --yes
+```
+
+`sites batch` 与 `sites add/update` 一样**默认落盘**，`--dry-run` 只算不写。唯一的例外是 `--op remove`：
+预演放行，实写必须再给 `--yes`，避免一句命令抹掉整批站点。
 
 ### 发布与云端 `publish`
 
@@ -104,6 +118,29 @@ nav schema                # 机器可读清单：命令 / 选项 / 退出码 / �
 `publish rollback` 前会先算「当前云端 → 目标快照」的站点增删改差异供确认；实际回滚时会把
 「回滚前的当前数据」也存一份快照，因此**回滚本身可撤销**。注意：该命令依赖线上已部署 V5 代码
 （`/api/sites` 的快照接口），线上仍是旧版本时会直接以退出码 4 提示「先发布 V5 代码」。
+
+### 运维事件与通知 `ops`
+
+| 命令 | 说明 | 写 |
+|------|------|----|
+| `ops history` | 发布历史（新 → 旧）：结果 / 触发来源 / 云端版本 / 耗时，附成功率概览 | |
+| `ops notify` | 通知中心列表：发布 / 批量操作 / 回滚 / 巡检事件，`--unread` 只看未读、`--kinds` 列类型目录 | |
+| `ops notify-read` | 标记已读，`--ids` 指定则只标这些，省略即全部已读 | ● |
+| `ops notify-clear` | 清空全部通知（不可撤销，须 `--yes`） | ● |
+| `ops webhook` | 查看通知 Webhook 配置（地址 / 最低推送级别） | |
+| `ops webhook-set` | 设置 Webhook：`--url`、`--min-severity error\|warn\|info`、`--clear` 停用 | ● |
+| `ops inspect` | 立即执行一次全站巡检：识别「新失效 / 已恢复」并落通知 | ● |
+
+这一域的数据源与本地控制台「通知中心」面板、线上 `/admin` 的发布历史与通知区**完全同源**
+（`tools/console/lib/{publishlog,notify,schedule}.mjs` + `shared/ops/*`），因此 CLI 查到的记录与面板里看到的是同一批。
+
+`ops history` 与 `data audit` 的分工：审计回答「谁在何时做了什么动作」（流水账，不删），
+发布历史回答「这一整条流水线的结果 —— 哪一步失败、耗时多久、云端推进到哪一版」（可回退分析）；
+通知则回答「哪些事还没人管」（可已读、可清空）。三者混在一起会既丢线索又刷屏。
+
+`ops inspect` 是定时巡检的手动入口：控制台没开着也能跑，因此「今天站点有没有挂」不依赖谁打开着面板。
+它只推送**状态发生翻转**的站点（新失效 / 已恢复），一直宕着的站不会每轮刷一条新通知 ——
+冷却期再由 `shared/ops/notify-core.mjs` 兜一层。
 
 ### Git 工作流 `git`
 
@@ -188,21 +225,26 @@ pnpm run mcp          # 启动 MCP 服务（stdio，供 MCP 客户端拉起）
 pnpm run mcp:test     # 端到端用例：真实 stdio 握手 + 逐条断言工具契约
 ```
 
-**工具收敛到 5 个域级工具**，而不是把 35 条命令平铺成 35 个工具 —— 工具数膨胀会显著拉低
+**工具收敛到 6 个域级工具**，而不是把 43 条命令平铺成 43 个工具 —— 工具数膨胀会显著拉低
 智能体的选择准确率：
 
 | 工具 | 覆盖 | 代表动作 |
 |------|------|----------|
 | `nav_status` | 智能体第一问 | 环境自检、本地/云端版本、分支状态、工作区概况 |
-| `nav_sites` | 站点域 | `list` / `get` / `add` / `update` / `remove` / `meta` / `icon` / `check` |
+| `nav_sites` | 站点域 | `list` / `get` / `add` / `update` / `remove` / `batch` / `meta` / `icon` / `check` |
 | `nav_publish` | 发布域 | `status` / `run` / `verify` / `sync-data` / `preflight` / `snapshots` / `rollback` |
+| `nav_ops` | 运维事件域 | `history` / `notify` / `notify-read` / `notify-clear` / `webhook` / `webhook-set` / `inspect` |
 | `nav_git` | Git 域 | `status` / `diff` / `hunks` / `log` / `suggest` / `stage` / `stage-hunks` / `commit` / `push` |
 | `nav_data` | 数据域 | `stats` / `integrity` / `diff` / `validate` / `audit` |
 
-**写操作闸门**：所有写操作（`add` / `update` / `remove` / `icon` / `stage` / `stage-hunks` /
-`commit` / `push` / `publish run` / `sync-data` / `rollback`）默认**只预演**，返回 `gate.preview = true`
+**写操作闸门**：所有写操作（`add` / `update` / `remove` / `batch` / `icon` / `stage` / `stage-hunks` /
+`commit` / `push` / `publish run` / `sync-data` / `rollback` / `ops inspect` / `notify-read` /
+`notify-clear` / `webhook-set`）默认**只预演**，返回 `gate.preview = true`
 与将要发生的变化；必须显式传 `confirm: true` 才真正执行。这挡住了智能体最常见的两类事故：
 把「看一眼会怎样」当成「已经做了」，以及在没确认的情况下真的改了生产数据。
+
+`nav_sites` 的 `batch` 动作带 `op` 枚举（`category` / `color` / `aliasAdd` / `aliasSet` / `icon` / `remove`），
+`remove` 还需 `yes: true`；`nav_ops` 的 `inspect` 预演只报「将巡检多少站」，不会真的发起 300+ 次探活。
 
 预演同样走完整校验：预演阶段被拒绝的请求（未登记分类、域名重复、缺名称）在真跑时也一样会被拒绝，
 不存在「预演放行、真跑翻车」。测试用一条不存在的 id 触发业务拒绝，验证带 `confirm` 后确实进入了

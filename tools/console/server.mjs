@@ -11,8 +11,11 @@ import { parseArgs } from 'node:util'
 import { ROOT, loadEnv } from './lib/env.mjs'
 import { handleApi, sendJson, isTrusted } from './lib/api.mjs'
 import * as jobs from './lib/jobs.mjs'
+import { startScheduler } from './lib/schedule.mjs'
 
 loadEnv()
+// 定时巡检的进程内调度：配置为启用时按间隔自动探活。控制台未开时由外部计划任务兜底。
+startScheduler()
 
 const args = parseArgs({
   args: process.argv.slice(2),

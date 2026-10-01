@@ -40,6 +40,7 @@
     <button class="tab" data-panel="data">数据</button>
     <button class="tab" data-panel="health">可用性</button>
     <button class="tab" data-panel="audit">审计</button>
+    <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
   <main class="content">
@@ -74,6 +75,7 @@
             <input class="msg-input mini" id="sites-search" placeholder="搜索名称 / 域名 / id">
             <select class="msg-input mini" id="sites-filter"></select>
             <button class="btn ghost" id="btn-sites-refresh">刷新</button>
+            <button class="btn ghost" id="btn-sites-select">批量选择</button>
             <button class="btn primary" id="btn-sites-new">新增站点</button>
           </div>
         </div>
@@ -90,6 +92,7 @@
           <label class="fld"><span>分类</span><select class="msg-input" id="f-category"></select></label>
           <label class="fld"><span>配色</span><input type="color" class="color-input" id="f-color"></label>
           <label class="fld wide"><span>描述</span><input class="msg-input" id="f-desc"></label>
+          <label class="fld wide"><span>别名 <em class="auto">（俗称 / 曾用名 / 缩写，逗号分隔）</em></span><input class="msg-input" id="f-aliases" placeholder="币安、Binance"></label>
         </div>
         <div class="icon-preview" id="icon-preview"></div>
         <div class="actions">
@@ -100,8 +103,27 @@
         </div>
       </div>
 
+      <div class="card" id="sites-batch-card" hidden>
+        <h3>批量操作 <span class="dim" id="batch-count"></span></h3>
+        <div class="publish-form">
+          <select class="msg-input mini" id="batch-op"></select>
+          <span class="batch-fields" id="batch-fields"></span>
+          <button class="btn ghost" id="btn-batch-preview">预演影响面</button>
+          <button class="btn primary" id="btn-batch-apply">执行</button>
+          <button class="btn ghost" id="btn-batch-clear">取消选择</button>
+        </div>
+        <div class="result" id="batch-result"></div>
+        <div class="batch-preview" id="batch-preview"></div>
+        <p class="hint">
+          预演与执行走同一套内核逻辑，因此「预览到什么，执行就是什么」。
+          批量删除不可撤销；改分类会跟随新分类主题色，除非另行指定配色。
+        </p>
+      </div>
+
       <div class="card">
-        <h3>站点列表 <span class="dim" id="sites-count"></span></h3>
+        <h3>站点列表 <span class="dim" id="sites-count"></span>
+          <button class="btn small ghost" id="btn-sites-selectall" hidden>全选本页</button>
+        </h3>
         <div class="site-list" id="site-list"></div>
       </div>
 
@@ -194,6 +216,28 @@
         <div class="result" id="sync-result"></div>
         <ol class="timeline" id="sync-timeline"></ol>
         <p class="hint">预检只读：不改工作区、不写云端。放行凭证绑定当前工作区指纹，工作区一变即作废（10 分钟内有效）。发布复用 <code>scripts/publish.mjs</code>（单一发布入口），控制台只做编排与可视化。</p>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3>发布历史 · 最近 30 次 <span class="dim" id="pubhist-count"></span></h3>
+          <div class="row-actions">
+            <select class="msg-input mini" id="pubhist-ok">
+              <option value="">全部结果</option>
+              <option value="ok">仅成功</option>
+              <option value="fail">仅失败</option>
+            </select>
+            <select class="msg-input mini" id="pubhist-trigger"></select>
+            <input class="msg-input mini" id="pubhist-search" placeholder="搜索提交信息 / 失败原因 / 备注">
+            <button class="btn ghost" id="btn-pubhist-refresh">刷新</button>
+          </div>
+        </div>
+        <div class="repo-info" id="pubhist-summary"></div>
+        <div class="audit-list" id="pubhist-list"></div>
+        <p class="hint">
+          每次「一键发布 / 数据同步 / 云端回滚」都会整体落盘一条记录（保留最近 50 条），
+          与线上 <code>/admin</code> 的发布历史同源同结构；失败原因、云端版本、耗时、部署地址都可回查。
+        </p>
       </div>
 
       <div class="card">
@@ -301,6 +345,66 @@
         <p class="hint">
           审计落盘于 <code>tools/console/.data/audit.jsonl</code>，超过 2MB 自动轮转（保留最近 20 份）。
           覆盖提交、推送、发布、放行 / 拒绝、回滚、站点增删改等关键动作；只记录已发生的事实，写入失败绝不阻断主流程。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-notify">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="notify-summary"></div>
+          <div class="row-actions">
+            <input class="msg-input mini" id="notify-search" placeholder="搜索标题 / 正文 / 目标">
+            <select class="msg-input mini" id="notify-kind"></select>
+            <select class="msg-input mini" id="notify-severity"></select>
+            <button class="btn ghost small" id="btn-notify-unread">只看未读</button>
+            <button class="btn ghost" id="btn-notify-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>定时巡检 · 自动发现站点失效</h3>
+        <div class="repo-info" id="notify-schedule-state"></div>
+        <div class="publish-form">
+          <label class="chk"><input type="checkbox" id="notify-enabled"> 启用定时巡检</label>
+          <select class="msg-input mini" id="notify-interval"></select>
+          <label class="chk">超时 <input class="msg-input mini num" id="notify-timeout" value="12"> 秒</label>
+          <label class="chk">并发 <input class="msg-input mini num" id="notify-concurrency" value="12"></label>
+          <button class="btn primary" id="btn-notify-save-schedule">保存配置</button>
+          <button class="btn" id="btn-notify-run">立即巡检</button>
+        </div>
+        <div class="result" id="notify-schedule-result"></div>
+        <p class="hint">
+          巡检只对「状态发生翻转」的站点发通知（新失效 / 已恢复），一直宕着的站不会每轮刷屏。
+          控制台进程内的定时器在关闭控制台后停止；需要无人值守时用系统计划任务调用 <code>nav inspect</code>。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>通知列表 <span class="dim" id="notify-count"></span>
+          <button class="btn small ghost" id="btn-notify-readall">全部已读</button>
+          <button class="btn small ghost danger" id="btn-notify-clear">清空</button>
+        </h3>
+        <div class="notify-list" id="notify-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>Webhook 推送</h3>
+        <div class="publish-form">
+          <input class="msg-input" id="notify-webhook-url" placeholder="https://…（留空则关闭推送）">
+          <select class="msg-input mini" id="notify-webhook-sev">
+            <option value="error">仅严重</option>
+            <option value="warn">注意及以上</option>
+            <option value="info">全部</option>
+          </select>
+          <button class="btn primary" id="btn-notify-save-webhook">保存</button>
+          <button class="btn ghost" id="btn-notify-test-webhook">测试投递</button>
+        </div>
+        <div class="result" id="notify-webhook-result"></div>
+        <p class="hint">
+          投递体为扁平 JSON：<code>{event, severity, title, body, target, time, text}</code>，
+          可直接对接飞书 / 钉钉机器人或自建服务。低于所选级别的通知不投递。
         </p>
       </div>
     </section>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>nav search probe</title>
+<style>
+  body { font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; margin: 0; padding: 10px; background: #0b0b0f; color: #b9f6ca; }
+  pre { white-space: pre-wrap; margin: 0; }
+  iframe { display: block; border: 0; margin: 0 0 8px; }
+</style>
+</head>
+<body>
+<pre id="out">RUNNING</pre>
+<script>
+const COLLECTOR = 'http://127.0.0.1:4599/report'
+const OVERLAY_KEY = 'nav-sites-overlay'
+const XSS_ID = 'xssprobe1'
+const XSS_NAME = '<img src=x onerror="window.__xssFired=1">XSSProbe'
+const XSS_DESC = '<svg onload="window.__xssFired=2"></svg>注入探测描述'
+const NOHIT = 'zzqqjjxxvvww'
+
+const out = document.getElementById('out')
+const lines = []
+function log(s) { lines.push(s); out.textContent = lines.join('\n') }
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+function waitFor(fn, timeout = 9000, step = 120) {
+  return new Promise(resolve => {
+    const t0 = Date.now()
+    const tick = () => {
+      let v = false
+      try { v = fn() } catch { v = false }
+      if (v) return resolve(true)
+      if (Date.now() - t0 > timeout) return resolve(false)
+      setTimeout(tick, step)
+    }
+    tick()
+  })
+}
+
+function seedOverlay() {
+  localStorage.setItem(OVERLAY_KEY, JSON.stringify({
+    __navDataVersion: 1,
+    data: {
+      adds: [{
+        id: XSS_ID, name: XSS_NAME, desc: XSS_DESC, url: 'xss-probe.example.com',
+        categoryId: 'starter', color: '#000000', initial: 'X',
+        visitCount: 0, createdAt: Date.now(), updatedAt: Date.now()
+      }],
+      edits: {}, deletes: [], order: [], visits: {}
+    }
+  }))
+}
+function clearOverlay() { localStorage.removeItem(OVERLAY_KEY) }
+
+async function mount(w, h, path) {
+  const f = document.createElement('iframe')
+  f.style.width = w + 'px'
+  f.style.height = h + 'px'
+  f.setAttribute('src', path)
+  document.body.appendChild(f)
+  await new Promise(res => {
+    let done = false
+    const fin = () => { if (!done) { done = true; res() } }
+    f.addEventListener('load', fin, { once: true })
+    setTimeout(fin, 12000)
+  })
+  await waitFor(() => f.contentDocument?.querySelector('.site-search-input'), 10000)
+  await sleep(1500)
+  return f
+}
+
+function typeInto(el, w, val) {
+  // 组件用 @focus 控制下拉可见性；离屏 iframe 里 el.focus() 不一定派发 focus 事件，
+  // 故显式补一次，保证测的是组件逻辑而非浏览器焦点策略。
+  el.dispatchEvent(new w.FocusEvent('focus'))
+  try { el.focus() } catch {}
+  el.value = val
+  el.dispatchEvent(new w.Event('input', { bubbles: true }))
+}
+
+const report = { checks: [], layout: [], errors: [] }
+function check(id, desc, cond, detail) {
+  report.checks.push({ id, desc, ok: !!cond, detail: String(detail ?? '') })
+  log((cond ? 'PASS ' : 'FAIL ') + id + ' ' + desc + (cond ? '' : ' :: ' + detail))
+}
+
+// ── A1 注入：真实 DOM 中不得解析出元素 / 不得执行脚本 ──
+async function runXSS() {
+  seedOverlay()
+  const f = await mount(1440, 900, '/')
+  const d = f.contentDocument, w = f.contentWindow
+  w.__xssFired = 0
+
+  const input = d.querySelector('.site-search-input')
+  typeInto(input, w, 'XSSProbe')
+  await sleep(900)
+
+  const sug = d.querySelector('.search-suggestions')
+  check('A1.1', '搜索建议下拉已渲染', !!sug,
+    `value="${input.value}" activeEl="${d.activeElement?.className || d.activeElement?.tagName}" sug=${!!sug}`)
+  if (sug) {
+    check('A1.2', '建议中未生成注入的 <img> 元素', sug.querySelectorAll('img[src="x"]').length === 0,
+      `imgCount=${sug.querySelectorAll('img[src="x"]').length}`)
+    check('A1.3', '注入串按纯文本原样显示', sug.textContent.includes('<img src=x onerror='),
+      sug.textContent.slice(0, 80))
+  }
+  check('A1.4', 'onerror/onload 未执行（window.__xssFired 仍为 0）', w.__xssFired === 0, 'fired=' + w.__xssFired)
+
+  // 命令面板同源渲染
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+  await sleep(500)
+  const cpInput = d.querySelector('.cp-panel input')
+  check('A1.5', '命令面板已打开', !!cpInput, `cpInput=${!!cpInput}`)
+  if (cpInput) {
+    typeInto(cpInput, w, 'XSSProbe')
+    await sleep(700)
+    const panel = d.querySelector('.cp-panel')
+    check('A1.6', '命令面板未生成注入元素', panel.querySelectorAll('img[src="x"], svg[onload]').length === 0,
+      `injected=${panel.querySelectorAll('img[src="x"], svg[onload]').length}`)
+    check('A1.7', '命令面板站点名按纯文本显示', (panel.querySelector('.cp-site-name')?.textContent || '').includes('<img src=x'),
+      panel.querySelector('.cp-site-name')?.textContent)
+    cpInput.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await sleep(400)
+  }
+  check('A1.8', '全程无脚本执行', w.__xssFired === 0, 'fired=' + w.__xssFired)
+
+  // ── A5 空态 ──
+  const pInput = d.querySelector('.site-search-input')
+  typeInto(pInput, w, NOHIT)
+  await sleep(900)
+  const empty = d.querySelector('.search-empty')
+  const link = d.querySelector('.search-empty-link')
+  check('A5.1', '无命中时展示空态引导', !!empty, `empty=${!!empty} value="${pInput.value}"`)
+  check('A5.2', '空态含「用 Google 搜索」入口', !!link, `link=${!!link}`)
+  if (link) {
+    check('A5.3', 'Google 链接正确编码关键词',
+      link.href.includes('google.com/search') && link.href.includes(encodeURIComponent(NOHIT)), link.href)
+  }
+  check('A5.4', '空态同时展示关键词', (empty?.textContent || '').includes(NOHIT), empty?.textContent)
+
+  // ── A3 一致性：页面搜索 vs 命令面板 ──
+  typeInto(pInput, w, 'binance')
+  await sleep(900)
+  const pageNames = Array.from(d.querySelectorAll('.search-suggestions .suggestion-name'))
+    .map(e => e.textContent.trim())
+
+  d.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true }))
+  await sleep(500)
+  const ci2 = d.querySelector('.cp-panel input')
+  typeInto(ci2, w, 'binance')
+  await sleep(700)
+  const cpNames = Array.from(d.querySelectorAll('.cp-panel .cp-site-name')).map(e => e.textContent.trim())
+
+  const n = Math.min(pageNames.length, cpNames.length)
+  const same = n > 0 && pageNames.slice(0, n).join('|') === cpNames.slice(0, n).join('|')
+  check('A3.1', '同一关键词两处站点结果同序', same, `page=${pageNames.slice(0,4).join(',')} / cp=${cpNames.slice(0,4).join(',')}`)
+
+  f.remove()
+  clearOverlay()
+}
+
+// ── A6 六档宽度回归 ──
+const WIDTHS = [375, 768, 1024, 1280, 1440, 1920]
+async function runLayout() {
+  for (const w of WIDTHS) {
+    let f
+    try {
+      f = await mount(w, 900, '/')
+      const d = f.contentDocument, win = f.contentWindow
+      const overflow = d.documentElement.scrollWidth - win.innerWidth
+      const inputRect = d.querySelector('.site-search-input')?.getBoundingClientRect()
+      const wrapRect = d.querySelector('.search-input-wrap')?.getBoundingClientRect()
+      const rec = {
+        width: w,
+        overflow,
+        searchVisible: !!wrapRect && wrapRect.width > 0,
+        searchFits: !!wrapRect && wrapRect.right <= win.innerWidth + 1 && wrapRect.left >= -1
+      }
+      report.layout.push(rec)
+      check('A6.' + w, `${w}px 无横向溢出`, overflow <= 1, 'overflow=' + overflow)
+      check('A6.' + w + '.search', `${w}px 搜索框可见且不溢出`, rec.searchVisible && rec.searchFits,
+        `visible=${rec.searchVisible} fits=${rec.searchFits}`)
+    } catch (e) {
+      report.errors.push('layout ' + w + ': ' + e)
+      check('A6.' + w, `${w}px 布局可测量`, false, String(e))
+    } finally { if (f) f.remove() }
+    await sleep(250)
+  }
+}
+
+async function send() {
+  const payload = JSON.stringify(report, null, 1)
+  try {
+    const r = await fetch(COLLECTOR, { method: 'POST', body: payload })
+    log('POST ' + r.status + ' bytes=' + payload.length)
+  } catch (e) { log('POST-FAIL ' + e) }
+}
+
+;(async () => {
+  try { await runXSS() } catch (e) { report.errors.push('xss-flow: ' + e); log('ERR xss-flow ' + e) }
+  try { await runLayout() } catch (e) { report.errors.push('layout-flow: ' + e); log('ERR layout-flow ' + e) }
+  await send()
+  log('DONE')
+})()
+</script>
+</body>
+</html>

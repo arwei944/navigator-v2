@@ -21,6 +21,10 @@
           <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"></textarea>
         </div>
         <div class="form-group">
+          <label>别名 <span class="hint">（俗称 / 曾用名 / 缩写，逗号分隔）</span></label>
+          <input type="text" v-model="form.aliases" placeholder="例如: 币安、Binance" class="form-input">
+        </div>
+        <div class="form-group">
           <label>分类</label>
           <select v-model="form.categoryId" required class="form-input">
             <option v-for="cat in categoriesStore.categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
@@ -60,7 +64,8 @@ const form = reactive({
   url: '',
   desc: '',
   categoryId: 'ai',
-  color: '#3b82f6'
+  color: '#3b82f6',
+  aliases: ''
 })
 
 onMounted(() => {
@@ -69,7 +74,24 @@ onMounted(() => {
   form.desc = props.site.desc
   form.categoryId = props.site.categoryId
   form.color = props.site.color
+  form.aliases = Array.isArray(props.site.aliases) ? props.site.aliases.join('、') : ''
 })
+
+/** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
+function parseAliases(raw, name, host) {
+  const nameLower = String(name || '').trim().toLowerCase()
+  const out = []
+  const seen = new Set()
+  for (const part of String(raw || '').split(/[,，、\n]/)) {
+    const a = part.trim()
+    if (!a) continue
+    const lower = a.toLowerCase()
+    if (seen.has(lower) || lower === nameLower || lower === host) continue
+    seen.add(lower)
+    out.push(a)
+  }
+  return out
+}
 
 function autoCompleteUrl() {
   if (form.url && !form.url.startsWith('http://') && !form.url.startsWith('https://')) {
@@ -78,14 +100,15 @@ function autoCompleteUrl() {
 }
 
 function submit() {
-  const domain = form.url.replace(/^https?:\/\//, '').split('/')[0]
+  const domain = form.url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase().replace(/^www\./, '')
   sitesStore.updateSite(props.site.id, {
     name: form.name,
     url: domain,
     desc: form.desc,
     categoryId: form.categoryId,
     color: form.color,
-    initial: form.name.charAt(0).toUpperCase()
+    initial: form.name.charAt(0).toUpperCase(),
+    aliases: parseAliases(form.aliases, form.name, domain)
   })
   emit('close')
 }
@@ -133,6 +156,7 @@ function submit() {
 .modal-body { padding: 20px 24px 24px; }
 .form-group { margin-bottom: 16px; }
 .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+.form-group label .hint { font-weight: 400; font-size: 12px; color: var(--text-secondary); }
 .form-input {
   width: 100%;
   padding: 9px 12px;

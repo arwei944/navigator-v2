@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navigator 前端三方对比与融合方案 — 参考站 / V5 / V6</title>
+<style>
+  :root{
+    --bg:#f4f5f8; --bg-2:#eef0f5;
+    --fg:#1d1d1f; --muted:#6e6e73; --faint:#86868b;
+    --primary:#0071e3; --primary-soft:#0071e31a; --primary-ink:#0060c0;
+    --green:#16865d; --green-soft:#16865d18;
+    --amber:#94610d; --amber-soft:#94610d18;
+    --red:#d92d20; --red-soft:#d92d2018;
+    --violet:#6d47c9; --violet-soft:#6d47c918;
+    --card:#ffffffd1; --card-solid:#fff; --card-border:#ffffffd1;
+    --border:#00000014; --hairline:#0000001a;
+    --code-bg:#00000008;
+    --shadow:inset 0 1px 1px 0 #ffffffe6, 0 4px 20px -2px #0000000a;
+    --shadow-lg:inset 0 1px 1px 0 #fff, 0 18px 44px -10px #0000001a;
+    --blur:saturate(190%) blur(22px);
+    --radius:18px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  [data-theme="dark"]{
+    --bg:#09090d; --bg-2:#0d0d12;
+    --fg:#f4f4f5; --muted:#a1a1aa; --faint:#71717a;
+    --primary:#38bdf8; --primary-soft:#38bdf824; --primary-ink:#7dd3fc;
+    --green:#34d399; --green-soft:#34d3991f;
+    --amber:#fbbf24; --amber-soft:#fbbf241f;
+    --red:#f87171; --red-soft:#f871711f;
+    --violet:#a78bfa; --violet-soft:#a78bfa1f;
+    --card:#16161cb3; --card-solid:#16161a; --card-border:#ffffff1f;
+    --border:#ffffff1a; --hairline:#ffffff24;
+    --code-bg:#ffffff0d;
+    --shadow:inset 0 1px 1px 0 #ffffff0f, 0 4px 20px -2px #00000059;
+    --shadow-lg:inset 0 1px 1px 0 #ffffff14, 0 18px 44px -10px #0000008c;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:76px}
+  body{
+    font-family:var(--font);background:var(--bg);color:var(--fg);
+    font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1100px 520px at 12% -6%, #e0eeffa6, transparent 62%),
+      radial-gradient(900px 480px at 88% 2%, #f0ebff80, transparent 60%),
+      radial-gradient(900px 620px at 50% 100%, #e6f5ff66, transparent 66%);
+    background-attachment:fixed;
+  }
+  [data-theme="dark"] body{
+    background-image:
+      radial-gradient(1100px 520px at 12% -6%, #0e325f40, transparent 62%),
+      radial-gradient(900px 480px at 88% 2%, #2d145033, transparent 60%),
+      radial-gradient(900px 620px at 50% 100%, #0a23412e, transparent 66%);
+  }
+  .wrap{width:min(1240px,100%);margin:0 auto;padding:0 24px}
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    position:sticky;top:0;z-index:50;height:52px;display:flex;align-items:center;
+    background:color-mix(in srgb,var(--bg) 72%,transparent);
+    border-bottom:1px solid var(--border);
+    backdrop-filter:saturate(190%) blur(24px);-webkit-backdrop-filter:saturate(190%) blur(24px);
+  }
+  .topbar .wrap{display:flex;align-items:center;gap:18px;width:min(1240px,100%)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:14.5px;letter-spacing:-.2px;white-space:nowrap}
+  .brand-mark{width:26px;height:26px;border-radius:7px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:12px;font-weight:700}
+  .topnav{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+  .topnav::-webkit-scrollbar{display:none}
+  .topnav a{font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:8px;white-space:nowrap;transition:.16s}
+  .topnav a:hover{color:var(--fg);background:var(--code-bg)}
+  .theme-btn{margin-left:8px;width:32px;height:32px;flex:none;display:grid;place-items:center;border:1px solid var(--card-border);border-radius:9px;background:var(--card);color:var(--muted);cursor:pointer;transition:.16s}
+  .theme-btn:hover{color:var(--primary);border-color:var(--primary)}
+  .theme-btn svg{width:16px;height:16px}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:56px 0 30px}
+  .eyebrow{font-size:11.5px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:14px}
+  h1{font-size:clamp(28px,4.4vw,44px);line-height:1.14;letter-spacing:-1.1px;font-weight:680}
+  h1 .thin{color:var(--muted);font-weight:400}
+  .lede{margin-top:16px;max-width:76ch;font-size:15.5px;color:var(--muted);line-height:1.7}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:550;color:var(--muted);background:var(--card);border:1px solid var(--card-border);border-radius:999px;padding:5px 12px;box-shadow:var(--shadow)}
+  .chip b{color:var(--fg);font-weight:600}
+
+  /* ---------- section ---------- */
+  section{padding:34px 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+  h2{font-size:clamp(19px,2.3vw,25px);letter-spacing:-.5px;font-weight:660}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--primary);font-weight:600}
+  .sec-sub{font-size:13.5px;color:var(--muted);max-width:80ch;margin-top:-8px;margin-bottom:20px}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;gap:14px}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);padding:20px 20px 18px}
+  .card.accent-ref{box-shadow:var(--shadow),0 0 0 1px #0071e333}
+  .card.accent-v5{box-shadow:var(--shadow),0 0 0 1px #6d47c933}
+  .card.accent-v6{box-shadow:var(--shadow),0 0 0 1px #16865d33}
+
+  .who{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .dot-ref{background:#0071e3}.dot-v5{background:#6d47c9}.dot-v6{background:#16865d}
+  .who h3{font-size:16px;font-weight:650;letter-spacing:-.2px}
+  .who .tag{font-size:10.5px;font-weight:600;color:var(--muted);background:var(--code-bg);border-radius:6px;padding:2px 7px;margin-left:auto;white-space:nowrap}
+  .who-sub{font-size:12.5px;color:var(--faint);font-family:var(--mono);margin-bottom:12px;word-break:break-all}
+  .kv{display:flex;gap:10px;font-size:13px;padding:6px 0;border-top:1px dashed var(--hairline)}
+  .kv:first-of-type{border-top:none}
+  .kv .k{flex:none;width:66px;color:var(--faint);font-size:12px}
+  .kv .v{color:var(--fg)}
+  .list{list-style:none;display:grid;gap:7px;margin-top:12px}
+  .list li{position:relative;padding-left:17px;font-size:13.2px;line-height:1.55;color:var(--fg)}
+  .list li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--primary)}
+  .list.pro li::before{background:var(--green)}
+  .list.con li::before{background:var(--red)}
+  .list li span{color:var(--muted)}
+
+  /* ---------- table ---------- */
+  .table-wrap{overflow-x:auto;border:1px solid var(--card-border);border-radius:var(--radius);background:var(--card);box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+  table{border-collapse:collapse;width:100%;min-width:900px;font-size:13px}
+  th,td{text-align:left;padding:12px 14px;vertical-align:top;border-bottom:1px solid var(--hairline)}
+  thead th{position:sticky;top:52px;background:var(--card-solid);font-size:11.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--faint);font-weight:650;z-index:5;border-bottom:1px solid var(--border)}
+  thead th:first-child{left:0;z-index:6}
+  tbody th{font-weight:600;font-size:12.5px;color:var(--fg);width:132px;background:var(--card-solid);position:sticky;left:0;z-index:4}
+  tbody tr:last-child th,tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td,tbody tr:hover th{background:var(--primary-soft)}
+  .col-ref{width:26%}.col-v5{width:26%}.col-v6{width:26%}
+  .w{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;margin-left:6px;vertical-align:1px;letter-spacing:.02em}
+  .w-ref{background:var(--primary-soft);color:var(--primary-ink)}
+  .w-v5{background:var(--violet-soft);color:var(--violet)}
+  .w-v6{background:var(--green-soft);color:var(--green)}
+  .w-mix{background:var(--amber-soft);color:var(--amber)}
+
+  /* ---------- dimension blocks ---------- */
+  .dim{border-top:1px solid var(--hairline);padding:26px 0}
+  .dim:first-of-type{border-top:none;padding-top:4px}
+  .dim-head{display:flex;align-items:center;gap:11px;margin-bottom:6px;flex-wrap:wrap}
+  .dim-head h3{font-size:16.5px;font-weight:650;letter-spacing:-.25px}
+  .verdict{font-size:11px;font-weight:650;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .v-ref{background:var(--primary-soft);color:var(--primary-ink)}
+  .v-v5{background:var(--violet-soft);color:var(--violet)}
+  .v-v6{background:var(--green-soft);color:var(--green)}
+  .v-mix{background:var(--amber-soft);color:var(--amber)}
+  .dim-note{font-size:13px;color:var(--muted);margin-bottom:14px;max-width:92ch}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+  .col{background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:14px 15px;box-shadow:var(--shadow)}
+  .col h4{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);font-weight:650;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .col p{font-size:13px;color:var(--fg);line-height:1.6}
+  .col p+p{margin-top:8px}
+  .col code,.inline-code{font-family:var(--mono);font-size:11.5px;background:var(--code-bg);border-radius:5px;padding:1px 5px;color:var(--fg)}
+  .col .plus,.col .minus{display:block;font-size:12.5px;margin-top:8px;padding-left:15px;position:relative;line-height:1.5}
+  .col .plus::before{content:"+";position:absolute;left:2px;color:var(--green);font-weight:700}
+  .col .minus::before{content:"−";position:absolute;left:2px;color:var(--red);font-weight:700}
+  .take{margin-top:12px;font-size:13px;background:var(--primary-soft);border-left:3px solid var(--primary);border-radius:0 10px 10px 0;padding:10px 13px}
+  .take b{color:var(--primary-ink)}
+
+  /* ---------- roadmap ---------- */
+  .pgroup{margin-bottom:26px}
+  .phead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .pbadge{font-size:11.5px;font-weight:700;letter-spacing:.04em;padding:4px 11px;border-radius:8px;color:#fff}
+  .p0{background:var(--red)}.p1{background:var(--amber)}.p2{background:var(--primary)}
+  .phead span{font-size:13px;color:var(--muted)}
+  .items{display:grid;gap:10px}
+  .item{display:grid;grid-template-columns:auto 1fr;gap:14px;background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur)}
+  .item .id{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--primary-ink);background:var(--primary-soft);border-radius:7px;padding:3px 8px;height:fit-content;white-space:nowrap}
+  .item h4{font-size:14.5px;font-weight:640;letter-spacing:-.2px;margin-bottom:5px}
+  .item p{font-size:13px;color:var(--muted);line-height:1.6}
+  .item p+p{margin-top:6px}
+  .item .why{font-size:12.5px;color:var(--fg);margin-top:8px;padding-top:8px;border-top:1px dashed var(--hairline)}
+  .item .why b{color:var(--primary-ink);font-weight:650}
+  .cost{display:inline-flex;gap:5px;align-items:center;font-size:11px;color:var(--faint);margin-top:9px}
+  .cost i{width:6px;height:6px;border-radius:50%;background:var(--border);display:inline-block}
+  .cost i.on{background:var(--primary)}
+
+  /* ---------- callouts ---------- */
+  .callout{border-radius:14px;padding:15px 17px;font-size:13.2px;line-height:1.65;border:1px solid transparent;display:flex;gap:12px}
+  .callout .ic{flex:none;width:18px;height:18px;margin-top:1px}
+  .callout.warn{background:var(--amber-soft);border-color:#94610d33;color:var(--fg)}
+  .callout.danger{background:var(--red-soft);border-color:#d92d2033;color:var(--fg)}
+  .callout.ok{background:var(--green-soft);border-color:#16865d33;color:var(--fg)}
+  .callout b{font-weight:650}
+  .callout code{font-family:var(--mono);font-size:11.5px;background:#00000012;border-radius:5px;padding:1px 5px}
+  [data-theme="dark"] .callout code{background:#ffffff14}
+
+  /* ---------- misc ---------- */
+  .src{list-style:none;display:grid;gap:8px;font-size:13px}
+  .src li{display:flex;gap:10px;color:var(--muted)}
+  .src li b{color:var(--fg);font-weight:600;flex:none;width:118px}
+  footer{padding:40px 0 70px;border-top:1px solid var(--hairline);margin-top:24px;font-size:12.5px;color:var(--faint)}
+  footer .wrap{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  @media (max-width:760px){
+    .wrap{padding:0 16px}
+    header.hero{padding:38px 0 20px}
+    thead th{position:static}
+    tbody th{position:static}
+    table{min-width:720px}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark">N</span>Navigator · 前端三方对比</div>
+    <nav class="topnav">
+      <a href="#summary">结论</a>
+      <a href="#profiles">三方画像</a>
+      <a href="#matrix">对比矩阵</a>
+      <a href="#dims">逐项详解</a>
+      <a href="#gaps">对齐残留</a>
+      <a href="#plan">融合方案</a>
+      <a href="#risk">风险</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" aria-label="切换主题">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Frontend Comparison &amp; Synthesis</div>
+  <h1>三方前端全面对比<br><span class="thin">参考站 huarun.win · V5 改造前 · V6 现状</span></h1>
+  <p class="lede">
+    这份报告回答一个问题：<b>把三条前端各自的优点合到一起，应该长什么样。</b>
+    参考站是「视觉与信息架构的标杆」，V5 是「交互密度与个性化最丰满的一版」，V6 是「已对齐参考站、但为对齐付出了一些体验代价的现状」。
+    结论不是三选一，而是<b>以 V6 为骨架</b>，回收 V5 被误删的交互能力，并补齐两处尚未对齐的规格。
+  </p>
+  <div class="meta-row">
+    <span class="chip">调研日期 <b>2026-10-01</b></span>
+    <span class="chip">参考站 <b>huarun.win</b>（Next.js）</span>
+    <span class="chip">V5 <b>git HEAD 49d305e</b></span>
+    <span class="chip">V6 <b>工作区未提交</b></span>
+    <span class="chip">取证 <b>源码 + 缓存 CSS/HTML</b></span>
+  </div>
+</header>
+
+<!-- ============ 结论 ============ -->
+<section id="summary">
+  <div class="sec-head"><span class="sec-num">01</span><h2>结论速览</h2></div>
+  <div class="grid g3">
+    <div class="card accent-ref">
+      <div class="who"><span class="dot dot-ref"></span><h3>参考站赢在「形」</h3></div>
+      <ul class="list pro">
+        <li>玻璃态 token 体系 + 内高光 + 径向光晕，双主题完整</li>
+        <li>双层导航：顶栏 5 个域 + 228px 侧栏 29 分类</li>
+        <li>卡片双形态（桌面网格 / 移动 iOS 列表行）与悬停位移主色环</li>
+        <li>文档流整页滚动 + 独立详情路由 + 页脚分类入口，利于 SEO</li>
+      </ul>
+    </div>
+    <div class="card accent-v5">
+      <div class="who"><span class="dot dot-v5"></span><h3>V5 赢在「用」</h3></div>
+      <ul class="list pro">
+        <li>悬停即看右侧详情面板 —— 零点击成本</li>
+        <li>站内搜索建议下拉：高亮 + 键盘上下选择 + 结果计数</li>
+        <li>侧栏可折叠成 60px 图标态、可拖拽调宽 160–400px</li>
+        <li>统计条 / 多预设主题换肤 / 时钟 / 天气 / Google 搜索</li>
+      </ul>
+    </div>
+    <div class="card accent-v6">
+      <div class="who"><span class="dot dot-v6"></span><h3>V6 赢在「底」</h3></div>
+      <ul class="list pro">
+        <li>形态已对齐参考站，且滚动模型、断点、卡片双形态全部到位</li>
+        <li>筛选层（分类 + 收藏 + 健康状态）与 URL query 双向同步</li>
+        <li>本地覆盖层 + 会话同步 + 探活分级 + 懒加载，数据能力远超参考站</li>
+        <li>个性化全保留：收藏 / 待办 / 历史 / 回收站 / 批量 / 拖拽 / 命令面板 / 后台</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="callout ok">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b>融合原则：V6 做骨架，V5 做血肉，参考站做标尺。</b>
+      骨架（布局 / 滚动 / 卡片 / 断点）已经是三方最优，不动；血肉（详情、搜索、侧栏操作、主题）从 V5 回收；标尺（规格数值）用参考站校验，只补未对齐项。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <div><b>对齐过程中确有「误伤」。</b>V6 为对齐参考站，把 V5 的悬停详情面板、搜索建议下拉、侧栏折叠/拖拽、分类分组折叠、多预设主题一并舍掉了 —— 这些并非参考站的缺陷，而是本地独有的增量能力。本报告的融合方案主要是把它们<b>在不动骨架的前提下装回来</b>。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 三方画像 ============ -->
+<section id="profiles">
+  <div class="sec-head"><span class="sec-num">02</span><h2>三方画像</h2></div>
+  <p class="sec-sub">三条前端的定位、技术栈与规模，先把坐标系对齐。</p>
+  <div class="grid g3">
+    <div class="card accent-ref">
+      <div class="who"><span class="dot dot-ref"></span><h3>参考站</h3><span class="tag">对标样本</span></div>
+      <div class="who-sub">https://huarun.win/</div>
+      <div class="kv"><span class="k">定位</span><span class="v">翻墙应用商店 · 纯展示型目录</span></div>
+      <div class="kv"><span class="k">技术</span><span class="v">Next.js（SSR）+ 构建期 CSS</span></div>
+      <div class="kv"><span class="k">骨架</span><span class="v">顶栏 + 228px 侧栏 + 文档流 + 页脚</span></div>
+      <div class="kv"><span class="k">导航</span><span class="v">顶栏 5 域 / 侧栏 29 分类 / 移动端底部 tab</span></div>
+      <div class="kv"><span class="k">数据</span><span class="v">静态，无个性化与状态</span></div>
+    </div>
+    <div class="card accent-v5">
+      <div class="who"><span class="dot dot-v5"></span><h3>V5</h3><span class="tag">改造前</span></div>
+      <div class="who-sub">git HEAD 49d305e · 已上线 v102</div>
+      <div class="kv"><span class="k">定位</span><span class="v">个人导航站 · 重交互重个性化</span></div>
+      <div class="kv"><span class="k">技术</span><span class="v">Vue 3 + Vite + Pinia + PWA</span></div>
+      <div class="kv"><span class="k">骨架</span><span class="v">三栏 100vh · 内部滚动（左 / 中 / 右）</span></div>
+      <div class="kv"><span class="k">导航</span><span class="v">侧栏 29 分类（分组折叠）/ 移动端顶部抽屉</span></div>
+      <div class="kv"><span class="k">数据</span><span class="v">收藏 / 待办 / 历史 / 回收站 / 云同步 / 探活</span></div>
+    </div>
+    <div class="card accent-v6">
+      <div class="who"><span class="dot dot-v6"></span><h3>V6</h3><span class="tag">现状</span></div>
+      <div class="who-sub">工作区未提交 · M1–M8 已落地</div>
+      <div class="kv"><span class="k">定位</span><span class="v">个人导航站 · 形态对齐参考站</span></div>
+      <div class="kv"><span class="k">技术</span><span class="v">Vue 3 + Vite + Pinia + PWA</span></div>
+      <div class="kv"><span class="k">骨架</span><span class="v">顶栏 + 228px 侧栏 + 文档流 + 页脚</span></div>
+      <div class="kv"><span class="k">导航</span><span class="v">顶栏域 / 侧栏 29 分类（平铺）/ 移动端底部 tab</span></div>
+      <div class="kv"><span class="k">数据</span><span class="v">V5 全部保留 + 本地覆盖层 + 健康筛选</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 对比矩阵 ============ -->
+<section id="matrix">
+  <div class="sec-head"><span class="sec-num">03</span><h2>对比矩阵</h2></div>
+  <p class="sec-sub">11 个维度逐格对照。每格标注该维度上谁更强 —— 这是后面融合方案「取谁的长」的依据。</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:120px">维度</th>
+          <th class="col-ref">参考站 huarun.win</th>
+          <th class="col-v5">V5（改造前）</th>
+          <th class="col-v6">V6（现状）</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>布局骨架</th>
+          <td>顶栏 + 228px 侧栏 + 文档流整页滚动<span class="w w-ref">强</span></td>
+          <td>三栏 100vh，滚动在内部容器，移动端体验差、SEO 差<span class="w w-v5">弱</span></td>
+          <td>已完整对齐参考站，含径向光晕背景<span class="w w-v6">采用</span></td>
+        </tr>
+        <tr>
+          <th>导航结构</th>
+          <td>双层：顶栏 5 域 + 侧栏 29 分类（平铺）<span class="w w-ref">强</span></td>
+          <td>单层侧栏，但分类<b>按域分组可折叠</b>、侧栏<b>可折叠可拖拽</b><span class="w w-v5">强</span></td>
+          <td>双层已就位，但侧栏固定 228px、29 项平铺无分组<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>卡片形态</th>
+          <td>玻璃态 18px 圆角 + 桌面网格 / 移动列表行 + 悬停位移与主色环<span class="w w-ref">强</span></td>
+          <td>实色 12px 圆角，网格 / 列表两态，视觉陈旧<span class="w w-v5">弱</span></td>
+          <td>形态已对齐；逐卡毛玻璃按性能取舍移除<span class="w w-v6">采用</span></td>
+        </tr>
+        <tr>
+          <th>详情呈现</th>
+          <td>独立路由 <code class="inline-code">/apps/&lt;slug&gt;</code>，图标 152×152<span class="w w-ref">强</span></td>
+          <td>悬停右侧面板即时展示（统计 / 时间线 / 快捷操作）<span class="w w-v5">强</span></td>
+          <td>路由页 <code class="inline-code">/site/:id</code>，含探活状态；图标 88×88<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>搜索</th>
+          <td>顶栏搜索框，无建议<span class="w w-ref">中</span></td>
+          <td>站内搜索：建议下拉 + 高亮 + 键盘上下选择 + 计数 + Ctrl+F<span class="w w-v5">强</span></td>
+          <td>顶栏 <code class="inline-code">SearchField</code>，已简化为无建议下拉<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>筛选</th>
+          <td>五维：类型 / 平台 / 内核 / 代码 / 价格<span class="w w-ref">强</span></td>
+          <td>仅分类 + 关键词<span class="w w-v5">弱</span></td>
+          <td>分类 chips + 仅收藏 + 健康状态，且进 URL query<span class="w w-v6">采用</span></td>
+        </tr>
+        <tr>
+          <th>统计与小组件</th>
+          <td>无<span class="w w-ref">—</span></td>
+          <td>统计条（站点 / 今日访问 / 收藏）+ 时钟 + 天气 + Google 搜索<span class="w w-v5">强</span></td>
+          <td>统计弱化；时钟收进页脚；天气与 Google 搜索成为死代码<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>主题能力</th>
+          <td>浅 / 深双 token，体系完整<span class="w w-ref">强</span></td>
+          <td>浅 / 深 + <b>多预设换肤</b>（ThemePicker）<span class="w w-v5">强</span></td>
+          <td>仅浅 / 深，<code class="inline-code">ThemePicker</code> 已零引用<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>移动端导航</th>
+          <td>底部 tab 栏，高 <code class="inline-code">72px</code> + 安全区<span class="w w-ref">强</span></td>
+          <td>顶部抽屉（MobileHeader + overlay）<span class="w w-v5">弱</span></td>
+          <td>底部 tab 栏已就位，但高 <code class="inline-code">60px</code>，差 12px<span class="w w-mix">需补</span></td>
+        </tr>
+        <tr>
+          <th>个性化与数据</th>
+          <td>无（纯展示）<span class="w w-ref">—</span></td>
+          <td>收藏 / 待办 / 历史 / 回收站 / 批量 / 拖拽 / 云同步 / 壁纸<span class="w w-v5">强</span></td>
+          <td>全部保留，另加本地覆盖层、会话同步、URL 状态同步<span class="w w-v6">采用</span></td>
+        </tr>
+        <tr>
+          <th>工程与性能</th>
+          <td>SSR + SEO（隐藏 h1、详情路由、分类链接页）<span class="w w-ref">强</span></td>
+          <td>虚拟化（content-visibility）、懒加载路由<span class="w w-v5">中</span></td>
+          <td>探活分级 + 30s 轮询 + 懒加载 + 虚拟化 + 数据 schema 门禁<span class="w w-v6">采用</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout warn" style="margin-top:14px">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+    <div>矩阵里出现 <b>「需补」</b> 的 5 行，是本轮融合的全部战场。其中「导航结构 / 详情呈现 / 搜索 / 统计 / 主题」五项是<b>用 V5 的长补 V6 的短</b>；只有「移动端 tab 高度」一项是<b>参考站规格尚未对齐</b>。</div>
+  </div>
+</section>
+
+<!-- ============ 逐项详解 ============ -->
+<section id="dims">
+  <div class="sec-head"><span class="sec-num">04</span><h2>逐项详解</h2></div>
+  <p class="sec-sub">对每个有分歧的维度，列出三方做法、各自得失，以及融合后的具体动作。</p>
+
+  <!-- 1 布局骨架 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.1 布局骨架与滚动模型</h3><span class="verdict v-v6">采用 V6</span></div>
+    <p class="dim-note">这是三方差异最大、也最不该再动的一层。V6 已经把它做对了。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>顶栏 52px 吸顶 + <code>228px</code> 侧栏 + 文档流整页滚动 + 页脚。滚动条属于文档，移动端可自然下拉刷新、可被搜索引擎抓取。</p>
+        <span class="plus">整页滚动，移动端与 SEO 友好</span>
+        <span class="minus">无个性化，骨架偏「展示」而非「工具」</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p><code>.app-layout</code> 三栏 <code>height:100vh; overflow:hidden</code>，滚动发生在中间容器内部；右栏 280px 可折叠到 0。</p>
+        <span class="plus">三栏同时可见，信息密度高</span>
+        <span class="minus">内部滚动导致移动端体验差、整页 SEO 差；断点 1440/1024/768 与参考站三段式不一致</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p><code>header.topbar → div.app-shell(228px + 1fr) → main.catalog → SiteFooter</code>，文档流滚动，背景叠三团径向光晕。</p>
+        <span class="plus">与参考站逐字对齐（M8 七宽度回归：桌面五档列宽/内边距/顶栏全部相等）</span>
+        <span class="minus">—</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>不动。V6 骨架保留，作为其余一切改造的承载面。</div>
+  </div>
+
+  <!-- 2 导航 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.2 导航结构：双层已就位，但丢了「分组」与「折叠」</h3><span class="verdict v-mix">V6 基底 + 回收 V5</span></div>
+    <p class="dim-note">V6 的「顶栏放域 + 侧栏放分类」与参考站一致；但 V5 侧栏的两项操作能力（分组折叠、整体折叠/拖拽）在 V6 里消失了。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>侧栏 29 分类<b>平铺</b>，每项 18×18 线性图标 + 标签 + 计数胶囊，激活项主色实底。固定 228px，不可折叠。</p>
+        <span class="plus">干净、可预期、视觉统一</span>
+        <span class="minus">29 项长列表在矮屏需滚动；无法为内容区腾空间</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>侧栏 240px，可折叠成 <code>60px</code> 纯图标态，可拖拽调宽 <code>160–400px</code>；分类按域<b>分组且可折叠</b>（<code>category-group</code> + chevron）；导航项带收藏/回收站角标。</p>
+        <span class="plus">分组折叠解决长列表；折叠/拖拽让用户掌控空间；角标给出未处理数量</span>
+        <span class="minus">默认 240px 与参考站 228px 不一致；平铺式视觉不如参考站精致</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>228px 吸顶侧栏 + lucide 图标 + 计数胶囊 + 底部卡片组，规格对齐参考站；但固定宽度、29 项平铺、无角标。</p>
+        <span class="plus">默认值对齐、视觉精致、底部卡片组给出控制台与说明入口</span>
+        <span class="minus">丧失折叠与拖拽；丧失分组；收藏/回收站数量只在顶栏更多菜单里</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>保留 228px 默认与视觉规格（参考站），把 V5 的<b>折叠（60px 图标态）+ 拖拽调宽（160–400px）</b>装回，宽度用 <code>versionedPersist</code> 持久化；分类<b>默认平铺</b>（对齐参考站），额外提供「按域分组」开关。</div>
+  </div>
+
+  <!-- 3 卡片 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.3 卡片形态与毛玻璃取舍</h3><span class="verdict v-v6">采用 V6</span></div>
+    <p class="dim-note">形态已完全对齐，唯一待议的是参考站有、V6 主动去掉的逐卡毛玻璃。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>18px 圆角 / <code>min-height:154px</code> / <code>blur(22px) saturate(190%)</code>；悬停 <code>translateY(-3px) scale(1.004)</code> + 主色描边环；≤800px 转 iOS 列表行（图标 56、动作区 74、分隔线左起 68px）。</p>
+        <span class="plus">视觉层次与质感是三方最强</span>
+        <span class="minus">301 张卡同时开毛玻璃会拖垮滚动</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>实色白底、12px 圆角、<code>--shadow-card</code> 极浅；网格/列表由 <code>viewMode</code> 切换，非断点驱动。</p>
+        <span class="plus">渲染廉价，滚动无压力</span>
+        <span class="minus">质感明显落后；两态切换靠手动而非自适应</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>完整复刻参考站桌面与移动两套形态；按性能取舍移除了逐卡 <code>backdrop-filter</code>，保留半透明底与阴影。</p>
+        <span class="plus">形态对齐且滚动 60fps；移动列表行分隔线左起 68px 已复现</span>
+        <span class="minus">玻璃质感略弱于参考站</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>形态不动。毛玻璃<b>条件启用</b>——仅在 <code>≥1181px</code> 且可见卡片数低于阈值时开启，或只对悬停卡开启，兼顾质感与帧率。</div>
+  </div>
+
+  <!-- 4 详情 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.4 详情呈现：V6 丢了「零点击查看」</h3><span class="verdict v-mix">V6 路由 + 回收 V5 悬停</span></div>
+    <p class="dim-note">这是 V5 最被低估的一处设计：鼠标划过即出详情，不需要点击、不打断浏览节奏。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>独立详情路由 <code>/apps/&lt;slug&gt;</code>，详情页图标放大到 152×152、圆角 33px。信息架构清晰、可分享、可被收录。</p>
+        <span class="plus">可分享、可索引、移动端体验好</span>
+        <span class="minus">必须离开列表，浏览节奏被打断</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>右栏 280px 常驻面板，悬停卡片即渲染：图标 + 分类标签 + 简介 + 使用统计（访问次数 / 已添加 / 上次访问）+ 时间线 + 打开/复制/收藏三个操作。</p>
+        <span class="plus">零点击、零跳转；三栏并置适合快速横向比较</span>
+        <span class="minus">占 280px 固定宽度；无独立 URL，无法分享到具体站点；移动端无法承载</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>路由页 <code>/site/:id</code>，含探活状态标签、简介、使用统计、时间线；图标 88×88 / 圆角 24。</p>
+        <span class="plus">可分享、有 URL、含健康状态（参考站没有）</span>
+        <span class="minus">回到列表才能继续看下一个；图标规格未对齐参考站的 152×152</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>路由页作为「深入」入口保留并<b>把图标对齐到 152×152 / 圆角 33</b>；同时在 <code>≥1181px</code> 增加<b>悬停预览浮层</b>（默认不占位、不改变网格），把 V5 的零点击查看以「轻量 popover」形式找回。</div>
+  </div>
+
+  <!-- 5 搜索 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.5 搜索：位置用 V6，能力补 V5</h3><span class="verdict v-mix">V6 位置 + 回收 V5 建议</span></div>
+    <p class="dim-note">V6 把搜索放进了顶栏（对），但把 V5 的建议下拉整段砍掉了（可惜）。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>顶栏一个搜索框，h34、圆角 10、宽度 <code>clamp(150px,22vw,320px)</code>，带 ⌘K 提示；无建议下拉。</p>
+        <span class="plus">位置正确、克制</span>
+        <span class="minus">只有结果过滤，没有「输入即导航」</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p><code>SiteSearchBar</code>：300ms 防抖、最多 6 条建议、关键词 <code>&lt;mark&gt;</code> 高亮、分类标签、直达链接、↑↓ 选择 + 回车打开、结果计数、Ctrl+F 聚焦。</p>
+        <span class="plus">键盘可全程操作，输入即可直达站点</span>
+        <span class="minus">占独立一行、把首屏往下推；高亮用 <code>v-html</code> 注入，有 XSS 风险（见 §06）</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>抽出通用 <code>SearchField</code> 放进顶栏，含放大镜、清除按钮、⌘K 提示、移动端 16px 防缩放；<b>但无建议下拉</b>。</p>
+        <span class="plus">位置与形态对齐参考站，组件可复用</span>
+        <span class="minus">丢了建议、高亮、键盘选择与直达能力</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>保持顶栏位置与外观，把 V5 的建议下拉移植进 <code>SearchField</code>（图标 + 名称/描述高亮 + 分类标签 + 直达 + ↑↓/回车）；<b>高亮改用 DOM 分段渲染</b>，不再走 <code>v-html</code>。</div>
+  </div>
+
+  <!-- 6 筛选 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.6 筛选层</h3><span class="verdict v-v6">采用 V6</span></div>
+    <p class="dim-note">参考站维度更多，但 V6 的「可分享筛选态」是参考站没有的。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>五维：类型 / 平台 / 内核 / 代码 / 价格，另有已选条件 chips 与空结果重置入口。</p>
+        <span class="plus">维度最丰富</span>
+        <span class="minus">筛选态不进 URL，刷新即丢</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>仅分类 + 关键词 + 排序 + 视图切换，没有独立筛选层。</p>
+        <span class="plus">简单</span>
+        <span class="minus">无法按状态/收藏快速收敛</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>分类 chips + 仅收藏 + 健康状态（在线/限流/无法访问）+ 结果计数 + 排序 + 视图切换 + 已选 chips；<b>全部写入 URL query</b>，可分享、可前进后退。</p>
+        <span class="plus">筛选态可分享、可回退；健康筛选会触发整体探活</span>
+        <span class="minus">缺参考站的「平台」维度（需先补站点数据字段）</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>采用 V6。平台维度列为 P2 —— 需先给站点数据补 <code>platforms</code> 字段，属于数据层工作，不阻塞本轮。</div>
+  </div>
+
+  <!-- 7 统计与小组件 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.7 统计条与小组件：一半被弱化，一半成了死代码</h3><span class="verdict v-mix">部分回收 + 清理</span></div>
+    <p class="dim-note">V5 的首屏信息很丰富（统计 + 时钟 + 天气 + Google 搜索），V6 为对齐参考站的「紧凑首屏」把它们压缩了 —— 但压缩得不彻底，留下了孤立组件。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>首屏只有顶栏 + 筛选 + 卡片，没有统计条与小组件。</p>
+        <span class="plus">首屏紧凑，卡片是唯一主角</span>
+        <span class="minus">没有任何全局计数</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p><code>StatsBar</code> 常驻首屏：共 N 个站点 / 今日访问 / 收藏，右侧排序下拉 + 网格/列表 + 主题 + 设置。另有 <code>DigitalClock</code>、<code>WeatherWidget</code>、<code>GoogleSearchBar</code>。</p>
+        <span class="plus">一眼掌握全局与今日活跃度</span>
+        <span class="minus">四行内容把卡片推到首屏之外</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>排序/视图进了 <code>FilterBar</code>，主题进了顶栏，设置进了顶栏「更多」菜单，时钟进了 <code>SiteFooter</code>；<b><code>GoogleSearchBar</code> 与 <code>WeatherWidget</code> 已零引用</b>，<code>ThemePicker</code> 同样零引用。</p>
+        <span class="plus">首屏回归紧凑，各归其位</span>
+        <span class="minus">「今日访问 / 收藏」统计丢失；三个组件挂在仓库里没人用</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>把「今日访问 / 收藏」补到页脚或侧栏底部（轻量、不占首屏）；<b>删除</b> <code>GoogleSearchBar</code>、<code>WeatherWidget</code> 两个零引用组件；<code>ThemePicker</code> 的去留由下一节决定。</div>
+  </div>
+
+  <!-- 8 主题 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.8 主题能力：多预设换肤被丢下</h3><span class="verdict v-mix">回收 V5</span></div>
+    <p class="dim-note">V5 有「主题换肤」面板，V6 只剩浅/深二态，而 <code>ThemePicker.vue</code> 还在仓库里。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>浅/深两套完整 token（<code>:root</code> 与 <code>.dark</code>），组件只引变量、不写字面色值。</p>
+        <span class="plus">体系干净，双主题一致性好</span>
+        <span class="minus">只有两态</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>浅/深 + <code>ThemePicker</code> 多预设（<code>preferencesStore.themePreset</code>），可整体换肤。</p>
+        <span class="plus">个性化更强</span>
+        <span class="minus">预设色值散落，未收敛到 token</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>token 层已按参考站口径重建（<code>tokens.css</code>），浅/深完整；<code>ThemePicker</code> 已无引用。</p>
+        <span class="plus">token 体系是三方最规范的</span>
+        <span class="minus">多预设能力丢失</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>把 <code>ThemePicker</code> 接回设置面板（入口已在顶栏「更多 → 设置」）；预设需<b>映射到 V6 的 token</b>（只覆盖 <code>--primary</code> / 光晕 / 强调色，不动结构 token），避免破坏与参考站的对齐。</div>
+  </div>
+
+  <!-- 9 移动端 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.9 移动端导航与一处未对齐的规格</h3><span class="verdict v-mix">V6 基底 + 补规格</span></div>
+    <p class="dim-note">V6 用底部 tab 栏替换了 V5 的顶部抽屉（对），但高度比参考站矮了 12px。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p><code>.mobile-site-tabs</code>：<code>z-index:40</code>、高 <code>calc(72px + safe-area-bottom)</code>、内边距 <code>6px max(10px, safe)</code>；<code>body</code> 预留 <code>80px + safe</code>。</p>
+        <span class="plus">触控区充裕，与安全区配合完善</span>
+        <span class="minus">—</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>顶部 <code>MobileHeader</code> 汉堡 + <code>.overlay</code> 抽屉；侧栏 <code>transform</code> 滑出。</p>
+        <span class="plus">侧栏内容可直接复用桌面版</span>
+        <span class="minus">顶部占位、抽屉打断浏览；无底部触达</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p><code>MobileTabBar</code>：4 个 tab（发现/分类/收藏/设置）、<code>z-index:40</code>、<b>高 <code>calc(60px + safe-area-bottom)</code></b>，收藏带角标。</p>
+        <span class="plus">形态正确、含角标、设置入口合理</span>
+        <span class="minus">高度 60px ≠ 参考站 72px；catalog 底部预留 96px 与参考站 body 80px 口径不同</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>tab 栏高度改为 <code>calc(72px + safe-area-inset-bottom)</code>，内边距对齐 <code>6px max(10px, safe)</code>；同步复核 catalog 底部预留，避免内容被遮挡或留白过多。</div>
+  </div>
+
+  <!-- 10 个性化 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.10 个性化与数据能力</h3><span class="verdict v-v6">采用 V6（本地独有优势）</span></div>
+    <p class="dim-note">这一层参考站完全没有，是本地项目的护城河，融合时<b>只准加强、不准削弱</b>。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>无。纯展示型目录，无用户状态。</p>
+        <span class="plus">—</span>
+        <span class="minus">无法收藏、无法记录历史、无个性化</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>收藏 / 待办 / 历史 / 回收站 / 批量选择 / 拖拽排序 / 命令面板 / 壁纸 / 云端会话同步 / 在线探活。</p>
+        <span class="plus">功能面已很完整</span>
+        <span class="minus">云端数据到达时会整体替换 <code>sites</code>，曾冲掉访客本地改动</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>V5 能力全保留，并新增<b>本地覆盖层</b>（云端基底 + 本地新增/修改/删除墓碑，<code>nav-sites-overlay</code>）、会话同步、健康状态分级与筛选。</p>
+        <span class="plus">修复了本地改动被覆盖的问题；健康分级与筛选联动</span>
+        <span class="minus">—</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>不动，且任何融合改动都必须回归验证「收藏/待办/历史/回收站/批量/拖拽/命令面板/后台」八项无一失效。</div>
+  </div>
+
+  <!-- 11 工程 -->
+  <div class="dim">
+    <div class="dim-head"><h3>4.11 工程化与性能</h3><span class="verdict v-v6">采用 V6</span></div>
+    <p class="dim-note">本地项目的工程化程度已明显高于参考站，融合时保持。</p>
+    <div class="cols">
+      <div class="col"><h4><span class="dot dot-ref"></span>参考站</h4>
+        <p>Next.js SSR；SEO 手法完整：视觉隐藏 h1、详情路由、分类快捷链接页。</p>
+        <span class="plus">可被搜索引擎完整抓取</span>
+        <span class="minus">构建产物 439KB CSS，无按需拆分</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v5"></span>V5</h4>
+        <p>组件拆分（壳 + 业务子组件）、store 版本化持久化、<code>content-visibility</code> 虚拟化、AdminView 懒加载。</p>
+        <span class="plus">单文件 ≤250 行、持久化有迁移表</span>
+        <span class="minus">无数据 schema 门禁</span>
+      </div>
+      <div class="col"><h4><span class="dot dot-v6"></span>V6</h4>
+        <p>在 V5 基础上加了发布门禁、数据 schema 校验、URL 状态双向同步、健康探测并发限流。</p>
+        <span class="plus">工程化最完善；SEO 侧已补视觉隐藏 h1</span>
+        <span class="minus">纯 CSR，SEO 仍不及参考站 SSR</span>
+      </div>
+    </div>
+    <div class="take"><b>融合动作：</b>不动。SEO 差距属架构层（CSR vs SSR），不在本轮范围，如需另行评估预渲染。</div>
+  </div>
+</section>
+
+<!-- ============ 对齐残留 ============ -->
+<section id="gaps">
+  <div class="sec-head"><span class="sec-num">05</span><h2>对齐残留项（本轮回归新发现）</h2></div>
+  <p class="sec-sub">这些是 V6 声称「已对齐参考站」、但实测仍有差距的地方。已回查参考站缓存 CSS 复核。</p>
+  <div class="items">
+    <div class="item">
+      <span class="id">GAP-1</span>
+      <div>
+        <h4>移动端底部 tab 栏高度差 12px</h4>
+        <p>参考站 <code class="inline-code">.mobile-site-tabs { height: calc(72px + env(safe-area-inset-bottom,0px)) }</code>；V6 <code class="inline-code">MobileTabBar</code> 为 <code class="inline-code">calc(60px + env(safe-area-inset-bottom))</code>。</p>
+        <div class="why"><b>判定：</b>实现与自身方案文档 §1.5 的「72px」口径不符，属实现残留。改动会联动 catalog 底部预留，需一并回归。</div>
+      </div>
+    </div>
+    <div class="item">
+      <span class="id">GAP-2</span>
+      <div>
+        <h4>底部预留口径不一致</h4>
+        <p>参考站用 <code class="inline-code">body:has(.mobile-site-tabs){padding-bottom:calc(80px + safe)}</code>；V6 在 catalog 上留 96px（M8 回归实测 <code class="inline-code">catalog.pad = 0 18 96 18</code>）。</p>
+        <div class="why"><b>判定：</b>机制与数值都不同。当前效果可接受（96 &gt; 80 有余量），但应统一为单一来源，避免 tab 高度改动后出现遮挡或过大留白。</div>
+      </div>
+    </div>
+    <div class="item">
+      <span class="id">GAP-3</span>
+      <div>
+        <h4>详情页图标规格未对齐</h4>
+        <p>参考站详情页图标 152×152、圆角 33px；V6 <code class="inline-code">SiteDetailView</code> 为 88×88、圆角 24px。</p>
+        <div class="why"><b>判定：</b>参考站把详情页当作「站点主页」来排版，图标是视觉主角；V6 偏保守。属可选对齐项。</div>
+      </div>
+    </div>
+    <div class="item">
+      <span class="id">GAP-4</span>
+      <div>
+        <h4>三处零引用组件（死代码）</h4>
+        <p><code class="inline-code">GoogleSearchBar.vue</code>、<code class="inline-code">WeatherWidget.vue</code>、<code class="inline-code">ThemePicker.vue</code> 在 V6 中 import 引用数均为 0。</p>
+        <div class="why"><b>判定：</b>前两个建议删除；<code class="inline-code">ThemePicker</code> 若按 §4.8 接回则保留，否则一并删除。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 融合方案 ============ -->
+<section id="plan">
+  <div class="sec-head"><span class="sec-num">06</span><h2>融合方案</h2></div>
+  <p class="sec-sub">按「先补规格、再回收能力、最后做增强」排序。P0 是必须做的收口，P1 是找回 V5 的核心体验，P2 是可选增强。</p>
+
+  <div class="pgroup">
+    <div class="phead"><span class="pbadge p0">P0 · 收口</span><span>低成本、高确定性，先做</span></div>
+    <div class="items">
+      <div class="item"><span class="id">F1</span><div>
+        <h4>移动端 tab 栏对齐 72px，统一底部预留口径</h4>
+        <p>高度改 <code class="inline-code">calc(72px + safe)</code>、内边距 <code class="inline-code">6px max(10px, safe)</code>；把底部预留收敛到单一来源（body 或 catalog 二选一）。</p>
+        <div class="why"><b>依据：</b>GAP-1 / GAP-2，参考站缓存 CSS 实测值。</div>
+        <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+      </div></div>
+      <div class="item"><span class="id">F2</span><div>
+        <h4>清理零引用组件</h4>
+        <p>删除 <code class="inline-code">GoogleSearchBar.vue</code>、<code class="inline-code">WeatherWidget.vue</code>；<code class="inline-code">ThemePicker</code> 按 F6 结论决定去留。</p>
+        <div class="why"><b>依据：</b>GAP-4，引用计数为 0。</div>
+        <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+      </div></div>
+      <div class="item"><span class="id">F3</span><div>
+        <h4>回归验收：八项业务能力自检</h4>
+        <p>收藏 / 待办 / 历史 / 回收站 / 批量选择 / 拖拽排序 / 命令面板 / 管理后台，逐项确认在融合改动后仍可用。</p>
+        <div class="why"><b>依据：</b>方案文档 §三 第 7 条验收标准。</div>
+        <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pgroup">
+    <div class="phead"><span class="pbadge p1">P1 · 回收 V5 能力</span><span>本轮的核心价值，找回被误删的体验</span></div>
+    <div class="items">
+      <div class="item"><span class="id">F4</span><div>
+        <h4>顶栏搜索建议下拉（移植 V5，修掉 XSS）</h4>
+        <p>在 <code class="inline-code">SearchField</code> 内加建议层：图标 + 名称/描述高亮 + 分类标签 + 直达链接 + ↑↓ 选择 + 回车打开 + 结果计数；保留 300ms 防抖。</p>
+        <div class="why"><b>关键改动：</b>V5 用 <code class="inline-code">v-html</code> 注入 <code class="inline-code">&lt;mark&gt;</code> 做高亮，必须改为 <b>DOM 分段渲染</b>（<code class="inline-code">createTextNode</code> + <code class="inline-code">&lt;mark&gt;</code> 节点拼装），否则搜索词会成为注入面。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+      </div></div>
+      <div class="item"><span class="id">F5</span><div>
+        <h4>侧栏可折叠（60px）+ 可拖拽调宽（160–400px）</h4>
+        <p>默认保持 228px（对齐参考站）；折叠态显示 18×18 图标 + <code class="inline-code">title</code> 提示；宽度用 <code class="inline-code">versionedPersist</code> 持久化；≤800px 仍整体隐藏。</p>
+        <div class="why"><b>依据：</b>§4.2，V5 <code class="inline-code">stores/sidebar.js</code> 已有完整实现可移植。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+      </div></div>
+      <div class="item"><span class="id">F6</span><div>
+        <h4>侧栏分类「按域分组」开关</h4>
+        <p>默认平铺（对齐参考站）；提供开关切到 V5 的分组折叠形态，解决 29 项长列表在矮屏下的滚动负担。</p>
+        <div class="why"><b>依据：</b>§4.2。做成偏好而非默认，既保对齐又保可用性。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险低</span>
+      </div></div>
+      <div class="item"><span class="id">F7</span><div>
+        <h4>桌面悬停详情预览（找回零点击查看）</h4>
+        <p><code class="inline-code">≥1181px</code> 下悬停卡片时以轻量浮层展示：图标、分类、简介、访问统计、打开/复制/收藏；路由页 <code class="inline-code">/site/:id</code> 保留为深入入口。</p>
+        <div class="why"><b>取舍：</b>浮层默认不占位、不改变网格与参考站形态；需确认「多一种交互」可接受。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i class="on"></i> · 风险中高</span>
+      </div></div>
+      <div class="item"><span class="id">F8</span><div>
+        <h4>详情页图标对齐 152×152 / 圆角 33</h4>
+        <p>按参考站详情页规格放大图标；移动端同步给出对应缩放。</p>
+        <div class="why"><b>依据：</b>GAP-3，方案文档 §1.6 已记录该规格。</div>
+        <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+      </div></div>
+    </div>
+  </div>
+
+  <div class="pgroup">
+    <div class="phead"><span class="pbadge p2">P2 · 增强</span><span>可选，按需推进</span></div>
+    <div class="items">
+      <div class="item"><span class="id">F9</span><div>
+        <h4>多预设主题换肤回归</h4>
+        <p>把 <code class="inline-code">ThemePicker</code> 接回设置面板；预设只覆盖 <code class="inline-code">--primary</code>、光晕与强调色，结构 token 不动。</p>
+        <div class="why"><b>依据：</b>§4.8。若不做则随 F2 一并删除该组件。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险低</span>
+      </div></div>
+      <div class="item"><span class="id">F10</span><div>
+        <h4>统计回归（今日访问 / 收藏）</h4>
+        <p>补到页脚或侧栏底部一行，不占首屏。</p>
+        <div class="why"><b>依据：</b>§4.7。V5 <code class="inline-code">StatsBar</code> 的 <code class="inline-code">todayCount</code> 逻辑可直接复用。</div>
+        <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+      </div></div>
+      <div class="item"><span class="id">F11</span><div>
+        <h4>卡片毛玻璃条件启用</h4>
+        <p>仅在 <code class="inline-code">≥1181px</code> 且可见卡片数低于阈值时开启逐卡 <code class="inline-code">backdrop-filter</code>，或只对悬停卡开启。</p>
+        <div class="why"><b>依据：</b>§4.3，需先做帧率基准再定阈值（M7 记录：301 卡全开时约 41fps）。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+      </div></div>
+      <div class="item"><span class="id">F12</span><div>
+        <h4>平台维度筛选</h4>
+        <p>为站点数据补 <code class="inline-code">platforms</code> 字段，筛选层增加「平台」维度，向参考站五维靠拢。</p>
+        <div class="why"><b>依据：</b>§4.6。属数据层工作，需同步更新 schema 门禁与抓取引擎。</div>
+        <span class="cost">工作量 <i class="on"></i><i class="on"></i><i class="on"></i> · 风险中</span>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 风险 ============ -->
+<section id="risk">
+  <div class="sec-head"><span class="sec-num">07</span><h2>风险与注意事项</h2></div>
+  <div class="grid g2">
+    <div class="callout danger">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+      <div><b>F4 搜索高亮必须重写，不能照抄。</b>V5 用 <code>v-html</code> 注入 <code>&lt;mark&gt;</code>，虽然对搜索词做了正则转义，但一旦站点名/描述中含 HTML，注入面仍然存在。移植时必须改为 DOM 分段渲染。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>F7 与参考站的信息架构存在张力。</b>参考站明确用独立路由承载详情（不用侧滑面板）。加悬停浮层等于「多一种交互」，需确认这是可接受的增强，而不是对对齐目标的偏离。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>F1 会联动三处。</b>tab 栏高度改动会同时影响 catalog 底部预留、<code>body</code> 滚动留白、以及内容末尾是否被遮挡，必须一起回归七宽度。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>F5 / F6 必须做移动端隔离。</b>折叠态与拖拽手柄只在桌面生效；≤800px 侧栏整体 <code>display:none</code>，不要因为加回折叠而破坏移动端形态。</div>
+    </div>
+    <div class="callout ok">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b>对齐基线已有自动化。</b>七宽度回归脚本（<code>_tmp-align-regress.mjs</code>）可复用；建议把 F1/F5/F7 的改动都纳入同一套回归，避免再次出现 GAP-1 这类「声称对齐但实测不符」的情况。</div>
+    </div>
+    <div class="callout ok">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b>数据层能力不要动。</b>本地覆盖层、会话同步、探活分级、URL 状态同步是三方对比中唯一的「护城河」，融合改动一律以不破坏它们为前提。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 附录 ============ -->
+<section id="appendix">
+  <div class="sec-head"><span class="sec-num">08</span><h2>取证来源</h2></div>
+  <ul class="src">
+    <li><b>参考站规格</b><span>首页 HTML（627KB）与构建产物 CSS（439KB）逐条提取；底部 tab 栏与 body 预留经缓存 CSS 复核</span></li>
+    <li><b>V5 源码</b><span><code class="inline-code">git show HEAD:&lt;path&gt;</code>（HEAD = 49d305e），含 App.vue / Sidebar.vue / RightSidebar.vue / SiteDetailPanel.vue / StatsBar.vue / SiteSearchBar.vue / MobileHeader.vue / stores/sidebar.js / main.css</span></li>
+    <li><b>V6 源码</b><span>工作区文件直接读取；零引用组件经全仓 import 引用计数确认</span></li>
+    <li><b>既有文档</b><span><code class="inline-code">docs/NAV-v6-frontend-redesign-plan.md</code>（§1 参考站规格 / §2 现状体检 / §4 改造方案 / §五之二 M1–M8 实施进度）</span></li>
+    <li><b>回归数据</b><span>M8 七宽度回归（1920/1440/1180/1080/1024/800/640/375）实测值</span></li>
+  </ul>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Navigator 前端三方对比与融合方案 · 2026-10-01</span>
+    <span>参考站 huarun.win · V5 (HEAD 49d305e) · V6 (工作区)</span>
+  </div>
+</footer>
+
+</div>
+
+<script>
+  (function(){
+    var btn = document.getElementById('themeBtn');
+    var saved = null;
+    try { saved = localStorage.getItem('nav-report-theme'); } catch(e){}
+    if (saved) document.documentElement.setAttribute('data-theme', saved);
+    btn.addEventListener('click', function(){
+      var cur = document.documentElement.getAttribute('data-theme');
+      var next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('nav-report-theme', next); } catch(e){}
+    });
+  })();
+</script>
+</body>
+</html>

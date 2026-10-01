@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>admin check</title>
+<style>body{font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;margin:0;padding:12px;background:#0b0b0f;color:#b9f6ca}pre{white-space:pre-wrap;margin:0}iframe{position:fixed;left:-20000px;top:0;border:0;width:1440px;height:900px}</style>
+</head>
+<body>
+<pre id="out">RUNNING</pre>
+<script>
+const lines = []
+const out = document.getElementById('out')
+function log(s) { lines.push(s); out.textContent = lines.join('\n') }
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+;(async () => {
+  log('RUN ' + new Date().toISOString())
+  const f = document.createElement('iframe')
+  f.setAttribute('src', '/')
+  document.body.appendChild(f)
+  await new Promise(r => { let d=false; const fin=()=>{if(!d){d=true;r()}}; f.addEventListener('load', fin, {once:true}); setTimeout(fin, 10000) })
+  await sleep(1500)
+  log('step1 url=' + f.contentWindow.location.pathname + ' hasApp=' + !!f.contentDocument.querySelector('.app-layout'))
+
+  // 捕获目标文档内的错误
+  const errs = []
+  f.contentWindow.addEventListener('error', e => errs.push('ERR ' + (e.message || e.type)))
+  f.contentWindow.addEventListener('unhandledrejection', e => errs.push('REJ ' + (e.reason && e.reason.message || e.reason)))
+
+  const p = new Promise(r => { let d=false; const fin=()=>{if(!d){d=true;r()}}; f.addEventListener('load', fin, {once:true}); setTimeout(fin, 10000) })
+  f.contentWindow.location.href = '/admin'
+  await p
+  await sleep(4000)
+
+  const d = f.contentDocument
+  log('step2 url=' + (f.contentWindow.location.pathname + f.contentWindow.location.search))
+  log('step2 title=' + d.title)
+  log('step2 hasAdminView=' + !!d.querySelector('.admin-view'))
+  log('step2 hasAppLayout=' + !!d.querySelector('.app-layout'))
+  log('step2 bodyLen=' + (d.body ? d.body.textContent.trim().length : -1))
+  log('step2 bodyHead=' + (d.body ? d.body.textContent.trim().slice(0, 160).replace(/\s+/g, ' ') : ''))
+  log('errors=' + JSON.stringify(errs))
+  log('DONE')
+
+  try {
+    await fetch('http://127.0.0.1:4600/report', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ lines }) })
+  } catch (e) { log('POST-SKIP ' + e) }
+})()
+</script>
+</body>
+</html>

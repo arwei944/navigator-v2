@@ -6,8 +6,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
 import { CATEGORY_GROUPS, categoryMeta } from '../../../shared/categories.mjs'
+import { hostOf } from '../../../shared/ops/site-ops.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
+
+export { hostOf }
 
 export function readSites() {
   return JSON.parse(readFileSync(join(ROOT, SITES_FILE), 'utf-8'))
@@ -29,16 +32,6 @@ export function categoryGroups() {
 /** 扁平分类元信息：id -> { label, color, group } */
 export function readCategoryMeta() {
   return categoryMeta()
-}
-
-/** 取主机名做去重比较：数据里存的是裸域名（无协议），需兼容补全后再解析 */
-export function hostOf(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return ''
-  try {
-    const u = new URL(raw.includes('://') ? raw : 'https://' + raw)
-    return u.hostname.replace(/^www\./, '').toLowerCase()
-  } catch { return '' }
 }
 
 export function report() {

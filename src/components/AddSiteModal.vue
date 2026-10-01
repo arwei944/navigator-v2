@@ -44,6 +44,12 @@
         </div>
 
         <div class="form-group">
+          <label>别名 <span class="hint">（俗称 / 曾用名 / 缩写，逗号分隔，可选）</span></label>
+          <input type="text" v-model="form.aliases" placeholder="例如: 币安、Binance" class="form-input">
+          <div class="field-note">补充常用叫法，搜索时也能命中这个站点</div>
+        </div>
+
+        <div class="form-group">
           <label>
             分类
             <span v-if="meta && !touched.categoryId && meta.categoryId" class="field-tag" :class="confClass('category')">自动 · {{ confText('category') }}</span>
@@ -123,6 +129,7 @@ const form = reactive({
   // 否则下拉框显示着「入门对话」、旁边却写着未识别，用户会直接提交错分类
   categoryId: '',
   color: '#3b82f6',
+  aliases: '',
 })
 
 const CONF_TEXT = { high: '高置信', medium: '中置信', low: '低置信，请复核' }
@@ -196,6 +203,7 @@ function resetForNewHost() {
   form.desc = ''
   form.categoryId = ''
   form.color = '#3b82f6'
+  form.aliases = ''
   faviconUrl.value = ''
   faviconHost.value = ''
   meta.value = null
@@ -267,6 +275,22 @@ function onUrlBlur() {
   if (form.url.trim() && hostOf(form.url) !== lastHost) fetchMeta()
 }
 
+/** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
+function parseAliases(raw, name, host) {
+  const nameLower = String(name || '').trim().toLowerCase()
+  const out = []
+  const seen = new Set()
+  for (const part of String(raw || '').split(/[,，、\n]/)) {
+    const a = part.trim()
+    if (!a) continue
+    const lower = a.toLowerCase()
+    if (seen.has(lower) || lower === nameLower || lower === host) continue
+    seen.add(lower)
+    out.push(a)
+  }
+  return out
+}
+
 function submit() {
   const rawDomain = form.url.replace(/^https?:\/\//, '').split('/')[0]
   const domain = rawDomain.toLowerCase().replace(/^www\./, '')
@@ -289,6 +313,9 @@ function submit() {
   // 本地新增的站点不会有脚本去抓图标，把远程图标地址一并存下，卡片据此直接加载。
   // 只认「图标确实抓自这个域名」的情况：换过网址又抓取失败时，宁可让卡片回落字母块，也不挂错图
   if (/^https?:\/\//i.test(faviconUrl.value) && faviconHost.value === domain) site.iconUrl = faviconUrl.value
+
+  const aliases = parseAliases(form.aliases, form.name, domain)
+  if (aliases.length) site.aliases = aliases
 
   sitesStore.addSite(site)
   emit('close')

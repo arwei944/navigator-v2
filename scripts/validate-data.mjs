@@ -49,6 +49,28 @@ sites.forEach((s, i) => {
 
   if (!s.color) warnings.push(`[${s.id}] 缺少 color`)
   if (!s.icon) warnings.push(`[${s.id}] 缺少 icon`)
+
+  // aliases 可选；一旦出现必须是「非空字符串数组、无重复、不与站名/域名重复」
+  if (s.aliases !== undefined) {
+    if (!Array.isArray(s.aliases)) {
+      errors.push(`[${s.id}] aliases 不是数组`)
+    } else {
+      const seen = new Set()
+      const name = String(s.name || '').trim().toLowerCase()
+      const host = String(s.url || '').toLowerCase().replace(/^www\./, '')
+      s.aliases.forEach((a, ai) => {
+        if (typeof a !== 'string' || !a.trim()) {
+          errors.push(`[${s.id}] aliases[${ai}] 不是非空字符串`)
+          return
+        }
+        const lower = a.trim().toLowerCase()
+        if (seen.has(lower)) errors.push(`[${s.id}] 别名重复: ${a}`)
+        seen.add(lower)
+        if (lower === name) warnings.push(`[${s.id}] 别名与站名相同: ${a}`)
+        if (lower === host) warnings.push(`[${s.id}] 别名与域名相同: ${a}`)
+      })
+    }
+  }
 })
 
 // 全局：id 前缀唯一性（categoryId 前导字母一致性）

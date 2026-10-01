@@ -13,10 +13,12 @@ import { commands as publishCommands } from '../commands/publish.mjs'
 import { commands as snapshotCommands } from '../commands/snapshots.mjs'
 import { commands as gitCommands } from '../commands/git.mjs'
 import { commands as dataCommands } from '../commands/data.mjs'
+import { commands as opsCommands } from '../commands/ops.mjs'
 
 export const GROUPS = [
-  { id: 'sites', label: '站点管理', desc: '站点数据增删改查、分类、元信息抓取、图标、批量探活', commands: siteCommands },
+  { id: 'sites', label: '站点管理', desc: '站点数据增删改查、分类、元信息抓取、图标、批量操作、批量探活', commands: siteCommands },
   { id: 'publish', label: '发布与云端', desc: '预检放行、一键发布、云端快照与回滚、数据同步、部署记录', commands: [...publishCommands, ...snapshotCommands] },
+  { id: 'ops', label: '运维事件与通知', desc: '发布历史、通知中心（未读 / Webhook）、可用性巡检', commands: opsCommands },
   { id: 'git', label: 'Git 工作流', desc: '状态、差异、历史、提交消息建议、暂存、提交、推送', commands: gitCommands },
   { id: 'data', label: '数据体检与环境', desc: '统计、完整性体检、改动对比、schema 门禁、环境自检', commands: dataCommands },
 ]

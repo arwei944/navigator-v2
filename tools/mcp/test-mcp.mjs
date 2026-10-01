@@ -2,7 +2,7 @@
  * nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。
  *
  * 覆盖三类风险：
- *   ① 工具数膨胀 —— 断言恰好 5 个工具，且每个都有描述与输入 schema
+ *   ① 工具数膨胀 —— 断言工具数收敛且每个都有描述与输入 schema
  *   ② 写操作裸奔 —— 不带 confirm 时必须只预演，且数据文件哈希不变
  *   ③ 闸门失灵   —— 带 confirm 时必须真的进入执行路径（用一个不存在的 id 触发业务拒绝来验证）
  *
@@ -48,7 +48,7 @@ async function call(client, name, args = {}) {
   return { isError: Boolean(r.isError), json, text }
 }
 
-const EXPECTED_TOOLS = ['nav_status', 'nav_sites', 'nav_publish', 'nav_git', 'nav_data']
+const EXPECTED_TOOLS = ['nav_status', 'nav_sites', 'nav_publish', 'nav_ops', 'nav_git', 'nav_data']
 
 const transport = new StdioClientTransport({ command: process.execPath, args: [SERVER], cwd: ROOT })
 const client = new Client({ name: 'nav-mcp-test', version: '1.0.0' })
@@ -70,7 +70,13 @@ try {
   const sitesTool = tools.find(t => t.name === 'nav_sites')
   const actions = sitesTool?.inputSchema?.properties?.action?.enum || []
   ok(actions.includes('add') && actions.includes('check'), 'nav_sites 的 action 枚举覆盖增删改查与探活')
+  ok(actions.includes('batch'), 'nav_sites 的 action 枚举包含批量操作 batch')
   ok(actions.length <= 12, `nav_sites 动作数受控（${actions.length} 个）`)
+
+  const opsTool = tools.find(t => t.name === 'nav_ops')
+  const opsActions = opsTool?.inputSchema?.properties?.action?.enum || []
+  ok(opsActions.includes('history') && opsActions.includes('notify'), 'nav_ops 覆盖发布历史与通知中心')
+  ok(opsActions.includes('inspect') && opsActions.includes('webhook-set'), 'nav_ops 覆盖巡检触发与 Webhook 配置')
 
   /* ---------------- ② nav_status：智能体第一问 ---------------- */
 
@@ -103,6 +109,20 @@ try {
   const remote = await call(client, 'nav_git', { action: 'remote' })
   ok(typeof remote.json.data.url === 'string', 'nav_git remote 返回 origin 地址')
 
+  const history = await call(client, 'nav_ops', { action: 'history', limit: 5 })
+  ok(typeof history.json.data.total === 'number', 'nav_ops history 返回发布记录总数')
+  ok(history.json.data.triggers && typeof history.json.data.triggers === 'object', 'nav_ops history 带回触发来源字典')
+  ok(history.json.data.summary && 'successRate' in history.json.data.summary, 'nav_ops history 带回成功率概览')
+
+  const notifyList = await call(client, 'nav_ops', { action: 'notify', limit: 5 })
+  ok(typeof notifyList.json.data.total === 'number', 'nav_ops notify 返回通知总数')
+  ok(typeof notifyList.json.data.summary?.unread === 'number', 'nav_ops notify 带回未读统计')
+  ok(notifyList.json.data.kinds && Object.keys(notifyList.json.data.kinds).length > 0, 'nav_ops notify 带回通知类型目录')
+
+  const webhook = await call(client, 'nav_ops', { action: 'webhook' })
+  eq(webhook.json.gate.write, false, 'nav_ops webhook 是只读动作，不触发写闸门')
+  ok('url' in (webhook.json.data || {}), 'nav_ops webhook 返回配置字段')
+
   /* ---------------- ④ 写操作闸门：不带 confirm 只预演 ---------------- */
 
   const before = dataHash()
@@ -126,6 +146,34 @@ try {
   eq(iconPreview.json.gate.preview, true, 'nav_sites icon 未带 confirm 时降级为预演')
   eq(iconPreview.json.data.dryRun, true, 'icon 预演标注 dryRun')
   ok(Array.isArray(iconPreview.json.data.candidates), 'icon 预演列出将要尝试的图标来源')
+
+  const batchPreview = await call(client, 'nav_sites', { action: 'batch', op: 'color', ids: 'dt33', color: '#ff0000' })
+  eq(batchPreview.json.gate.write, true, 'nav_sites batch 被识别为写操作')
+  eq(batchPreview.json.gate.preview, true, 'nav_sites batch 未带 confirm 时降级为预演')
+  eq(batchPreview.json.data.dryRun, true, 'batch 预演标注 dryRun')
+  ok(Array.isArray(batchPreview.json.data.changes), 'batch 预演列出将改动的站点')
+  ok(/改配色/.test(batchPreview.json.data.summary || ''), 'batch 预演摘要点明操作类型')
+
+  const batchRemovePreview = await call(client, 'nav_sites', { action: 'batch', op: 'remove', ids: 'dt33' })
+  eq(batchRemovePreview.json.gate.preview, true, 'batch remove 未带 confirm 时也只是预演（不会误删）')
+
+  const clearPreview = await call(client, 'nav_ops', { action: 'notify-clear' })
+  eq(clearPreview.json.gate.write, true, 'nav_ops notify-clear 被识别为写操作')
+  eq(clearPreview.json.gate.preview, true, 'nav_ops notify-clear 未带 confirm 时降级为预演')
+  ok(typeof clearPreview.json.data.wouldClear === 'number', 'notify-clear 预演报出将清空的条数')
+
+  const inspectPreview = await call(client, 'nav_ops', { action: 'inspect' })
+  eq(inspectPreview.json.gate.write, true, 'nav_ops inspect 被识别为写操作')
+  eq(inspectPreview.json.gate.preview, true, 'nav_ops inspect 未带 confirm 时不真跑探活')
+  eq(inspectPreview.json.data.dryRun, true, 'inspect 预演标注 dryRun')
+  ok(inspectPreview.json.data.total === localCount, 'inspect 预演报出将巡检的站点数')
+
+  const readPreview = await call(client, 'nav_ops', { action: 'notify-read' })
+  eq(readPreview.json.gate.preview, true, 'nav_ops notify-read 未带 confirm 时降级为预演')
+
+  const webhookSetPreview = await call(client, 'nav_ops', { action: 'webhook-set', url: 'https://example.com/hook' })
+  eq(webhookSetPreview.json.gate.preview, true, 'nav_ops webhook-set 未带 confirm 时降级为预演')
+  ok(Boolean(webhookSetPreview.json.data.after?.url), 'webhook-set 预演给出将写入的地址')
 
   const stagePreview = await call(client, 'nav_git', { action: 'stage', paths: ['api/sites-data.json'] })
   eq(stagePreview.json.gate.preview, true, 'nav_git stage 未带 confirm 时降级为预演')
@@ -173,6 +221,14 @@ try {
 
   const noName = await call(client, 'nav_sites', { action: 'add', url: 'x.example.com', desc: '缺名称' })
   eq(noName.json.ok, false, '预演也执行校验：缺名称被拒绝')
+
+  const badBatchCat = await call(client, 'nav_sites', { action: 'batch', op: 'category', ids: 'dt33', category: 'not-a-real-category' })
+  eq(badBatchCat.json.ok, false, 'batch 预演也执行校验：未登记分类被拒绝')
+  ok(/未登记的分类/.test(badBatchCat.json.error?.message || ''), 'batch 拒绝原因指向「未登记的分类」')
+
+  const badBatchOp = await call(client, 'nav_sites', { action: 'batch', op: 'nope', ids: 'dt33' })
+  ok(badBatchOp.isError === true, 'batch 未知 op 被拒绝')
+  ok(/validation error|-32602|未知批量操作/.test(badBatchOp.json?.error?.message || badBatchOp.text || ''), 'batch 未知 op 报的是可读错误')
 
   /* ---------------- ⑥ 闸门放开：带 confirm 真的进入执行路径 ---------------- */
 

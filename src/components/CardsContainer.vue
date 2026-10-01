@@ -1,21 +1,5 @@
 <template>
   <div class="cards-container">
-    <!-- 工具栏：非回收站视图 -->
-    <div v-if="sidebarStore.activeNav !== 'trash'" class="cards-toolbar">
-      <div class="toolbar-left">
-        <button class="toolbar-btn" :class="{ active: batchMode }" @click="toggleBatchMode">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          {{ batchMode ? '取消选择' : '选择' }}
-        </button>
-      </div>
-      <div class="toolbar-right">
-        <button class="drag-toggle" :class="{ active: dragEnabled }" @click="dragEnabled = !dragEnabled" :disabled="batchMode">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-          {{ dragEnabled ? '完成排序' : '排序' }}
-        </button>
-      </div>
-    </div>
-
     <!-- 回收站视图 -->
     <template v-if="sidebarStore.activeNav === 'trash'">
       <div class="trash-header">
@@ -165,7 +149,6 @@ import { ref, computed } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useFavoritesStore } from '@/stores/favorites'
-import { useHistoryStore } from '@/stores/history'
 import SiteCard from '@/components/SiteCard.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -174,26 +157,27 @@ import Draggable from 'vuedraggable'
 const sitesStore = useSitesStore()
 const sidebarStore = useSidebarStore()
 const favoritesStore = useFavoritesStore()
-const historyStore = useHistoryStore()
 
 const editingSite = ref(null)
 const deletingSite = ref(null)
-const dragEnabled = ref(false)
 const showBatchDeleteConfirm = ref(false)
 const permanentDeletingSite = ref(null)
 const showEmptyConfirm = ref(false)
 
 const selectedCount = computed(() => sitesStore.selectedIds.size)
+// 工具栏已上移到 MainToolbar，拖拽开关由 store 承载
+const dragEnabled = computed(() => sitesStore.dragEnabled)
 
 const displaySites = computed(() => {
   switch (sidebarStore.activeNav) {
     case 'favorites':
       return sitesStore.filteredSites.filter(s => favoritesStore.isFav(s.id))
     case 'recent':
-      // 最近添加：按录入时间倒序展示最新站点
+      // 最近添加：按录入时间倒序。这里**不能截断**——侧栏那版只露 24 条是「预览」，
+      // 提成独立范围后截断会让筛选条计数（301）与列表（24）对不上，且用户滚到底也
+      // 翻不到更早的站点，成了死路。排序本身已足够表达「最近」。
       return [...sitesStore.filteredSites]
         .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-        .slice(0, 24)
     default:
       return sitesStore.filteredSites
   }
@@ -215,11 +199,6 @@ const batchMode = computed({
   get: () => sitesStore.batchMode,
   set: (v) => { if (!v) sitesStore.toggleBatchMode() }
 })
-
-function toggleBatchMode() {
-  sitesStore.toggleBatchMode()
-  if (dragEnabled.value) dragEnabled.value = false
-}
 
 function openEdit(site) {
   editingSite.value = { ...site }
@@ -274,18 +253,6 @@ function onDragChange() {
 .no-results { text-align: center; padding: 60px 20px; color: var(--text-secondary); font-size: 14px; }
 .no-results svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: .3; }
 
-/* 工具栏 */
-.cards-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-shrink: 0; }
-.toolbar-left, .toolbar-right { display: flex; gap: 6px; }
-.toolbar-btn, .drag-toggle {
-  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 12px; font-weight: 500;
-  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-white); color: var(--text-secondary);
-  cursor: pointer; transition: all var(--transition);
-}
-.toolbar-btn:hover, .drag-toggle:hover { border-color: var(--accent); color: var(--accent); }
-.toolbar-btn.active, .drag-toggle.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-.toolbar-btn svg, .drag-toggle svg { width: 14px; height: 14px; }
-.toolbar-btn:disabled, .drag-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
 .dragging-ghost { opacity: 0.4; background: var(--accent-light) !important; border: 2px dashed var(--accent) !important; transform: none !important; }
 
 /* 批量操作浮动栏 */
@@ -306,6 +273,19 @@ function onDragChange() {
 .batch-btn-danger { color: #ef4444; border-color: #fca5a5; }
 .batch-btn-danger:hover { background: #fef2f2; border-color: #ef4444; }
 .batch-btn-danger svg { width: 14px; height: 14px; }
+
+/* 移动端：批量栏抬到 tab 栏之上，避免遮挡 */
+@media (max-width: 768px) {
+  .batch-bar {
+    bottom: calc(56px + env(safe-area-inset-bottom));
+    padding: 12px 16px;
+    gap: 10px;
+    justify-content: space-between;
+  }
+  .batch-count { font-size: 13px; }
+  .batch-actions { gap: 6px; }
+  .batch-btn { padding: 7px 12px; font-size: 12px; }
+}
 
 /* 回收站 */
 .trash-header {
@@ -358,6 +338,8 @@ function onDragChange() {
 }
 @media (max-width: 768px) {
   .cards-grid { grid-template-columns: 1fr !important; }
+  /* 为底部 tab 栏留出空间，避免最后一行卡片被遮挡 */
+  .cards-container { padding: 16px 16px calc(72px + env(safe-area-inset-bottom)); }
 }
 @media (min-width: 1440px) {
   .cards-grid { grid-template-columns: repeat(4, 1fr) !important; }

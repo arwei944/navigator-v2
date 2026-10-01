@@ -254,10 +254,107 @@ async function doRollback(snap) {
     out.textContent = `✅ 已回滚到 v${p.snapshotVersion}：云端 v${r.previousVersion} → v${r.version} · ${r.count} 站点 · ${r.withIcons} 带图标；回滚前数据已存快照 ${r.safetySnapshot?.pathname || '(无)'}`
     await refresh()
     await refreshSnapshots()
+    await refreshPubHistory()
   } catch (e) {
     out.className = 'result err'
     out.textContent = `回滚失败：${e.message}`
   }
+}
+
+/* ---------- 发布历史：最近 30 次流水线结果 ---------- */
+
+const histState = { items: [], summary: null, triggers: {}, built: false }
+
+function fmtSec(ms) {
+  if (ms === null || ms === undefined) return ''
+  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
+}
+
+function renderPubHistory() {
+  const box = $('#pubhist-list')
+  const sum = $('#pubhist-summary')
+  box.innerHTML = ''
+  const s = histState.summary
+  if (sum) {
+    sum.innerHTML = ''
+    if (s && s.total) {
+      sum.append(el('span', 'chip', `共 ${s.total} 次`))
+      sum.append(el('span', `chip ${s.ok ? 'ok' : ''}`, `成功 ${s.ok}`))
+      sum.append(el('span', `chip ${s.failed ? 'err' : ''}`, `失败 ${s.failed}`))
+      if (s.successRate !== null && s.successRate !== undefined) sum.append(el('span', 'chip', `成功率 ${s.successRate}%`))
+      if (s.avgDuration) sum.append(el('span', 'chip', `平均 ${fmtSec(s.avgDuration)}`))
+    }
+  }
+  const count = $('#pubhist-count')
+  if (count) count.textContent = histState.items.length ? `显示 ${histState.items.length} 条` : ''
+
+  if (!histState.items.length) {
+    box.append(el('div', 'dim', histState.summary?.total
+      ? '没有匹配的发布记录，试试放宽筛选条件。'
+      : '暂无发布记录。跑一次「一键发布」或「数据同步」后，这里会留下痕迹。'))
+    return
+  }
+
+  for (const r of histState.items) {
+    const row = el('div', `audit-row ${r.ok ? '' : 'fail'}`)
+    row.append(el('span', `audit-mark ${r.ok ? 'ok' : 'fail'}`, r.ok ? '✓' : '✗'))
+
+    const main = el('div', 'audit-main')
+    const head = el('div', 'audit-head')
+    head.append(el('span', 'audit-action', fmtClock(r.ts)))
+    head.append(el('span', 'audit-actor', histState.triggers[r.trigger] || r.trigger))
+    if (r.cloud) head.append(el('span', 'audit-key', `v${r.cloud.version} · ${r.cloud.count} 站点`))
+    if (r.duration) head.append(el('span', 'audit-key', fmtSec(r.duration)))
+    main.append(head)
+    if (!r.ok && r.reason) main.append(el('div', 'audit-detail', `失败：${r.reason}`))
+    if (r.note) main.append(el('div', 'audit-detail', r.note))
+    if (r.deployment?.url) {
+      const d = el('div', 'audit-detail')
+      const a = el('a', 'link small', r.deployment.url)
+      a.href = r.deployment.url
+      a.target = '_blank'
+      a.rel = 'noreferrer'
+      d.append(a)
+      main.append(d)
+    }
+    row.append(main)
+    row.append(el('span', 'audit-key', r.runner || ''))
+    box.append(row)
+  }
+}
+
+async function refreshPubHistory() {
+  const params = new URLSearchParams({ limit: '30' })
+  const ok = $('#pubhist-ok')?.value
+  const trigger = $('#pubhist-trigger')?.value
+  const q = $('#pubhist-search')?.value.trim()
+  if (ok) params.set('ok', ok)
+  if (trigger) params.set('trigger', trigger)
+  if (q) params.set('q', q)
+  try {
+    const r = await api(`/api/publish/history?${params.toString()}`)
+    histState.items = r.items || []
+    histState.summary = r.summary || null
+    histState.triggers = r.triggers || {}
+    if (!histState.built && $('#pubhist-trigger')) {
+      const sel = $('#pubhist-trigger')
+      sel.replaceChildren()
+      const all = el('option', '', '全部来源')
+      all.value = ''
+      sel.append(all)
+      for (const [value, label] of Object.entries(histState.triggers)) {
+        const o = el('option', '', label)
+        o.value = value
+        sel.append(o)
+      }
+      histState.built = true
+    }
+  } catch (e) {
+    histState.items = []
+    histState.summary = null
+    appendLocal(`读取发布历史失败：${e.message}`, 'stderr')
+  }
+  renderPubHistory()
 }
 
 /* ---------- 交互 ---------- */
@@ -320,6 +417,7 @@ async function doPublish(bypass = false) {
       $('#btn-sync-publish').disabled = true
       await refresh()
       await refreshSnapshots()
+      await refreshPubHistory()
     }, {
       steps: list => { state.steps = list; renderTimeline() },
       step: applyStep,
@@ -360,8 +458,18 @@ export function initSyncPanel() {
   $('#btn-sync-publish').addEventListener('click', () => doPublish(false))
   $('#btn-gate-bypass').addEventListener('click', () => doPublish(true))
   $('#btn-snap-refresh').addEventListener('click', () => refreshSnapshots())
+  $('#btn-pubhist-refresh').addEventListener('click', () => refreshPubHistory())
+  $('#pubhist-ok').addEventListener('change', () => refreshPubHistory())
+  $('#pubhist-trigger').addEventListener('change', () => refreshPubHistory())
+  let histTimer = null
+  $('#pubhist-search').addEventListener('input', () => {
+    clearTimeout(histTimer)
+    histTimer = setTimeout(refreshPubHistory, 200)
+  })
   renderTimeline()
   renderGateReport()
+  renderPubHistory()
   refresh()
   refreshSnapshots()
+  refreshPubHistory()
 }

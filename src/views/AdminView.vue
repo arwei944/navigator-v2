@@ -10,6 +10,9 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         发布到云端
       </button>
+      <button v-if="unreadBadge" class="admin-btn admin-notify-btn" @click="scrollToNotifications" :title="`${unreadBadge} 条未读通知`">
+        通知 <span class="admin-notify-count">{{ unreadBadge }}</span>
+      </button>
     </header>
 
     <div class="admin-stats">
@@ -34,12 +37,28 @@
     <div class="admin-section">
       <div class="admin-section-header">
         <h2>站点管理</h2>
-        <button class="admin-btn" @click="showAdd = true">+ 添加站点</button>
+        <div class="admin-head-actions">
+          <button class="admin-btn ghost" @click="sitesStore.toggleBatchMode()">
+            {{ sitesStore.batchMode ? '退出批量' : '批量操作' }}
+          </button>
+          <button class="admin-btn" @click="showAdd = true">+ 添加站点</button>
+        </div>
       </div>
+
+      <AdminBatchBar
+        v-if="sitesStore.batchMode"
+        :admin-key="adminKey"
+        @select-all="selectAllSites"
+        @clear="sitesStore.clearSelection()"
+      />
+
       <div class="admin-table-wrap">
         <table class="admin-table">
           <thead>
             <tr>
+              <th v-if="sitesStore.batchMode" class="admin-check-col">
+                <input type="checkbox" :checked="allSelected" @change="toggleAll">
+              </th>
               <th>名称</th>
               <th>网址</th>
               <th>分类</th>
@@ -48,7 +67,10 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="site in sitesStore.sites" :key="site.id">
+            <tr v-for="site in sitesStore.sites" :key="site.id" :class="{ 'row-selected': sitesStore.batchMode && sitesStore.selectedIds.has(site.id) }">
+              <td v-if="sitesStore.batchMode" class="admin-check-col">
+                <input type="checkbox" :checked="sitesStore.selectedIds.has(site.id)" @change="sitesStore.toggleSelect(site.id)">
+              </td>
               <td>
                 <div class="admin-site-name">
                   <span class="admin-favicon" :style="{ background: site.color }">
@@ -160,6 +182,18 @@
       </div>
     </div>
 
+    <div class="admin-section">
+      <AdminSnapshots :admin-key="adminKey" @rolled="onRolled" />
+    </div>
+
+    <div class="admin-section">
+      <AdminPublishHistory ref="historyRef" :admin-key="adminKey" />
+    </div>
+
+    <div class="admin-section" ref="notifySectionRef">
+      <AdminNotifications ref="notifyRef" :admin-key="adminKey" @badge="unreadBadge = $event" />
+    </div>
+
     <AddSiteModal v-if="showAdd" @close="showAdd = false" />
     <EditSiteModal v-if="editingSite" :site="editingSite" @close="editingSite = null" />
     <ConfirmDialog v-if="deletingSite"
@@ -181,6 +215,11 @@ import { useHealthStore } from '@/stores/health'
 import AddSiteModal from '@/components/AddSiteModal.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import AdminBatchBar from '@/components/admin/AdminBatchBar.vue'
+import AdminSnapshots from '@/components/admin/AdminSnapshots.vue'
+import AdminPublishHistory from '@/components/admin/AdminPublishHistory.vue'
+import AdminNotifications from '@/components/admin/AdminNotifications.vue'
+import { opsApi } from '@/services/opsApi'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -243,6 +282,10 @@ const showAdd = ref(false)
 const editingSite = ref(null)
 const deletingSite = ref(null)
 const publishSectionRef = ref(null)
+const historyRef = ref(null)
+const notifyRef = ref(null)
+const notifySectionRef = ref(null)
+const unreadBadge = ref(0)
 const adminKey = ref(localStorage.getItem('nav_admin_key') || '')
 const webhookUrl = ref(localStorage.getItem('nav_admin_webhook') || '')
 const publishState = ref('idle')
@@ -269,6 +312,63 @@ function scrollToPublish() {
   }
 }
 
+function scrollToNotifications() {
+  notifySectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+/* ---------------- 批量选择 ---------------- */
+
+const allSelected = computed(() =>
+  sitesStore.sites.length > 0 && sitesStore.sites.every(s => sitesStore.selectedIds.has(s.id)),
+)
+
+function selectAllSites() {
+  sitesStore.selectAll(sitesStore.sites.map(s => s.id))
+}
+
+function toggleAll() {
+  if (allSelected.value) sitesStore.clearSelection()
+  else selectAllSites()
+}
+
+/* ---------------- 运维面刷新 ---------------- */
+
+function refreshOps() {
+  historyRef.value?.reload()
+  notifyRef.value?.reload()
+}
+
+/** 回滚成功：先把响应回填为云端基底再清覆盖层，顺序反了会瞬间回退到旧数据 */
+function onRolled(data) {
+  sitesStore.applyCloudData(data)
+  sitesStore.clearLocalOverlay()
+  refreshOps()
+}
+
+/** 发布成功后落一条历史 + 一条通知（运维面失败不影响发布结果） */
+function recordPublish(data) {
+  const key = adminKey.value.trim()
+  const count = data.sites?.length || sitesStore.sites.length
+  opsApi.appendHistory(key, {
+    runner: 'cloud',
+    trigger: 'admin',
+    ok: true,
+    duration: null,
+    steps: [{ key: 'hotupdate', label: 'Blob 热更新', status: 'success', detail: `v${data.version} · ${count} 站点` }],
+    cloud: { version: data.version, count, previousVersion: data.previousVersion || 0 },
+    snapshot: data.snapshot?.pathname ? { pathname: data.snapshot.pathname, ok: data.snapshot.ok !== false } : null,
+    counts: { sites: count },
+    note: '线上后台热更新',
+  }).catch(() => {})
+  opsApi.pushNotification(key, {
+    kind: 'publish.done',
+    title: `发布完成 · v${data.version}`,
+    body: `${count} 站点已热更新到云端`,
+    meta: { version: data.version, count },
+  }).catch(() => {})
+  refreshOps()
+}
+
 async function publishToCloud() {
   if (!adminKey.value.trim()) {
     publishState.value = 'error'
@@ -278,20 +378,7 @@ async function publishToCloud() {
   publishState.value = 'loading'
   publishMsg.value = ''
   try {
-    const res = await fetch('/api/sites', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${adminKey.value.trim()}`
-      },
-      body: JSON.stringify({ sites: sitesStore.sites })
-    })
-    const data = await res.json()
-    if (!res.ok) {
-      publishState.value = 'error'
-      publishMsg.value = data.error || '发布失败'
-      return
-    }
+    const data = await opsApi.publish(adminKey.value.trim(), sitesStore.sites)
     publishState.value = 'success'
     publishMsg.value = `发布成功！云端版本 v${data.version}，其他设备将在 30 秒内自动更新。`
     // 发布的就是「云端基底 + 本地覆盖层」拼出的当前列表，覆盖层内容已进云端：
@@ -299,6 +386,7 @@ async function publishToCloud() {
     // 否则本地改动会长期遮蔽后续云端变更。
     sitesStore.applyCloudData(data)
     sitesStore.clearLocalOverlay()
+    recordPublish(data)
     if (webhookUrl.value.trim()) {
       notifyWebhook(data.version, data.sites?.length || sitesStore.sites.length)
     }
@@ -395,6 +483,22 @@ function doDelete() {
   cursor: pointer;
 }
 .admin-btn:hover { filter: brightness(1.1); }
+.admin-btn.ghost { background: var(--bg-white); color: var(--text-primary); border: 1px solid var(--border); }
+.admin-btn.ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+.admin-head-actions { display: flex; gap: 8px; }
+.admin-check-col { width: 40px; text-align: center; }
+.admin-table tr.row-selected { background: var(--accent-light); }
+.admin-notify-count {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
 .admin-table-wrap {
   background: var(--bg-white);
   border: 1px solid var(--border);

@@ -8,7 +8,11 @@ const state = {
   q: '', category: '', editing: null, faviconUrl: '', faviconHost: '',
   steps: [], cloud: null, loading: false,
   meta: null, lastHost: '', reqSeq: 0, touched: { name: false, desc: false, categoryId: false, color: false },
+  selectMode: false, selected: new Set(), batchOps: [],
 }
+
+/** 每种批量操作需要什么参数：决定批量栏里渲染哪种输入控件 */
+const OP_FIELD = { category: 'category', color: 'color', aliasAdd: 'aliases', aliasSet: 'aliases', icon: null, remove: null }
 
 function el(tag, cls, text) {
   const node = document.createElement(tag)
@@ -101,6 +105,19 @@ function renderIcon(site) {
 
 function renderRow(site) {
   const row = el('div', 'site-row')
+  if (state.selectMode) {
+    row.classList.add('selectable')
+    const check = el('input', 'row-check')
+    check.type = 'checkbox'
+    check.checked = state.selected.has(site.id)
+    check.addEventListener('change', () => {
+      if (check.checked) state.selected.add(site.id)
+      else state.selected.delete(site.id)
+      renderBatchBar()
+    })
+    row.append(check)
+    row.classList.toggle('picked', check.checked)
+  }
   row.append(renderIcon(site))
 
   const main = el('div', 'site-main')
@@ -112,6 +129,7 @@ function renderRow(site) {
   const dot = el('span', 'dist-dot')
   dot.style.background = site.categoryColor
   tags.append(dot, el('span', 'dim', site.categoryLabel))
+  if (Array.isArray(site.aliases) && site.aliases.length) tags.append(el('span', 'chip', `别名 ${site.aliases.length}`))
   if (!site.known) tags.append(el('span', 'chip err', '未登记分类'))
   if (!site.icon) tags.append(el('span', 'chip warn', '无图标'))
   row.append(tags)
@@ -160,6 +178,7 @@ function openForm(site) {
   $('#f-url').value = site ? site.url : ''
   $('#f-name').value = site ? site.name : ''
   $('#f-desc').value = site ? site.desc || '' : ''
+  $('#f-aliases').value = site && Array.isArray(site.aliases) ? site.aliases.join('、') : ''
   $('#f-category').value = site ? site.categoryId : ($('#f-category').value || '')
   $('#f-color').value = site?.color || '#3b82f6'
   $('#btn-fetch-meta').textContent = '自动补全'
@@ -278,6 +297,7 @@ async function saveSite() {
     desc: $('#f-desc').value.trim(),
     categoryId: $('#f-category').value,
     color: $('#f-color').value,
+    aliases: $('#f-aliases').value.trim(),
   }
   const btn = $('#btn-save-site')
   btn.disabled = true
@@ -336,6 +356,130 @@ async function removeSite(site) {
     setResult('#sites-sync-result', '', `本地已删除 ${site.id} · 点「同步到云端」即时生效`)
   } catch (e) {
     appendLocal(`删除失败：${e.message}`, 'stderr')
+  }
+}
+
+/* ---------- 批量操作 ---------- */
+
+function renderBatchBar() {
+  const on = state.selectMode
+  $('#sites-batch-card').hidden = !on
+  $('#btn-sites-selectall').hidden = !on
+  $('#btn-sites-select').textContent = on ? '退出批量' : '批量选择'
+  if (!on) return
+  $('#batch-count').textContent = `· 已选 ${state.selected.size} / 显示 ${state.matched}`
+  const empty = state.selected.size === 0
+  $('#btn-batch-apply').disabled = empty
+  $('#btn-batch-preview').disabled = empty
+  const allPicked = state.sites.length > 0 && state.sites.every(s => state.selected.has(s.id))
+  $('#btn-sites-selectall').textContent = allPicked ? '取消全选' : '全选本页'
+}
+
+function renderBatchOps() {
+  const sel = $('#batch-op')
+  sel.innerHTML = ''
+  for (const o of state.batchOps) {
+    const opt = document.createElement('option')
+    opt.value = o.id
+    opt.textContent = o.label
+    opt.title = o.hint || ''
+    sel.append(opt)
+  }
+  renderBatchFields()
+}
+
+/** 参数控件随操作类型切换：改分类给分类下拉，改配色给取色器，别名给文本框，其余无需参数 */
+function renderBatchFields() {
+  const box = $('#batch-fields')
+  box.innerHTML = ''
+  const kind = OP_FIELD[$('#batch-op').value]
+  if (!kind) return
+  if (kind === 'category') {
+    const sel = el('select', 'msg-input mini')
+    sel.id = 'batch-value'
+    for (const g of state.categories) {
+      const og = document.createElement('optgroup')
+      og.label = g.label
+      for (const c of g.categories) {
+        const o = document.createElement('option')
+        o.value = c.id
+        o.textContent = c.label
+        og.append(o)
+      }
+      sel.append(og)
+    }
+    box.append(sel)
+  } else if (kind === 'color') {
+    const inp = el('input', 'color-input')
+    inp.id = 'batch-value'
+    inp.type = 'color'
+    inp.value = '#3b82f6'
+    box.append(inp)
+  } else {
+    const inp = el('input', 'msg-input')
+    inp.id = 'batch-value'
+    inp.placeholder = '别名，逗号分隔'
+    box.append(inp)
+  }
+}
+
+function batchPatch() {
+  const kind = OP_FIELD[$('#batch-op').value]
+  if (!kind) return {}
+  const v = $('#batch-value')?.value ?? ''
+  if (kind === 'category') return { categoryId: v }
+  if (kind === 'color') return { color: v }
+  return { aliases: v }
+}
+
+function renderBatchPreview(r) {
+  const box = $('#batch-preview')
+  box.innerHTML = ''
+  if (!r || !r.ok) return
+  const rows = []
+  const brief = (items, fmt) => `${items.slice(0, 8).map(fmt).join('、')}${items.length > 8 ? ' …' : ''}`
+  if (r.changes.length) rows.push(`更新 ${r.changes.length}：${brief(r.changes, c => `${c.id}（${c.labels.join('/')}）`)}`)
+  if (r.removed.length) rows.push(`删除 ${r.removed.length}：${brief(r.removed, s => `${s.id} ${s.name}`)}`)
+  if (r.skipped.length) rows.push(`跳过 ${r.skipped.length}（无变化）：${brief(r.skipped, s => s.id)}`)
+  if (!rows.length) rows.push('无实际改动')
+  for (const line of rows) box.append(el('div', 'bp-line', line))
+}
+
+async function previewBatch() {
+  const ids = [...state.selected]
+  setResult('#batch-result', '', '预演中…')
+  try {
+    const r = await api('/api/sites/batch/preview', { method: 'POST', body: { ids, op: $('#batch-op').value, patch: batchPatch() } })
+    renderBatchPreview(r)
+    setResult('#batch-result', r.ok ? 'ok' : 'err', r.ok ? r.summary : r.errors.join('；'))
+  } catch (e) {
+    setResult('#batch-result', 'err', e.message)
+  }
+}
+
+async function applyBatch() {
+  const op = $('#batch-op').value
+  const def = state.batchOps.find(o => o.id === op)
+  const ids = [...state.selected]
+  // 破坏性操作必须二次确认：影响面在确认框里说清楚，避免误删
+  if (def?.destructive) {
+    const ok = confirm(`确认执行「${def.label}」？将影响 ${ids.length} 个站点。\n\n此操作不可撤销（改动仍可通过 git 恢复），执行后需点「同步到云端」才会在线上生效。`)
+    if (!ok) return
+  }
+  $('#btn-batch-apply').disabled = true
+  setResult('#batch-result', '', '执行中…')
+  try {
+    const r = await api('/api/sites/batch', { method: 'POST', body: { ids, op, patch: batchPatch() } })
+    setResult('#batch-result', 'ok', r.summary)
+    renderBatchPreview(r)
+    appendLocal(`批量操作完成：${r.summary}`, 'success')
+    state.selected.clear()
+    await refresh()
+    setResult('#sites-sync-result', '', '本地数据已变更 · 点「同步到云端」即时生效')
+  } catch (e) {
+    setResult('#batch-result', 'err', e.message)
+  } finally {
+    $('#btn-batch-apply').disabled = false
   }
 }
 
@@ -416,7 +560,9 @@ export async function refresh() {
     state.matched = list.matched
     state.cloud = st?.cloud || null
     if (list.categories.length) state.categories = list.categories
+    if (list.batchOps?.length) state.batchOps = list.batchOps
     if (!$('#f-category').options.length) renderCategoryOptions()
+    if (state.batchOps.length && !$('#batch-op').options.length) renderBatchOps()
   } catch (e) {
     appendLocal(`读取站点列表失败：${e.message}`, 'stderr')
   } finally {
@@ -424,6 +570,7 @@ export async function refresh() {
   }
   renderSummary()
   renderList()
+  renderBatchBar()
 }
 
 let searchTimer = null
@@ -436,6 +583,34 @@ export function initSitesPanel() {
   $('#btn-fetch-meta').addEventListener('click', () => doFetchMeta())
   $('#btn-save-site').addEventListener('click', () => saveSite())
   $('#btn-sites-sync').addEventListener('click', () => doSync())
+
+  $('#btn-sites-select').addEventListener('click', () => {
+    state.selectMode = !state.selectMode
+    if (!state.selectMode) state.selected.clear()
+    renderList()
+    renderBatchBar()
+  })
+  $('#btn-sites-selectall').addEventListener('click', () => {
+    const allPicked = state.sites.length > 0 && state.sites.every(s => state.selected.has(s.id))
+    for (const s of state.sites) {
+      if (allPicked) state.selected.delete(s.id)
+      else state.selected.add(s.id)
+    }
+    renderList()
+    renderBatchBar()
+  })
+  $('#batch-op').addEventListener('change', () => {
+    renderBatchFields()
+    $('#batch-preview').innerHTML = ''
+    setResult('#batch-result', '', '')
+  })
+  $('#btn-batch-preview').addEventListener('click', () => previewBatch())
+  $('#btn-batch-apply').addEventListener('click', () => applyBatch())
+  $('#btn-batch-clear').addEventListener('click', () => {
+    state.selected.clear()
+    renderList()
+    renderBatchBar()
+  })
 
   // 手改过的字段不再被自动补全覆盖：打上标记 + 摘掉描边
   const markTouched = (sel, key, evt = 'input') => {

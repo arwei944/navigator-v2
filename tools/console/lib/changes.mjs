@@ -6,14 +6,11 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
 import { getStatus, showFileAtHead } from './git.mjs'
+import { diffSites, checkIntegrity } from '../../../shared/ops/site-ops.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
-// 只比较语义字段，忽略 visitCount/updatedAt 这类本地噪音
-const SITES_FIELDS = ['name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder']
-const FIELD_LABEL = {
-  name: '名称', url: '链接', desc: '描述', categoryId: '分类',
-  icon: '图标', color: '配色', initial: '首字母', sortOrder: '排序',
-}
+
+export { diffSites, checkIntegrity }
 
 const RULES = [
   { scope: 'sites', type: 'feat', match: p => p === SITES_FILE },
@@ -29,38 +26,9 @@ function classify(path) {
   return RULES.find(r => r.match(path)) || { scope: '', type: 'chore' }
 }
 
-/** 站点数组结构化对比 */
-export function diffSites(before, after) {
-  const prev = new Map((before || []).map(s => [s.id, s]))
-  const next = new Map((after || []).map(s => [s.id, s]))
-  const added = []
-  const removed = []
-  const modified = []
-  for (const [id, s] of next) {
-    if (!prev.has(id)) { added.push({ id, name: s.name }); continue }
-    const p = prev.get(id)
-    const fields = SITES_FIELDS.filter(k => JSON.stringify(p[k]) !== JSON.stringify(s[k]))
-    if (fields.length) modified.push({ id, name: s.name, fields, labels: fields.map(k => FIELD_LABEL[k] || k) })
-  }
-  for (const [id, s] of prev) if (!next.has(id)) removed.push({ id, name: s.name })
-  return { added, removed, modified, total: next.size }
-}
 
-/** 数据完整性：图标缺失 / sortOrder 重复 / 分类数 */
-export function checkIntegrity(sites) {
-  const list = Array.isArray(sites) ? sites : []
-  const counter = new Map()
-  for (const s of list) {
-    const k = String(s.sortOrder)
-    counter.set(k, (counter.get(k) || 0) + 1)
-  }
-  return {
-    total: list.length,
-    missingIcon: list.filter(s => !s.icon).map(s => s.id),
-    dupSortOrder: [...counter.entries()].filter(([, n]) => n > 1).map(([k]) => Number(k)).sort((a, b) => a - b),
-    categories: new Set(list.map(s => s.categoryId)).size,
-  }
-}
+
+
 
 function nameList(items) {
   const names = items.slice(0, 3).map(i => i.name || i.id)

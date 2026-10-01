@@ -178,6 +178,77 @@ const iconCmd = {
   },
 }
 
+const batchCmd = {
+  path: 'sites batch',
+  summary: '批量操作多个站点：改分类 / 改配色 / 追加别名 / 替换别名 / 清空图标 / 删除（--dry-run 只预演影响面）',
+  usage: 'nav sites batch --op <category|color|aliasAdd|aliasSet|icon|remove> --ids <id,id,...> [--category <分类ID>] [--color #rrggbb] [--aliases "别名1,别名2"] [--yes]',
+  mutating: true,
+  flags: {
+    op: { desc: `操作类型：${sites.BATCH_OP_LIST.map(o => o.id).join(' / ')}` },
+    ids: { desc: '目标站点 ID，逗号分隔（用 nav sites list 查询）' },
+    category: { desc: 'op=category 的目标分类 ID；op=color 时可省略' },
+    color: { desc: 'op=color 的主题色；op=category 一并给出则用该色，否则跟随新分类色' },
+    aliases: { desc: 'op=aliasAdd / aliasSet 的别名，逗号分隔（aliasAdd 不覆盖既有别名）' },
+    yes: { type: 'boolean', desc: 'op=remove 是不可逆操作，须显式加 --yes 才执行' },
+  },
+  async run(argv, ctx) {
+    const { values } = parseCommandArgs(argv, buildOptions(batchCmd.flags), { usage: batchCmd.usage })
+    const opList = sites.BATCH_OP_LIST.map(o => o.id).join(' / ')
+    const op = String(values.op || '').trim()
+    if (!op) throw new CliError('缺少 --op', { code: 'USAGE', exitCode: EXIT.USAGE, hint: `可用：${opList}；用法：${batchCmd.usage}` })
+    const def = sites.BATCH_OPS[op]
+    if (!def) throw new CliError(`未知批量操作：${op}`, { code: 'USAGE', exitCode: EXIT.USAGE, hint: `可用：${opList}` })
+
+    const ids = String(values.ids || '').split(',').map(s => s.trim()).filter(Boolean)
+    if (!ids.length) throw new CliError('缺少 --ids', { code: 'USAGE', exitCode: EXIT.USAGE, hint: `用 nav sites list 查询站点 ID；用法：${batchCmd.usage}` })
+
+    const patch = {}
+    if (values.category !== undefined) patch.categoryId = values.category
+    if (values.color !== undefined) patch.color = values.color
+    if (values.aliases !== undefined) patch.aliases = values.aliases
+
+    // 删除不可撤销：预演放行，实写必须显式 --yes，避免一句命令抹掉整批站点
+    if (def.destructive && !ctx.dryRun && !values.yes) {
+      throw new CliError(`${def.label}不可撤销，需加 --yes 确认`, {
+        code: 'REJECTED', exitCode: EXIT.REJECTED,
+        hint: '先 --dry-run 查看影响面，确认无误后再加 --yes 执行',
+      })
+    }
+
+    const r = sites.batchOp({ ids, op, patch, dryRun: ctx.dryRun })
+    if (!r.ok) {
+      throw new CliError(r.errors.join('；'), {
+        code: 'REJECTED', exitCode: EXIT.REJECTED,
+        hint: '核对 --ids / --op / --category（分类用 nav sites categories 查询）',
+      })
+    }
+
+    const data = {
+      dryRun: Boolean(ctx.dryRun),
+      applied: !ctx.dryRun,
+      op: r.op,
+      opLabel: def.label,
+      summary: r.summary,
+      requested: ids.length,
+      affected: r.affected.length,
+      changes: r.changes,
+      removed: r.removed,
+      skipped: r.skipped,
+      totalAfter: r.next.length,
+    }
+    return {
+      data,
+      render: d => [
+        `${d.opLabel}（${d.dryRun ? '预演，未生效' : '已落盘'}）：${d.summary}`,
+        `目标 ${d.requested} 个 · 更新 ${d.changes.length} · 删除 ${d.removed.length} · 跳过 ${d.skipped.length} · 操作后共 ${d.totalAfter} 个`,
+        d.changes.length ? '\n' + table(['ID', '名称', '改动字段'], d.changes.map(c => [c.id, c.name, c.labels.join('/')])) : '',
+        d.removed.length ? '\n删除：' + d.removed.map(r => `${r.id} ${r.name}`).join('、') : '',
+        d.skipped.length ? '\n跳过（无变化）：' + d.skipped.map(s => s.id).join('、') : '',
+      ].filter(Boolean).join('\n'),
+    }
+  },
+}
+
 const checkCmd = {
   path: 'sites check',
   summary: '批量探活：区分「正常 / 可忽略（限流反爬）/ 需处理」，--strict 时存在需处理站点则退出码 5',
@@ -239,4 +310,4 @@ const checkCmd = {
   },
 }
 
-export const commands = [listCmd, getCmd, addCmd, updateCmd, removeCmd, categoriesCmd, metaCmd, iconCmd, checkCmd]
+export const commands = [listCmd, getCmd, addCmd, updateCmd, removeCmd, batchCmd, categoriesCmd, metaCmd, iconCmd, checkCmd]

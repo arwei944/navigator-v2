@@ -16,6 +16,11 @@ import { ROOT, getAdminKey } from './env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
 import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
 import { diffSites } from './changes.mjs'
+import {
+  EDITABLE_FIELDS, BATCH_OPS, BATCH_OP_LIST, applyBatch, batchSummary,
+  normalizeUrl, toTarget, normalizeAliases, nextId, nextSortOrder,
+  buildSitesCommitMessage, describeDiff, matchSite,
+} from '../../../shared/ops/site-ops.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import { SITE_URL, fetchCloud } from './sync.mjs'
@@ -27,7 +32,7 @@ const ICON_DIR = 'public/icons'
 const PAYLOAD_FILE = 'tmp-console-payload.json'
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
-const EDITABLE = ['name', 'url', 'desc', 'categoryId', 'color', 'initial', 'icon', 'sortOrder']
+export { normalizeUrl, toTarget, normalizeAliases, BATCH_OPS, BATCH_OP_LIST, batchSummary }
 
 /* ---------------- 读写 ---------------- */
 
@@ -44,70 +49,12 @@ function saveSites(list) {
   renameSync(tmp, sitesPath())
 }
 
-/* ---------------- id / url 规范化 ---------------- */
-
-/** 只保留域名：去协议、去查询串与尾斜杠（与 AddSiteModal 的落库口径一致） */
-export function normalizeUrl(input) {
-  let raw = String(input || '').trim()
-  if (!raw) throw new Error('请填写站点地址')
-  if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw
-  let u
-  try { u = new URL(raw) } catch { throw new Error(`站点地址无法解析：${input}`) }
-  if (!['http:', 'https:'].includes(u.protocol)) throw new Error('仅支持 http/https 地址')
-  return u.hostname
-}
-
-/**
- * 抓取目标：保留用户填写的路径与协议，与线上 api/metadata.js 口径一致。
- * 落库仍只存域名（normalizeUrl），但抓取要带路径 —— SPA 子页与带路径的站点
- * 只有访问原地址才拿得到真实标题，一律抓根域名会退化成按域名猜。
- */
-export function toTarget(input) {
-  const raw = String(input || '').trim()
-  if (!raw) throw new Error('请填写站点地址')
-  return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw
-}
-
-function letterPrefix(categoryId, sites) {
-  const counts = new Map()
-  for (const s of sites) {
-    if (s.categoryId !== categoryId) continue
-    const m = String(s.id || '').match(/^[a-z]+/)
-    if (m) counts.set(m[0], (counts.get(m[0]) || 0) + 1)
-  }
-  if (counts.size) {
-    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0][0]
-  }
-  // 新分类：用分类名首字母，若已被别的分类占用则追加 x 直到唯一
-  const taken = new Set()
-  for (const s of sites) {
-    if (s.categoryId === categoryId) continue
-    const m = String(s.id || '').match(/^[a-z]+/)
-    if (m) taken.add(m[0])
-  }
-  let p = String(categoryId).toLowerCase().replace(/[^a-z]/g, '').slice(0, 4) || 'x'
-  while (taken.has(p)) p += 'x'
-  return p
-}
-
-function nextId(categoryId, sites) {
-  const prefix = letterPrefix(categoryId, sites)
-  const re = new RegExp('^' + prefix + '(\\d+)$')
-  let max = 0
-  for (const s of sites) {
-    const m = String(s.id || '').match(re)
-    if (m) max = Math.max(max, Number(m[1]))
-  }
-  return prefix + (max + 1)
-}
-
-function nextSortOrder(sites) {
-  return sites.reduce((n, s) => Math.max(n, Number(s.sortOrder) || 0), 0) + 1
-}
+/* URL 归一 / id / sortOrder 一律取自 shared/ops/site-ops.mjs —— 四端共用同一口径，
+   此处不再重复实现（否则会出现「控制台允许、线上拒绝」的漂移）。 */
 
 /* ---------------- 列表 / 分类 ---------------- */
 
-const LIST_FIELDS = ['id', 'name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'createdAt']
+const LIST_FIELDS = ['id', 'name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'createdAt', 'aliases']
 
 export function list({ q = '', category = '' } = {}) {
   const all = loadSites()
@@ -116,14 +63,7 @@ export function list({ q = '', category = '' } = {}) {
 
   let items = all
   if (category) items = items.filter(s => s.categoryId === category)
-  if (kw) {
-    items = items.filter(s =>
-      String(s.name).toLowerCase().includes(kw) ||
-      String(s.url).toLowerCase().includes(kw) ||
-      String(s.desc || '').toLowerCase().includes(kw) ||
-      String(s.id).toLowerCase() === kw
-    )
-  }
+  if (kw) items = items.filter(s => matchSite(s, kw))
 
   const pick = s => {
     const out = {}
@@ -141,6 +81,7 @@ export function list({ q = '', category = '' } = {}) {
     matched: items.length,
     sites: sorted.map(pick),
     categories: categoryGroups(),
+    batchOps: BATCH_OP_LIST,
   }
 }
 
@@ -186,6 +127,8 @@ export function addSite(input = {}, { dryRun = false } = {}) {
     updatedAt: now,
   }
   if (input.icon) site.icon = input.icon
+  const aliases = normalizeAliases(input.aliases, { name, url })
+  if (aliases.length) site.aliases = aliases
 
   if (dryRun) return site
   sites.push(site)
@@ -201,8 +144,8 @@ export function updateSite(id, patch = {}, { dryRun = false } = {}) {
   const meta = readCategoryMeta()
 
   const next = { ...site }
-  for (const k of EDITABLE) {
-    if (patch[k] === undefined) continue
+  for (const k of EDITABLE_FIELDS) {
+    if (k === 'aliases' || patch[k] === undefined) continue
     next[k] = k === 'sortOrder' ? Number(patch[k]) : String(patch[k]).trim()
   }
 
@@ -219,6 +162,13 @@ export function updateSite(id, patch = {}, { dryRun = false } = {}) {
   }
   if (patch.categoryId !== undefined && !next.color) next.color = meta[next.categoryId].color
 
+  // 别名在 name / url 定型后再归一，才能剔除与站名 / 域名同形的项；清空即删除字段
+  if (patch.aliases !== undefined) {
+    const aliases = normalizeAliases(patch.aliases, { name: next.name, url: next.url })
+    if (aliases.length) next.aliases = aliases
+    else delete next.aliases
+  }
+
   next.updatedAt = Date.now()
   if (dryRun) return next
   sites[idx] = next
@@ -233,6 +183,30 @@ export function removeSite(id, { dryRun = false } = {}) {
   if (dryRun) return site
   saveSites(sites.filter(s => s.id !== id))
   return site
+}
+
+/* ---------------- 批量操作 ---------------- */
+
+/**
+ * 批量操作预演：只算不写。UI 用它在提交前展示影响面
+ * （改哪些字段 / 删哪些站点 / 哪些因无变化被跳过）。
+ *
+ * 预演与实写共用内核 applyBatch，所以「预览到什么，执行就是什么」。
+ */
+export function previewBatch({ ids = [], op, patch = {} } = {}) {
+  const result = applyBatch(loadSites(), { ids, op, patch, categoryMeta: readCategoryMeta() })
+  return { ...result, op, summary: batchSummary(result, { op }) }
+}
+
+/**
+ * 批量操作执行。dryRun=true 时与 previewBatch 完全等价（CLI --dry-run 复用）。
+ * 落盘前不做二次校验 —— 校验口径已在 applyBatch 内完成，重复实现只会制造漂移。
+ */
+export function batchOp({ ids = [], op, patch = {}, dryRun = false } = {}) {
+  const result = previewBatch({ ids, op, patch })
+  if (!result.ok) return result
+  if (!dryRun) saveSites(result.next)
+  return { ...result, op, dryRun }
 }
 
 /* ---------------- 元信息抓取（curl.exe，走系统代理） ---------------- */
@@ -449,27 +423,6 @@ function runStep(job, command, cmdArgs, opts = {}) {
   })
 }
 
-function describeDiff(diff) {
-  const parts = []
-  if (diff.added.length) parts.push(`新增 ${diff.added.map(s => `${s.id} ${s.name}`).join('、')}`)
-  if (diff.removed.length) parts.push(`移除 ${diff.removed.map(s => `${s.id} ${s.name}`).join('、')}`)
-  if (diff.modified.length) parts.push(`更新 ${diff.modified.map(m => m.id).join('、')}`)
-  return parts.join('；')
-}
-
-/** 由站点数据 diff 生成规范提交消息 */
-function buildMessage(diff) {
-  if (diff.added.length && !diff.removed.length && !diff.modified.length) {
-    return `feat(sites): 新增 ${diff.added.map(s => s.name).join('、')}`
-  }
-  const parts = []
-  if (diff.added.length) parts.push(`新增 ${diff.added.length} 个`)
-  if (diff.removed.length) parts.push(`移除 ${diff.removed.length} 个`)
-  if (diff.modified.length) parts.push(`更新 ${diff.modified.length} 个`)
-  const type = diff.added.length ? 'feat' : 'chore'
-  return `${type}(sites): ${parts.join('，') || '同步站点数据'}`
-}
-
 export function startDataSync({ commit = true, push = true, message = '' } = {}) {
   if (jobs.listJobs().some(j => j.title === DATA_SYNC_TITLE && j.status === 'running')) {
     throw new Error('已有数据同步任务在运行中，请等待完成或终止后再试。')
@@ -533,7 +486,7 @@ async function runSync(job, steps, opts) {
     step('commit', { status: 'skipped', detail: '数据文件无未提交改动' })
     step('push', { status: 'skipped', detail: '无新提交可推送' })
   } else {
-    const msg = String(opts.message || '').trim() || buildMessage(diff)
+    const msg = String(opts.message || '').trim() || buildSitesCommitMessage(diff)
     step('commit', { status: 'running' })
     try {
       await git.stagePaths(commitPaths)

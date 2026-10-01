@@ -1,24 +1,21 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { CATEGORY_GROUPS } from '../../shared/categories.mjs'
+import { computed } from 'vue'
+import { CATEGORY_GROUPS, categoriesOfDomain, domainOfScope, isDomainScope } from '../../shared/categories.mjs'
 
 export const useCategoriesStore = defineStore('categories', () => {
   // 分类表唯一数据源在 shared/categories.mjs，与本地控制台、线上接口同源。
-  // 这里深拷一份：collapsed 是纯 UI 状态，不该写回共享常量。
-  const groups = ref(CATEGORY_GROUPS.map(g => ({ ...g, categories: g.categories.map(c => ({ ...c })) })))
+  // 侧栏已不再展开子分类（改由中间栏筛选条承载），所以这里不需要可变副本。
+  const groups = CATEGORY_GROUPS
 
   // 向后兼容：扁平化所有分类
-  const categories = computed(() => {
-    return groups.value.flatMap(g => g.categories)
-  })
+  const categories = computed(() => groups.flatMap(g => g.categories))
 
-  function toggleGroup(groupId) {
-    const g = groups.value.find(g => g.id === groupId)
-    if (g) g.collapsed = !g.collapsed
-  }
+  // 域（导航一级方向）：全部 + AI 学习 / 币圈 / 工具 / 基础服务
+  const domains = computed(() => groups.map(g => ({ id: g.id, label: g.label })))
 
   function getCategoryLabel(id) {
-    for (const g of groups.value) {
+    if (isDomainScope(id)) return groups.find(g => g.id === id)?.label || id
+    for (const g of groups) {
       const cat = g.categories.find(c => c.id === id)
       if (cat) return cat.label
     }
@@ -26,7 +23,8 @@ export const useCategoriesStore = defineStore('categories', () => {
   }
 
   function getCategoryColor(id) {
-    for (const g of groups.value) {
+    if (isDomainScope(id)) return '#64748b'
+    for (const g of groups) {
       const cat = g.categories.find(c => c.id === id)
       if (cat) return cat.dotColor
     }
@@ -34,8 +32,12 @@ export const useCategoriesStore = defineStore('categories', () => {
   }
 
   function getGroupByCategory(catId) {
-    return groups.value.find(g => g.categories.some(c => c.id === catId))
+    return groups.find(g => g.categories.some(c => c.id === catId))
   }
 
-  return { groups, categories, toggleGroup, getCategoryLabel, getCategoryColor, getGroupByCategory }
+  return {
+    groups, categories, domains,
+    getCategoryLabel, getCategoryColor, getGroupByCategory,
+    isDomainScope, domainOfScope, categoriesOfDomain
+  }
 })

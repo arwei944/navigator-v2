@@ -1,100 +1,62 @@
 <template>
-  <aside class="sidebar" :class="{ open: sidebarStore.open, collapsed: sidebarStore.collapsed }"
-         :style="sidebarStore.collapsed
+  <aside class="sidebar" :class="{ open: sidebarStore.open, collapsed: isCollapsed }"
+         :style="isCollapsed
            ? { width: 'var(--sidebar-w-collapsed, 60px)', minWidth: 'var(--sidebar-w-collapsed, 60px)' }
            : { width: sidebarStore.width + 'px', minWidth: sidebarStore.width + 'px' }"
          role="navigation" aria-label="主导航">
     <div class="sidebar-header">
       <div class="sidebar-logo" aria-hidden="true">N</div>
-      <span class="sidebar-brand" v-show="!sidebarStore.collapsed">Navigator</span>
+      <span class="sidebar-brand" v-show="!isCollapsed">Navigator</span>
     </div>
 
+    <!-- 侧栏只负责「范围」这一轴；方向与子分类的筛选在中间栏的筛选条上 -->
     <nav class="sidebar-nav">
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'discover' }"
-           @click="navigate('discover')" :title="sidebarStore.collapsed ? '发现' : ''" tabindex="0" role="button">
+           @click="navigate('Home')" @keydown.enter="navigate('Home')" :title="isCollapsed ? '全部' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span v-show="!sidebarStore.collapsed">发现</span>
-      </div>
-      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'categories' }"
-           @click="navigate('categories')" :title="sidebarStore.collapsed ? '分类' : ''" tabindex="0" role="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        <span v-show="!sidebarStore.collapsed">分类</span>
+        <span v-show="!isCollapsed">全部</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'favorites' }"
-           @click="navigate('favorites')" :title="sidebarStore.collapsed ? '收藏' : ''" tabindex="0" role="button">
+           @click="navigate('Favorites')" @keydown.enter="navigate('Favorites')" :title="isCollapsed ? '收藏' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <span v-show="!sidebarStore.collapsed">收藏</span>
+        <span v-show="!isCollapsed">收藏</span>
         <span v-if="favoritesStore.count > 0" class="badge">{{ favoritesStore.count }}</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'recent' }"
-           @click="navigate('recent')" :title="sidebarStore.collapsed ? '最近' : ''" tabindex="0" role="button">
+           @click="navigate('Recent')" @keydown.enter="navigate('Recent')" :title="isCollapsed ? '最近' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span v-show="!sidebarStore.collapsed">最近</span>
+        <span v-show="!isCollapsed">最近</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'feed' }"
-           @click="navigate('feed')" :title="sidebarStore.collapsed ? '内容聚合' : ''" tabindex="0" role="button">
+           @click="navigate('Feed')" @keydown.enter="navigate('Feed')" :title="isCollapsed ? '内容聚合' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-        <span v-show="!sidebarStore.collapsed">内容聚合</span>
+        <span v-show="!isCollapsed">内容聚合</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'trash' }"
-           @click="navigate('trash')" :title="sidebarStore.collapsed ? '回收站' : ''" tabindex="0" role="button">
+           @click="navigate('Trash')" @keydown.enter="navigate('Trash')" :title="isCollapsed ? '回收站' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        <span v-show="!sidebarStore.collapsed">回收站</span>
+        <span v-show="!isCollapsed">回收站</span>
         <span v-if="sitesStore.trash.length > 0" class="badge">{{ sitesStore.trash.length }}</span>
       </div>
     </nav>
 
-    <div v-show="!sidebarStore.collapsed" class="sidebar-divider"></div>
-
-    <div v-show="!sidebarStore.collapsed" class="sidebar-categories" id="categories" role="listbox" aria-label="网站分类">
-      <div class="sidebar-category" :class="{ active: sitesStore.currentCategory === 'all' }"
-           @click="selectCategory('all')" tabindex="0" role="option" :aria-selected="sitesStore.currentCategory === 'all'">
-        <span class="category-dot" style="background:var(--accent)"></span>
-        全部
-        <span class="category-count">{{ sitesStore.sites.length }}</span>
+    <div class="sidebar-footer" v-show="!isCollapsed">
+      <!-- 统计与时钟从首屏工具栏下沉到这里，把首屏让给内容 -->
+      <div class="sidebar-stats">
+        <div class="sidebar-stat">共 <strong>{{ sitesStore.sites.length }}</strong> 个站点</div>
+        <div class="sidebar-stat">今日访问 <strong>{{ todayCount }}</strong></div>
+        <div class="sidebar-stat">收藏 <strong>{{ favoritesStore.count }}</strong></div>
       </div>
-
-      <div v-for="group in categoriesStore.groups" :key="group.id" class="category-group">
-        <div class="category-group-header" @click="categoriesStore.toggleGroup(group.id)" tabindex="0" role="button">
-          <svg class="group-chevron" :class="{ rotated: !group.collapsed }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="9 18 15 12 9 6"/>
-          </svg>
-          <span class="group-label">{{ group.label }}</span>
-        </div>
-        <div v-show="!group.collapsed" class="group-categories">
-          <div v-for="cat in group.categories" :key="cat.id"
-               class="sidebar-category" :class="{ active: sitesStore.currentCategory === cat.id }"
-               @click="selectCategory(cat.id)" tabindex="0" role="option" :aria-selected="sitesStore.currentCategory === cat.id">
-            <span class="category-dot" :style="{ background: cat.dotColor }"></span>
-            {{ cat.label }}
-            <span class="category-count">{{ sitesStore.sites.filter(s => s.categoryId === cat.id).length }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-show="!sidebarStore.collapsed" class="sidebar-footer">
-      <button class="sidebar-btn" @click="showAddModal = true" aria-label="添加网站">
+      <DigitalClock class="sidebar-clock" />
+      <button class="sidebar-btn sidebar-btn-primary" @click="showAddModal = true" aria-label="添加网站">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         添加网站
-      </button>
-      <button class="sidebar-btn" @click="showTodoPanel = true" aria-label="待办事项">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        待办事项
-      </button>
-      <button class="sidebar-btn" @click="showThemePicker = true" aria-label="主题">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        主题换肤
-      </button>
-      <button class="sidebar-btn" @click="showImport = true" aria-label="导入导出">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        导入导出
       </button>
     </div>
 
     <!-- 折叠/展开切换按钮 -->
-    <button class="sidebar-collapse-toggle" @click="sidebarStore.toggleCollapse()" :title="sidebarStore.collapsed ? '展开侧边栏' : '折叠侧边栏'">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: sidebarStore.collapsed ? 'rotate(180deg)' : '' }">
+    <button class="sidebar-collapse-toggle" @click="sidebarStore.toggleCollapse()" :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: isCollapsed ? 'rotate(180deg)' : '' }">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
     </button>
@@ -104,51 +66,49 @@
 
     <!-- 弹窗 -->
     <AddSiteModal v-if="showAddModal" @close="showAddModal = false" />
-    <TodoPanel v-if="showTodoPanel" @close="showTodoPanel = false" />
-    <ThemePicker v-if="showThemePicker" :current-theme="preferencesStore.themePreset" @select="applyTheme" @close="showThemePicker = false" />
-    <BookmarkImport v-if="showImport" @close="showImport = false" />
   </aside>
 </template>
 
 <script setup>
-import { ref, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useSitesStore } from '@/stores/sites'
-import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
-import { usePreferencesStore } from '@/stores/preferences'
+import { useHistoryStore } from '@/stores/history'
 import AddSiteModal from '@/components/AddSiteModal.vue'
-import TodoPanel from '@/components/TodoPanel.vue'
-import ThemePicker from '@/components/ThemePicker.vue'
-import BookmarkImport from '@/components/BookmarkImport.vue'
+import DigitalClock from '@/components/DigitalClock.vue'
 
+const route = useRoute()
+const router = useRouter()
 const sidebarStore = useSidebarStore()
 const sitesStore = useSitesStore()
-const categoriesStore = useCategoriesStore()
 const favoritesStore = useFavoritesStore()
-const preferencesStore = usePreferencesStore()
+const historyStore = useHistoryStore()
 const showAddModal = ref(false)
-const showTodoPanel = ref(false)
-const showThemePicker = ref(false)
-const showImport = ref(false)
 
-function navigate(nav) {
-  sidebarStore.setActiveNav(nav)
-  if (nav === 'favorites' || nav === 'recent') {
-    sitesStore.setCategory('all')
+const todayCount = computed(() => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return historyStore.records.filter(r => r.timestamp >= today.getTime()).length
+})
+
+// 移动端（≤768px）侧栏是 off-canvas 抽屉，此时忽略桌面折叠态，始终展开显示完整内容
+const MOBILE_QUERY = '(max-width: 768px)'
+const isMobile = ref(false)
+let mq = null
+function syncIsMobile(e) { isMobile.value = e.matches }
+
+const isCollapsed = computed(() => sidebarStore.collapsed && !isMobile.value)
+
+function navigate(name) {
+  // 已在目标范围：清掉筛选，回到该范围的干净状态
+  if (route.name === name) {
+    router.push({ name, query: undefined })
+  } else {
+    router.push({ name })
   }
   sidebarStore.close()
-}
-
-function selectCategory(catId) {
-  sitesStore.setCategory(catId)
-  sidebarStore.setActiveNav('categories')
-  sidebarStore.close()
-}
-
-function applyTheme(theme) {
-  preferencesStore.setThemePreset(theme.id)
-  showThemePicker.value = false
 }
 
 /* ---- 拖拽调节宽度 ---- */
@@ -179,13 +139,22 @@ function startResize(e) {
   resizeUnlisten = onUp
 }
 
+onMounted(() => {
+  mq = window.matchMedia(MOBILE_QUERY)
+  isMobile.value = mq.matches
+  mq.addEventListener('change', syncIsMobile)
+})
+
 onUnmounted(() => {
   if (resizeUnlisten) resizeUnlisten()
+  if (mq) mq.removeEventListener('change', syncIsMobile)
 })
 </script>
 
 <style scoped>
 .sidebar {
+  width: var(--sidebar-w, 240px);
+  min-width: var(--sidebar-w, 240px);
   background: var(--glass-bg);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -204,10 +173,6 @@ onUnmounted(() => {
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 /* 折叠状态 */
-.sidebar.collapsed {
-  width: var(--sidebar-w-collapsed, 60px);
-  min-width: var(--sidebar-w-collapsed, 60px);
-}
 .sidebar.collapsed .sidebar-header {
   justify-content: center;
   padding: 16px 8px 12px;
@@ -244,12 +209,6 @@ onUnmounted(() => {
   justify-content: center;
   padding: 0 4px;
   border-radius: 8px;
-}
-.sidebar.collapsed .sidebar-footer,
-.sidebar.collapsed .sidebar-divider,
-.sidebar.collapsed .sidebar-section-title,
-.sidebar.collapsed .sidebar-categories {
-  display: none;
 }
 
 .sidebar-header {
@@ -305,26 +264,30 @@ onUnmounted(() => {
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
 .sidebar-nav-item.active svg { opacity: 1; }
 .badge { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
-.sidebar-divider { height: 1px; background: var(--border); margin: 10px 20px 10px; }
-.sidebar-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text-sidebar-dim); padding: 4px 20px 8px; opacity: .7; }
-.sidebar-categories { padding: 0 12px; display: flex; flex-direction: column; gap: 1px; }
-.category-group { display: flex; flex-direction: column; gap: 1px; }
-.category-group-header { display: flex; align-items: center; gap: 6px; padding: 8px 8px 6px; cursor: pointer; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text-sidebar-dim); transition: color .15s ease; user-select: none; opacity: .6; }
-.category-group-header:hover { color: var(--text-sidebar); opacity: 1; }
-.group-chevron { width: 12px; height: 12px; flex-shrink: 0; transition: transform .2s ease; opacity: .6; }
-.group-chevron.rotated { transform: rotate(90deg); }
-.group-label { flex: 1; }
-.group-categories { display: flex; flex-direction: column; gap: 1px; }
-.sidebar-category { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-sidebar-dim); transition: all .15s ease; }
-.sidebar-category:hover { background: var(--sidebar-hover); color: var(--text-sidebar); }
-.sidebar-category.active { background: var(--sidebar-active); color: var(--text-sidebar); }
-.category-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.category-count { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
-.sidebar-category.active .category-count { background: var(--sidebar-active); color: var(--text-sidebar); }
-.sidebar-footer { margin-top: auto; padding: 16px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
-.sidebar-btn { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-sidebar-dim); transition: all .15s ease; border: 1px dashed var(--border); background: transparent; width: 100%; text-align: left; }
+.sidebar-footer { margin-top: auto; padding: 16px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.sidebar-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 4px; }
+.sidebar-stat { font-size: 12px; color: var(--text-sidebar-dim); }
+.sidebar-stat strong { color: var(--text-sidebar); font-weight: 600; }
+.sidebar-clock { padding: 2px 0 0; }
+.sidebar-clock :deep(.clock-time) { color: var(--text-sidebar); }
+.sidebar-clock :deep(.digital-clock) { align-items: flex-start; }
+.sidebar-btn {
+  display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-sidebar-dim);
+  transition: all .15s ease; border: 1px dashed var(--border); background: transparent;
+  width: 100%; text-align: left; font-family: inherit;
+}
 .sidebar-btn:hover { background: var(--sidebar-hover); color: var(--text-sidebar); border-color: var(--accent); }
 .sidebar-btn svg { width: 16px; height: 16px; opacity: .7; }
+/* 唯一的固定动作：实心，区别于曾经的四个虚线按钮 */
+.sidebar-btn-primary {
+  border-style: solid;
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+.sidebar-btn-primary:hover { background: var(--accent); color: #fff; opacity: .9; border-color: transparent; }
+.sidebar-btn-primary svg { opacity: 1; }
 
 /* 折叠切换按钮 */
 .sidebar-collapse-toggle {
@@ -376,5 +339,27 @@ onUnmounted(() => {
 }
 .sidebar.collapsed .sidebar-resize-handle {
   display: none;
+}
+
+/* 移动端：off-canvas 抽屉，脱离文档流，不再挤压内容区 */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    /* 覆盖内联的桌面宽度（内联样式只能由 !important 覆盖） */
+    width: min(82vw, 320px) !important;
+    min-width: 0 !important;
+    transform: translateX(-100%);
+    z-index: 200;
+    border-right: none;
+    box-shadow: 0 0 40px rgba(0, 0, 0, .28);
+    transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+  }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar-resize-handle,
+  .sidebar-collapse-toggle { display: none; }
+  .sidebar-header { padding-top: calc(18px + env(safe-area-inset-top)); }
 }
 </style>

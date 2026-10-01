@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Navigator 导航结构优化方案 — 以 V5 为根基</title>
+<style>
+  :root{
+    --bg:#f4f5f8; --fg:#1d1d1f; --muted:#6e6e73; --faint:#86868b;
+    --primary:#0071e3; --primary-soft:#0071e31a; --primary-ink:#0060c0;
+    --green:#16865d; --green-soft:#16865d18;
+    --amber:#94610d; --amber-soft:#94610d18;
+    --red:#d92d20; --red-soft:#d92d2018;
+    --violet:#6d47c9; --violet-soft:#6d47c918;
+    --card:#ffffffd1; --card-border:#ffffffd1;
+    --border:#00000014; --hairline:#0000001a;
+    --code-bg:#00000008;
+    --shadow:inset 0 1px 1px 0 #ffffffe6, 0 4px 20px -2px #0000000a;
+    --blur:saturate(190%) blur(22px);
+    --radius:18px;
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","Helvetica Neue",Arial,"Noto Sans SC",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  [data-theme="dark"]{
+    --bg:#09090d; --fg:#f4f4f5; --muted:#a1a1aa; --faint:#71717a;
+    --primary:#38bdf8; --primary-soft:#38bdf824; --primary-ink:#7dd3fc;
+    --green:#34d399; --green-soft:#34d3991f;
+    --amber:#fbbf24; --amber-soft:#fbbf241f;
+    --red:#f87171; --red-soft:#f871711f;
+    --violet:#a78bfa; --violet-soft:#a78bfa1f;
+    --card:#16161cb3; --card-border:#ffffff1f;
+    --border:#ffffff1a; --hairline:#ffffff24;
+    --code-bg:#ffffff0d;
+    --shadow:inset 0 1px 1px 0 #ffffff0f, 0 4px 20px -2px #00000059;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth;scroll-padding-top:70px}
+  body{
+    font-family:var(--font);background:var(--bg);color:var(--fg);
+    font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1100px 520px at 12% -6%, #e0eeffa6, transparent 62%),
+      radial-gradient(900px 480px at 88% 2%, #f0ebff80, transparent 60%),
+      radial-gradient(900px 620px at 50% 100%, #e6f5ff66, transparent 66%);
+    background-attachment:fixed;
+  }
+  [data-theme="dark"] body{
+    background-image:
+      radial-gradient(1100px 520px at 12% -6%, #0e325f40, transparent 62%),
+      radial-gradient(900px 480px at 88% 2%, #2d145033, transparent 60%),
+      radial-gradient(900px 620px at 50% 100%, #0a23412e, transparent 66%);
+  }
+  .wrap{width:min(1180px,100%);margin:0 auto;padding:0 24px}
+
+  .topbar{position:sticky;top:0;z-index:50;height:52px;display:flex;align-items:center;
+    background:color-mix(in srgb,var(--bg) 74%,transparent);border-bottom:1px solid var(--border);
+    backdrop-filter:saturate(190%) blur(24px);-webkit-backdrop-filter:saturate(190%) blur(24px)}
+  .topbar .wrap{display:flex;align-items:center;gap:16px;width:min(1180px,100%)}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:650;font-size:14px;letter-spacing:-.2px;white-space:nowrap}
+  .brand-mark{width:25px;height:25px;border-radius:7px;background:var(--primary);color:#fff;display:grid;place-items:center;font-size:11.5px;font-weight:700}
+  .topnav{display:flex;gap:2px;margin-left:auto;overflow-x:auto;scrollbar-width:none}
+  .topnav::-webkit-scrollbar{display:none}
+  .topnav a{font-size:12.5px;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:8px;white-space:nowrap;transition:.16s}
+  .topnav a:hover{color:var(--fg);background:var(--code-bg)}
+  .theme-btn{margin-left:8px;width:31px;height:31px;flex:none;display:grid;place-items:center;border:1px solid var(--card-border);border-radius:9px;background:var(--card);color:var(--muted);cursor:pointer;transition:.16s}
+  .theme-btn:hover{color:var(--primary);border-color:var(--primary)}
+  .theme-btn svg{width:15px;height:15px}
+
+  header.hero{padding:52px 0 26px}
+  .eyebrow{font-size:11.5px;font-weight:650;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:13px}
+  h1{font-size:clamp(27px,4.2vw,42px);line-height:1.15;letter-spacing:-1.05px;font-weight:680}
+  h1 .thin{color:var(--muted);font-weight:400}
+  .lede{margin-top:15px;max-width:78ch;font-size:15.5px;color:var(--muted);line-height:1.7}
+  .meta-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:550;color:var(--muted);background:var(--card);border:1px solid var(--card-border);border-radius:999px;padding:5px 12px;box-shadow:var(--shadow)}
+  .chip b{color:var(--fg);font-weight:600}
+
+  section{padding:32px 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  h2{font-size:clamp(19px,2.3vw,25px);letter-spacing:-.5px;font-weight:660}
+  .sec-num{font-family:var(--mono);font-size:12px;color:var(--primary);font-weight:600}
+  .sec-sub{font-size:13.5px;color:var(--muted);max-width:82ch;margin:-8px 0 20px}
+
+  .card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);padding:20px 20px 18px}
+  .grid{display:grid;gap:14px}
+  .g2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(270px,1fr))}
+  .g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+
+  /* 关键指标 */
+  .kpi{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(178px,1fr));margin-bottom:8px}
+  .kpi .box{background:var(--card);border:1px solid var(--card-border);border-radius:14px;box-shadow:var(--shadow);padding:15px 16px}
+  .kpi .n{font-family:var(--mono);font-size:23px;font-weight:660;letter-spacing:-.6px;line-height:1.2}
+  .kpi .l{font-size:12px;color:var(--muted);margin-top:3px}
+  .kpi .box.bad .n{color:var(--red)}
+  .kpi .box.good .n{color:var(--green)}
+  .kpi .box.warn .n{color:var(--amber)}
+
+  h3{font-size:16px;font-weight:650;letter-spacing:-.2px}
+  h4{font-size:13.5px;font-weight:640;letter-spacing:-.1px}
+  p{font-size:13.6px;line-height:1.68}
+  .dim-note{color:var(--muted);font-size:13px;margin-bottom:12px}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  .table-wrap{overflow-x:auto;border:1px solid var(--card-border);border-radius:14px;background:var(--card);box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--hairline);vertical-align:top}
+  thead th{font-size:11.5px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;background:var(--code-bg);white-space:nowrap}
+  tbody tr:last-child td{border-bottom:none}
+  tbody th{font-weight:640;font-size:12.8px;white-space:nowrap;color:var(--fg)}
+  td{color:var(--muted);line-height:1.6}
+  td b,th b{color:var(--fg)}
+
+  code,.inline-code{font-family:var(--mono);font-size:12px;background:var(--code-bg);padding:1.5px 5px;border-radius:5px;color:var(--primary-ink)}
+  [data-theme="dark"] code,[data-theme="dark"] .inline-code{color:var(--primary-ink)}
+
+  .sev{display:inline-block;font-size:10.5px;font-weight:700;border-radius:6px;padding:1.5px 7px;white-space:nowrap}
+  .sev-p0{background:var(--red-soft);color:var(--red)}
+  .sev-p1{background:var(--amber-soft);color:var(--amber)}
+  .sev-p2{background:var(--primary-soft);color:var(--primary-ink)}
+
+  .callout{display:flex;gap:11px;padding:13px 15px;border-radius:13px;font-size:13.2px;line-height:1.6;background:var(--card);border:1px solid var(--card-border);box-shadow:var(--shadow)}
+  .callout .ic{width:17px;height:17px;flex:none;margin-top:2px}
+  .callout.warn{background:var(--amber-soft);border-color:#94610d33}
+  .callout.warn .ic{color:var(--amber)}
+  .callout.danger{background:var(--red-soft);border-color:#d92d2033}
+  .callout.danger .ic{color:var(--red)}
+  .callout.ok{background:var(--green-soft);border-color:#16865d33}
+  .callout.ok .ic{color:var(--green)}
+
+  .list{list-style:none;display:grid;gap:7px;margin-top:10px}
+  .list li{position:relative;padding-left:17px;font-size:13.2px;line-height:1.58}
+  .list li::before{content:"";position:absolute;left:2px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--primary)}
+  .list.con li::before{background:var(--red)}
+  .list.pro li::before{background:var(--green)}
+  .list li span{color:var(--muted)}
+
+  /* 线框 */
+  .wire{display:grid;gap:6px;font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:12px}
+  .wire .row{display:flex;gap:6px}
+  .wire .blk{border:1px dashed var(--hairline);border-radius:7px;padding:7px 8px;background:var(--code-bg);line-height:1.45}
+  .wire .blk.solid{border-style:solid;border-color:var(--card-border);background:var(--card)}
+  .wire .blk.hot{border-color:var(--red);background:var(--red-soft);color:var(--red);font-weight:600}
+  .wire .blk.new{border-color:var(--green);background:var(--green-soft);color:var(--green);font-weight:600}
+  .wire .blk.acc{border-color:var(--primary);background:var(--primary-soft);color:var(--primary-ink);font-weight:600}
+  .wire .blk .t{display:block;font-size:10px;opacity:.85;font-weight:400;color:var(--muted)}
+
+  /* 三轴模型 */
+  .axis{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));margin-top:6px}
+  .axis .a{background:var(--card);border:1px solid var(--card-border);border-radius:14px;box-shadow:var(--shadow);padding:15px 16px}
+  .axis .a .tag{font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--primary)}
+  .axis .a h4{margin:4px 0 8px;font-size:14.5px}
+  .axis .a .pill{display:inline-block;font-size:11.5px;font-family:var(--mono);background:var(--code-bg);border-radius:6px;padding:2px 7px;margin:0 4px 4px 0;color:var(--fg)}
+
+  /* 方案对比 */
+  .opt{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 18px 16px;display:flex;flex-direction:column}
+  .opt.pick{border-color:var(--primary);box-shadow:var(--shadow),0 0 0 2px var(--primary-soft)}
+  .opt .oh{display:flex;align-items:center;gap:9px;margin-bottom:3px}
+  .opt .oh h4{font-size:15px}
+  .opt .badge{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 8px;margin-left:auto;white-space:nowrap}
+  .opt .badge.pick{background:var(--primary);color:#fff}
+  .opt .badge.alt{background:var(--code-bg);color:var(--muted)}
+  .opt .who-sub{font-size:12px;color:var(--faint);font-family:var(--mono);margin-bottom:10px}
+
+  /* 分期 */
+  .phase{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:14px}
+  .phead{display:flex;align-items:center;gap:10px;margin-bottom:13px;flex-wrap:wrap}
+  .pbadge{font-size:11px;font-weight:700;border-radius:7px;padding:3px 10px}
+  .p0{background:var(--red);color:#fff}
+  .p1{background:var(--amber);color:#fff}
+  .p2{background:var(--primary);color:#fff}
+  .phead span:last-child{font-size:12.5px;color:var(--muted)}
+  .task{display:flex;gap:12px;padding:11px 0;border-top:1px dashed var(--hairline)}
+  .task:first-of-type{border-top:none;padding-top:0}
+  .task .id{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--primary);flex:none;width:34px;padding-top:2px}
+  .task .body{min-width:0}
+  .task .body h4{margin-bottom:3px}
+  .task .body p{font-size:13px;color:var(--muted)}
+  .task .body .why{margin-top:6px;font-size:12.4px;color:var(--muted)}
+  .task .body .why b{color:var(--fg)}
+  .cost{display:inline-flex;align-items:center;gap:5px;margin-top:7px;font-size:11.5px;color:var(--faint);font-family:var(--mono)}
+  .cost i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--hairline)}
+  .cost i.on{background:var(--primary)}
+
+  .src{list-style:none;display:grid;gap:11px}
+  .src li{font-size:13.2px;display:flex;gap:11px;align-items:baseline}
+  .src li b{flex:none;width:96px;font-size:12.5px}
+  .src li span{color:var(--muted)}
+  footer{padding:26px 0 46px;color:var(--faint);font-size:12.5px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="brand-mark">N</span>Navigator · 导航结构优化</div>
+    <nav class="topnav">
+      <a href="#audit">现状体检</a>
+      <a href="#issues">问题清单</a>
+      <a href="#principles">设计原则</a>
+      <a href="#model">目标模型</a>
+      <a href="#options">方案选型</a>
+      <a href="#redesign">界面改造</a>
+      <a href="#phases">实施分期</a>
+      <a href="#accept">验收标准</a>
+      <a href="#risk">风险与前置</a>
+    </nav>
+    <button class="theme-btn" id="themeBtn" aria-label="切换深浅色">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">V5 根基 · 导航结构优化 · 产品与体验评审稿</div>
+  <h1>把「找到那个网站」这件事<br><span class="thin">从 3 步压到 1 步</span></h1>
+  <p class="lede">
+    本方案以线上运行的 V5（HEAD <code>49d305e</code> / 数据 v102）为唯一基线，V6 的全部改造搁置。
+    导航结构是这个产品的主动脉 —— 它的效率直接决定用户能否在几秒内到达目标站点。
+    下面是逐条带证据的体检、一套正交的导航模型、以及分期落地计划。
+  </p>
+  <div class="meta-row">
+    <span class="chip">基线 <b>V5 · 49d305e</b></span>
+    <span class="chip">线上数据 <b>v102</b></span>
+    <span class="chip">站点 <b>301</b></span>
+    <span class="chip">分类 <b>4 域 / 30 类</b></span>
+    <span class="chip">问题 <b>18 条</b></span>
+    <span class="chip">推荐 <b>方案 B</b></span>
+  </div>
+</header>
+
+<!-- ============ 00 摘要 ============ -->
+<section id="summary">
+  <div class="sec-head"><span class="sec-num">00</span><h2>摘要</h2></div>
+  <div class="kpi">
+    <div class="box bad"><div class="n">0 px</div><div class="l">375px 视口下内容区实测宽度</div></div>
+    <div class="box bad"><div class="n">2 / 6</div><div class="l">侧栏视图项在内容层无差异化行为</div></div>
+    <div class="box bad"><div class="n">0 / 5</div><div class="l">视图状态可被 URL 直达的数量</div></div>
+    <div class="box warn"><div class="n">5 行</div><div class="l">首屏内容之上堆叠的 chrome 行数</div></div>
+    <div class="box warn"><div class="n">31 行</div><div class="l">侧栏导航条目总数（默认全展开）</div></div>
+    <div class="box good"><div class="n">1 条</div><div class="l">全站移动端断点数量（768px）</div></div>
+  </div>
+  <div class="callout danger" style="margin-top:14px">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+    <div><b>最重要的一个结论：V5 的移动端目前是不可用的。</b>375px 视口实测：左侧栏渲染宽 <code>229px</code>、右侧栏 <code>min-width:280px</code>、中间内容区 <code>main.main</code> 宽度被挤到 <b>0px</b>；同时移动端顶栏 <code>.mobile-header</code> 从未渲染（DOM 存在但宽度 0，汉堡按钮不可达）。也就是说手机上只剩两条侧栏，看不到任何站点。这是 P0，必须先修。</div>
+  </div>
+</section>
+
+<!-- ============ 01 现状体检 ============ -->
+<section id="audit">
+  <div class="sec-head"><span class="sec-num">01</span><h2>现状体检：V5 导航由什么构成</h2></div>
+  <p class="sec-sub">先把事实摆清楚。以下全部来自 <code>git show HEAD:</code> 的 V5 源码与线上站点实测，不含推测。</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>骨架与布局模型</h3>
+      <p class="dim-note"><code>src/App.vue</code> · <code>src/styles/main.css</code></p>
+      <div class="wire">
+        <div class="row"><div class="blk solid" style="flex:1">header.mobile-header<span class="t">display:none，无媒体查询覆盖 → 永不显示</span></div></div>
+        <div class="row">
+          <div class="blk solid" style="flex:0 0 84px">aside.sidebar<span class="t">240px（inline minWidth）<br>折叠 60px / 拖拽 160–400</span></div>
+          <div class="blk solid" style="flex:1">main.main<span class="t">flex:1，无 min-width<br>StatsBar→时钟→Google→搜索→卡片工具栏</span></div>
+          <div class="blk solid" style="flex:0 0 74px">aside.right-sidebar<span class="t">280px（min-width 280）<br>可折叠为 0</span></div>
+        </div>
+        <div class="row"><div class="blk" style="flex:1">.app-layout { display:flex; height:100vh } —— 三栏并排，滚动在各自容器内部<span class="t">移动端仅有一条规则：@media(max-width:768px){ .main{margin-left:0!important} }（flex 布局下该属性无效）</span></div></div>
+      </div>
+      <div class="callout danger" style="margin-top:13px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <div>两侧栏都是 <b>硬宽度 + min-width</b>（240 + 280 = 520px），flex 无法压缩它们，于是 <code>main</code> 被压到 0。这是移动端不可用的根因。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>导航状态模型</h3>
+      <p class="dim-note"><code>stores/sidebar.js</code> · <code>stores/sites.js</code> · <code>App.vue</code></p>
+      <p>导航由<b>四条互相独立、部分重叠的状态轴</b>共同决定，但它们之间没有统一语义：</p>
+      <ul class="list con">
+        <li><code>activeNav</code> ∈ 发现 / 分类 / 收藏 / 最近 / 内容聚合 / 回收站 <span>—— 视图轴，仅存于内存</span></li>
+        <li><code>currentCategory</code> <span>—— 筛选轴，同步到 <code>/category/:id</code></span></li>
+        <li><code>searchQuery</code> <span>—— 同步到 <code>?q=</code></span></li>
+        <li><code>sortBy</code> / <code>viewMode</code> <span>—— 不进 URL，不持久化</span></li>
+      </ul>
+      <div class="callout warn" style="margin-top:13px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>四条轴里<b>只有两条进 URL</b>。切换「收藏 / 最近 / 回收站 / 内容聚合」不产生历史记录、刷新即丢、无法分享。这是导航层最实质的可达性缺陷。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>侧栏承载的职责</h3>
+      <p class="dim-note"><code>components/Sidebar.vue</code>，共 31 行导航条目</p>
+      <div class="wire">
+        <div class="row"><div class="blk solid" style="flex:1">品牌区<span class="t">Logo + Navigator</span></div></div>
+        <div class="row"><div class="blk acc" style="flex:1">6 个视图项<span class="t">发现 / 分类 / 收藏(角标) / 最近 / 内容聚合 / 回收站(角标)</span></div></div>
+        <div class="row"><div class="blk hot" style="flex:1">分类区 31 行<span class="t">「全部」+ 4 个域分组头 + 30 个分类，默认全部展开</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">4 个动作按钮<span class="t">添加网站 / 待办事项 / 主题换肤 / 导入导出（虚线边框）</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">折叠按钮 + 拖拽手柄<span class="t">sidebar-collapse-toggle / sidebar-resize-handle</span></div></div>
+      </div>
+      <p style="margin-top:12px">导航、筛选、管理动作、个性化设置四类不同性质的东西，全部挤在一条 240px 的竖栏里，靠内部滚动消化。</p>
+    </div>
+
+    <div class="card">
+      <h3>首屏内容之上的 chrome</h3>
+      <p class="dim-note">进入首页后、第一张卡片之前，依次渲染了 5 层</p>
+      <div class="wire">
+        <div class="row"><div class="blk hot" style="flex:1">StatsBar<span class="t">今日访问 / 收藏 + 排序下拉 + 网格·列表切换 + 主题 + 设置</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">top-widgets<span class="t">DigitalClock 数字时钟</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">GoogleSearchBar<span class="t">外站搜索，与站内搜索职责重叠</span></div></div>
+        <div class="row"><div class="blk solid" style="flex:1">SiteSearchBar<span class="t">站内搜索（建议下拉 / 高亮 / ↑↓ / Ctrl+F）</span></div></div>
+        <div class="row"><div class="blk hot" style="flex:1">.cards-toolbar<span class="t">批量选择 / 拖拽排序 / 清空回收站</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">第一张卡片<span class="t">目标内容</span></div></div>
+      </div>
+      <div class="callout warn" style="margin-top:13px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>「排序 / 视图切换」被放在 <b>StatsBar</b>，而结果列表在 3 行之后 —— 控件与它作用的对象被隔开，违反邻近性原则。同类控件还被拆到两处：排序在 StatsBar，批量与拖拽在 <code>.cards-toolbar</code>。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 02 问题清单 ============ -->
+<section id="issues">
+  <div class="sec-head"><span class="sec-num">02</span><h2>问题清单（18 条，按性质分组）</h2></div>
+  <p class="sec-sub">每条都附源码或实测证据。严重度：P0 = 功能不可用 / P1 = 效率与可达性 / P2 = 打磨。</p>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th style="width:58px">编号</th><th style="width:200px">问题</th><th>证据</th><th style="width:200px">影响</th><th style="width:56px">严重度</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>A1</th>
+          <td>移动端内容区宽度为 0</td>
+          <td>375px 实测：<code>aside.sidebar</code>=229px、<code>.right-sidebar</code> min-width=280px、<code>main.main</code>=<b>0px</b></td>
+          <td>手机上完全看不到站点，产品等于不可用</td>
+          <td><span class="sev sev-p0">P0</span></td>
+        </tr>
+        <tr>
+          <th>A2</th>
+          <td>移动端顶栏从未渲染</td>
+          <td><code>MobileHeader.vue</code> 的 <code>.mobile-header{display:none}</code> 没有任何媒体查询覆盖；DOM 中宽度为 0</td>
+          <td>汉堡入口不可达，抽屉机制形同虚设</td>
+          <td><span class="sev sev-p0">P0</span></td>
+        </tr>
+        <tr>
+          <th>A3</th>
+          <td>无拇指可达的主导航</td>
+          <td>全站没有底部导航栏；移动端唯一的导航是侧栏抽屉</td>
+          <td>单手持机时一级导航位于最难触及的左上角</td>
+          <td><span class="sev sev-p0">P0</span></td>
+        </tr>
+        <tr>
+          <th>B1</th>
+          <td>6 个视图项里 2 个是空壳</td>
+          <td><code>CardsContainer</code> 的 <code>displaySites</code> switch 只处理 <code>favorites</code> / <code>recent</code>，<code>discover</code> 与 <code>categories</code> 落到 default 分支，行为与默认完全相同</td>
+          <td>点击「发现」「分类」界面毫无变化，用户怀疑功能坏了</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>B2</th>
+          <td>视图状态不进 URL</td>
+          <td><code>App.vue</code> 仅 watch <code>currentCategory</code> 与 <code>searchQuery</code>；<code>activeNav</code> 无任何路由同步</td>
+          <td>收藏 / 最近 / 回收站 / 聚合 不可分享、不可收藏、刷新丢失、返回键无效</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>B3</th>
+          <td>「分类」一词承担两种含义</td>
+          <td>侧栏既有名为「分类」的视图项（只改高亮），又有分类列表；选中分类时还会把 <code>activeNav</code> 置为 <code>categories</code></td>
+          <td>用户无法判断「分类」是视图还是筛选器</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>B4</th>
+          <td>视图与筛选互相隐式改写</td>
+          <td><code>navigate('favorites')</code> 内部调用 <code>setCategory('all')</code>；选分类又改写 <code>activeNav</code></td>
+          <td>状态跳转不可预期，用户不知道自己「离开」了收藏视图</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>B5</th>
+          <td>「最近」语义与入口不一致</td>
+          <td>侧栏「最近」= 按 <code>createdAt</code> 倒序取前 24 条收录时间</td>
+          <td>命名为「最近」却与浏览历史无关，用户预期落空</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+        <tr>
+          <th>C1</th>
+          <td>31 行导航默认全展开</td>
+          <td><code>CATEGORY_GROUPS</code> 四组的 <code>collapsed</code> 初值均为 <code>false</code></td>
+          <td>侧栏内部滚动；30 个分类里找一个靠滚动而非检索</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>C2</th>
+          <td>导航内没有分类检索</td>
+          <td>侧栏无过滤输入框</td>
+          <td>分类规模一旦增长，查找成本线性上升</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>C3</th>
+          <td>「全部」与域分组头视觉同级</td>
+          <td><code>.sidebar-category</code>（全部）与 <code>.category-group-header</code> 相邻渲染</td>
+          <td>层级关系读不出来，域的归属感弱</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+        <tr>
+          <th>D1</th>
+          <td>首屏 5 层 chrome</td>
+          <td>StatsBar → 时钟 → GoogleSearchBar → SiteSearchBar → .cards-toolbar → 卡片</td>
+          <td>笔记本高度下卡片被推到折叠线以下，首屏几乎看不到内容</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>D2</th>
+          <td>三个搜索入口并存</td>
+          <td><code>SiteSearchBar</code>（站内）+ <code>CommandPalette</code>（Ctrl+K）+ <code>GoogleSearchBar</code>（外站）</td>
+          <td>注意力被稀释，用户要判断「该用哪个框」</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>D3</th>
+          <td>同类控件分散两处</td>
+          <td>排序 / 视图切换在 StatsBar；批量 / 拖拽在 <code>.cards-toolbar</code></td>
+          <td>「整理站点」的心智动作被拆散</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+        <tr>
+          <th>D4</th>
+          <td>低价值组件占据黄金位置</td>
+          <td>数字时钟独占一行；StatsBar 占据首屏第一行</td>
+          <td>用最贵的版面换最弱的信息</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+        <tr>
+          <th>E1</th>
+          <td>键盘无法激活导航项</td>
+          <td>侧栏项为 <code>div[tabindex=0][role=button]</code>，只绑 <code>@click</code>，无 <code>keydown</code> 处理</td>
+          <td>键盘用户能聚焦却按不动，等于导航不可用</td>
+          <td><span class="sev sev-p1">P1</span></td>
+        </tr>
+        <tr>
+          <th>E2</th>
+          <td>伪 listbox 语义</td>
+          <td><code>role="listbox"</code> / <code>role="option"</code> 但没有方向键导航、没有 <code>aria-activedescendant</code></td>
+          <td>读屏播报与真实交互不符，误导辅助技术用户</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+        <tr>
+          <th>E3</th>
+          <td>缺少跳转到主内容的 skip-link</td>
+          <td>页面无 skip 链接</td>
+          <td>键盘/读屏用户每次都要穿过整条侧栏</td>
+          <td><span class="sev sev-p2">P2</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout ok" style="margin-top:14px">
+    <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    <div><b>V5 已有的好底子，不要动：</b>侧栏折叠（60px 图标态）+ 拖拽调宽（160–400px）+ <code>versionedPersist</code> 持久化；域分组可折叠的数据结构（<code>shared/categories.mjs</code> 单一数据源）；站内搜索的建议下拉与键盘选择；收藏/回收站角标。这些是本轮改造的资产，不是负担。</div>
+  </div>
+</section>
+
+<!-- ============ 03 设计原则 ============ -->
+<section id="principles">
+  <div class="sec-head"><span class="sec-num">03</span><h2>设计目标与原则</h2></div>
+  <p class="sec-sub">先把「为什么」定下来，后面的取舍才有依据。</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>核心任务（JTBD）</h3>
+      <p><b>主任务：</b>「我想去那个网站」—— 在最短路径内找到并打开。</p>
+      <p style="margin-top:8px"><b>次任务：</b>「我要整理我的站点集合」—— 收藏、添加、归类、清理。</p>
+      <p style="margin-top:8px"><b>偶发任务：</b>换主题、导入导出、看统计。</p>
+      <div class="callout warn" style="margin-top:12px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>当前实现把<b>三类任务的入口平等地堆在一起</b>：主任务的分类列表被 30 行淹没，偶发任务（主题/导入导出）却占了侧栏固定位置。原则就是按任务频率重新分配版面。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>六条设计原则</h3>
+      <ul class="list">
+        <li><b>P1 单一导航模型</b><span>：把「在看什么范围」与「怎么筛」彻底分开，一个状态只由一个轴决定。</span></li>
+        <li><b>P2 状态即 URL</b><span>：任何导航状态都必须可直达、可刷新、可回退、可分享。</span></li>
+        <li><b>P3 拇指优先</b><span>：移动端一级导航放在底部，单手可达。</span></li>
+        <li><b>P4 渐进披露</b><span>：低频项（主题、导入导出）不占导航位，收进设置。</span></li>
+        <li><b>P5 内容优先</b><span>：首屏 chrome 总高度设上限，控件紧贴它作用的对象。</span></li>
+        <li><b>P6 键盘等价</b><span>：能用鼠标完成的导航，键盘必须能完成。</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 04 目标模型 ============ -->
+<section id="model">
+  <div class="sec-head"><span class="sec-num">04</span><h2>目标导航模型：三轴正交</h2></div>
+  <p class="sec-sub">用三个彼此独立、可组合的轴取代现在纠缠的四条状态。每个轴都能单独进 URL，组合即状态。</p>
+
+  <div class="axis">
+    <div class="a">
+      <div class="tag">Axis 1 · 范围</div>
+      <h4>我在看哪些站点</h4>
+      <span class="pill">全部 /</span><span class="pill">/favorites</span><span class="pill">/recent</span><span class="pill">/feed</span><span class="pill">/trash</span>
+      <p style="margin-top:9px;font-size:12.8px;color:var(--muted)">取代 <code>activeNav</code>。每个范围是一个真实可访问的地址，互斥。</p>
+    </div>
+    <div class="a">
+      <div class="tag">Axis 2 · 域</div>
+      <h4>我关注哪个方向</h4>
+      <span class="pill">AI 学习</span><span class="pill">币圈</span><span class="pill">工具</span><span class="pill">基础服务</span>
+      <p style="margin-top:9px;font-size:12.8px;color:var(--muted)">数据已存在于 <code>shared/categories.mjs</code>，只是从未被当作导航层级使用。</p>
+    </div>
+    <div class="a">
+      <div class="tag">Axis 3 · 筛选</div>
+      <h4>我怎么缩小结果</h4>
+      <span class="pill">/c/:categoryId</span><span class="pill">?q=</span><span class="pill">?sort=</span><span class="pill">?view=</span>
+      <p style="margin-top:9px;font-size:12.8px;color:var(--muted)">分类、搜索、排序、视图。作用于当前范围之上，可叠加。</p>
+    </div>
+  </div>
+
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card">
+      <h3>URL 契约</h3>
+      <p class="dim-note">范围进路径，筛选进 query。这是「状态即 URL」原则的落地形式。</p>
+      <div class="table-wrap" style="box-shadow:none">
+        <table>
+          <thead><tr><th>地址</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td><code>/</code></td><td>全部站点（默认范围）</td></tr>
+            <tr><td><code>/favorites</code></td><td>收藏</td></tr>
+            <tr><td><code>/recent</code></td><td>最近浏览</td></tr>
+            <tr><td><code>/feed</code></td><td>内容聚合</td></tr>
+            <tr><td><code>/trash</code></td><td>回收站</td></tr>
+            <tr><td><code>/c/cex?q=binance&amp;sort=hot</code></td><td>交易所分类 + 搜索 + 按热度</td></tr>
+            <tr><td><code>/favorites?q=api</code></td><td>在收藏里搜「api」</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn" style="margin-top:12px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>现存的 <code>/category/:id</code> 需保留一条 <b>301 重定向</b>到 <code>/c/:id</code>，否则已分享出去的链接会失效。</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>目标侧栏结构（桌面）</h3>
+      <p class="dim-note">保留 V5 的折叠与拖拽能力，只重新分配职责。</p>
+      <div class="wire">
+        <div class="row"><div class="blk solid" style="flex:1">品牌 + 折叠按钮<span class="t">沿用 V5，含 60px 图标态</span></div></div>
+        <div class="row"><div class="blk acc" style="flex:1">范围导航 5 项<span class="t">全部 / 收藏 / 最近 / 聚合 / 回收站（带角标）<br>移除语义为空的「发现」「分类」</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">域分组（默认折叠）<span class="t">AI 学习 / 币圈 / 工具 / 基础服务 —— 4 行</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">分类检索框<span class="t">输入即过滤 30 个分类</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">展开后的分类<span class="t">仅在对应域展开时出现</span></div></div>
+        <div class="row"><div class="blk solid" style="flex:1">主按钮：添加网站<span class="t">唯一的固定动作</span></div></div>
+        <div class="row"><div class="blk" style="flex:1">待办 / 主题 / 导入导出<span class="t">移出侧栏 → 顶栏更多菜单或设置面板</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 05 方案选型 ============ -->
+<section id="options">
+  <div class="sec-head"><span class="sec-num">05</span><h2>方案选型</h2></div>
+  <p class="sec-sub">三个候选方案，取舍在「改动面」与「结构收益」之间。</p>
+  <div class="grid g3">
+    <div class="opt">
+      <div class="oh"><h4>方案 A · 保守微调</h4><span class="badge alt">不推荐</span></div>
+      <div class="who-sub">只修 P0 与明显 bug</div>
+      <ul class="list">
+        <li>修移动端 0 宽、补抽屉与底部 tab</li>
+        <li>删掉空壳视图项，修 A11y</li>
+        <li>不改信息架构</li>
+      </ul>
+      <div class="callout warn" style="margin-top:12px;box-shadow:none">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <div>改动最小，但 31 行侧栏、状态不进 URL、首屏 5 层 chrome 这些结构性成本全部保留。</div>
+      </div>
+    </div>
+
+    <div class="opt pick">
+      <div class="oh"><h4>方案 B · 三轴重构</h4><span class="badge pick">推荐</span></div>
+      <div class="who-sub">重建导航语义，保留 V5 全部能力</div>
+      <ul class="list pro">
+        <li>范围 / 域 / 筛选 三轴正交，全部进 URL</li>
+        <li>侧栏职责重分配：域分组默认折叠 + 分类检索框</li>
+        <li>移动端底部 tab + off-canvas 抽屉</li>
+        <li>工具栏合并，chrome 下沉</li>
+        <li>保留折叠、拖拽、角标、搜索建议等 V5 资产</li>
+      </ul>
+      <div class="callout ok" style="margin-top:12px;box-shadow:none">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        <div>结构收益最大，且不动数据层与交互能力。代价是路由与侧栏需要一次成体系的改造。</div>
+      </div>
+    </div>
+
+    <div class="opt">
+      <div class="oh"><h4>方案 C · 极简顶部导航</h4><span class="badge alt">不推荐</span></div>
+      <div class="who-sub">学参考站：顶栏放域，侧栏放分类</div>
+      <ul class="list">
+        <li>顶栏承载 4 个域</li>
+        <li>侧栏仅保留分类</li>
+        <li>视图入口收进顶栏下拉</li>
+      </ul>
+      <div class="callout danger" style="margin-top:12px;box-shadow:none">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+        <div>那是纯展示站的做法。本项目有收藏 / 待办 / 历史 / 回收站等重交互，把它们塞进顶栏下拉会牺牲可达性 —— 正是 V6 走过的路。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 06 界面改造 ============ -->
+<section id="redesign">
+  <div class="sec-head"><span class="sec-num">06</span><h2>关键界面改造（前后对照）</h2></div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>R1 · 移动端：从「不可用」到「可用」</h3>
+      <div class="wire">
+        <div class="row"><div class="blk hot" style="flex:1">现状 375px<span class="t">侧栏 229px + 右栏 280px 并排 → 内容区 0px</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">目标 375px<span class="t">侧栏 off-canvas（translateX(-100%)）· 右栏 ≤1024 收起 / ≤768 隐藏<br>内容区占满 · 顶部 52px 顶栏（含汉堡）· 底部 4 项 tab</span></div></div>
+      </div>
+      <ul class="list pro" style="margin-top:12px">
+        <li>侧栏改 <code>position:fixed</code> + <code>transform:translateX(-100%)</code>，去掉 <code>min-width</code> 的挤压效应</li>
+        <li>补上 <code>.mobile-header</code> 的媒体查询，让汉堡真正出现</li>
+        <li>底部 tab：<b>全部 / 域 / 收藏 / 最近 / 更多</b>，高 56px + 安全区</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>R2 · 侧栏：从 31 行到 9 行可见</h3>
+      <div class="wire">
+        <div class="row"><div class="blk hot" style="flex:1">现状<span class="t">6 视图 + 全部 + 4 分组头 + 30 分类（全展开）= 31 行，需滚动</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">目标<span class="t">5 范围 + 4 域（默认折叠）= 9 行，一屏放下<br>需要分类时：展开域，或直接用检索框</span></div></div>
+      </div>
+      <ul class="list pro" style="margin-top:12px">
+        <li>域分组 <code>collapsed</code> 初值改 <code>true</code>，并提供「默认展开」偏好开关</li>
+        <li>新增分类检索框：输入即过滤，命中域自动展开</li>
+        <li>移除「发现」「分类」两个空壳视图项</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>R3 · 首屏：5 层 chrome → 2 层</h3>
+      <div class="wire">
+        <div class="row"><div class="blk hot" style="flex:1">现状<span class="t">StatsBar（统计+排序+视图+主题+设置）→ 时钟 → Google 搜索 → 站内搜索 → 卡片工具栏 → 卡片</span></div></div>
+        <div class="row"><div class="blk new" style="flex:1">目标<span class="t">搜索（含建议）→ 结果工具栏（排序/视图/批量/拖拽，紧贴列表）→ 卡片<br>统计与时钟下沉到侧栏底部；移除 Google 搜索</span></div></div>
+      </div>
+      <ul class="list pro" style="margin-top:12px">
+        <li>合并 StatsBar 与 <code>.cards-toolbar</code> 为单一工具栏，置于结果列表正上方</li>
+        <li>GoogleSearchBar 移除（外站搜索并入命令面板，作为一条命令）</li>
+        <li>首屏 chrome 上限：桌面 ≤ 2 行（搜索 + 工具栏）</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>R4 · 搜索：三个入口 → 一个主入口</h3>
+      <div class="wire">
+        <div class="row"><div class="blk solid" style="flex:1">主：站内搜索<span class="t">建议下拉 / 高亮 / ↑↓ / 回车打开 / 结果计数</span></div></div>
+        <div class="row"><div class="blk solid" style="flex:1">高级：命令面板 Ctrl+K<span class="t">保留，覆盖跳转与操作</span></div></div>
+        <div class="row"><div class="blk hot" style="flex:1">移除：GoogleSearchBar<span class="t">职责重叠，且是零引用的死代码候选</span></div></div>
+      </div>
+      <div class="callout danger" style="margin-top:12px">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
+        <div><b>注意：</b>V5 的搜索建议用 <code>v-html</code> 注入 <code>&lt;mark&gt;</code> 做高亮。既然要把它确立为唯一主搜索，就必须同时改为 <b>DOM 分段渲染</b>（<code>createTextNode</code> + <code>&lt;mark&gt;</code> 节点拼装），否则站点名/描述里的 HTML 会成为注入面。</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 07 实施分期 ============ -->
+<section id="phases">
+  <div class="sec-head"><span class="sec-num">07</span><h2>实施分期</h2></div>
+  <p class="sec-sub">按「先止血、再正骨、后打磨」排序。每期结束都可独立上线，不留半成品。</p>
+
+  <div class="phase">
+    <div class="phead"><span class="pbadge p0">P0 · 止血</span><span>移动端不可用 + 状态可达性，先修</span></div>
+    <div class="task"><span class="id">N1</span><div class="body">
+      <h4>修复移动端内容区 0 宽</h4>
+      <p>侧栏改 <code>position:fixed</code> off-canvas；右栏 ≤1024 默认收起、≤768 隐藏；移除两侧栏在窄屏下的 <code>min-width</code> 约束。</p>
+      <div class="why"><b>依据：</b>A1。实测 <code>main.main</code> = 0px，属功能不可用。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+    </div></div>
+    <div class="task"><span class="id">N2</span><div class="body">
+      <h4>让移动端顶栏真正渲染</h4>
+      <p>为 <code>.mobile-header</code> 补 <code>@media (max-width:768px){ display:flex }</code>，汉堡按钮接入侧栏抽屉开合。</p>
+      <div class="why"><b>依据：</b>A2。DOM 存在但宽度 0。</div>
+      <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+    </div></div>
+    <div class="task"><span class="id">N3</span><div class="body">
+      <h4>新增移动端底部 tab 栏</h4>
+      <p>四项：全部 / 域 / 收藏 / 最近，第五项「更多」打开抽屉。高 56px + <code>env(safe-area-inset-bottom)</code>，正文底部预留收敛到单一来源。</p>
+      <div class="why"><b>依据：</b>A3。拇指可达性。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+    </div></div>
+    <div class="task"><span class="id">N4</span><div class="body">
+      <h4>视图状态进 URL</h4>
+      <p>新增 <code>/favorites</code> <code>/recent</code> <code>/feed</code> <code>/trash</code> 路由；<code>/category/:id</code> 重定向到 <code>/c/:id</code>；<code>activeNav</code> 由路由派生而非独立存储。</p>
+      <div class="why"><b>依据：</b>B2。让刷新、回退、分享、收藏全部生效。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i class="on"></i> · 风险中高</span>
+    </div></div>
+  </div>
+
+  <div class="phase">
+    <div class="phead"><span class="pbadge p1">P1 · 正骨</span><span>信息架构收敛，这是本轮的核心价值</span></div>
+    <div class="task"><span class="id">N5</span><div class="body">
+      <h4>移除空壳视图项，统一为 5 个范围</h4>
+      <p>删掉「发现」「分类」；侧栏范围导航固定为 全部 / 收藏 / 最近 / 聚合 / 回收站。选中分类不再改写视图状态。</p>
+      <div class="why"><b>依据：</b>B1 / B3 / B4。消除「点了没反应」与一词两义。</div>
+      <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+    </div></div>
+    <div class="task"><span class="id">N6</span><div class="body">
+      <h4>侧栏域分组默认折叠 + 分类检索框</h4>
+      <p>四组 <code>collapsed</code> 初值改 <code>true</code>；新增检索输入框，输入即过滤分类并自动展开命中的域；提供「默认展开」偏好开关照顾老习惯。</p>
+      <div class="why"><b>依据：</b>C1 / C2 / C3。31 行 → 9 行可见。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险低</span>
+    </div></div>
+    <div class="task"><span class="id">N7</span><div class="body">
+      <h4>合并工具栏，chrome 下沉</h4>
+      <p>StatsBar 与 <code>.cards-toolbar</code> 合并为单一工具栏，紧贴结果列表；排序 / 视图 / 批量 / 拖拽同处一行；统计与时钟移入侧栏底部。</p>
+      <div class="why"><b>依据：</b>D1 / D3 / D4。恢复邻近性，为内容让出首屏。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险低</span>
+    </div></div>
+    <div class="task"><span class="id">N8</span><div class="body">
+      <h4>侧栏低频项下沉</h4>
+      <p>主题换肤 / 导入导出 / 待办移出侧栏固定区，收进顶栏「更多」菜单或设置面板；侧栏底部只留「添加网站」。</p>
+      <div class="why"><b>依据：</b>P4 渐进披露。</div>
+      <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+    </div></div>
+  </div>
+
+  <div class="phase">
+    <div class="phead"><span class="pbadge p2">P2 · 打磨</span><span>可访问性与一致性</span></div>
+    <div class="task"><span class="id">N9</span><div class="body">
+      <h4>导航项键盘可达</h4>
+      <p>侧栏项改为 <code>&lt;button&gt;</code>（或补 <code>@keydown.enter/space</code>）；listbox 补 roving tabindex 与 ↑↓/Home/End；新增 skip-link。</p>
+      <div class="why"><b>依据：</b>E1 / E2 / E3。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险低</span>
+    </div></div>
+    <div class="task"><span class="id">N10</span><div class="body">
+      <h4>搜索统一 + 高亮 XSS 修复</h4>
+      <p>确立站内搜索为唯一主入口；建议高亮改 DOM 分段渲染；GoogleSearchBar 移除，外站搜索并入命令面板。</p>
+      <div class="why"><b>依据：</b>D2 + 安全。当前 <code>v-html</code> 是注入面。</div>
+      <span class="cost">工作量 <i class="on"></i><i class="on"></i><i></i> · 风险中</span>
+    </div></div>
+    <div class="task"><span class="id">N11</span><div class="body">
+      <h4>「最近」语义对齐</h4>
+      <p>让「最近」反映浏览历史（<code>history</code> store 已存在），与侧栏命名一致；收录时间另作「最新收录」排序项。</p>
+      <div class="why"><b>依据：</b>B5。</div>
+      <span class="cost">工作量 <i class="on"></i><i></i><i></i> · 风险低</span>
+    </div></div>
+  </div>
+</section>
+
+<!-- ============ 08 验收标准 ============ -->
+<section id="accept">
+  <div class="sec-head"><span class="sec-num">08</span><h2>验收标准</h2></div>
+  <p class="sec-sub">可量化，且能被脚本或人工在浏览器里逐条核对。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:74px">编号</th><th style="width:230px">验收项</th><th>判定口径</th></tr></thead>
+      <tbody>
+        <tr><th>AC-1</th><td>移动端内容可用</td><td>375px 视口下 <code>main</code> 宽度 ≥ 343px（375 − 左右各 16px），无横向滚动</td></tr>
+        <tr><th>AC-2</th><td>移动端主导航可达</td><td>底部 tab 可见且可点；汉堡按钮可见（宽度 &gt; 0）并能开合抽屉</td></tr>
+        <tr><th>AC-3</th><td>状态可直达</td><td>直接粘贴 <code>/favorites</code>、<code>/recent</code>、<code>/trash</code>、<code>/feed</code>、<code>/c/cex?sort=hot</code> 均能进入对应状态；刷新不丢失；浏览器返回键逐级回退</td></tr>
+        <tr><th>AC-4</th><td>侧栏首屏可见行数</td><td>桌面 900px 高下，无需滚动即可看到全部 5 个范围项 + 4 个域分组</td></tr>
+        <tr><th>AC-5</th><td>分类可检索</td><td>在检索框输入「交」，30 个分类中命中「交易所 CEX」并自动展开所属域，点击即进入</td></tr>
+        <tr><th>AC-6</th><td>首屏内容优先</td><td>桌面 1440×900 下，内容区在首屏可见 ≥ 6 张卡片；chrome 行数 ≤ 2</td></tr>
+        <tr><th>AC-7</th><td>键盘全链路</td><td>仅用键盘可完成「切范围 → 选分类 → 打开站点」，且焦点可见</td></tr>
+        <tr><th>AC-8</th><td>旧链接不失效</td><td>访问 <code>/category/cex</code>、<code>/c/cex</code> 自动跳转 <code>/?c=cex</code>（分类已从路径迁到 query，其它参数如 <code>sort</code> 原样保留），且内容正确</td></tr>
+        <tr><th>AC-9</th><td>能力无回归</td><td>收藏 / 待办 / 历史 / 回收站 / 批量选择 / 拖拽排序 / 命令面板 / 管理后台 八项逐一确认可用</td></tr>
+        <tr><th>AC-10</th><td>侧栏偏好保持</td><td>折叠态、拖拽宽度、域分组展开态在刷新后保留（<code>versionedPersist</code>）</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ============ 09 风险与前置 ============ -->
+<section id="risk">
+  <div class="sec-head"><span class="sec-num">09</span><h2>风险与前置动作</h2></div>
+  <div class="grid g2">
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>前置动作：先把 V6 工作区改动安全搁置。</b>当前工作区有 86 个未提交改动（V6 全部改造）。要回到 V5 根基，必须先留存它们 —— 建议打成一个补丁归档（<code>git diff</code> + 未跟踪文件打包）或提交到独立分支，<b>不做丢弃式回退</b>，保证随时可恢复。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>N1 会改动布局模型。</b>侧栏从 flex 子项改为 <code>position:fixed</code> 后，主内容区的左边距需要重新建立（原先依赖 flex 排布）。必须回归 1920 / 1440 / 1280 / 1024 / 768 / 375 六档宽度，确认三栏并排与抽屉切换都正确。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>N4 会改动路由与状态来源。</b><code>activeNav</code> 从独立 ref 改为路由派生后，<code>App.vue</code> 里现有的双向 watch（Store ↔ 路由）需一并重构，避免出现「改路由触发改 Store、改 Store 又触发改路由」的循环。这是本期风险最高的一项。</div>
+    </div>
+    <div class="callout warn">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      <div><b>N6 会改变老用户的肌肉记忆。</b>域分组默认折叠后，「点一下就能看到分类」变成「先展开域」。缓解方式：检索框自动展开 + 提供「默认展开」偏好开关，把选择权交回用户。</div>
+    </div>
+    <div class="callout ok">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b>数据层一律不动。</b>本地覆盖层（<code>nav-sites-overlay</code>）、会话同步、探活分级、<code>shared/categories.mjs</code> 单一分类源，是本项目最值钱的资产。所有改造都建立在它们之上，不触碰。</div>
+    </div>
+    <div class="callout ok">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+      <div><b>上线路径已有自动化。</b><code>npm run check</code> 做站点体检、<code>npm run publish</code> 走「备份 → schema 门禁 → 构建 → 热更新 → 验证」。每期结束按此发布，不手工改线上数据。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 10 取证 ============ -->
+<section id="src">
+  <div class="sec-head"><span class="sec-num">10</span><h2>取证来源</h2></div>
+  <ul class="src">
+    <li><b>V5 源码</b><span><code>git show HEAD:&lt;path&gt;</code>（HEAD = <code>49d305e</code>）：<code>App.vue</code> / <code>components/Sidebar.vue</code> / <code>components/MobileHeader.vue</code> / <code>components/RightSidebar.vue</code> / <code>components/CardsContainer.vue</code> / <code>components/SiteSearchBar.vue</code> / <code>components/StatsBar.vue</code> / <code>stores/sidebar.js</code> / <code>stores/sites.js</code> / <code>stores/categories.js</code> / <code>styles/main.css</code> / <code>router/index.js</code> / <code>shared/categories.mjs</code></span></li>
+    <li><b>线上实测</b><span>浏览器访问 <code>https://navigator-v2-two.vercel.app</code>（生产 v102），375×812 视口实测：<code>aside.sidebar</code> 渲染宽 229px、<code>main.main</code> 宽 0px、<code>.mobile-header</code> 宽 0px</span></li>
+    <li><b>断点枚举</b><span><code>git grep "@media (max-width" HEAD -- src</code>：全站仅 CardsContainer(1024/768)、SiteSearchBar(768)、main.css(768)、AdminView(900) 四处，无任何侧栏响应式规则</span></li>
+    <li><b>线上版本</b><span><code>/api/sites</code> 返回 <code>version=102</code>、<code>count=301</code>、<code>icons=292</code>；部署产物 <code>assets/index-DT8yW9BP.js</code> 含 V5 特征、不含 V6 特征</span></li>
+  </ul>
+</section>
+
+<footer>Navigator 导航结构优化方案 · 以 V5（49d305e / v102）为基线 · 本文档为评审稿，待确认后进入实施</footer>
+
+</div>
+
+<script>
+  const btn = document.getElementById('themeBtn');
+  const root = document.documentElement;
+  const saved = localStorage.getItem('nav-opt-theme');
+  if (saved) root.setAttribute('data-theme', saved);
+  btn.addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    localStorage.setItem('nav-opt-theme', next);
+  });
+</script>
+</body>
+</html>

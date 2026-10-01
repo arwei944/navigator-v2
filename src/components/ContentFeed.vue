@@ -214,6 +214,10 @@ function onVisit(siteId) {
   height: 100%;
   box-sizing: border-box;
 }
+@media (max-width: 768px) {
+  /* 为底部 tab 栏留出空间 */
+  .feed-panel { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
 
 /* ---- 分区 ---- */
 .feed-section {

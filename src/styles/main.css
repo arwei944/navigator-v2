@@ -165,7 +165,13 @@ button { font-family: inherit; }
 }
 
 /* 响应式 */
+@media (min-width: 769px) {
+  /* 桌面端侧栏是常驻栏位，遮罩层无意义（避免移动端开抽屉后缩回桌面残留遮罩） */
+  .overlay { display: none !important; }
+}
 @media (max-width: 768px) {
+  /* 移动端：顶栏在文档流顶部，主内容区纵向占满；侧栏为 fixed 抽屉，不占位 */
+  .app-layout { flex-direction: column; }
   .main { margin-left: 0 !important; }
   ::-webkit-scrollbar { width: 3px; }
 }

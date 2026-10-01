@@ -1587,3 +1587,256 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
   （已推送 origin/master）。
 - 线上实测（`/api/metadata?url=https://openchainbench.com/`）：`color=#7a2e1f`、
   `sources.color=manifest`、`confidence.color=high` ✅（修复前为 hash 色 `#313db9`）。
+
+---
+
+## 三十、站点数据新增 `aliases` 字段 + 别名录入（2026-10-01，Nav V5「找得到」）
+
+检索此前只认 `name / url / desc`，中文用户敲「币安」「小狐狸」「抱抱脸」「火币」找不到站点 ——
+而这些正是他们最自然的叫法。本次为站点数据引入可选的 `aliases: string[]`，并完成全量录入。
+
+### 30.1 字段与录入口径
+
+- **字段**：`aliases?: string[]`，可选。缺失 / 空数组等价于「无别名」，前端与校验器都按此处理。
+- **收录口径**（宁缺毋滥，别名只增加召回、不改动主名称的排序地位）：
+  1. 中文俗称 / 官方中文名 —— 币安、欧易、小狐狸、扣子、抹茶、慢雾、律动
+  2. 中英互译 —— 豆包 → `Doubao`，英文站补中文名
+  3. 曾用名 —— HTX 的「火币」、OKX 的「OKEx」、Make 的「Integromat」
+  4. 通用缩写 —— `GPT`、`MJ`、`SD`、`CMC`、`HF`
+- **明确不收**：代币代码（UNI / TAO）、与站名仅大小写不同的写法、字面直译但社区不这么叫的
+  （Uniswap→优尼斯瓦普）、歧义过大的两字母词（MM / TV / CG / ME）。
+- **类别级通用词也不收**：`空投`、`临时邮箱` 挂在个别站点上会造成「搜『空投』只出两个站、
+  其余同类站点不出现」的误导 —— 这类词归分类，不归别名（脚本 `DROP` 表显式移除）。
+- **录入结果**：**135 个站点 / 176 条别名**（原始映射 221 条，剔除无检索价值项后落库）。
+  仅 `苹果id`（acc1/acc2）、`hero sms`（sm8/sm17）两条在站间重复，均为同品牌 / 同品类，属预期。
+
+### 30.2 检索内核：别名参与评分
+
+`src/utils/search.js` 评分档位扩为（高 → 低）：
+
+```
+名称精确 1000 > 别名精确 940 > 名称前缀 820 > 别名前缀 760
+> 名称包含 640 > 别名包含 580 > 域名 520 > 描述 440
+> 拼音首字母前缀 400 > 别名拼音首字母前缀 380
+> 拼音名包含 340 > 别名拼音包含 320 > 拼音描述 200
+```
+
+- 别名排在「同名档位之后、域名 / 描述之前」：既让俗称找得到，又不喧宾夺主。
+- `keysOf()` 的 `WeakMap` 缓存新增 `aliases / pyAliases / pyAliasInitial`，拼音只算一次。
+- Fuse 模糊兜底新增 `aliases` 键（权重 1.6），拼写近似时俗称同样能兜住。
+- 新增 `matchedAlias(site, query)`：返回命中的别名（精确 > 前缀 > 包含 > 拼音），
+  供 UI 解释「这条为什么会出现」；无命中返回 `''`。
+
+### 30.3 界面与编辑入口
+
+| 位置 | 改动 |
+|------|------|
+| `SiteSearchBar.vue` | 结果名称后新增 `别名 · 币安` 标签（`.suggestion-name` 改 flex，名称分段包进 `.suggestion-name-text` 以免高亮被拆成多个 flex 项）；placeholder 补「别名」 |
+| `command/CommandResults.vue` | 命令面板站点行 URL 前显示 `别名 · X` |
+| `AddSiteModal.vue` / `EditSiteModal.vue` | 新增「别名」输入（逗号 / 顿号分隔），`parseAliases()` 归一：去重 + 剔除与站名 / 域名同形项 |
+| `tools/console/lib/sites.mjs` | `EDITABLE` / `LIST_FIELDS` 加入 `aliases`；新增 `normalizeAliases()`；列表搜索覆盖别名；`updateSite` 清空即删除字段 |
+| `tools/console/ui/` | 表单新增「别名」宽字段；列表行显示 `别名 N` 徽标 |
+| `scripts/validate-data.mjs` | 校验 `aliases` 必须是非空字符串数组、无站内重复；与站名 / 域名同形仅告警 |
+
+### 30.4 验收
+
+- `node scripts/seed-aliases.mjs`（幂等，写入前自动备份至 `backups/sites-data-*.json`）：
+  首轮 +137 站 / +180 条，清理轮 -4 条，最终 **135 站 / 176 条**。
+- `npm run validate` → 301 条通过（9 条已知无图标为预期警告）。
+- `node probe/_search-test.mjs` → **42 passed / 0 failed**（新增 A7.1–A7.16 共 16 条别名断言：
+  俗称 / 曾用名 / 缩写 / 别名拼音 / 别名首字母命中，别名精确档位与主名称档位不互相压制）。
+  - 注：A4.3 / A4.4 由 `wushuo` 改为完整全拼 `wushuoqukuailian` —— md5 新增别名 `WuShuo`
+    会截走前缀查询，完整全拼不是任何别名的子串，才能真正隔离「名称拼音」路径。
+- `npm run build` → 通过（`index-*.js` 688.66 kB / gzip 312.21 kB）。
+- `npm run console:test:all` → 全部通过（trust 13 / infer 108 / guard 27 / hunks 72）。
+
+---
+
+## 三十一、「发布 + 管理」合并大模块（2026-10-01，Nav V5「可运维」）
+
+此前发布与运营能力散落在三处：本地控制台只做「提交 → 推送 → 发布 → 热更新」，
+线上 `/admin` 只做「改站点数据 + 推云端」，CLI 只能跑零散命令。三者各写一套逻辑，
+语义漂移、体验割裂。本次把它们合并成一个**共用内核、双端等价、双入口**的大模块。
+
+### 31.1 架构：一套内核，两端入口
+
+```
+        ┌──────────────── 共用内核 shared/ops/（纯逻辑，零依赖） ────────────────┐
+        │  site-ops   pipeline   publish-history   notify-core   audit-core     │
+        └───────┬───────────────┬───────────────┬──────────────┬───────────────┘
+                │               │               │              │
+   本地控制台 ──┼───────────────┼───────────────┼──────────────┼──── 线上 /admin
+   （tools/console）             │               │              │     （api/ops.js + src/components/admin/）
+                │               │               │              │
+   CLI nav ─────┴───────────────┴───────────────┴──────────────┴──── MCP nav_* 工具
+```
+
+- **双端等价**：本地控制台与线上 `/admin` 共用同一批纯函数，同一份记录结构、同一套分级口径。
+  两端能在同一套语义下对比同一段历史，避免「本地看着成功、线上看着失败」。
+- **双入口**：能力同时挂在「本地控制台」与「线上管理后台」，各自服务不同场景
+  （本机全链路发布 vs. 任意地点改数据 / 看历史）。
+- **内核边界**：`shared/ops/*` 只放纯逻辑，不碰文件系统 / 网络 / Blob ——
+  落盘在 `tools/console/lib/*`，云端持久化在 `api/ops.js`，两端各自注入。
+
+### 31.2 内核清单（`shared/ops/`，5 个文件）
+
+| 文件 | 职责 | 关键导出 |
+|------|------|---------|
+| `site-ops.mjs` | 站点数据纯逻辑：字段定义、URL 归一、校验、diff、完整性体检、批量操作 | `SITE_FIELDS` `normalizeUrl` `validateSite` `diffSites` `checkIntegrity` `BATCH_OPS` `applyBatch` `batchSummary` `matchSite` |
+| `pipeline.mjs` | 发布流水线定义与状态机：步骤目录、三段管线、执行端能力、推进 / 收敛 | `STEP_CATALOG` `FULL_PIPELINE` `DATA_ONLY_PIPELINE` `CLOUD_PIPELINE` `RUNNER_CAPS` `planPipeline` `markStep` `advanceTo` `pipelineVerdict` |
+| `publish-history.mjs` | 发布历史记录模型与检索：归一、排序、筛选、概览、裁剪、回退目标推导 | `HISTORY_KEEP` `TRIGGERS` `normalizeRecord` `filterRecords` `summarizeRecords` `prunableRecords` `rollbackTarget` |
+| `notify-core.mjs` | 通知中心：类型目录、级别口径、聚合键折叠、Webhook 投递体 | `NOTIFY_KINDS` `SEVERITY_LABEL` `buildNotification` `collapseNotifications` `filterNotifications` `webhookPayload` `notificationText` |
+| `audit-core.mjs` | 审计事件：动作目录、归一、筛选、概览、动作中文名 | `AUDIT_ACTIONS` `normalizeEntry` `filterEntries` `summarizeEntries` `actionLabel` |
+
+**批量操作目录 `BATCH_OPS`**（`destructive` 的 UI 必须二次确认；`patchKeys` 声明写哪些字段，
+供前端表单与影响面预览共用）：
+
+| op | 标签 | 写字段 | 说明 |
+|----|------|--------|------|
+| `category` | 改分类 | `categoryId` | 整体迁移到另一分类 |
+| `color` | 改配色 | `color` | 统一主题色 |
+| `aliasAdd` | 追加别名 | `aliases` | 在既有别名上追加（不覆盖） |
+| `aliasSet` | 替换别名 | `aliases` | 整体替换别名列表 |
+| `icon` | 清空图标 | `icon` | 清空引用，前端回落分类色块 + 首字母 |
+| `remove` | 删除站点 | — | `destructive`，不可撤销 |
+
+**发布流水线三段**（`RUNNER_CAPS` 决定执行端能跑哪些步骤，跑不了的显式 `skipped` 而非静默略过）：
+
+- `FULL_PIPELINE`：check → commit → push → backup → validate → build → deploy → hotupdate → verify（本地控制台）
+- `DATA_ONLY_PIPELINE`：check → commit → push → backup → validate → hotupdate → verify（只同步数据）
+- `CLOUD_PIPELINE`：validate → hotupdate → verify（线上后台无 git / 构建能力，从门禁起步）
+
+### 31.3 本地控制台（`tools/console/`）
+
+| 位置 | 能力 |
+|------|------|
+| `lib/sites.mjs` | 新增 `previewBatch()` / `batchOp()`（`dryRun=true` 时与预演完全等价，CLI `--dry-run` 复用）；`BATCH_OP_LIST` 供前端渲染操作下拉 |
+| `lib/publishlog.mjs` | 发布历史落盘 `tools/console/.data/publish-history.jsonl`；整文件重写以支持裁剪；**写入失败绝不阻断发布**（历史是旁路） |
+| `lib/notify.mjs` | 通知中心落盘 + 未读统计 + Webhook 投递 |
+| `lib/schedule.mjs` | 定时巡检：按间隔探活全站，按「状态翻转」差集推送通知（一直宕着的不每轮刷屏） |
+| `lib/api.mjs` | 新增 `/api/sites/batch/preview`（只读）、`/api/sites/batch`、`/api/publish/history`、`/api/notify*`、`/api/schedule*`；批量结果里 `next` 是整份 300+ 条站点数组，`stripNext()` 不回传前端 |
+| `ui/sitespanel.js` | 批量选择模式（复选框 + 全选本页 + 已选计数）、操作下拉与动态字段、影响面预演、执行、取消选择 |
+| `ui/syncpanel.js` | 发布历史卡片：摘要统计（总数 / 成功 / 失败 / 成功率 / 平均耗时）、按结果 / 来源 / 关键词筛选、审计行样式复用 |
+| `ui/notifypanel.js` | 通知中心：类型 / 级别 / 只看未读筛选、全部已读、清空、Webhook 配置与测试投递、定时巡检配置 |
+
+### 31.4 线上 `api/ops.js` + `/admin` 组件
+
+- **`api/ops.js`（新增，运维面）**：发布历史与通知中心的 Blob 持久化与查询。
+  与 `api/sites.js`（**数据面**）刻意分开 —— 数据面必须简单、失败面小（热更新是用户可感知的关键路径），
+  运维面是旁路，写失败不该拖慢发布。全部要求 `Bearer <SITES_ADMIN_KEY>`。
+  - 读：`?limit=&ok=&trigger=&q=` 取发布历史；`?notifications=1&severity=&kind=&unread=&q=` 取通知。
+  - 写：`history.append` / `notify.push` / `notify.read` / `notify.clear`。
+  - 存储：`ops/publish-history.json`（保留 `HISTORY_KEEP` 条）、`ops/notifications.json`（保留 200 条）。
+- **`src/services/opsApi.js`（新增）**：前端封装，统一带 Bearer；密钥缺失由调用方先行拦截。
+- **`src/components/admin/`（新增 4 个组件，AdminView 拆分为壳 + 业务子组件）**：
+
+  | 组件 | 能力 |
+  |------|------|
+  | `AdminBatchBar.vue` | 批量选择 + 操作 + 影响面预演（与本地控制台同目录同语义） |
+  | `AdminSnapshots.vue` | 云端快照清单 + 一键回滚 |
+  | `AdminPublishHistory.vue` | 发布历史列表 + 概览 + 筛选 |
+  | `AdminNotifications.vue` | 通知中心 + 未读角标（`@badge` 上抛给壳） |
+
+  发布成功后必须先 `applyCloudData(响应)` 再 `clearLocalOverlay()`，顺序反了会瞬间回退到旧基底。
+
+### 31.5 CLI 与 MCP
+
+- **CLI `nav sites batch`**：`--op <category|color|aliasAdd|aliasSet|icon|remove> --ids <id,id,...>`；
+  删除（`destructive`）在非 `--dry-run` 时**必须显式 `--yes`**，否则拒绝执行；`--dry-run` 只预演影响面。
+- **CLI `nav ops`（新增命令组）**：`history` / `notify` / `notify-read` / `notify-clear` / `webhook` /
+  `webhook-set` / `inspect`。与本地控制台、线上后台共用同一批内核与同一份数据来源。
+- **MCP**：`nav_sites` 新增 `batch` 动作；新增 `nav_ops` 工具（7 个动作）。
+  写操作默认只预演，须带 `confirm: true` 才真跑；工具数收敛在 6 个（`nav_status` / `nav_sites` /
+  `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），远离膨胀阈值。
+
+### 31.6 验收
+
+- `npm run console:test:all` → 全部通过：trust（13）/ infer（108）/ guard（27）/ hunks（72）/
+  **ops（62，新增）** / **api-ops（12，新增）**。
+  - `test-ops.mjs`：钉死五个内核的关键契约 —— 批量预演必须等于实写、云端执行端必须显式跳过跑不了的步骤、
+    通知必须按聚合键折叠、发布记录必须能从快照推导出回退目标。
+  - `test-api-ops.mjs`：用 `node:test` 的模块 mock 顶掉 `@vercel/blob`，把 `api/ops.js` 当普通函数调，
+    在本地跑通「鉴权 / 路由 / 落盘语义」，不依赖网络与凭据（含 500 / 401 / 400 / 405 异常路径）。
+- `npm run mcp:test` → **98 条断言全通过**（新增 `nav_sites batch`、`nav_ops` 契约与闸门断言）。
+- `npm run validate` → 301 条通过（9 条已知无图标为预期警告）。
+- `npm run build` → 通过。`AdminView` 已拆为独立懒加载 chunk（`AdminView-*.js` 29.82 kB / gzip 11.42 kB），
+  主包 `index-*.js` 685.76 kB / gzip 311.38 kB。
+- `node probe/_console-probe.cjs` → 控制台 UI 实测全绿、**0 控制台报错**：
+  - 通知面板：8 条通知、类型 / 级别下拉齐全、角标随「全部已读」即时归零；
+  - 同步面板：发布历史摘要 + 2 行记录 + 来源筛选下拉 + 5 份云端快照；
+  - 站点面板：**301 行 / 301 复选框**、批量操作下拉 6 项、批量卡片随选择态显隐、
+    已选计数（`已选 2 / 显示 301`）→ 预演影响面 → 取消选择归零。
+- CLI 冒烟：`nav help`（新增「运维事件与通知」命令组）、`nav ops history` / `notify` /
+  `sites batch --dry-run` / `ops inspect --dry-run` 均返回预期契约。
+
+---
+
+## 三十二、导航结构重设计（2026-10-01，Nav V5「好找」）
+
+侧栏此前把「范围 + 全部 30 个子分类」堆在同一列，信息密度过高、层级不清；且分类进路径
+（`/c/:id`）导致「收藏 + 币圈」这类组合无法表达 —— 在收藏页点任一方向筛选就被弹回全量范围。
+本次把导航拆成**三根互不挤占的轴**，并把子分类整体搬到中间栏。
+
+设计稿见 `docs/NAV-v5-nav-optimization.html`。
+
+### 32.1 三轴正交模型
+
+| 轴 | 取值 | 承载位置 | 状态表达 |
+|----|------|---------|---------|
+| **范围** | 全部 / 收藏 / 最近 / 内容聚合 / 回收站 | 侧栏 5 项 + 移动端底部 tab | **路径**：`/` `/favorites` `/recent` `/feed` `/trash` |
+| **域** | 全部 / AI 学习 / 币圈 / 工具 / 基础服务 | 中间栏一级分段控件 | **query** `?c=` |
+| **筛选** | 子分类（30 个，按域分组） | 中间栏二级 chips | **query** `?c=`（与域共用同一参数） |
+
+关键约束：**范围进路径、筛选进 query**。两轴各自独立，才能在 `/favorites?c=cex` 上同时表达
+「收藏里看交易所」，范围不会被筛选挤掉。
+
+### 32.2 侧栏瘦身 + 移动端 off-canvas 抽屉
+
+- `Sidebar.vue` 只保留 5 个范围项 + 底部设置/折叠入口，子分类整体迁出（这是「太乱」的根因）。
+- 桌面折叠 `240px → 60px`，折叠态图标居中、隐藏文字与徽标；偏好持久化（`AC-10`）。
+- ≤768px：侧栏改为 `position: fixed` 的 off-canvas 抽屉（`transform: -307.5px ↔ 0`）+ 遮罩，
+  不再挤压内容区（`mainW=375`，`hOverflow=0`）；点遮罩关闭。
+- 新增 `MobileTabBar.vue`（全部 / 收藏 / 最近 / 更多）：底部拇指可达；「更多」拉起抽屉
+  复用同一份侧栏，不做第二套导航。
+
+### 32.3 中间栏两级筛选条（`FilterBar.vue`）
+
+- **一级域 tabs**：带计数（`全部 301 | AI 学习 79 | 币圈 168 | 工具 45 | 基础服务 9`）。
+- **二级 chips**：未选域时**按域分组多行铺开**（每组自带换行，标签不会被甩到行尾）；
+  选中域后只列该域子分类，首位固定「全部」用于退回整域。
+- **再点已选中的子分类 = 退回它所属的域**，避免「只能前进不能后退」。
+- 域是派生量：选了子分类时其所属域保持高亮，用户不丢方向感。
+- **计数基准跟随范围轴**：收藏范围内只数收藏，否则数字与下方列表对不上。
+- 多行铺开 + **无横向滚动条**（探针实测 `chipRowOverflowX=0`）。
+
+### 32.4 工具栏合并（`MainToolbar.vue`）
+
+- 站内搜索 `SiteSearchBar` + 外部搜索 `ExternalSearchBox` 同排。外部搜索用原生 `<form method="GET">`
+  提交（`target="_blank"` + `rel="noopener noreferrer"`），引擎下拉 Google / Bing / 百度 / DDG / PPLX，
+  下拉用短标签避免被 `DuckDuckGo` 撑宽（设置面板内仍是全称），引擎选择持久化。
+- 排序 / 批量选择 / 手动排序 / 视图切换 / 待办 / 主题 / 设置 收敛为一行，统计信息下沉。
+- 响应式收敛：≤1500px「选择 / 手动排序」只留图标（tooltip 补文案）；≤1360px、≤1300px 逐级收窄外部搜索输入。
+
+### 32.5 URL 状态化与旧链接兼容（`router/index.js`）
+
+- 范围进路径，分类与搜索进 query（`?c=` / `?q=`）。
+- 旧链接不失效：`/c/:id` 与 `/category/:id` 重定向到 `/?c=:id`，并**保留其余 query**（如 `sort=hot`）。
+- 浏览器返回键逐级回退：`/favorites(9) → /favorites?c=crypto(7) → /favorites(9)`，计数复原。
+- `/admin` 与 404 走独立布局，不被主导航壳包裹。
+
+### 32.6 首屏内容优先
+
+合并工具栏 + 统计下沉 + 移除冗余组件后，chrome 压到 **2 行 / 281px**（`gridTop=309`），
+1440px 首屏可见 **8 张卡片**（验收线 ≥6）。
+
+### 32.7 验收
+
+- **布局 / 交互探针**：`probe/_measure.html`（30 个用例，`node probe/_run-probe.cjs` 驱动真实窗口）→
+  **★ 全部断言通过**：
+  - AC-2 移动端抽屉开合 3/3；AC-3 返回键 3/3；AC-4 侧栏首屏可见；AC-5 命令面板可检索分类；
+    AC-6 首屏内容优先；AC-7 键盘全链路；AC-8 旧链接兼容 7/7；AC-9 能力无回归 8/8；AC-10 侧栏偏好持久化。
+  - 交互快照 16 个：计数≠卡片数 **0**、范围被挤掉 **0**。
+  - 断点实测 375 / 768 / 1024 / 1280 / 1440 / 1920，`hOverflow=0`（无横向溢出）。
+- `node probe/_search-test.mjs` → 42 passed / 0 failed。
+- `npm run build` → 通过。
+- 探针产物（报告 / 截图 / 日志）由 `.gitignore` 排除，不入库。
