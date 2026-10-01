@@ -40,17 +40,25 @@
       </div>
     </nav>
 
-    <div class="sidebar-footer" v-show="!isCollapsed">
-      <!-- 统计与时钟从首屏工具栏下沉到这里，把首屏让给内容 -->
-      <div class="sidebar-stats">
-        <div class="sidebar-stat">共 <strong>{{ sitesStore.sites.length }}</strong> 个站点</div>
-        <div class="sidebar-stat">今日访问 <strong>{{ todayCount }}</strong></div>
-        <div class="sidebar-stat">收藏 <strong>{{ favoritesStore.count }}</strong></div>
+    <!-- 底部区：统计/时钟/添加在折叠时整体收起；管理入口常驻，折叠态收为图标，保证任何状态都可达 -->
+    <div class="sidebar-bottom">
+      <div class="sidebar-footer" v-show="!isCollapsed">
+        <!-- 统计与时钟从首屏工具栏下沉到这里，把首屏让给内容 -->
+        <div class="sidebar-stats">
+          <div class="sidebar-stat">共 <strong>{{ sitesStore.sites.length }}</strong> 个站点</div>
+          <div class="sidebar-stat">今日访问 <strong>{{ todayCount }}</strong></div>
+          <div class="sidebar-stat">收藏 <strong>{{ favoritesStore.count }}</strong></div>
+        </div>
+        <DigitalClock class="sidebar-clock" />
+        <button class="sidebar-btn sidebar-btn-primary" @click="showAddModal = true" aria-label="添加网站">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          添加网站
+        </button>
       </div>
-      <DigitalClock class="sidebar-clock" />
-      <button class="sidebar-btn sidebar-btn-primary" @click="showAddModal = true" aria-label="添加网站">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        添加网站
+      <!-- 纯前端管理入口：直达 /admin（发布热更新、批量操作、快照回滚、通知） -->
+      <button class="sidebar-btn sidebar-admin-btn" @click="goAdmin" aria-label="管理后台" :title="isCollapsed ? '管理后台' : ''">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span v-show="!isCollapsed">管理后台</span>
       </button>
     </div>
 
@@ -108,6 +116,11 @@ function navigate(name) {
   } else {
     router.push({ name })
   }
+  sidebarStore.close()
+}
+
+function goAdmin() {
+  router.push('/admin')
   sidebarStore.close()
 }
 
@@ -210,6 +223,14 @@ onUnmounted(() => {
   padding: 0 4px;
   border-radius: 8px;
 }
+/* 折叠态：管理入口收为图标并居中，保持底部可达 */
+.sidebar.collapsed .sidebar-bottom { padding: 8px; }
+.sidebar.collapsed .sidebar-admin-btn {
+  justify-content: center;
+  padding: 9px 0;
+  width: 44px;
+  margin: 0 auto;
+}
 
 .sidebar-header {
   display: flex;
@@ -264,7 +285,8 @@ onUnmounted(() => {
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
 .sidebar-nav-item.active svg { opacity: 1; }
 .badge { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
-.sidebar-footer { margin-top: auto; padding: 16px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.sidebar-bottom { margin-top: auto; padding: 16px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.sidebar-footer { display: flex; flex-direction: column; gap: 8px; }
 .sidebar-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 4px; }
 .sidebar-stat { font-size: 12px; color: var(--text-sidebar-dim); }
 .sidebar-stat strong { color: var(--text-sidebar); font-weight: 600; }

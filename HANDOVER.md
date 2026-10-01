@@ -1840,3 +1840,33 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 - `node probe/_search-test.mjs` → 42 passed / 0 failed。
 - `npm run build` → 通过。
 - 探针产物（报告 / 截图 / 日志）由 `.gitignore` 排除，不入库。
+
+## 三十三、纯前端管理入口可见化（2026-10-01，Nav V5「可运维」）
+
+### 33.1 背景
+
+`/admin` 此前只有两条入口：命令面板 `⌘K` →「管理后台」，或手敲 URL。主界面（侧栏 / 工具栏 / 设置）
+均无可见入口，普通用户基本找不到 —— 与「完全在前端做管理」的目标不符。
+
+### 33.2 改动
+
+- `Sidebar.vue` 底部新增常驻「管理后台」按钮（齿轮图标，次级虚线样式，区别于实心「添加网站」），
+  点击 `router.push('/admin')`，移动端自动收起抽屉。
+- 底部区重构为 `.sidebar-bottom` 容器：统计 / 时钟 /「添加网站」在折叠态整体收起
+  （`v-show="!isCollapsed"`），「管理后台」**常驻**，折叠态收为居中图标（`width:44px` + tooltip），
+  保证任何状态都可达。
+- `.sidebar-footer` 的 `margin-top:auto` / 上边框 / 内边距上移到 `.sidebar-bottom`，折叠态补
+  `.sidebar-bottom{padding:8px}` 与 `.sidebar-admin-btn{justify-content:center;width:44px;margin:0 auto}`。
+
+### 33.3 现在的三条入口
+
+| 入口 | 位置 | 备注 |
+|------|------|------|
+| 侧栏底部「管理后台」 | 侧栏底部，常驻 | 新增；折叠态为图标 |
+| 命令面板 | `⌘K` →「管理后台」 | 既有 |
+| 直接 URL | `/admin` | 线上返回 200（SPA 兜底） |
+
+### 33.4 验收
+
+- `npm run build` → 通过。
+- 写操作仍需在页面填入 `SITES_ADMIN_KEY`（存 `localStorage.nav_admin_key`，下次自动填充）。
