@@ -3169,19 +3169,6 @@
     ]
   },
   {
-    "id": "sm3",
-    "name": "Xtemporary",
-    "url": "xtemporary.com",
-    "desc": "免费临时邮箱和短信接收平台，保护隐私，匿名接收验证邮件和短信。",
-    "categoryId": "sms",
-    "color": "#8b5cf6",
-    "initial": "X",
-    "sortOrder": 206,
-    "visitCount": 0,
-    "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
-  },
-  {
     "id": "sm4",
     "name": "SMS-Activate",
     "url": "sms-activate.org",
@@ -4063,24 +4050,6 @@
     "createdAt": 1788044762249,
     "updatedAt": 1788044762253,
     "icon": "icons/dt23.png"
-  },
-  {
-    "id": "sm16",
-    "name": "四方接码平台",
-    "url": "sz-fang.cc",
-    "desc": "四方接码平台，提供临时手机号与短信验证码接收服务，含网页端控制台、用户端（卡号端）与卡商端客户端下载，支持 API 接入，常用于账号注册、短信验证码接收等场景。",
-    "categoryId": "sms",
-    "color": "#059669",
-    "initial": "四",
-    "sortOrder": 264,
-    "visitCount": 0,
-    "createdAt": 1788099598401,
-    "updatedAt": 1788099598405,
-    "icon": "icons/sm16.ico",
-    "aliases": [
-      "四方接码",
-      "四方"
-    ]
   },
   {
     "id": "acc3",

@@ -13,6 +13,7 @@
     "deploy": "vite build && vercel deploy --prod --yes --name=navigator-v2",
     "publish": "node scripts/publish.mjs",
     "validate": "node scripts/validate-data.mjs",
+    "auth:hash": "node scripts/hash-password.mjs",
     "check": "node scripts/check-sites.mjs",
     "check:report": "node scripts/check-sites.mjs --only-bad --report",
     "icons": "node scripts/fetch-favicons.mjs",

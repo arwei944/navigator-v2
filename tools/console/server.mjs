@@ -12,8 +12,12 @@ import { ROOT, loadEnv } from './lib/env.mjs'
 import { handleApi, sendJson, isTrusted } from './lib/api.mjs'
 import * as jobs from './lib/jobs.mjs'
 import { startScheduler } from './lib/schedule.mjs'
+import { applyProxyEnv } from '../../shared/proxy.mjs'
 
 loadEnv()
+// 代理端口探测：把本机实际监听的代理端口写回环境变量，使所有 curl.exe 子进程
+// （探活 / 发布 / 抓取 / 通知）都免疫 Clash 端口漂移，无需逐个调用点改造
+const ACTIVE_PROXY = await applyProxyEnv()
 // 定时巡检的进程内调度：配置为启用时按间隔自动探活。控制台未开时由外部计划任务兜底。
 startScheduler()
 
@@ -151,5 +155,6 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`\n  nav-console 已启动  →  http://localhost:${port}\n`)
   console.log(`  项目根目录: ${ROOT}`)
   console.log(`  端口策略: ${STRICT_PORT ? '严格固定（不漂移）' : '占用则顺延 +1'}`)
+  console.log(`  代理环境: ${ACTIVE_PROXY || '未探测到（直连）'}`)
   console.log('  仅监听 127.0.0.1，Ctrl+C 退出\n')
 })

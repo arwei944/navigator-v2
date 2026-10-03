@@ -7,9 +7,10 @@
  * 把两者分到不同函数，数据面就永远不会因为运维面的 bug 而变慢或变脆。
  *
  * 记录结构来自 shared/ops/*（与本地控制台同源），因此两端能在同一套语义下对比。
- * 鉴权：全部要求 Bearer <SITES_ADMIN_KEY> —— 运维面信息不对匿名访客开放。
+ * 鉴权：全部要求 Bearer 凭据（登录会话 token 或 SITES_ADMIN_KEY）—— 运维面信息不对匿名访客开放。
  */
 import { get, put } from '@vercel/blob'
+import { checkAuthHeader } from '../shared/auth.mjs'
 import {
   HISTORY_KEEP, TRIGGERS, normalizeRecord, sortRecords, filterRecords,
   summarizeRecords, prunableRecords,
@@ -18,10 +19,16 @@ import {
   NOTIFY_KINDS, SEVERITY_LABEL, buildNotification, collapseNotifications,
   sortNotifications, filterNotifications, summarizeNotifications,
 } from '../shared/ops/notify-core.mjs'
+import {
+  AUDIT_ACTIONS, AUDIT_RESULTS, actionOptions,
+  normalizeEntry, filterEntries, summarizeEntries,
+} from '../shared/ops/audit-core.mjs'
 
 const HISTORY_PATH = 'ops/publish-history.json'
 const NOTIFY_PATH = 'ops/notifications.json'
+const AUDIT_PATH = 'ops/audit.json'
 const NOTIFY_KEEP = 200
+const AUDIT_KEEP = 2000
 
 /* ---------------- Blob 读写 ---------------- */
 
@@ -48,6 +55,7 @@ async function writeJson(pathname, data) {
 
 const readHistory = () => readJson(HISTORY_PATH, [])
 const readNotifications = () => readJson(NOTIFY_PATH, [])
+const readAudit = () => readJson(AUDIT_PATH, [])
 
 /* ---------------- 写入 ---------------- */
 
@@ -76,15 +84,25 @@ async function markRead(ids) {
   return { updated: next.filter(n => n.read).length, total: next.length }
 }
 
+/**
+ * 追加一条审计记录。审计是旁路：写失败不抛给调用方，只回 ok:false，
+ * 让「记不上账」不至于反过来阻断发布/编辑这些主流程。
+ */
+async function appendAudit(input) {
+  const entry = normalizeEntry(input || {})
+  const items = [entry, ...await readAudit()].slice(0, AUDIT_KEEP)
+  await writeJson(AUDIT_PATH, items)
+  return entry
+}
+
 /* ---------------- HTTP 辅助 ---------------- */
 
+/**
+ * 鉴权：运维面全部要求 Bearer 凭据（会话 token 或共享密钥）。
+ * 运维面信息不对匿名访客开放。
+ */
 function authorized(req) {
-  const adminKey = process.env.SITES_ADMIN_KEY
-  if (!adminKey) return { ok: false, code: 500, error: 'SITES_ADMIN_KEY not configured' }
-  const auth = (req.headers && req.headers.authorization) || ''
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : auth.trim()
-  if (token !== adminKey) return { ok: false, code: 401, error: 'Unauthorized' }
-  return { ok: true }
+  return checkAuthHeader(req)
 }
 
 function noStore(res) {
@@ -110,6 +128,27 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      if (query.audit !== undefined) {
+        const all = await readAudit()
+        const items = filterEntries(all, {
+          action: query.action || '',
+          result: query.result || '',
+          q: query.q || '',
+        })
+        const limit = Math.max(1, Math.min(Number(query.limit) || 200, 2000))
+        res.status(200).json({
+          ok: true,
+          total: all.length,
+          matched: items.length,
+          summary: summarizeEntries(all),
+          actions: actionOptions(),
+          actionLabels: AUDIT_ACTIONS,
+          results: AUDIT_RESULTS,
+          items: items.slice(0, limit),
+        })
+        return
+      }
+
       if (query.notifications !== undefined) {
         const raw = await readNotifications()
         const collapsed = collapseNotifications(sortNotifications(raw))
@@ -182,6 +221,16 @@ export default async function handler(req, res) {
         case 'notify.clear': {
           await writeJson(NOTIFY_PATH, [])
           res.status(200).json({ ok: true })
+          return
+        }
+        case 'audit.append': {
+          try {
+            const entry = await appendAudit(body.entry || body)
+            res.status(200).json({ ok: true, entry })
+          } catch (e) {
+            // 审计是旁路：落盘失败也不能让调用方以为主流程失败
+            res.status(200).json({ ok: false, error: String(e?.message || e) })
+          }
           return
         }
         default:

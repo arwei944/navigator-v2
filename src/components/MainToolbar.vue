@@ -8,7 +8,7 @@
         <option value="default">默认排序</option>
         <option value="name-asc">名称 A-Z</option>
         <option value="name-desc">名称 Z-A</option>
-        <option value="hot">按热度</option>
+        <option value="clicks">按点击量</option>
         <option value="newest">最近添加</option>
       </select>
 

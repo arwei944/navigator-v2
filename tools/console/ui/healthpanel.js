@@ -184,6 +184,24 @@ async function doProbe({ onlyProblems = false } = {}) {
   }
 }
 
+/* ---------- 发布判定到云端 ---------- */
+
+async function doPublish() {
+  const btn = $('#btn-health-publish')
+  btn.disabled = true
+  setProgress('正在发布判定到云端…')
+  try {
+    const r = await api('/api/health/publish', { method: 'POST', body: {} })
+    setProgress(`已发布到云端 version=${r.version}（共 ${r.counts.total} 条判定 · 代理 ${r.proxy}）`)
+    appendLocal(`判定已发布到云端 version=${r.version}`, 'success')
+  } catch (e) {
+    setProgress(`发布到云端失败：${e.message}`)
+    appendLocal(`判定发布失败：${e.message}`, 'stderr')
+  } finally {
+    btn.disabled = false
+  }
+}
+
 /* ---------- 交互 ---------- */
 
 export async function refresh() {
@@ -215,6 +233,7 @@ export function initHealthPanel() {
   $('#btn-health-refresh').addEventListener('click', () => refresh())
   $('#btn-health-probe').addEventListener('click', () => doProbe())
   $('#btn-health-probe-bad').addEventListener('click', () => doProbe({ onlyProblems: true }))
+  $('#btn-health-publish').addEventListener('click', () => doPublish())
   $('#health-scope').addEventListener('change', e => {
     state.scope = e.target.value
     renderList()

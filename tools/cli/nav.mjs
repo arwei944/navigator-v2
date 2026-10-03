@@ -12,7 +12,8 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from '../console/lib/env.mjs'
+import { ROOT, loadEnv } from '../console/lib/env.mjs'
+import { applyProxyEnv } from '../../shared/proxy.mjs'
 import { CliError, EXIT, EXIT_CODES, GLOBAL_FLAGS, emitResult, note, splitGlobals, table, toCliError } from './lib/core.mjs'
 import { GROUPS, findCommand } from './lib/registry.mjs'
 
@@ -176,6 +177,11 @@ async function main() {
   }
 
   if (ctx.dryRun && !cmd.mutating) note(`提示：nav ${cmd.path} 是只读命令，--dry-run 无效果`, ctx)
+
+  // 真正执行命令前才解析代理（help / schema 等纯文本命令无需探测），
+  // 写回环境变量后，命令内所有 curl.exe 子进程都免疫代理端口漂移
+  loadEnv()
+  await applyProxyEnv()
 
   const started = Date.now()
   let res

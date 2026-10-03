@@ -55,7 +55,7 @@ const props = defineProps({
   site: { type: Object, required: true }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 
@@ -110,6 +110,7 @@ function submit() {
     initial: form.name.charAt(0).toUpperCase(),
     aliases: parseAliases(form.aliases, form.name, domain)
   })
+  emit('saved', { name: form.name, url: domain })
   emit('close')
 }
 </script>

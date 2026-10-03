@@ -99,6 +99,9 @@ export async function runInspection({ trigger = 'manual', actor = 'console' } = 
   })
   const saved = health.saveRun(results, { actor })
 
+  // 巡检同样要发布：它是「没人盯着的时候」跑的那一轮，前端角标更需要它来保持新鲜
+  const published = await health.publishRun(results, { actor })
+
   const nowDown = results.filter(r => r.status === 'down')
   const nowDownIds = new Set(nowDown.map(r => r.id))
   const fresh = nowDown.filter(r => !prevDown.has(r.id))
@@ -142,7 +145,7 @@ export async function runInspection({ trigger = 'manual', actor = 'console' } = 
     detail: `${sites.length} 站点 · 正常 ${c.ok} / 可忽略 ${c.limited} / 需处理 ${c.down} · 新增 ${fresh.length} / 恢复 ${recovered.length}`,
   })
 
-  return { run: saved.run, ts: saved.ts, total: sites.length, counts: c, fresh, recovered, saved: saved.saved }
+  return { run: saved.run, ts: saved.ts, total: sites.length, counts: c, fresh, recovered, saved: saved.saved, published }
 }
 
 /** 起一个巡检任务：进度走 SSE，结束落通知 */
@@ -161,6 +164,8 @@ export function startInspection({ trigger = 'manual', actor = 'console' } = {}) 
       `巡检完成（${((Date.now() - t0) / 1000).toFixed(1)}s）：正常 ${r.counts.ok} / 可忽略 ${r.counts.limited} / 需处理 ${r.counts.down}`,
       r.counts.down ? 'stderr' : 'success',
     )
+    if (r.published?.ok) jobs.log(job, `判定已发布到云端 version=${r.published.version}（代理 ${r.published.proxy}）`, 'success')
+    else jobs.log(job, `判定发布到云端失败：${r.published?.error || '未知原因'}`, 'stderr')
     jobs.finish(job, 0)
   })().catch(e => {
     jobs.log(job, `巡检异常：${e.message}`, 'stderr')

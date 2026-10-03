@@ -12,6 +12,16 @@ export function getAdminKey() {
   return localStorage.getItem(KEY_STORE) || ''
 }
 
+/** 写入凭据（登录签发的会话 token，或直接粘贴的共享密钥） */
+export function setAdminKey(key) {
+  if (key) localStorage.setItem(KEY_STORE, key)
+  else localStorage.removeItem(KEY_STORE)
+}
+
+export function clearAdminKey() {
+  localStorage.removeItem(KEY_STORE)
+}
+
 function qs(params = {}) {
   const sp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -31,7 +41,14 @@ async function call(url, { key, method = 'GET', body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+  if (!res.ok) {
+    // 凭据失效（过期 / 轮换）时广播一次，由 AdminView 统一退回登录闸门，
+    // 避免每个面板各自弹一遍「Unauthorized」
+    if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('nav-auth-expired'))
+    }
+    throw new Error(data.error || `HTTP ${res.status}`)
+  }
   return data
 }
 
@@ -47,12 +64,25 @@ export const opsApi = {
   appendHistory: (key, record) => call('/api/ops', { key, method: 'POST', body: { action: 'history.append', record } }),
   pushNotification: (key, notification) => call('/api/ops', { key, method: 'POST', body: { action: 'notify.push', notification } }),
 
+  /** 操作审计日志列表，附概览统计与动作字典 */
+  audit: (key, params = {}) => call(`/api/ops?${qs({ audit: 1, limit: 200, ...params })}`, { key }),
+
+  /** 追加一条审计记录（旁路，失败不影响主流程） */
+  appendAudit: (key, entry) => call('/api/ops', { key, method: 'POST', body: { action: 'audit.append', entry } }),
+
   /** 云端快照清单（回滚的可选目标） */
   snapshots: (key) => call('/api/sites?snapshots=1', { key }),
 
   /** 一键回滚到指定快照 */
   rollback: (key, snapshot) => call('/api/sites', { key, method: 'POST', body: { action: 'rollback', snapshot } }),
 
-  /** 发布站点数据到云端（数据面，与 api/sites.js POST 对应） */
-  publish: (key, sites) => call('/api/sites', { key, method: 'POST', body: { sites } }),
+  /**
+   * 发布站点数据到云端（数据面，与 api/sites.js POST 对应）。
+   * categories 缺省不传 → 服务端沿用云端已有分类表，CLI / 旧客户端发布不会清空它。
+   */
+  publish: (key, sites, categories) => call('/api/sites', {
+    key,
+    method: 'POST',
+    body: categories ? { sites, categories } : { sites },
+  }),
 }

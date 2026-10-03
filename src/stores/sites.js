@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import SEED_SITES from '../../api/sites-data.json'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
 import { rankSites } from '@/utils/search'
-import { categoriesOfDomain, isDomainScope } from '../../shared/categories.mjs'
+import { useCategoriesStore } from '@/stores/categories'
+import { useClicksStore } from '@/stores/clicks'
 
 const OVERLAY_KEY = 'nav-sites-overlay'
 const TRASH_KEY = 'nav-sites-trash'
@@ -27,6 +28,12 @@ function loadOverlay() {
 }
 
 export const useSitesStore = defineStore('sites', () => {
+  // 分类表是动态的（云端可下发自定义分类），域 / 子分类的判定必须走 store 而非静态常量，
+  // 否则后台新增的分类在「整域筛选」里会被漏掉。
+  const categoriesStore = useCategoriesStore()
+  // 点击量是**云端全局口径**（所有访客的总和），与本地 visitCounts 是两回事
+  const clicksStore = useClicksStore()
+
   // 云端基底（种子数据只是首屏兜底，拉到云端后即被替换）
   const cloudSites = ref([...SEED_SITES])
   // 渲染用列表 = 基底 + 覆盖层，由 rebuild() 维护，不要直接改它
@@ -61,17 +68,19 @@ export const useSitesStore = defineStore('sites', () => {
   const categorySites = computed(() => {
     const v = currentCategory.value
     if (!v || v === 'all') return sites.value
-    if (isDomainScope(v)) {
-      const ids = new Set(categoriesOfDomain(v).map(c => c.id))
+    if (categoriesStore.isDomainScope(v)) {
+      const ids = new Set(categoriesStore.categoriesOfDomain(v).map(c => c.id))
       return sites.value.filter(s => ids.has(s.categoryId))
     }
     return sites.value.filter(s => s.categoryId === v)
   })
 
+  // 点击量走云端全局口径（clicksStore.countFor），不再用本机 visitCount 冒充热度 ——
+  // 单人设备的访问次数无法代表站点在全网的热度，两者口径必须分开
   const SORT_COMPARATORS = {
     'name-asc': (a, b) => a.name.localeCompare(b.name),
     'name-desc': (a, b) => b.name.localeCompare(a.name),
-    'hot': (a, b) => b.visitCount - a.visitCount,
+    'clicks': (a, b) => clicksStore.countFor(b.id) - clicksStore.countFor(a.id),
     'newest': (a, b) => b.createdAt - a.createdAt
   }
 
@@ -186,10 +195,13 @@ export const useSitesStore = defineStore('sites', () => {
   function recordVisit(id) {
     const site = sites.value.find(s => s.id === id)
     if (!site) return
+    // 本地口径：我这台设备的访问次数（供「推荐发现」做个性化）
     const next = (visitCounts.value[id] ?? site.visitCount ?? 0) + 1
     visitCounts.value[id] = next
     site.visitCount = next
     saveOverlay()
+    // 云端口径：所有访客的全局点击量（卡片角标 / 排行的权威来源），攒批后匿名上报
+    clicksStore.record(id)
   }
 
   function reorderSites(newOrderedSites) {
@@ -306,6 +318,8 @@ export const useSitesStore = defineStore('sites', () => {
     if (!data || !Array.isArray(data.sites)) return false
     cloudSites.value = data.sites
     cloudVersion.value = data.version || 0
+    // 分类表与站点同批下发：缺省时 applyCloudGroups 返回 false，保留当前表不动
+    if (data.categories) categoriesStore.applyCloudGroups(data.categories)
     rebuild()
     return true
   }

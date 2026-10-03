@@ -15,6 +15,8 @@ import { probeMany, tally, STATUS_LABEL } from '../../../shared/health-probe.mjs
 import { readSites } from './data.mjs'
 import * as jobs from './jobs.mjs'
 import { record } from './audit.mjs'
+import { publishHealth } from './cloud.mjs'
+import { resolveProxyUrl } from '../../../shared/proxy.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data', 'health')
 const KEEP_DAYS = 30
@@ -164,6 +166,38 @@ export function recentTrends({ limit = 12 } = {}) {
   return { runs: order.map(o => o.run), trends }
 }
 
+/* ---------------- 发布到云端 ---------------- */
+
+/**
+ * 把一轮探活结果发布到云端 —— 前端状态角标 / 失效清单的唯一判定来源。
+ *
+ * 为什么必须由本机发布：判定要「以本地自带代理环境」为准。浏览器读不到跨域状态码，
+ * 云端出网口在海外、与本机可达性不是一回事，只有本机 curl.exe（走系统代理）才是真口径。
+ * 发布失败不抛错：本地已落盘，云端没更新只是角标暂时偏旧，不该让探活任务整体失败。
+ */
+export async function publishRun(results, { actor = 'console' } = {}) {
+  const r = await publishHealth(results, { actor })
+  const proxy = (await resolveProxyUrl()) || '未设置'
+  record({
+    action: 'health.publish',
+    actor,
+    result: r.ok ? 'ok' : 'fail',
+    target: r.ok ? `v${r.version}` : '云端判定',
+    detail: r.ok
+      ? `${r.counts.total} 站点 · 正常 ${r.counts.ok} / 可忽略 ${r.counts.limited} / 需处理 ${r.counts.down} · 代理 ${proxy}`
+      : `发布失败：${r.error}`,
+  })
+  return { ...r, proxy }
+}
+
+/** 把最近一轮本地探活重新发布到云端（不重新探测） */
+export async function publishLatest({ actor = 'console' } = {}) {
+  const last = latest()
+  if (!last) return { ok: false, error: '本地还没有探活记录，请先探活' }
+  const results = Object.entries(last.results).map(([id, r]) => ({ id, code: r.code, ms: r.ms }))
+  return publishRun(results, { actor })
+}
+
 /* ---------------- 探活任务 ---------------- */
 
 /** 起一个探活任务：进度走 SSE，结果落盘，最后写审计 */
@@ -201,6 +235,13 @@ export function startProbe({ ids = null, limit = 0, timeout = 12, concurrency = 
     jobs.log(job, `探活完成（${((Date.now() - t0) / 1000).toFixed(1)}s）：正常 ${c.ok} / 可忽略 ${c.limited} / 需处理 ${c.down}`, c.down ? 'stderr' : 'success')
     if (saved.saved) jobs.log(job, `已落盘快照 run=${saved.run}`, 'success')
     else jobs.log(job, '快照落盘失败（结果仅本次可见）', 'stderr')
+
+    // 探活完自动发布到云端：前端角标的判定来源就是这一份。
+    // 不发布的话云端仍停在上一轮，用户会以为「探了活但角标没变」。
+    const pub = await publishRun(results, { actor: 'console' })
+    if (pub.ok) jobs.log(job, `判定已发布到云端 version=${pub.version}（代理 ${pub.proxy}）`, 'success')
+    else jobs.log(job, `判定发布到云端失败：${pub.error}`, 'stderr')
+
     jobs.finish(job, 0)
   })().catch(e => {
     jobs.log(job, `探活异常：${e.message}`, 'stderr')

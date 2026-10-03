@@ -31,8 +31,8 @@
       <div class="section-label">使用统计</div>
       <div class="stat-grid">
         <div class="stat-item">
-          <div class="stat-value">{{ site.visitCount || 0 }}</div>
-          <div class="stat-name">访问次数</div>
+          <div class="stat-value">{{ clickCount }}</div>
+          <div class="stat-name">全网点击</div>
         </div>
         <div class="stat-item">
           <div class="stat-value">{{ age }}</div>
@@ -94,6 +94,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useHistoryStore } from '@/stores/history'
+import { useClicksStore } from '@/stores/clicks'
 
 const props = defineProps({
   site: { type: Object, default: null }
@@ -103,6 +104,7 @@ const categoriesStore = useCategoriesStore()
 const favoritesStore = useFavoritesStore()
 const sitesStore = useSitesStore()
 const historyStore = useHistoryStore()
+const clicksStore = useClicksStore()
 
 const copied = ref(false)
 let copyTimer = null
@@ -114,6 +116,8 @@ const categoryColor = computed(() =>
   props.site ? categoriesStore.getCategoryColor(props.site.categoryId) : '#64748b'
 )
 const isFav = computed(() => (props.site ? favoritesStore.isFavorite(props.site.id) : false))
+// 全网点击量（所有访客累计），与「我的访问次数」不是一回事
+const clickCount = computed(() => (props.site ? clicksStore.countFor(props.site.id) : 0))
 const fullUrl = computed(() => {
   if (!props.site) return '#'
   const url = props.site.url

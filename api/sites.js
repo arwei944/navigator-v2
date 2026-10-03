@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { get, put, list, del } from '@vercel/blob'
 import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, snapshotPathname, parseSnapshotName, prunableSnapshots, isSnapshotPathname } from '../shared/snapshots.mjs'
+import { sanitizeGroups } from '../shared/categories.mjs'
+import { checkAuthHeader } from '../shared/auth.mjs'
 
 // 数据真相源：Vercel Blob 上的 sites.json（运行时权威数据）。
 // 以下 SEED_SITES 仅作为 Blob 为空时的本地兜底，由 scripts/publish.mjs 保持与 Blob 同步，
@@ -67,14 +69,12 @@ function readBody(req) {
   return Promise.resolve(req.body || {})
 }
 
-/** 鉴权：写操作与快照读取都要求 Bearer <SITES_ADMIN_KEY> */
+/**
+ * 鉴权：写操作与快照读取都要求 Bearer 凭据。
+ * 凭据可以是登录签发的会话 token，也可以是共享密钥（CLI / 脚本 / 旧客户端）。
+ */
 function authorized(req) {
-  const adminKey = process.env.SITES_ADMIN_KEY
-  if (!adminKey) return { ok: false, code: 500, error: 'SITES_ADMIN_KEY not configured' }
-  const auth = (req.headers && req.headers.authorization) || ''
-  const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : auth.trim()
-  if (token !== adminKey) return { ok: false, code: 401, error: 'Unauthorized' }
-  return { ok: true }
+  return checkAuthHeader(req)
 }
 
 function noStore(res) {
@@ -183,6 +183,12 @@ export default async function handler(req, res) {
         restoredFrom: pathname,
         restoredAt: new Date().toISOString(),
       }
+      // 分类表与站点表是两个轴：老快照里没有 categories 时沿用当前值，
+      // 不能顺手抹掉，否则一次回滚会把整张分类体系退回内置默认表
+      const rollbackCats = Array.isArray(snapshot.categories)
+        ? snapshot.categories
+        : (prev && Array.isArray(prev.categories) ? prev.categories : null)
+      if (rollbackCats) data.categories = rollbackCats
       await put(PATHNAME, JSON.stringify(data), {
         access: 'private',
         addRandomSuffix: false,
@@ -200,10 +206,24 @@ export default async function handler(req, res) {
     }
 
     /* ---- 常规热更新：写入前先给当前数据落快照 ---- */
-    const { sites } = body
+    const { sites, categories } = body
     if (!Array.isArray(sites) || sites.length === 0) {
       res.status(400).json({ error: 'Invalid sites payload' })
       return
+    }
+
+    // 分类表：显式提供才更新（缺省沿用前值，CLI / 旧客户端发布不会把云端分类表清空）。
+    // 提供时必须过体检 —— 脏结构一旦落盘，全站分类下拉与筛选条会一起崩，
+    // 宁可拒绝这次发布，也不能写入半张表。
+    let nextCategories = null
+    if (categories !== undefined) {
+      nextCategories = sanitizeGroups(categories)
+      if (!nextCategories) {
+        res.status(400).json({ error: '分类表结构非法：需为「非空分组 → 非空子分类」，id 唯一且域 id 与子分类 id 不重名' })
+        return
+      }
+    } else if (prev && Array.isArray(prev.categories)) {
+      nextCategories = prev.categories
     }
 
     const version = prevVersion + 1
@@ -213,6 +233,7 @@ export default async function handler(req, res) {
       sites,
       updatedAt: new Date().toISOString()
     }
+    if (nextCategories) data.categories = nextCategories
     await put(PATHNAME, JSON.stringify(data), {
       access: 'private',
       addRandomSuffix: false,

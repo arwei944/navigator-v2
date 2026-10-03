@@ -306,6 +306,7 @@
             <button class="btn ghost" id="btn-health-refresh">刷新</button>
             <button class="btn ghost" id="btn-health-probe-bad">仅探异常</button>
             <button class="btn primary" id="btn-health-probe">开始探活</button>
+            <button class="btn ghost" id="btn-health-publish">发布到云端</button>
           </div>
         </div>
       </div>
@@ -318,6 +319,10 @@
           口径与 <code>nav sites check</code> 同源：2xx / 3xx 正常；429 / 403 / 405 / 401 归「可忽略」（限流、反爬，站点实际可用）；
           其余 4xx 与连接失败归「需处理」。判定为需处理前会自动重试一次，抑制 WAF 抖动造成的假宕机。
           结果按天落盘 <code>tools/console/.data/health/YYYY-MM-DD.jsonl</code>（保留 30 天），趋势条按「左旧右新」排列。
+        </p>
+        <p class="hint">
+          探活与巡检结束会<strong>自动发布判定到云端</strong>：前台卡片状态角标与管理后台失效清单都只读云端那一份，
+          判定来源是本机代理环境（curl.exe 走系统代理）。「发布到云端」按钮用于不重新探测、只重发最近一轮。
         </p>
       </div>
 

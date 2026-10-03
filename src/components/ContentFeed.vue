@@ -64,7 +64,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="12" height="12">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
-            {{ site.visitCount }} 次访问
+            {{ clicksStore.countFor(site.id) }} 次点击
           </span>
         </a>
       </div>
@@ -116,11 +116,14 @@ import { useSitesStore } from '@/stores/sites'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useHistoryStore } from '@/stores/history'
 import { useCategoriesStore } from '@/stores/categories'
+import { useClicksStore } from '@/stores/clicks'
+import { rankByClicks } from '../../shared/clicks-core.mjs'
 
 const sitesStore = useSitesStore()
 const favoritesStore = useFavoritesStore()
 const historyStore = useHistoryStore()
 const categoriesStore = useCategoriesStore()
+const clicksStore = useClicksStore()
 
 /** 最近访问：取历史记录前 5 条（去重），附带时间戳 */
 const recentSites = computed(() => {
@@ -138,18 +141,22 @@ const recentSites = computed(() => {
   return result
 })
 
-/** 热门站点：按 visitCount 降序，取前 6 条 */
-const hotSites = computed(() => {
-  return [...sitesStore.sites]
-    .sort((a, b) => b.visitCount - a.visitCount)
-    .slice(0, 6)
-})
+/**
+ * 热门站点：只保留**真的有点击**的站点，按全网点击量降序取前 6。
+ * 全站还没有任何点击时返回空数组 → 整个分区隐藏：把 0 次点击的站点摆进「热门」
+ * 比不显示更误导（点击统计刚上线时，全站点击必然从 0 起步）。
+ */
+const hotSites = computed(() =>
+  rankByClicks(sitesStore.sites, clicksStore.mergedCounts)
+    .filter(s => clicksStore.countFor(s.id) > 0)
+    .slice(0, 6),
+)
 
 /**
  * 推荐发现：基于访问历史 + 分类共现
  * - 对访问记录里每类打分（最近访问加权更高），同分类候选站得分更高
  * - 从未访问过、且未收藏的站点作为候选
- * - 无历史时退化为热门（visitCount 降序）未收藏站点
+ * - 无历史时退化为热门（全网点击量降序）未收藏站点
  */
 const discoverSites = computed(() => {
   const visited = new Set(historyStore.records.map(r => r.siteId))
@@ -158,10 +165,11 @@ const discoverSites = computed(() => {
 
   if (pool.length === 0) {
     // 兜底：全部访问过时推荐热门未收藏
-    return [...sitesStore.sites]
-      .filter(s => !favIds.has(s.id))
-      .sort((a, b) => b.visitCount - a.visitCount)
-      .slice(0, 6)
+    return rankByClicks(
+      sitesStore.sites.filter(s => !favIds.has(s.id)),
+      clicksStore.mergedCounts,
+      { limit: 6 },
+    )
   }
 
   // 访问历史分类权重：越早访问记越低的权重
@@ -174,11 +182,11 @@ const discoverSites = computed(() => {
   })
 
   const scored = pool.map(s => {
-    // 主信号：与已访问站点同分类（分类共现）；次级信号：全局热度
-    const score = (catScore.get(s.categoryId) || 0) + Math.log1p(s.visitCount || 0) * 0.05
+    // 主信号：与已访问站点同分类（分类共现）；次级信号：全网热度
+    const score = (catScore.get(s.categoryId) || 0) + Math.log1p(clicksStore.countFor(s.id)) * 0.05
     return { site: s, score }
   })
-  scored.sort((a, b) => b.score - a.score || b.site.visitCount - a.site.visitCount)
+  scored.sort((a, b) => b.score - a.score || clicksStore.countFor(b.site.id) - clicksStore.countFor(a.site.id))
   return scored.slice(0, 6).map(x => x.site)
 })
 

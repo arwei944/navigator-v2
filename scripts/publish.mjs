@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { record } from '../tools/console/lib/audit.mjs'
+import { applyProxyEnv } from '../shared/proxy.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(root, 'api', 'sites-data.json')
@@ -25,6 +26,11 @@ try {
     }
   }
 } catch { /* 无 .env.local 时忽略 */ }
+
+// 探测本机实际监听的代理端口并写回环境变量：后续所有 curl.exe（热更新 / webhook /
+// 验证）都免疫 Clash 端口漂移，不再依赖可能滞后的 HTTP_PROXY 环境变量
+const ACTIVE_PROXY = await applyProxyEnv()
+console.log(`代理环境: ${ACTIVE_PROXY || '未探测到（直连）'}`)
 
 const args = parseArgs({
   args: process.argv.slice(2),

@@ -118,3 +118,127 @@ export function categoryMeta() {
   }
   return map
 }
+
+/** 深拷贝一份分组表（默认表是模块级常量，写入前必须拷贝，否则会污染所有消费方） */
+export function cloneGroups(groups = CATEGORY_GROUPS) {
+  return groups.map(g => ({
+    id: g.id,
+    label: g.label,
+    collapsed: Boolean(g.collapsed),
+    categories: g.categories.map(c => ({ id: c.id, label: c.label, dotColor: c.dotColor })),
+  }))
+}
+
+/**
+ * 校验并规范化「云端分类表」。
+ *
+ * 云端数据是运行时权威源，但它的结构可能被旧版本、手工编辑或半截写入破坏 ——
+ * 一旦放行脏数据，全站分类下拉、筛选条、卡片配色会同时崩掉。
+ * 因此这里做一次严格体检：任一硬约束不满足就整体返回 null，
+ * 由调用方回退到内置默认表（宁可退回上一版结构，也不能渲染出半张表）。
+ *
+ * 硬约束：
+ *  ① 至少一个分组，每个分组至少一个子分类；
+ *  ② 分组 id / 子分类 id 各自唯一，且两组 id 集合互不相交（域与子分类同轴，重名会歧义）；
+ *  ③ label 非空；dotColor 非空，缺失时补中性灰而非拒绝。
+ */
+export function sanitizeGroups(input) {
+  if (!Array.isArray(input) || input.length === 0) return null
+
+  const groupIds = new Set()
+  const catIds = new Set()
+  const groups = []
+
+  for (const g of input) {
+    if (!g || typeof g !== 'object') return null
+    const gid = String(g.id || '').trim()
+    const glabel = String(g.label || '').trim()
+    if (!gid || !glabel || groupIds.has(gid)) return null
+    if (!Array.isArray(g.categories) || g.categories.length === 0) return null
+
+    const categories = []
+    for (const c of g.categories) {
+      if (!c || typeof c !== 'object') return null
+      const cid = String(c.id || '').trim()
+      const clabel = String(c.label || '').trim()
+      if (!cid || !clabel || catIds.has(cid)) return null
+      catIds.add(cid)
+      const dotColor = String(c.dotColor || '').trim()
+      categories.push({ id: cid, label: clabel, dotColor: dotColor || '#64748b' })
+    }
+
+    groupIds.add(gid)
+    groups.push({ id: gid, label: glabel, collapsed: Boolean(g.collapsed), categories })
+  }
+
+  // 域 id 与子分类 id 不能重名：同轴取值 'all' | 域 id | 子分类 id，重名会让筛选语义歧义
+  for (const gid of groupIds) if (catIds.has(gid)) return null
+
+  return groups
+}
+
+/**
+ * 分类表结构化对比（发布预检用）：域 / 分类的增删改与域内排序变化。
+ *
+ * 分类 id 是站点的归属键、创建后不可改，所以「改」只可能是 label / dotColor / 所属域。
+ * 域内顺序变化单独记一条 `reordered`（顺序影响前台筛选条的呈现，值得提示但不阻断）。
+ */
+export function diffGroups(before, after) {
+  const prevGroups = Array.isArray(before) ? before : []
+  const nextGroups = Array.isArray(after) ? after : []
+  const prevG = new Map(prevGroups.map(g => [g.id, g]))
+  const nextG = new Map(nextGroups.map(g => [g.id, g]))
+
+  const indexCats = (groups) => {
+    const map = new Map()
+    for (const g of groups) for (const c of (g.categories || [])) map.set(c.id, { cat: c, group: g.id })
+    return map
+  }
+  const prevC = indexCats(prevGroups)
+  const nextC = indexCats(nextGroups)
+
+  const groupsAdded = []
+  const groupsRemoved = []
+  const groupsRenamed = []
+  for (const [id, g] of nextG) {
+    if (!prevG.has(id)) groupsAdded.push({ id, label: g.label })
+    else if (prevG.get(id).label !== g.label) groupsRenamed.push({ id, from: prevG.get(id).label, to: g.label })
+  }
+  for (const [id, g] of prevG) if (!nextG.has(id)) groupsRemoved.push({ id, label: g.label })
+
+  const catsAdded = []
+  const catsRemoved = []
+  const catsUpdated = []
+  const catsMoved = []
+  for (const [id, { cat, group }] of nextC) {
+    if (!prevC.has(id)) {
+      catsAdded.push({ id, label: cat.label, group })
+      continue
+    }
+    const p = prevC.get(id)
+    const fields = []
+    if (p.cat.label !== cat.label) fields.push('label')
+    if (p.cat.dotColor !== cat.dotColor) fields.push('dotColor')
+    if (p.group !== group) fields.push('group')
+    if (!fields.length) continue
+    if (fields.includes('group')) catsMoved.push({ id, label: cat.label, fields, from: p.group, to: group })
+    else catsUpdated.push({ id, label: cat.label, fields })
+  }
+  for (const [id, { cat, group }] of prevC) if (!nextC.has(id)) catsRemoved.push({ id, label: cat.label, group })
+
+  const reordered = nextGroups.some(g => {
+    const p = prevG.get(g.id)
+    if (!p) return false
+    return p.categories.map(c => c.id).join(',') !== g.categories.map(c => c.id).join(',')
+  })
+
+  const total = groupsAdded.length + groupsRemoved.length + groupsRenamed.length +
+    catsAdded.length + catsRemoved.length + catsUpdated.length + catsMoved.length + (reordered ? 1 : 0)
+
+  return {
+    groupsAdded, groupsRemoved, groupsRenamed,
+    catsAdded, catsRemoved, catsUpdated, catsMoved, reordered,
+    total,
+    changed: total > 0,
+  }
+}

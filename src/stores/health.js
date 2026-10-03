@@ -2,80 +2,78 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 /**
- * 站点在线状态探测 store
- * 按需探测：只探测调用方传入的站点（通常为当前可见卡片），
- * 带 60s LRU 缓存与并发控制，避免对全量站点打爆触发反爬。
+ * 站点在线状态 store —— **只读云端判定**，前端不做任何探测。
  *
- * 状态等级（与 scripts/check-sites.mjs 口径一致）：
+ * 为什么不自己探：浏览器 fetch 是跨域的，读不到对方的状态码（几乎全落 `ERR` → 误判「失效」）；
+ * 而且浏览器的出网路径与「本机代理环境」不是一回事 —— 判定必须由本机探活
+ * （`shared/health-probe.mjs` 走 curl.exe / 系统代理）产出，发布到云端 `ops/health.json`，
+ * 前端只读结论。这样前台角标、管理后台失效清单、控制台看板、CLI 四处口径完全一致。
+ *
+ * 状态等级（由云端下发，规则见 `shared/health-rules.mjs`）：
  *  - ok      : 2xx / 3xx 可访问
  *  - limited : 429/403/405/401 反爬/限流（可忽略，但非正常）
  *  - down    : 连接失败 / ERR / 000 / 404 / 402 / 410 等真实失效
- *  - unknown : 未探测 / 探测中 / 缓存过期
+ *  - unknown : 云端还没有这个站点的判定
  */
-const CACHE_TTL = 60 * 1000 // 60s
-const MAX_CONCURRENT = 6
+const CLOUD_TTL = 5 * 60 * 1000 // 云端判定 5 分钟内不重复拉取
 
 export const useHealthStore = defineStore('health', () => {
-  const statusMap = ref({}) // { [siteId]: { status, code, ts } }
+  const statusMap = ref({})   // { [siteId]: { status, code, ms, ts } }
+  const counts = ref(null)    // { total, ok, limited, down }
+  const updatedAt = ref(null) // 判定产出时间（本机探活那一刻）
+  const actor = ref('')       // 谁发布的
+  const proxy = ref('')       // 判定所依据的本机代理环境
+  const loading = ref(false)
+  const loadedAt = ref(0)
 
-  function classify(code) {
-    const n = Number(code)
-    if (code === 'ERR' || code === '000' || Number.isNaN(n)) return { status: 'down', code: 'ERR' }
-    if (n >= 200 && n < 400) return { status: 'ok', code: n }
-    if ([429, 403, 405, 401].includes(n)) return { status: 'limited', code: n } // 反爬/限流
-    return { status: 'down', code: n } // 404/402/410 等真实失效
-  }
+  let inflight = null
 
-  /** 读取某站状态；缓存过期视为 unknown */
-  function getStatus(siteId) {
-    const e = statusMap.value[siteId]
-    if (!e || Date.now() - e.ts > CACHE_TTL) return { status: 'unknown', code: null, ts: 0 }
-    return e
-  }
-
-  async function _probeOne(site) {
-    const base = site.url.includes('://') ? site.url : 'https://' + site.url
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 5000)
-    let code = 'ERR'
-    try {
-      let resp = await fetch(base, { method: 'HEAD', redirect: 'follow', signal: controller.signal })
-      code = String(resp.status)
-      if (resp.status === 405 || resp.status === 403 || resp.status === 404) {
-        // HEAD 被拒，回退 GET 探测（注意 404 可能是 HEAD 不支持，再试 GET）
-        resp = await fetch(base, { method: 'GET', redirect: 'follow', signal: controller.signal })
-        code = String(resp.status)
+  async function load({ force = false } = {}) {
+    if (!force && loadedAt.value && Date.now() - loadedAt.value < CLOUD_TTL) return
+    if (inflight) return inflight
+    loading.value = true
+    inflight = (async () => {
+      try {
+        const res = await fetch('/api/health', { cache: 'no-store' })
+        if (!res.ok) return
+        const j = await res.json()
+        const ts = j.updatedAt ? Date.parse(j.updatedAt) : 0
+        const map = {}
+        for (const [id, r] of Object.entries(j.results || {})) {
+          map[id] = { status: r.status, code: r.code, ms: r.ms ?? null, ts }
+        }
+        statusMap.value = map
+        counts.value = j.counts || null
+        updatedAt.value = j.updatedAt || null
+        actor.value = j.actor || ''
+        proxy.value = j.proxy || ''
+        loadedAt.value = Date.now()
+      } catch {
+        // 网络失败保留旧值：宁可显示上一次判定，也不要闪回「未探测」
+      } finally {
+        loading.value = false
+        inflight = null
       }
-    } catch {
-      code = 'ERR'
-    } finally {
-      clearTimeout(timer)
-    }
-    const { status, code: c } = classify(code)
-    statusMap.value[site.id] = { status, code: c, ts: Date.now() }
-    return status
+    })()
+    return inflight
+  }
+
+  /** 读某站判定；云端没有该站记录即「未探测」 */
+  function getStatus(siteId) {
+    return statusMap.value[siteId] || { status: 'unknown', code: null, ms: null, ts: 0 }
   }
 
   /**
-   * 探测一批站点。仅探测未缓存或已过期的；
-   * 信号量限流并发；resolve 后 statusMap 已更新。
+   * 兼容旧调用点（卡片挂载 / 进入后台时调用）：不再逐站探测，只确保云端判定已加载。
+   * TTL 内重复调用是零成本 no-op，因此 300 张卡片各调一次也不会打爆接口。
    */
-  async function probeSites(sites) {
-    const pending = sites.filter(s => {
-      const e = statusMap.value[s.id]
-      return !e || Date.now() - e.ts > CACHE_TTL
-    })
-    if (pending.length === 0) return
+  function probeSites() {
+    return load()
+  }
 
-    let cursor = 0
-    async function worker() {
-      while (cursor < pending.length) {
-        const site = pending[cursor++]
-        try { await _probeOne(site) } catch { /* 单站失败不阻塞批处理 */ }
-      }
-    }
-    const workers = Array.from({ length: Math.min(MAX_CONCURRENT, pending.length) }, worker)
-    await Promise.all(workers)
+  /** 强制拉取最新判定（管理后台进入时用，避免看到 5 分钟内的旧值） */
+  function refresh() {
+    return load({ force: true })
   }
 
   /** 供卡片使用：含义化节点 */
@@ -83,5 +81,10 @@ export const useHealthStore = defineStore('health', () => {
     return { ok: 'green', limited: 'amber', down: 'red' }[status] || 'gray'
   }
 
-  return { statusMap, getStatus, probeSites, nodeFor }
+  // 判定是云端快照，页面长开时不轮询就会一直显示开局那一份；已加载过才轮询
+  if (typeof window !== 'undefined') {
+    setInterval(() => { if (loadedAt.value) load({ force: true }) }, CLOUD_TTL)
+  }
+
+  return { statusMap, counts, updatedAt, actor, proxy, loading, getStatus, probeSites, refresh, nodeFor }
 })

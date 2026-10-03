@@ -29,10 +29,16 @@
       <div class="card-desc">{{ site.desc }}</div>
     </div>
     <div v-if="!batchMode" class="card-footer">
-      <span class="card-tag">
-        <span class="card-tag-dot" :style="{ background: categoriesStore.getCategoryColor(site.categoryId) }"></span>
-        {{ categoriesStore.getCategoryLabel(site.categoryId) }}
-      </span>
+      <div class="card-footer-left">
+        <span class="card-tag">
+          <span class="card-tag-dot" :style="{ background: categoriesStore.getCategoryColor(site.categoryId) }"></span>
+          {{ categoriesStore.getCategoryLabel(site.categoryId) }}
+        </span>
+        <span v-if="clickCount > 0" class="card-clicks" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V6a2 2 0 0 1 4 0v5"/><path d="M13 11V4a2 2 0 0 1 4 0v9"/><path d="M17 13v-2a2 2 0 0 1 4 0v4a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7v-1a2 2 0 0 1 4 0"/></svg>
+          {{ clickCount }}
+        </span>
+      </div>
       <div class="card-actions">
         <button class="card-fav-btn" :class="{ favorited: favoritesStore.isFav(site.id) }"
                 @click.stop="favoritesStore.toggle(site.id)" :aria-label="favoritesStore.isFav(site.id) ? '取消收藏' : '收藏'">
@@ -89,6 +95,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useHistoryStore } from '@/stores/history'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useHealthStore } from '@/stores/health'
+import { useClicksStore } from '@/stores/clicks'
 
 const props = defineProps({
   site: { type: Object, required: true },
@@ -107,6 +114,10 @@ const categoriesStore = useCategoriesStore()
 const historyStore = useHistoryStore()
 const sidebarStore = useSidebarStore()
 const healthStore = useHealthStore()
+const clicksStore = useClicksStore()
+
+// 全网点击量（所有访客累计）——点完立刻 +1，不等云端往返
+const clickCount = computed(() => clicksStore.countFor(props.site.id))
 
 // 正式收录的站点有本地图标文件（icons/xx.png）；访客自己新增的只有远程图标地址
 const iconSrc = computed(() => props.site.icon ? '/' + props.site.icon : (props.site.iconUrl || ''))
@@ -252,7 +263,10 @@ onUnmounted(() => {
 .card-url { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
 .card-body { flex: 1; }
 .card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.card-footer { display: flex; align-items: center; justify-content: space-between; }
+.card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-footer-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.card-clicks { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+.card-clicks svg { width: 12px; height: 12px; }
 .card-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
 .card-tag-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .card-actions { display: flex; align-items: center; gap: 4px; }

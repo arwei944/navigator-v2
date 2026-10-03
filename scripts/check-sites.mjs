@@ -1,13 +1,17 @@
 /**
  * 站点健康检查：批量检测导航站所有站点是否可访问
  * 用法: node scripts/check-sites.mjs [--limit N] [--timeout 15] [--only-bad] [--report]
+ *
+ * 探测方式与分级口径**全部来自 `shared/health-probe.mjs`**，与控制台看板、
+ * CLI `nav sites check` 同源。此处不再自建 curl 逻辑 —— 历史上这里复制了一份
+ * 「HEAD 优先」的实现，与主引擎一起踩了同一个坑（HEAD 404/超时未回落 GET，
+ * 把 Kaggle / 文心一言 / BlockBeats 误判为失效），两处各修一遍不如只留一份。
  */
-import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { IGNORABLE as IGNORABLE_CODES } from '../shared/health-probe.mjs'
+import { probeMany } from '../shared/health-probe.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const sites = JSON.parse(readFileSync(join(root, 'api', 'sites-data.json'), 'utf-8'))
@@ -29,55 +33,22 @@ const makeReport = !!args.values.report
 
 const targets = sites.slice(0, limit)
 const CONC = 12
-const results = []
-let done = 0
-
-async function check(site) {
-  const url = site.url.includes('://') ? site.url : 'https://' + site.url
-  let code = 'ERR'
-  try {
-    let out = execFileSync('curl.exe', ['-s', '-o', 'NUL', '-w', '%{http_code}', '-I', '-L', '--max-time', String(timeout), url], { encoding: 'utf8', timeout: (timeout + 5) * 1000 }).trim()
-    code = out || 'ERR'
-    if (code === '000' || code === 'ERR') {
-      out = execFileSync('curl.exe', ['-s', '-o', 'NUL', '-w', '%{http_code}', '-L', '--max-time', String(timeout), url], { encoding: 'utf8', timeout: (timeout + 5) * 1000 }).trim()
-      code = out || 'ERR'
-    }
-  } catch {
-    code = 'ERR'
-  }
-  results.push({ site, code })
-  done++
-  if (done % 50 === 0) console.log(`checked ${done}/${targets.length}`)
-}
-
-// 真失效：连不上或页面不存在；可忽略：限流(429)/反爬(403)/方法误用(405)/鉴权(401)
-// 可忽略码取自 shared/health-probe.mjs，与控制台看板、CLI sites check 同源
-const IGNORABLE = new Set([...IGNORABLE_CODES].map(String))
-
-function isBad(code) {
-  const n = Number(code)
-  return code === 'ERR' || code === '000' || (n >= 400 && !IGNORABLE.has(code))
-}
-
-function classify(code) {
-  if (code === 'ERR' || code === '000') return '连接失败'
-  const n = Number(code)
-  if (n >= 400) return IGNORABLE.has(code) ? '可忽略' : 'HTTP ' + code
-  return '正常'
-}
 
 async function main() {
   console.log(`检查 ${targets.length} 个站点（并发 ${CONC}，超时 ${timeout}s）...`)
-  for (let i = 0; i < targets.length; i += CONC) {
-    await Promise.all(targets.slice(i, i + CONC).map(check))
-  }
+  const probed = await probeMany(targets, {
+    timeout,
+    concurrency: CONC,
+    onProgress: ({ done, total }) => { if (done % 50 === 0 || done === total) console.log(`checked ${done}/${total}`) },
+  })
+  const results = probed.map((r, i) => ({ site: targets[i], code: r.code, status: r.status }))
 
-  const bad = results.filter(r => isBad(r.code))
+  const bad = results.filter(r => r.status === 'down')
   const ok = results.length - bad.length
-  console.log(`\n--- 完成 --- 正常 ${ok} / 异常 ${bad.length} / 共 ${results.length}`)
+  console.log(`\n--- 完成 --- 正常 ${ok} / 需处理 ${bad.length} / 共 ${results.length}`)
 
   if (bad.length > 0) {
-    console.log('\n异常站点：')
+    console.log('\n需处理站点：')
     bad.forEach(r => console.log(`  [${r.code}] ${r.site.id} ${r.site.name} ${r.site.url}`))
   }
 
@@ -85,34 +56,34 @@ async function main() {
     const ts = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 19)
     const reportDir = join(root, 'backups')
     mkdirSync(reportDir, { recursive: true })
-    const critical = bad.filter(r => classify(r.code) !== '可忽略')
-    const ignorable = bad.filter(r => classify(r.code) === '可忽略')
+    const limited = results.filter(r => r.status === 'limited')
     const lines = []
     lines.push(`# 导航站健康检查报告`)
     lines.push(``)
     lines.push(`- 检查时间: ${new Date().toISOString()}`)
     lines.push(`- 站点总数: ${results.length}`)
-    lines.push(`- 正常: ${ok} / 异常: ${bad.length}`)
+    lines.push(`- 正常: ${ok} / 需处理: ${bad.length}`)
     lines.push(``)
-    lines.push(`## 需处理（连接失败 / 页面不存在） — ${critical.length}`)
-    if (critical.length) {
+    lines.push(`## 需处理（连接失败 / 页面不存在） — ${bad.length}`)
+    if (bad.length) {
       lines.push(`| ID | 名称 | 地址 | 状态 |`)
       lines.push(`|---|---|---|---|`)
-      critical.forEach(r => lines.push(`| ${r.site.id} | ${r.site.name} | ${r.site.url} | ${r.code} |`))
+      bad.forEach(r => lines.push(`| ${r.site.id} | ${r.site.name} | ${r.site.url} | ${r.code} |`))
     } else {
       lines.push(`无`)
     }
     lines.push(``)
-    lines.push(`## 可忽略（限流/反爬/方法）（仅供参考） — ${ignorable.length}`)
-    if (ignorable.length) {
+    lines.push(`## 可忽略（限流/反爬/方法）（仅供参考） — ${limited.length}`)
+    if (limited.length) {
       lines.push(`| ID | 名称 | 地址 | 状态 |`)
       lines.push(`|---|---|---|---|`)
-      ignorable.forEach(r => lines.push(`| ${r.site.id} | ${r.site.name} | ${r.site.url} | ${r.code} |`))
+      limited.forEach(r => lines.push(`| ${r.site.id} | ${r.site.name} | ${r.site.url} | ${r.code} |`))
     } else {
       lines.push(`无`)
     }
     lines.push(``)
-    lines.push(`> 人工复核补充：429/405/403 多为反爬或 WAF 拦截，站点实际可用。`)
+    lines.push(`> 判定由本机代理环境（curl.exe 走系统代理）产出；429/405/403 多为反爬或 WAF 拦截，站点实际可用。`)
+    lines.push(`> 404/402 等也偶有 WAF 误报，删除前建议人工复核。`)
     const reportFile = join(reportDir, `check-report-${ts}.md`)
     writeFileSync(reportFile, lines.join('\n'), 'utf-8')
     console.log(`\n报告已生成: backups/check-report-${ts}.md`)

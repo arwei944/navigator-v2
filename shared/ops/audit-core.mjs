@@ -11,6 +11,9 @@
  * 命名规则 `域.动作`，域与 `sites / publish / gate / notify / schedule` 对齐。
  */
 export const AUDIT_ACTIONS = {
+  'auth.login': '登录成功',
+  'auth.loginFail': '登录失败',
+  'auth.lockout': '登录锁定',
   'gate.preflight': '发布预检',
   'gate.approve': '发布放行',
   'gate.bypass': '绕过门禁',
@@ -32,8 +35,13 @@ export const AUDIT_ACTIONS = {
   'sites.remove': '删除站点',
   'sites.batch': '批量站点操作',
   'sites.sync': '站点同步',
+  'category.add': '新增分类',
+  'category.update': '编辑分类',
+  'category.remove': '删除分类',
+  'category.reorder': '分类排序',
   'icon.fetch': '抓取图标',
   'health.probe': '可用性探活',
+  'health.publish': '可用性判定发布',
   'schedule.run': '定时巡检执行',
   'schedule.config': '定时巡检配置',
   'notify.push': '通知推送',

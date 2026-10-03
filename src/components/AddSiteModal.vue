@@ -105,7 +105,7 @@ import { reactive, ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 
@@ -318,6 +318,7 @@ function submit() {
   if (aliases.length) site.aliases = aliases
 
   sitesStore.addSite(site)
+  emit('saved', { name: site.name, url: site.url })
   emit('close')
 }
 </script>

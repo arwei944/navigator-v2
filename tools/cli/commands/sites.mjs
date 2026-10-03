@@ -5,6 +5,9 @@
 import * as sites from '../../console/lib/sites.mjs'
 import * as data from '../../console/lib/data.mjs'
 import { probeMany } from '../../../shared/health-probe.mjs'
+import { publishHealth } from '../../console/lib/cloud.mjs'
+import { resolveProxyUrl } from '../../../shared/proxy.mjs'
+import { getAdminKey } from '../../console/lib/env.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, note, parseCommandArgs, requirePositional, table } from '../lib/core.mjs'
 
 /* ---------------- 命令定义 ---------------- */
@@ -251,14 +254,15 @@ const batchCmd = {
 
 const checkCmd = {
   path: 'sites check',
-  summary: '批量探活：区分「正常 / 可忽略（限流反爬）/ 需处理」，--strict 时存在需处理站点则退出码 5',
-  usage: 'nav sites check [--ids a,b] [--limit <n>] [--timeout <秒>] [--concurrency <n>] [--strict]',
+  summary: '批量探活（走本机代理口径）：区分「正常 / 可忽略（限流反爬）/ 需处理」，--strict 时存在需处理站点则退出码 5',
+  usage: 'nav sites check [--ids a,b] [--limit <n>] [--timeout <秒>] [--concurrency <n>] [--strict] [--publish]',
   flags: {
     ids: { desc: '只检查这些站点，逗号分隔' },
     limit: { desc: '只检查前 N 个（默认全量 298 个）' },
     timeout: { desc: '单站点超时秒数，默认 15' },
     concurrency: { desc: '并发数，默认 12' },
     strict: { type: 'boolean', desc: '存在需处理站点时以退出码 5 结束（供 CI/智能体门禁）' },
+    publish: { type: 'boolean', desc: '把本次判定发布到云端（前端状态角标据此显示，走本机代理口径）' },
   },
   async run(argv, ctx) {
     const { values } = parseCommandArgs(argv, buildOptions(checkCmd.flags), { usage: checkCmd.usage })
@@ -276,6 +280,13 @@ const checkCmd = {
     if (values.limit !== undefined) targets = targets.slice(0, Number(values.limit))
     if (targets.length === 0) throw new CliError('没有可检查的站点', { code: 'REJECTED', exitCode: EXIT.REJECTED })
 
+    // 先验密钥再探活：否则白跑一轮 300 站才在发布时才发现写不进去
+    if (values.publish && !getAdminKey()) {
+      throw new CliError('缺少 SITES_ADMIN_KEY，无法发布判定到云端', {
+        code: 'ENV', exitCode: EXIT.ENV, hint: '在 .env.local 配置 SITES_ADMIN_KEY 后重试',
+      })
+    }
+
     const timeout = values.timeout !== undefined ? Number(values.timeout) : 15
     const conc = values.concurrency !== undefined ? Number(values.concurrency) : 12
     const probed = await probeMany(targets, {
@@ -290,6 +301,18 @@ const checkCmd = {
     const limited = results.filter(r => r.verdict === 'limited')
     const healthy = results.length - down.length - limited.length
     const strictFail = Boolean(values.strict) && down.length > 0
+
+    let published = null
+    if (values.publish) {
+      note(`发布判定到云端（代理 ${(await resolveProxyUrl()) || '未设置'}）…`, ctx)
+      published = await publishHealth(probed, { actor: 'cli' })
+      if (!published.ok) {
+        throw new CliError(`判定发布到云端失败：${published.error}`, {
+          code: 'REMOTE', exitCode: EXIT.REMOTE, hint: '检查网络与 SITES_ADMIN_KEY 是否有效',
+        })
+      }
+    }
+
     return {
       ok: !strictFail,
       exitCode: strictFail ? EXIT.REJECTED : EXIT.OK,
@@ -301,11 +324,14 @@ const checkCmd = {
         down: down.length,
         needAttention: down,
         results,
+        published,
       },
-      render: d => `${d.checked} 个站点：正常 ${d.healthy} / 可忽略 ${d.limited} / 需处理 ${d.down}\n\n` + table(
-        ['ID', '状态', '判定', '名称'],
-        d.results.map(r => [r.id, r.code, r.verdict, r.name]),
-      ),
+      render: d => `${d.checked} 个站点：正常 ${d.healthy} / 可忽略 ${d.limited} / 需处理 ${d.down}\n`
+        + (d.published ? `判定已发布到云端 version=${d.published.version}（共 ${d.published.counts.total} 条判定）\n` : '')
+        + '\n' + table(
+          ['ID', '状态', '判定', '名称'],
+          d.results.map(r => [r.id, r.code, r.verdict, r.name]),
+        ),
     }
   },
 }

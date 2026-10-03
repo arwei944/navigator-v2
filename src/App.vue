@@ -60,6 +60,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import { useClicksStore } from '@/stores/clicks'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileTabBar from '@/components/MobileTabBar.vue'
 import Sidebar from '@/components/Sidebar.vue'
@@ -80,6 +81,7 @@ const sidebarStore = useSidebarStore()
 const preferencesStore = usePreferencesStore()
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
+const clicksStore = useClicksStore()
 const commandPaletteRef = ref(null)
 const shortcutsRef = ref(null)
 const showSettings = ref(false)
@@ -183,6 +185,9 @@ onMounted(() => {
   // 云端站点热更新：启动拉取 + 30s 轮询
   sitesStore.initCloudSites()
   sitesStore.startPolling(30000)
+
+  // 全局点击量（卡片角标 / 排行的权威口径）：启动拉一次，之后按 TTL 自刷新
+  clicksStore.load()
 
   // 标签页重新可见时立即重拉，避免热更新后等待整轮 30s
   const onVisibility = () => {

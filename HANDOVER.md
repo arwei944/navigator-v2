@@ -1,6 +1,6 @@
 # Navigator V2 项目交接文档
 
-> 最后更新：2026-09-25
+> 最后更新：2026-10-03
 > 线上地址：https://navigator-v2-two.vercel.app
 > 仓库本地路径：`c:\work\solo work\new\nav-v2`
 
@@ -11,8 +11,8 @@
 Navigator V2 是一个现代化的网站导航中心，聚合了 AI 工具、加密货币、基础服务等领域的优质站点。基于 Vue 3 + Vite + Pinia 构建，部署在 Vercel，支持 PWA 离线使用。
 
 **核心数据：**
-- 站点总数：约 210+ 个
-- 分类总数：4 个大类、22 个子分类
+- 站点总数：301 个
+- 分类总数：4 个大类（域）、29 个子分类
 - 技术栈：Vue 3 + Vite 5 + Pinia + Vue Router + Tailwind CSS 变量
 
 ---
@@ -32,7 +32,7 @@ Navigator V2 是一个现代化的网站导航中心，聚合了 AI 工具、加
 | 拖拽 | vuedraggable | ^4.1.0 |
 | 虚拟滚动 | vue-virtual-scroller | ^3.0.4 |
 | PWA | vite-plugin-pwa | ^0.17.0 |
-| KV 存储 | @vercel/kv | ^3.0.0 |
+| 云端存储 | @vercel/blob | ^2.8.0 |
 
 ### 2.2 项目结构
 
@@ -1870,3 +1870,689 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 
 - `npm run build` → 通过。
 - 写操作仍需在页面填入 `SITES_ADMIN_KEY`（存 `localStorage.nav_admin_key`，下次自动填充）。
+
+---
+
+## 三十四、管理后台 P0 升级：站点检索 / 分类体系管理 / 操作审计（2026-10-03）
+
+### 34.1 背景与范围
+
+先产出了一份商用导航站管理后台的功能清单（7 大模块 / 60 项能力，含「已有 / 部分 / 缺失」现状对标与
+P0/P1/P2 优先级），见 `docs/admin-backend-checklist/admin-backend-checklist.html`。
+本轮从清单里挑出**三项立刻见效**的 P0 能力落地，不碰登录认证与角色权限（留待下一轮）：
+
+1. 站点检索 / 筛选 / 排序 / 分页（后台此前只有一坨列表，找不到具体站点）；
+2. 分类体系管理（分类表此前是编译进代码的静态常量，改分类要改源码 + 重新部署）；
+3. 操作审计日志 UI（`shared/ops/audit-core.mjs` 内核早已存在，但线上没有任何查看入口）。
+
+### 34.2 分类表动态化（本轮地基）
+
+分类表从「编译期常量」升级为「云端可下发数据」，但**默认表仍是唯一权威源**：
+
+- `shared/categories.mjs`：新增 `cloneGroups()`（深拷贝，写入前必须拷贝否则污染所有消费方）与
+  `sanitizeGroups()`（严格体检）。
+- `sanitizeGroups` 硬约束：① 至少一个分组、每组至少一个子分类；② 分组 id / 子分类 id 各自唯一，
+  且**两组 id 集合互不相交**（域与子分类同轴取值 `'all' | 域 id | 子分类 id`，重名会让筛选语义歧义）；
+  ③ label 非空，dotColor 缺失补中性灰而非拒绝。**任一硬约束不满足即整体返回 null** ——
+  宁可回退到内置默认表，也不能渲染出半张表。
+- `api/sites.js`（数据面）POST 新增可选 `categories` 字段：
+  - 显式提供 → 过 `sanitizeGroups`，非法则 **400 拒绝本次发布**（不落脏表）；
+  - 缺省不传 → **沿用云端前值**（`prev.categories`），CLI / 旧客户端发布不会把云端分类表清空；
+  - 回滚分支：分类表与站点表是两个轴，老快照里没有 `categories` 时沿用当前值，不能顺手抹掉。
+- `src/stores/categories.js`：持有运行时副本 `groups`，云端下发时整体替换；`cloudGroups` 作为基线，
+  `dirty` 计算本地草稿是否已偏离云端。新增编辑 API：`addCategory / updateCategory / removeCategory /
+  moveCategory / updateGroupLabel / resetToDefault / toCloudGroups`。
+  - id 规则 `^[a-z0-9][a-z0-9_-]*$`，且不得与域 id 重名；
+  - 删除分类前由后台判定引用数，有站点占用则拒绝（提示先用批量操作迁移）；
+  - 每个域至少保留一个分类。
+- `src/stores/sites.js`：域 / 子分类判定全部改走 `categoriesStore`（不再读静态常量），
+  否则后台新增的分类在「整域筛选」里会被漏掉。
+- 发布时**仅当 `categoriesStore.dirty` 才推送分类表**：否则每次发布都会把云端表覆盖成本地副本，
+  一旦本地没成功拉到云端表（离线 / 首屏兜底），就会静默把云端分类退回默认表。
+
+### 34.3 站点管理面板（`AdminSitesPanel.vue`，新增）
+
+- 结构化筛选（域 → 子分类 → 在线状态）先收敛，再交给检索内核 `rankSites` 做相关性排序；
+  有搜索词时**相关性优先，显式排序只作同分并列的 tieBreak**（与全站搜索口径一致）。
+- 切域后自动清掉不属于新域的子分类选项，避免筛出空集；筛选变化即回到第 1 页，
+  且 `totalPages` 变小时把页码夹回有效范围（否则会停在一片空白页）。
+- 分页（20 / 50 / 100 每页），复用 `AdminBatchBar` 做批量操作；编辑 / 删除复用既有模态框。
+- 表格行内联显示分类色标签与在线状态（读 `healthStore`，与 `AdminInsights` 的探活共享状态）。
+
+### 34.4 分类体系管理（`AdminCategoryManager.vue`，新增）
+
+- 域重命名 / 分类重命名 / 配色选择 / 域内上下移动 / 新增 / 删除，改动先落本地草稿，
+  由「发布到云端」统一推送；顶部显示「本地草稿未发布」徽标。
+- 每个分类实时显示占用站点数（一次遍历建表，避免模板里对每个分类重扫全量站点）；
+  有引用时禁止删除并提示先迁移。
+- 新增分类时按名称**拼音首字母预生成 id**，重名自动加序号，用户手改后不再覆盖。
+
+### 34.5 操作审计日志（`AdminAuditLog.vue`，新增）
+
+- `shared/ops/audit-core.mjs` 补充分类相关动作：`category.add / category.update / category.remove /
+  category.reorder`。
+- `api/ops.js` 新增 `ops/audit.json` 持久化与两个接口：`GET ?audit=1`（服务端过滤 action/result/q +
+  返回动作字典与概览统计）、`POST {action:'audit.append'}`。
+- `src/services/auditLog.js`：`recordAudit()` 三条约束 —— ① 旁路（写失败静默，绝不阻断主流程）；
+  ② 无密钥不发（避免打出必然 401 的请求）；③ 只记已发生的事实。
+- 埋点覆盖：发布成功 / 失败、回滚、站点增改删与批量、分类增改删与排序。
+- UI：服务端过滤（口径与本地控制台一致）+ 客户端分页（一次取回上限内全部命中再切片）。
+
+### 34.6 验收
+
+- `npm run validate` → 通过（301 站点 / 29 分类；9 个无图标站点为已知项）。
+- `npm run build` → 通过（AdminView chunk 44.38 kB）。
+- `npm run console:test:ops` → **67 通过 / 0 失败**（本轮口径；第三十五节又补入认证 / 预检 / 登录审计用例，现为 85 条）。
+- `npm run console:test:all` → 全绿。
+
+---
+
+## 三十五、管理后台 P0 收尾：登录认证 + 发布预检门禁（2026-10-03）
+
+### 35.1 背景与决策
+
+第三十四节明确把「登录认证 / 角色权限」留到下一轮。本轮用户拍板：
+
+- 认证方式 = **自建账号密码 + 签名会话 token**，不接 SSO（本站单管理员、无 IdP，接第三方登录要额外账号体系与回调域名）；
+- **不做角色权限模型** —— 单管理员场景下角色只会多出一套空壳 UI 与维护成本；
+- 其余 P0 项全部落实：登录认证、发布预检与变更摘要。
+
+### 35.2 认证内核（`shared/auth.mjs`，新增）
+
+仅服务端（依赖 `node:crypto`），前端不得 import。
+
+- **口令**：scrypt（N=16384 / r=8 / p=1）加盐哈希，存储格式 `scrypt$N$saltB64$hashB64`，比对走 `timingSafeEqual`。
+- **会话**：无状态 token = `base64url(payload).base64url(HMAC-SHA256)`，payload `{sub,iat,exp,jti}`，TTL 7 天。
+  服务端**不存会话表** —— 每个受保护请求都读一次 Blob 会让热更新明显变慢；payload 预留 `jti`，
+  将来做「强制下线 / 设备管理」时再加吊销表即可。
+- **防枚举**：用户名比对同样常量时间，且口令与用户名校验**无条件都执行**，不靠「用户名错就提前返回」的计时差泄露管理员账号。
+- **统一鉴权** `checkAuthHeader(req)`：先验会话 token，再回落比对 `SITES_ADMIN_KEY`
+  （CLI / 脚本 / 旧客户端零改动）；返回 `via` 区分「登录态 / 密钥直连」，供审计署名。
+- **零配置可用**：签名密钥缺省回退 `SITES_ADMIN_KEY`；单独设 `AUTH_SECRET` 则轮换管理密钥不会踢掉所有登录态。
+
+### 35.3 认证接口（`api/auth.js`，新增）
+
+- `GET /api/auth` → `{ loginReady, keyReady, username }`（不鉴权；前端据此决定显示登录表单还是密钥直连）。
+- `POST { action: login | verify | logout }`。`verify` 返回 `reason`（`expired` / `bad-signature`），前端据此区分「过期」与「伪造」。
+- **登录限流**：按来源 IP 落 `ops/auth-attempts.json`，10 分钟窗口内累计失败 8 次即锁定一个窗口。
+  **限流组件故障时放行但仍走口令校验** —— 不能因为限流坏了就把管理员挡在门外；scrypt 约 100ms 的计算开销本身也是暴力破解成本。
+- **登录事件服务端审计**（新增动作 `auth.login / auth.loginFail / auth.lockout`），与 `api/ops.js` 写同一个
+  `ops/audit.json`、同一套 `normalizeEntry` 结构。安全事件必须在服务端记（客户端埋点可被跳过），写入依旧是旁路。
+
+### 35.4 鉴权接入
+
+`api/sites.js`（数据面）与 `api/ops.js`（运维面）统一改用 `checkAuthHeader`，凭据走
+`Authorization: Bearer <token>`；密钥直连路径保持兼容。
+
+### 35.5 前端
+
+- `src/services/authApi.js`（新增）：`status / login / verify / logout`；token 存进既有 `nav_admin_key` 槽位，
+  数据面 / 运维面所有既有调用方无需改动。
+- `src/components/admin/AdminLogin.vue`（新增）：账号登录 ⇄ 密钥直连双模式；服务端未配任何鉴权方式时给出明确配置指引，
+  口令哈希缺失时提示 `npm run auth:hash`。
+  - **上线前修复的锁死风险**：`authApi.status()` 失败时（网络抖动 / 新接口尚未生效）原先会落到
+    「服务端未配置任何鉴权方式」的死胡同 —— 连密钥输入框都不渲染，管理员将被彻底挡在后台外。
+    现改为**失败即回退密钥直连模式**并提示原因；「服务端确实没配」交给 `submitKey` 的校验结果暴露。
+- `src/views/AdminView.vue`：进入即 `authApi.verify` 自检；任一面板拿到 401 → `opsApi` 广播 `nav-auth-expired`
+  → 统一退回登录闸门并提示「登录状态已失效」；顶栏显示当前身份与有效期（密钥直连标注「无有效期」）；
+  退出登录清理凭据与审计署名。
+- `scripts/hash-password.mjs`（新增，`npm run auth:hash -- "口令"`）：生成可直接写入 `ADMIN_PASSWORD_HASH` 的哈希串。
+- `.env.example` 补充 `ADMIN_USERNAME / ADMIN_PASSWORD_HASH / AUTH_SECRET` 说明。
+
+### 35.6 发布预检（`shared/ops/preflight.mjs`，新增）
+
+纯函数、零依赖，浏览器与 Node 同口径引用 —— 避免「本地 dry-run 说没问题、线上拦下来」的割裂。
+
+判据是**发布后前台会立刻坏掉**的才阻断，只是「不理想」的一律降级为警告：
+
+- 阻断：无凭据、站点列表为空、分类表结构非法、站点引用了未登记的分类。
+- 警告：空分类、重复域名（忽略 www，口径同站点内核）、排序号重复、与云端相比无改动。
+
+同时产出 `sites` / `categories` 结构化 diff 与一句话摘要 `summarizePreflight`，供发布按钮旁、通知、审计共用。
+
+- `src/components/admin/AdminPublishPreflight.vue`（新增）：阻断 / 提示 / 通过三态 + 两侧变更明细；
+  `watch(result)` 实时向父级推送 verdict（否则数据变了按钮状态不更新）。
+- `AdminView`：`preflightOk === false` 时**发布按钮直接禁用**并列出阻断原因 —— 预检成为发布门禁，不是装饰。
+
+### 35.7 验收
+
+- `npm run validate` → 通过（301 站点 / 29 分类；9 个无图标站点为已知项）。
+- `npm run build` → 通过（AdminView chunk 60.33 kB）。
+- `npm run console:test:ops` → **85 通过 / 0 失败**（新增认证内核往返、`diffGroups`、发布预检四类阻断、登录审计动作用例）。
+- `npm run console:test:all` → 全绿。
+
+### 35.8 已知边界
+
+- 会话无状态：`logout` 仅客户端丢弃 token，服务端无吊销表（预留 `jti`，需要「强制下线」时再加）。
+- 未做角色权限（本轮明确不做）；`authConfig` 只有一个 `ADMIN_USERNAME`，天然单管理员。
+- 登录审计与限流共用 `ops/audit.json` 的「读—改—写」，与 `api/ops.js` 的并发追加存在竞态；
+  登录是低频事件，影响可忽略（如需彻底解决，应给审计追加加锁或改用 append-only 存储）。
+
+### 35.9 上线记录（2026-10-03）
+
+`npm run publish` 全链路通过：备份 → schema 门禁 → 构建 → Vercel 生产部署 → Blob 热更新 → 轮询验证。
+
+- 部署：`https://navigator-v2-two.vercel.app`（Aliased，Ready in 36s）。
+- 热更新：`version=105 / 301 站点 / 292 图标`，快照 `sites-data.snapshots/000104-2026-10-03T06-28-59-170Z.json`。
+- 线上实测：
+  - `GET /api/auth` → `{loginReady:false, keyReady:true}`（生产尚未配 `ADMIN_PASSWORD_HASH`，故走密钥直连，符合预期）；
+  - `POST /api/auth {action:verify}` 带管理密钥 → `{valid:true, via:"key"}`；
+  - `GET /api/sites` → `version:105`，数据正常下发；
+  - **鉴权确实生效**：`/api/ops` 无凭据 → 401、`/api/sites` POST 无凭据 → 401、伪造 token → 401；
+  - `/admin` → 200。
+
+**账号登录开通（2026-10-03 同日完成）**
+
+生产环境原先只有 `SITES_ADMIN_KEY`（密钥直连），账号登录未启用。已补齐：
+
+- 在 Vercel Production 新增两个 **Sensitive** 变量：`ADMIN_PASSWORD_HASH`（scrypt 哈希，由 `npm run auth:hash` 生成）
+  与 `AUTH_SECRET`（48 位随机串，用于会话签名；单独设置后轮换管理密钥不会踢掉登录态）。
+- 明文口令**只交付给管理员本人保存，不写入本仓库、不写入 `.env.local`、不进 git**；环境变量里只有哈希。
+  需要更换口令时：`npm run auth:hash -- "新口令"` → 在 Vercel 覆盖 `ADMIN_PASSWORD_HASH` → 重新部署。
+- 环境变量变更需重新部署才对 Serverless 生效（本次已重部署，Ready in 38s）。
+
+线上实测（`https://navigator-v2-two.vercel.app`）：
+
+| 检查项 | 结果 |
+| --- | --- |
+| `GET /api/auth` | `{loginReady:true, keyReady:true, username:"admin"}` |
+| 登录（错误口令） | **401** |
+| 登录（正确口令） | 签发会话 token（146 字符，TTL 7 天，`sub:"admin"`） |
+| 会话 token 调 `/api/ops` | **200** |
+| `POST {action:verify}` 带会话 token | `{valid:true, via:"session", username:"admin"}` |
+| 登录事件入审计 | `auth.login` / `auth.loginFail` 均落盘，含 `actor` 与来源 IP |
+
+密钥直连（`keyReady:true`）保持可用，CLI / 脚本 / 旧客户端不受影响；两条凭据路径并存。
+
+### 35.10 登录体验：浏览器自动填充 + 记住此设备（2026-10-03）
+
+口令是 20 位随机串，手打成本高。**明确拒绝的做法**：把口令写进前端自动填充 —— bundle 公开可读，
+等于把管理员口令发到公网。改用两条安全路径：
+
+**1. 浏览器密码管理器**（`src/components/admin/AdminLogin.vue`）
+
+- 关键坑：`/admin` 是 AJAX 登录、**没有页面跳转**，Chrome/Edge 因此识别不出「这是一次登录」，
+  不会弹「保存密码」—— 只加 `autocomplete` 属性并不能可靠触发。
+- 做法：登录成功后显式调用 `navigator.credentials.store(new PasswordCredential({ id, password, name }))`；
+  进入页面时用 `navigator.credentials.get({ password: true, mediation: 'silent' })` 静默回填。
+- **顺序约束**：必须先 `store` 再清空输入框，清空后就取不到明文口令了。
+- 兼容：仅 Chromium 系有 `window.PasswordCredential`；其余浏览器走 `autocomplete` 原生路径，不支持即静默跳过。
+- 同时补 `name="username" / name="password"`，提升密码管理器识别率（原先只有 `autocomplete`）。
+- 用户名本就由 `/api/auth` 回填，无需手打；口令是唯一需要输入的字段。
+
+**2. 记住此设备（90 天）**
+
+- `shared/auth.mjs` 新增 `SESSION_TTL_LONG_MS`（90 天）；`api/auth.js` 的 login 接受 `remember`，
+  **只影响会话有效期，不影响鉴权强度** —— 口令仍是 scrypt 哈希，不会被延长。
+- `authApi.login(user, pass, remember)`；登录页新增勾选框（默认勾选）。
+- 收回手段：轮换 `AUTH_SECRET` 并重新部署，所有已签发会话同时失效。
+- 审计明细记录有效期档位（「有效期 90 天（记住此设备）」/「有效期 7 天」），便于事后区分登录来源。
+
+**验收**：`npm run validate` 通过；`npm run build` 通过（AdminView 61.08 kB）；
+`npm run console:test:ops` **86 通过 / 0 失败**；`console:test:all` 全绿。
+
+**线上实测**：`remember:true` → `ttl=7776000000`（90 天）；`remember:false` → `ttl=604800000`（7 天）；
+90 天会话 token 调 `/api/ops` → **200**；审计正确区分两个档位。
+
+> 注意：浏览器密码管理器只在**首次成功登录之后**才拿到凭据。也就是说新代码上线后，
+> 需要手动登录一次，之后才会自动填充。
+
+### 35.11 修复：管理后台鼠标无法滚动（2026-10-03）
+
+**现象**：`/admin` 鼠标滚轮完全无反应，内容超出视口后被裁掉，底部面板不可达。
+
+**根因**：`src/styles/main.css` 为让主壳做固定分栏，全局设了 `html, body { height: 100%; overflow: hidden }`，
+**视口滚动被关掉**。主壳 `.app-layout` → `.main` 是 `overflow: hidden` 的固定布局，滚动由内部
+`CardsContainer` 自己承担 —— 所以主站一切正常，问题只在后台。
+而 `Admin` 是 **standalone 路由**（`App.vue` 的 `STANDALONE_ROUTES`，不套 `.app-layout`），
+`AdminView` 根元素只有 `min-height: 100vh`、**没有任何滚动容器**，内容一超高就被裁掉且无处可滚。
+全库无 wheel 事件拦截，纯样式问题。
+
+**修复**（`src/views/AdminView.vue`）：给 `.admin-view` 自建滚动容器 ——
+`height: 100vh; height: 100dvh; overflow-y: auto; overscroll-behavior: contain`
+（`100dvh` 覆盖移动端动态工具栏，`100vh` 作回退）。
+
+**未受影响**：头部「发布到云端」「通知」两个跳转按钮用的是 `scrollIntoView`，
+会自动寻找最近的滚动祖先，因此无需改动。
+
+**验收**：`npm run build` 通过；线上 `AdminView-*.css` 确认含该规则；
+浏览器实测（真实视口 603×611）：`.admin-view` computed `overflow-y: auto`，
+`scrollHeight 8579 / clientHeight 611`，`scrollTop` 0 → 500 → 7968（到底）→ 0 全部正常，
+底部可达「登录日志」「通知中心」，滚动流畅无卡顿。
+
+> 排查插曲：首次自动化验证「失败」，原因是浏览器标签页视口高度为 0（渲染被节流、截图失败），
+> `100vh` 随之解析为 0，`clientHeight` 读出 0 —— 这是**验证环境**的问题，不是页面问题。
+> 新建标签页拿到正常视口后即通过。以后遇到 `clientHeight: 0` 先怀疑视口，别急着改页面。
+
+> 教训：standalone 路由不继承主壳的滚动容器，**任何新增的整页路由都必须自建滚动容器**，
+> 否则会被全局 `overflow: hidden` 静默裁掉。
+
+### 35.12 管理后台改为 Tab 布局（2026-10-03）
+
+**动因**：后台原来是「一页瀑布流」，各模块上下堆叠，找一个功能要滚很久。改为按模块分 Tab。
+
+**布局结构**（`src/views/AdminView.vue`）：
+`.admin-view` 改为 flex 纵向列（`height: 100dvh; overflow: hidden`）——
+固定头部 `.admin-header` → 固定 Tab 栏 `.admin-tabs` → 滚动内容区 `.admin-body`。
+滚动容器从 `.admin-view` 下沉到 `.admin-body`，头部与 Tab 栏始终可见。
+**`.admin-body` 必须带 `min-height: 0`**，否则 flex 子项不收缩、滚动条不会出现。
+
+**8 个 Tab**：概览（统计卡片 + 数据洞察）/ 站点管理 / 分类体系 / 云端发布 /
+快照与回滚 / 发布历史 / 操作审计 / 通知中心。默认「概览」。
+
+**Tab 状态写进 URL**：用 `router.replace`（不污染历史），刷新 / 收藏 / 分享都能落回同一模块；
+未登记的 `tab` 值一律回落默认页，避免手改地址栏把页面切成空白；
+监听 `route.query.tab` 以支持浏览器前进 / 后退；`?tab=` 为默认值时从 URL 中删掉，保持干净。
+
+**懒加载**：面板用 `v-if` 而非 `v-show` —— 8 个面板里有一半挂载即打接口
+（发布历史 / 审计 / 通知 / 快照都是 `onMounted(load)`），全量常驻会造成首屏并发请求。
+代价是切 Tab 会重置面板内部状态（筛选 / 分页），可接受。
+
+**连带处理（不改会静默坏掉的地方）**：
+
+- **通知角标失效**：角标原来靠 `AdminNotifications` 常驻挂载后 `emit('badge')` 上报；
+  懒加载后要等用户点开通知中心才会上报，角标就失去「提示有新通知」的意义。
+  改为 `AdminView` 登录成功后主动拉一次（`opsApi.notifications(key, { limit: 1 })` → `summary.unread`），发布成功后也刷新。
+- **删除死代码**：`refreshOps()` 及 `historyRef / auditRef / notifyRef` 在懒加载下永远取不到已挂载实例（恒为 null），
+  已成空转，一并删除；各面板改为切到该 Tab 时自行 `onMounted(load)` 拉最新数据。
+- **头部按钮**：「通知」按钮移除（角标移到「通知中心」Tab 上）；
+  「发布到云端」保留为跳转到「云端发布」Tab 的快捷入口；`scrollToPublish` / `scrollToNotifications` 随之删除。
+
+**验收**：`npm run validate` 通过；`npm run build` 通过（AdminView 62.00 kB / CSS 36.52 kB）；
+`console:test:all` 全绿（内核 86/0、trust 12/0、site-infer 108、metadata 27、hunk 72）。
+
+**浏览器实测**（视口 603×611）：8 个 Tab 顺序正确；默认「概览」；
+逐个点击**同一时刻只有一个模块可见**；站点管理 301 站点 / 16 页、内容区滚动正常；
+URL 随 Tab 变为 `?tab=sites` 等；无空白、无重复堆叠、无报错。
+
+---
+
+## 三十六、站点管理改为卡片式布局（2026-10-03）
+
+**动因**：站点管理原是表格布局，列多拥挤、窄屏必须横向滚动、每行信息密度与可读性都不理想。改为自适应卡片网格。
+
+### 36.1 卡片结构（`src/components/admin/AdminSitesPanel.vue`）
+
+每张卡片自上而下：
+
+- **顶部行**：批量勾选框（仅批量模式渲染）→ 图标（`site.color` 底色 + 首字母兜底，`img` 加载失败即 `@error` 自摘）→ 名称（单行省略）+ 网址（monospace 单行省略）→ 编辑 ✎ / 删除 ✕ 两个图标按钮。
+- **描述**：`-webkit-line-clamp: 2` 两行截断，无描述不渲染该行。
+- **底部行**：分类胶囊（用 `getCategoryColor` 派生 `+20` 透明底 + 主色文字）、健康状态徽标（正常 / 限流 / 失效 / 未探测，四色）、访问次数（`margin-left: auto` 右对齐）。
+
+`card-foot` 用 `margin-top: auto` 顶到底部，同一行卡片高度不齐时底栏仍对齐。
+
+**功能零丢失**：筛选（搜索 / 域 / 分类 / 状态 / 排序）、分页（20/50/100）、批量全选与勾选、增删改弹窗全部保留，仅换渲染层。
+
+### 36.2 窄屏溢出修复（本轮关键修复）
+
+**现象**：视口 603px 时一行排 3 张卡片，首张卡片右边界超出容器，卡片相互重叠、右侧被裁切。
+
+**根因**：`grid-template-columns: repeat(auto-fill, minmax(272px, 1fr))` 的最小列宽写死 `272px`。
+`auto-fill` 只在「容器宽度足够放下一列」时降列，当容器可用宽度小于 `272px` 时（窄屏 + `.admin-section` 左右各 32px 内边距），
+轨道仍按 `272px` 建立，于是溢出容器。
+
+**修复**（三处）：
+
+1. 最小列宽改为 `minmax(min(272px, 100%), 1fr)` —— `min(272px, 100%)` 保证最小列宽**永不大于容器宽度**，窄屏最多退化成单列铺满，不会再溢出。
+2. `.site-card` 加 `min-width: 0` —— 网格子项默认 `min-width: auto`，内容（长网址 / 长名称）会把轨道撑破，置 0 后由内部 `text-overflow: ellipsis` 接管。
+3. 新增 `@media (max-width: 768px)`：`.admin-section` 内边距 32px → 16px、卡片间距与内边距收紧、搜索框 `min-width: 100%` 独占一行、`.site-meta` 允许换行并取消页码右浮。
+
+### 36.3 验收与上线（2026-10-03）
+
+- `npm run build` 通过（`AdminView-BygHrK5F.css` 37.75 kB）。
+- 产物核验：`dist/assets/AdminView-*.css` 含 `minmax(min(272px,100%),1fr)`。
+- `npm run publish` 全链路通过：备份 301 条 → schema 门禁（9 个无图标站点为已知项）→ 构建 → Vercel 生产部署 → Blob 热更新 → 轮询收敛。
+  - 部署：`https://navigator-v2-two.vercel.app`（Aliased，Ready in 34s）。
+  - 热更新：`version=106 / 301 站点 / 292 图标`，快照 `sites-data.snapshots/000105-2026-10-03T08-00-35-621Z.json`。
+  - 线上核验：`GET /assets/AdminView-BygHrK5F.css` 确认包含 `min(272px,100%)` 修复规则。
+
+---
+
+## 三十七、站点失效判定改为「本机代理环境」口径（2026-10-03）
+
+### 37.1 问题与决策
+
+原实现由**浏览器**逐站 `fetch` 探测在线状态（`src/stores/health.js`）。两个致命缺陷：
+
+1. **跨域读不到状态码** —— 浏览器 `fetch` 第三方域名几乎全部落到 `ERR`（CORS 拦截），大批可用站点被误判「失效」。
+2. **口径不统一** —— 浏览器的出网路径与本机代理环境不是一回事；用户明确要求「站点是否失效要以本地自带代理环境判断」。
+
+**决策**：判定只由**本机**产出（`curl.exe` 走系统代理），发布到云端，前端只读结论。
+- 浏览器读不到跨域状态码 → 不探。
+- 云端（Vercel）出网口在海外，与本机代理可达性不同 → 不探。
+- 只有本机 `curl.exe`（系统代理）才是用户要的真口径。
+
+**单一真相源**：前台卡片状态角标、管理后台失效清单、控制台可用性看板、CLI `nav sites check` 四处共用同一份云端判定。
+
+### 37.2 分层与文件
+
+| 层 | 文件 | 职责 |
+|----|------|------|
+| 纯规则 | `shared/health-rules.mjs`（新增） | `IGNORABLE` 限流码集合 / `STATUS_LABEL` / `verdictOf(code)` / `tally()` |
+| 探测引擎 | `shared/health-probe.mjs`（改） | 只保留「怎么探」（curl.exe + HEAD→GET 回落 + down 重试），规则改为从 `health-rules.mjs` 导入再 re-export |
+| 云端落点 | `api/health.js`（新增） | `GET` 公开读（前端唯一来源）/ `POST` 鉴权写（按 code **重算 status** 后落 Blob `ops/health.json`） |
+| 本机发布 | `tools/console/lib/cloud.mjs`（改） | `publishHealth()` 上报事实（id/code/ms），`proxyEnv()` 记录代理；`fetchCloudHealth()` 核对 |
+| 控制台 | `tools/console/lib/health.mjs` / `schedule.mjs`（改） | 探活、巡检结束后**自动发布**；`publishLatest()` 支持只重发不重探 |
+| 控制台 UI | `tools/console/ui/index.html` / `healthpanel.js`（改） | 「发布到云端」按钮 + `/api/health/publish` 接口 |
+| CLI | `tools/cli/commands/sites.mjs`（改） | `nav sites check --publish` 探完即发布 |
+| 前端 | `src/stores/health.js`（改） | 删除浏览器探测，改为 5 分钟 TTL 拉 `/api/health`；`probeSites()` 退化为「确保已加载」 |
+| 后台 | `src/components/admin/AdminInsights.vue`（改） | 展示云端判定时间 / 代理环境；无判定时给操作指引 |
+
+### 37.3 关键设计点
+
+1. **为什么规则要单独成文件**：`health-probe.mjs` 依赖 `node:child_process`（拉起 curl.exe），不能把子进程模块拖进 Vercel 函数运行时；但 `api/health.js` 写入判定时也要用同一套分级规则，故规则抽到零依赖的 `health-rules.mjs`，两边共用。
+2. **服务端按 code 重算 status，不信任客户端结论**：客户端只上报事实（HTTP 码 / 耗时），`status` 由 `api/health.js` 用 `verdictOf()` 重算。即便某个旧版控制台用了过时口径，也不会把「限流」写成「失效」污染全站角标。
+3. **合并写入而非整体覆盖**：控制台 / CLI 都支持只探部分站点（`--ids` / `--limit`），覆盖式写入会让没被探到的站点集体退回「未探测」，比不发布更糟。故 `api/health.js` 读旧值后 `{...prev, ...incoming}` 合并，`version` 递增。
+4. **发布失败不抛错**：本地已落盘，云端没更新只是角标暂时偏旧，不该让探活任务整体失败（`publishRun` 只记录审计 + 日志）。
+5. **`verdictOf` 分级**：`ok` = 2xx/3xx；`limited` = 429/403/405/401（限流/反爬/方法误用/鉴权，站点实际可用）；`down` = `ERR`/`000`/404/402/410 等真实失效；`unknown` = 无云端判定。
+
+### 37.4 验收与上线（2026-10-03）
+
+- `npm run console:test:all` 全绿（trust 13 / infer 108 / guard 27 / hunks 72 / ops 86 / api-ops 12）。
+- `npm run build` 通过。
+- `npm run publish` 全链路通过：部署 `navigator-v2-two.vercel.app`（Ready in 36s），Blob 热更新 `version=107 / 301 站点 / 292 图标`，快照 `sites-data.snapshots/000106-2026-10-03T08-23-16-372Z.json`。
+- **端到端实测**：
+  - `GET /api/health`（新函数已上线）首次返回空判定 → 200。
+  - `nav sites check --limit 3 --publish` → 发布 `version=1`（3 条，代理 `http://127.0.0.1:7897`），`GET` 回读一致。
+  - 全量 `nav sites check --publish` → 301 站（耗时 106s）→ 发布 `version=2`：**正常 245 / 可忽略 50 / 需处理 6**。
+  - `GET /api/health` 回读：`version=2 / total=301 / actor=cli / proxy=http://127.0.0.1:7897`，与发布响应一致。
+  - 需处理 6 站：`l2 Kaggle(404)`、`s9 文心一言(404)`、`g12 DESIGN.md Editor(402)`、`md7 BlockBeats(ERR)`、`sm3 Xtemporary(ERR)`、`sm16 四方接码(ERR)`。
+- **误判提示**：上述部分站点（kaggle / yiyan.baidu / theblockbeats / sz-fang）在本机网络下有已知 WAF 误报史（见「九、已知问题」），故后台失效清单保留「删除前仍建议人工复核 WAF / 限流误判」的告警文案，不自动删除。
+
+### 37.5 使用方式
+
+- **日常**：控制台「可用性」面板点「开始探活」或等定时巡检，结束后自动发布到云端；「发布到云端」按钮用于不重新探测、只重发最近一轮。
+- **CLI**：`nav sites check --publish`（全量）/ `nav sites check --ids a,b --publish`（定点）。
+- **前端**：无需任何操作，`/api/health` 5 分钟 TTL 自动刷新；管理后台「数据洞察」展示判定时间、代理环境与失效清单。
+
+### 37.6 复核 6 个「需处理」站点 + 修复 HEAD 误判（2026-10-03）
+
+首轮判定（`version=2`）报出 6 个「需处理」，逐一复核后发现 **3 个是引擎误判**：
+
+| 站点 | 首轮判定 | 复核真相 | 证据 |
+|------|----------|----------|------|
+| `l2` Kaggle | down(404) | **正常** | HEAD 404 / GET 200 |
+| `s9` 文心一言 | down(404) | **正常** | HEAD 404 / GET 200 |
+| `md7` BlockBeats | down(ERR) | **正常** | HEAD 超时(exit 28) / GET 200 |
+| `g12` DESIGN.md Editor | down(402) | 真失效 | `X-Vercel-Error: DEPLOYMENT_DISABLED`（Vercel 部署被禁用） |
+| `sm3` Xtemporary | down(ERR) | 真失效 | DNS NXDOMAIN（8.8.8.8 / 1.1.1.1 均无记录） |
+| `sm16` 四方接码 | down(ERR) | 真失效 | 无 A/AAAA 记录（Cloudflare NS 但 NODATA），握手失败 / 402/502 |
+
+**根因：`probeOnce` 的 HEAD→GET 回落逻辑有两处失效**
+
+1. **HEAD 返回 4xx 不回落**：原逻辑仅在 `000`/空 时回落 GET，而大量站点不支持 HEAD（返回 404/405），GET 却是 200 → 误判「失效」。
+2. **HEAD 超时直接定性**：curl `--max-time` 超时以 exit 28 退出，`execFile` 的 Promise reject，`try/catch` 直接返回 `ERR`，**GET 回落永远执行不到**。
+
+**修复（`shared/health-probe.mjs`）**
+
+- 新增 `curlCode()`：从 `error.stdout` 取回 `-w` 写入的 http_code，超时不再被当成探测异常。
+- `probeOnce()` 改为「**只要 HEAD 不是 2xx/3xx，一律用 GET 复核**」（GET 才是用户真实访问方式）。
+
+**顺带修复 `scripts/check-sites.mjs`**：该脚本复制了一份同款「HEAD 优先」实现（违反「同源」约定，且踩同一个坑），已重构为直接调用 `probeMany()`，删除本地 curl 逻辑与 `isBad/classify` 重复判定。
+
+**修复后全量重探并发布 `version=3`**：正常 **254** / 可忽略 **44** / 需处理 **3**（`g12` 402 / `sm3` 000 / `sm16` 000）。
+除 3 个误判站点归正外，另有 6 个原「可忽略(405/403)」站点经 GET 复核确认为正常：`l3` Google Colab、`dt13` MangosLab、`aiapi3` Radeon Token Factory、`sc8` Tsecbench、`dt28` BlockHorizon、`st3` Allnodes。
+
+**验证**：`npm run console:test:all` 全绿；`node scripts/check-sites.mjs --limit 6` 正常；`GET /api/health` 回读 `version=3` 与发布响应一致。
+
+> 注：本次只改本机 Node 工具（`shared/health-probe.mjs`、`scripts/check-sites.mjs`），`api/health.js` 仅依赖 `shared/health-rules.mjs`，故**无需重新部署 Vercel**，只需重跑探活并发布判定。
+
+---
+
+## 三十八、移除 2 个真失效站点 + 代理端口漂移事故（2026-10-03）
+
+### 38.1 删除操作
+
+复核后确认 `sm3` / `sm16` 为真失效（`g12` 保留观察），执行：
+
+```
+nav sites batch --op remove --ids sm3,sm16 --yes
+```
+
+- `sm3` Xtemporary（xtemporary.com）：DNS NXDOMAIN，域名已注销
+- `sm16` 四方接码平台（sz-fang.cc）：无 A/AAAA 记录（Cloudflare NS 但 NODATA）
+- 删除后站点总数 **301 → 299**
+- 顺手清理孤儿图标 `public/icons/sm16.ico`（`removeSite` 不删图标文件，须手工清理；校验后 public/icons 孤儿 0 / 悬空 0）
+- 发布结果：部署 Ready 33s，Blob 热更新 `version=108 / count=299 / withIcons=291`，轮询第 1 次即收敛
+- 线上核对：`/api/sites` 返回 299 条、`sm3`/`sm16` 已不存在、`g12` 保留
+
+### 38.2 事故：本机代理端口漂移导致发布连续失败
+
+**现象**：`npm run publish` 连续两次在第 3 步（`npx vercel deploy`）报 `Error: fetch failed`；随后所有 curl 请求（含 baidu / google）全部返回 `000`。
+
+**根因**：Clash Verge 的 `mixed-port` 已从 **7897 变为 7900**（`%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\clash-verge.yaml` 与运行时 `config.yaml` 均为 7900），但**机器环境变量 `HTTP_PROXY`/`HTTPS_PROXY` 仍指向 7897**。于是：
+
+- curl.exe 忠实使用环境变量里的 7897 → 该端口已无监听 → 全部 `000`；
+- `proxyEnv()` 同样读环境变量，探活口径也会跟着失效（会把全部站点误判为「需处理」）。
+
+**诊断要点（可复用）**：
+
+1. `netstat -ano | Select-String "LISTENING" | Select-String ":7897"` → 无监听；
+2. 查代理核心真实端口：`netstat -ano | Select-String "LISTENING" | Select-String "<mihomo PID>"` → `127.0.0.1:7900`；
+3. 用 `--noproxy "*"` 区分「底层网络断」与「代理客户端挂」：本例 baidu 200 / api.vercel.com 308 → 底层网络正常，问题在代理；
+4. `npx vercel whoami` 清空代理变量后成功 → 证明 Vercel CLI 直连可用。
+
+**处置**：本次以 `$env:HTTP_PROXY='http://127.0.0.1:7900'` 等临时覆盖端口完成发布。
+
+**已修复（2026-10-03）**：按用户确认，把 **User 层**环境变量改为与 Clash Verge 一致：
+
+```powershell
+[Environment]::SetEnvironmentVariable('HTTP_PROXY','http://127.0.0.1:7900','User')
+[Environment]::SetEnvironmentVariable('HTTPS_PROXY','http://127.0.0.1:7900','User')
+```
+
+- 两个变量原先只在 **User 层**（`HKCU:\Environment`，值 7897），Machine 层为空；`NO_PROXY` 保持不变。
+- 已回读注册表确认写入 7900。
+- ⚠️ 已运行的进程不会自动继承（工具宿主 / 控制台服务需**重启**才生效；控制台服务当时未运行，下次启动即读新值）。
+- ⚠️ 若 Clash Verge 端口再次变动，会重新失配 —— 建议在 Clash Verge 中把 mixed-port 设为固定值（关闭自动分配）。
+
+### 38.3 判定数据剔除（已修复）
+
+**问题**：云端 `ops/health.json` 曾保留 `sm3`/`sm16` 两条判定。因 `api/health.js` 是**合并写入**（只增不删），删除站点不会自动清除其判定 —— 残留条目会被 `counts` 计入，也可能被未来同 id 的新站点继承。
+
+**修复（`api/health.js`）**：合并之后增加一步**按当前站点集剔除**。
+
+- 站点集取自 **Blob `sites.json`**（运行时权威表），而非部署包里的 `sites-data.json` —— 控制台支持「只热更新不重新部署」，用部署包会漏掉刚新增的站点、把新站判定误删。
+- `knownSiteIds()` 读取失败返回 `null`，此时**跳过剔除**（fail-open）：判定宁可多留一条，也不能因读不到站点表就把整份判定清空。
+
+```js
+const known = await knownSiteIds()
+const merged = {}
+for (const [id, r] of Object.entries({ ...prevResults, ...incoming })) {
+  if (!known || known.has(id)) merged[id] = r
+}
+```
+
+**验证**：部署后重跑 `nav sites check --publish` → 判定 `version=4 / total=299 / ok=254 / limited=44 / down=1`；`GET /api/health` 回读 `sm3`/`sm16` 均已消失，需处理仅剩 `g12(402)`，代理记录为 `http://127.0.0.1:7900`（新端口已生效）。`/api/sites` 同为 299，两轴一致。
+
+### 38.4 根治：代码层自动探测代理端口（2026-10-03）
+
+**为什么还要做**：38.2 的处置是「把环境变量手动改成 7900」——这只是把漂移**推迟**到下一次。只要 Clash Verge 再换端口，同样的事故会重演，且症状是「全站误判为需处理 + 发布整体失败」，排查成本高。
+
+**方案**：新增 `shared/proxy.mjs`，把「本机到底哪个端口在当代理」变成代码探测的事实，而不是环境变量的假设。
+
+**口径优先级**（`resolveProxyUrl`）：
+
+1. 环境变量里的端口**确实在监听** → 原样采用（尊重用户显式配置）
+2. 否则扫描常见代理端口 `7890 / 7897 / 7900 / 7899 / 7891 / 10809 / 10808 / 1080 / 2080`，命中即用
+3. 都没有 → 返回空串，按「不走代理」处理
+
+> 刻意不收 8080 / 8888：这两个口常被开发服务器占用，收进来会把无关服务误认成代理。
+
+**两个落点**：
+
+- `applyProxyEnv()`：把探测结果**写回 `process.env`**。curl.exe 会继承子进程环境，因此这一处就让所有既有调用点（发布 / 抓取 / 通知 / 快照 / vercel.mjs）一并免疫漂移，无需逐个改造。探测不到时**不动**环境变量，不误删用户可能有效的配置。
+- `health-probe.mjs`：探活时**显式传 `--proxy`**（整批只解析一次），不再依赖环境变量，判定口径确定且同批一致。
+
+**结果带 30s 缓存**：代理端口切换后控制台无需重启即可自动跟上（`force:true` 可强制重探）。
+
+**启动引导点**（都在真正干活前才探测，help/schema 等纯文本命令不付代价）：
+
+| 入口 | 位置 |
+|---|---|
+| 控制台 | `tools/console/server.mjs`：`loadEnv()` 后 `await applyProxyEnv()`，启动横幅打印「代理环境」 |
+| CLI | `tools/cli/nav.mjs`：`cmd.run()` 前 `await applyProxyEnv()` |
+| 发布脚本 | `scripts/publish.mjs`：加载 `.env.local` 后 `await applyProxyEnv()` |
+
+`scripts/check-sites.mjs` 走 `probeMany`（已显式传代理），无需改动。
+
+**验证**（本机环境变量仍为滞后的 7897，正是漂移现场）：
+
+```
+resolveProxyUrl()            → http://127.0.0.1:7900   （自动纠正，未用滞后的 7897）
+经滞后端口 7897 探 google     → 000 / down              （复现事故）
+经探测端口 7900 探 google     → 200 / ok                （修复生效）
+控制台启动横幅               → 代理环境: http://127.0.0.1:7900
+```
+
+**回归用例**（`tools/console/test-ops.mjs`，内核用例 86 → 89）：`portOf` 解析；环境变量端口在监听时原样采用；**环境变量端口失效时不再沿用该失效端口**（且返回的代理端口必须真的在监听）。
+
+**残留提示**：环境变量从「唯一依据」降级为「优先候选 + 兜底」，因此 38.2 的手工修改仍有意义（省一次扫描），但**不再是单点故障**。若 Clash Verge 关闭（无任何监听），系统会自动转为直连，而不是拿着失效代理全站报错。
+
+---
+
+## 三十九、点击统计与按点击量排序（2026-10-03）
+
+### 39.1 为什么做
+
+原有「访问统计」是 `visitCount`，存在两处根本缺陷：
+
+1. **口径错位**：它记的是**本机**（我这个浏览器）访问某站点的次数，被当作「热门度」展示。单人设备的访问次数无法代表站点在全网的热度，热门榜会退化成「我最近点了谁」。
+2. **不跨设备**：换设备 / 换浏览器即归零，无法作为运营依据。
+
+因此把「热度」拆成两条互不冒充的口径，并新增全局点击统计：
+
+| 口径 | 存储 | 用途 | 权威性 |
+|---|---|---|---|
+| `visitCounts`（本机） | localStorage | 「推荐发现」个性化（同分类共现） | 仅代表本设备 |
+| `clicks`（全局） | Blob `ops/clicks.json` | 卡片角标 / 热门榜 / 后台 TOP 榜 | **站点热度的唯一权威** |
+
+### 39.2 分层与文件
+
+沿用「本机/访客产出事实 → 云端归一 → 前端只读」的既有范式（与 `health` 同构）：
+
+| 层 | 文件 | 职责 |
+|---|---|---|
+| 纯规则 | `shared/clicks-core.mjs`（新增） | 增量校验 / 合并 / 汇总 / 排行；**零依赖纯函数**，浏览器与 Node 双端共用 |
+| 云端 | `api/clicks.js`（新增） | `GET` 公开读、`POST` 匿名写（限流 + 按站点集剔除 + 累加合并） |
+| 前端状态 | `src/stores/clicks.js`（新增） | 本地待发队列、批量上报、云端拉取、`mergedCounts` 统一展示口径 |
+| 展示 | `SiteCard` / `SiteDetailPanel` / `MainToolbar` / `DisplaySection` / `ContentFeed` / `AdminSitesPanel` / `AdminInsights` | 角标、排序项、TOP 榜 |
+
+### 39.3 关键设计点
+
+**① 纯规则单独抽出，杜绝口径漂移**。点击数据有三个读写方（访客前端、线上接口、管理后台）。任何一方自写「多大算一次有效点击 / 合并怎么加 / 删站后怎么剔除」都会漂移。收进 `shared/clicks-core.mjs` 后各端只负责搬运。硬约束：**必须零依赖**（不 import `node:*`、不碰 fs/网络），否则 Vite 前端打包会失败。
+
+**② 写入是「累加」不是「覆盖」**。点击天然是增量，多个访客并发上报时覆盖会互相抹掉，故 `读 → 加 → 写`。Serverless 无共享状态，理论上存在并发丢更新（与 health 同源），但点击统计允许此量级误差，换取实现简单稳定。
+
+**③ 匿名写必须限流 + 钳制**。与 health「必须鉴权写」相反，点击是访客行为，只能匿名写。风险用三层压住：
+
+- `normalizeIncrements`：非法项（无 id / 非正数 / 超长 id）静默丢弃；单站点单次增量钳到 `MAX_STEP=50`；单次最多 `MAX_BATCH=300` 站点、总增量 `MAX_TOTAL_STEP=2000`。
+- 单实例内存窗口限流：同 IP 60s 内最多 60 次写。
+- 前端 `sendBeacon` + 批量合并，正常流量天然低频。
+
+**④ 待发队列必须落 localStorage**。点击发生在**跳转前的一瞬**，用户点完即离开页面；若只放内存，未发出的增量会随页面卸载一起丢。故 `pending` 持久化，并在 `pagehide` / `visibilitychange` 用 `sendBeacon` 兜底发出（拿不到响应时靠 `absorb` 乐观并入，避免角标回跳）。任何发送失败都**保留队列**下次重试 —— 丢一点可以接受，丢整份不行。
+
+**⑤ 展示与排行共用一份 `mergedCounts`**（云端已确认 + 本地待发）。否则「角标」与「排行」会出现两套口径：点完角标 +1 但排行没动。
+
+**⑥ 删除站点时点击一起消失**。合并前按 **Blob `sites.json`**（运行时权威表，而非部署包的 `sites-data.json`）取当前站点集剔除；读取失败返回 `null` 则**跳过剔除**（fail-open，宁可多留一条也不清空整份）。
+
+### 39.4 验收（2026-10-03）
+
+```
+node tools/console/test-ops.mjs   →  内核用例 101 通过 / 0 失败（clicks 相关新增 12 条）
+npm run build                     →  ✓ built in 8.59s（PWA precache 288 entries）
+```
+
+回归用例覆盖：非法项丢弃、同 id 累加且受单站点上限约束、站点数上限截断、`mergeClicks` 剔除已删站点（含 prev 残留）、未传 `known` 时跳过剔除、非正增量不产生 0 值脏键、`tallyClicks` 汇总、`countOf` 非法兜底、`rankByClicks` 降序 + 同分按名升序且不改动入参。
+
+### 39.5 使用方式
+
+- **前台**：工具栏「排序」下拉新增「按点击量」；设置面板「默认排序」同样可选；卡片页脚、热门站点卡片显示全网累计点击角标。
+- **后台**：站点管理卡片显示点击量且可按点击量排序；数据洞察新增「点击量 TOP 10」，头部显示「全网累计点击 N 次 · M 个站点有点击」。
+- **读取 TTL**：云端点击快照 5 分钟 TTL，页面长开时按 TTL 轮询刷新；`refresh()` 可强制拉取。
+
+### 39.6 上线后修复：榜单不再用 0 点击站点冒充「热门」（2026-10-03）
+
+**发现**：线上验收时确认排序下拉、API、渲染均正常，但「热门站点」区与后台「点击量 TOP 10」在全站点击量为 0 时，仍会各取 6 / 10 个站点填满榜单，并标注「0 次点击」。
+
+**为什么必须改**：改动前的 `hotSites`（`[...sites].sort(by visitCount).slice(0,6)`）同样是「永远取 6 个」——所以这不是本次引入的回归。但**点击统计刚上线时全站点击必然从 0 起步**，于是每个访客都会看到「0 次点击」的假热门，比不显示更误导。
+
+**修复**：两处榜单都改为**只列真的有点击的站点**，无数据时不填满：
+
+```js
+// ContentFeed.vue：空数组 → 整个分区隐藏
+const hotSites = computed(() =>
+  rankByClicks(sitesStore.sites, clicksStore.mergedCounts)
+    .filter(s => clicksStore.countFor(s.id) > 0)
+    .slice(0, 6))
+
+// AdminInsights.vue：空数组 → 显示空态文案
+const topSites = computed(() =>
+  rankByClicks(sitesStore.sites, clicksStore.mergedCounts)
+    .filter(s => clicksStore.countFor(s.id) > 0)
+    .slice(0, 10))
+```
+
+「推荐发现」的兜底分支**保持原样**：它的定位是「推荐」而非「热门」，无历史时推荐未访问站点是合理行为，不构成误导。
+
+**验证**：重新构建通过（9.35s）并二次部署（新 bundle `index-pUoI4sz5.js` / `AdminView-C13h3a92.js`）。线上 `/feed` 实测：点击量为 0 时页面出现「最近访问」「推荐发现」，**「热门站点」分区已隐藏**，且无 `/api/clicks` 相关报错 → 修复生效。
+
+> 注：后台「点击量 TOP 10」的空态文案（需登录后台）本轮**未实测**，仅经构建通过；其逻辑与 `/feed` 同源（同样的 `filter(countFor > 0)`），风险等同。
+
+### 39.7 验收留痕（2026-10-03）
+
+| 项 | 方式 | 结果 |
+|---|---|---|
+| 内核用例 | `node tools/console/test-ops.mjs` | 101 通过 / 0 失败 |
+| 生产构建 | `npm run build` | ✓ 通过 |
+| 生产部署 | `npm run publish` → v110；`npm run deploy`（修复版） | 已 alias `navigator-v2-two.vercel.app` |
+| `GET /api/clicks` | curl（经探测代理 7900） | `{"version":0,...,"clicks":{}}` 空态正常 |
+| `POST /api/clicks` | curl 投递不存在站点 id | `version:1 / patched:1 / clicks:{}` → 写入成功且**已删站点被正确剔除**，未污染真实统计 |
+| 前台排序 | 线上浏览器 | 下拉含「按点击量」，选中后 299 站点正常渲染 |
+| 热门分区隐藏 | 线上 `/feed` 浏览器 | 点击量为 0 时「热门站点」已隐藏 |
+
+---
+
+## 四十、复探复核原「6 个需处理」站点（2026-10-03）
+
+**背景**：用户要求「复核那 6 个需处理的站点」。该 6 个来自 §37.6 的首轮判定（301 站，正常 245 / 可忽略 50 / 需处理 6）。本轮先全量重探（299 站，202s）确认现状，再对 6 个逐一复核。
+
+**先说结论**：当前**「需处理」只剩 1 个**，不是 6 个 —— 3 个是引擎误判（已随 §37.6 修复归正），2 个已删除（§38.1）。
+
+| ID | 站点 | 首轮判定 | 本轮实测 | 结论 |
+|---|---|---|---|---|
+| `l2` | Kaggle | down(404) | 200 正常 | 误判已归正（HEAD 404 / GET 200） |
+| `s9` | 文心一言 | down(404) | 200 正常 | 误判已归正 |
+| `md7` | BlockBeats | down(ERR) | 200 正常（16.4s） | 误判已归正；响应偏慢但可用 |
+| `g12` | DESIGN.md Editor | down(402) | **402 仍失效** | 真失效，用户决定**继续观察** |
+| `sm3` | Xtemporary | down(ERR) | 已删除；`xtemporary.com` 双公共 DNS 均 NXDOMAIN | 删除正确 |
+| `sm16` | 四方接码平台 | down(ERR) | 已删除；`sz-fang.cc` 无 A 记录、HTTPS 000 | 删除正确 |
+
+全站现状：**正常 254 / 可忽略 44 / 需处理 1**，与云端判定（`version=4`）计数完全一致，故**本轮未重新发布判定**。
+
+### 40.1 g12 复核证据（为何定性「真失效」而非 WAF 误报）
+
+```
+HTTP/1.1 402 Payment Required
+Server: Vercel
+X-Vercel-Error: DEPLOYMENT_DISABLED
+```
+
+`DEPLOYMENT_DISABLED` 是**站点所有者侧**禁用了 Vercel 部署（常见于免费额度暂停或主动下架），与 402 状态码互为印证 —— 不是反爬拦截，因此不适用「402 偶有 WAF 误报」的一般提醒。
+
+替代地址核查（结论：官方尚未迁移）：
+
+| 地址 | 结果 | 说明 |
+|---|---|---|
+| `design.ricoui.com` | 402 | 已失效本体 |
+| `ricoui.com`（主域） | 200 | 作者主站正常 |
+| `ricoui.com/blog/design-md-editor/` | 200 | 该文内的工具链接**仍指向已失效的 `design.ricoui.com`** → 官方未迁移 |
+| `github.com/ricocc/ricoui-design-md` | 200 | 开源仓库，性质是代码仓库而非在线编辑器 |
+
+> 站内已有 `cd16` DESIGN.md（`designmd.ai`，200）覆盖同类主题，即使日后删除 g12 也不造成内容空缺。
+
+### 40.2 决策
+
+用户确认 **g12 继续观察**（`DEPLOYMENT_DISABLED` 常可逆 —— 作者恢复额度或重新启用后即可访问）。本轮**未改动任何数据**，站点表与云端判定保持 299 条。
+
+> 诊断要点留痕：`ricoui.com` 首次探测返回 `000`，复测为 200 —— 属瞬时失败，**单次 000 不足以定性失效**，需复测或结合响应头判断（与 §37.6「HEAD 误判」同一类教训）。

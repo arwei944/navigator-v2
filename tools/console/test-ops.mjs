@@ -9,6 +9,7 @@
  * 运行：npm run console:test:ops
  */
 import assert from 'node:assert/strict'
+import net from 'node:net'
 import {
   SITE_FIELDS, normalizeUrl, hostOf, normalizeAliases, diffSites, checkIntegrity,
   validateSite, nextId, nextSortOrder, BATCH_OPS, applyBatch, batchSummary, matchSite,
@@ -27,6 +28,18 @@ import {
   filterNotifications, summarizeNotifications, webhookPayload, notificationText,
 } from '../../shared/ops/notify-core.mjs'
 import { AUDIT_ACTIONS, normalizeEntry, filterEntries, summarizeEntries, actionLabel } from '../../shared/ops/audit-core.mjs'
+import { CATEGORY_GROUPS, cloneGroups, sanitizeGroups, diffGroups } from '../../shared/categories.mjs'
+import { preflightPublish, summarizePreflight } from '../../shared/ops/preflight.mjs'
+import {
+  hashPassword, verifyPassword, safeEqual, issueSession, verifySession,
+  checkAuthHeader, authConfig, loginLockState, registerFail,
+  LOGIN_MAX_FAILS, LOGIN_WINDOW_MS, SESSION_TTL_MS, SESSION_TTL_LONG_MS,
+} from '../../shared/auth.mjs'
+import { resolveProxyUrl, portOf } from '../../shared/proxy.mjs'
+import {
+  normalizeIncrements, mergeClicks, tallyClicks, countOf, rankByClicks,
+  MAX_BATCH, MAX_STEP,
+} from '../../shared/clicks-core.mjs'
 
 let pass = 0
 let fail = 0
@@ -35,6 +48,16 @@ const failures = []
 function test(name, fn) {
   try {
     fn()
+    pass += 1
+  } catch (e) {
+    fail += 1
+    failures.push({ name, message: e.message })
+  }
+}
+
+async function testAsync(name, fn) {
+  try {
+    await fn()
     pass += 1
   } catch (e) {
     fail += 1
@@ -534,6 +557,402 @@ test('summarizeEntries 统计失败数与最近一次放行', () => {
 
 test('AUDIT_ACTIONS 含定时巡检与通知相关动作', () => {
   for (const k of ['schedule.run', 'schedule.config', 'notify.push', 'notify.webhook']) assert.ok(AUDIT_ACTIONS[k], `缺少审计动作 ${k}`)
+})
+
+test('AUDIT_ACTIONS 含分类体系管理动作', () => {
+  for (const k of ['category.add', 'category.update', 'category.remove', 'category.reorder']) assert.ok(AUDIT_ACTIONS[k], `缺少审计动作 ${k}`)
+})
+
+test('AUDIT_ACTIONS 含登录认证动作（服务端登录事件可入账）', () => {
+  for (const k of ['auth.login', 'auth.loginFail', 'auth.lockout']) assert.ok(AUDIT_ACTIONS[k], `缺少审计动作 ${k}`)
+  const e = normalizeEntry({ action: 'auth.login', target: 'admin', result: 'ok', detail: '来源 1.2.3.4', actor: 'admin' })
+  assert.equal(e.actor, 'admin')
+  assert.equal(actionLabel(e.action), '登录成功')
+})
+
+/* ---------------- categories（云端分类表体检） ---------------- */
+
+test('默认分类表可通过 sanitizeGroups', () => {
+  const next = sanitizeGroups(cloneGroups(CATEGORY_GROUPS))
+  assert.ok(Array.isArray(next))
+  assert.equal(next.length, CATEGORY_GROUPS.length)
+})
+
+test('sanitizeGroups 整体拒绝非法结构', () => {
+  assert.equal(sanitizeGroups([]), null)
+  assert.equal(sanitizeGroups({}), null)
+  assert.equal(sanitizeGroups([{ id: 'a', label: 'A', categories: [] }]), null)
+  assert.equal(sanitizeGroups([{ id: 'a', label: 'A', categories: [{ id: 'x', label: '' }] }]), null)
+  assert.equal(sanitizeGroups([{ id: 'a', label: 'A', categories: [{ id: 'x', label: 'X' }, { id: 'x', label: 'Y' }] }]), null)
+  // 域 id 与子分类 id 同轴，重名必须整体拒绝
+  assert.equal(sanitizeGroups([{ id: 'a', label: 'A', categories: [{ id: 'a', label: 'X' }] }]), null)
+})
+
+test('sanitizeGroups 补齐缺省配色并归一 collapsed', () => {
+  const [g] = sanitizeGroups([{ id: 'a', label: 'A', categories: [{ id: 'x', label: 'X' }] }])
+  assert.equal(g.categories[0].dotColor, '#64748b')
+  assert.equal(g.collapsed, false)
+})
+
+test('cloneGroups 是深拷贝，不会污染默认表', () => {
+  const copy = cloneGroups(CATEGORY_GROUPS)
+  assert.notEqual(copy[0].categories, CATEGORY_GROUPS[0].categories)
+  copy[0].categories[0].label = '改名'
+  assert.notEqual(CATEGORY_GROUPS[0].categories[0].label, '改名')
+})
+
+/* ---------------- auth（登录认证内核） ---------------- */
+
+test('hashPassword / verifyPassword 往返，且拒绝错口令与坏格式', () => {
+  const stored = hashPassword('correct horse battery')
+  assert.ok(stored.startsWith('scrypt$'))
+  assert.equal(verifyPassword('correct horse battery', stored), true)
+  assert.equal(verifyPassword('wrong', stored), false)
+  assert.equal(verifyPassword('correct horse battery', ''), false)
+  assert.equal(verifyPassword('correct horse battery', 'plaintext'), false)
+  assert.equal(verifyPassword('correct horse battery', 'scrypt$0$aa$bb'), false)
+})
+
+test('相同口令两次哈希不同（加盐），比对结果仍为真', () => {
+  const a = hashPassword('same-password')
+  const b = hashPassword('same-password')
+  assert.notEqual(a, b)
+  assert.equal(verifyPassword('same-password', a), true)
+  assert.equal(verifyPassword('same-password', b), true)
+})
+
+test('safeEqual 长度不同直接判否，不抛错', () => {
+  assert.equal(safeEqual('abc', 'abc'), true)
+  assert.equal(safeEqual('abc', 'abcd'), false)
+  assert.equal(safeEqual('', 'x'), false)
+})
+
+test('issueSession / verifySession 往返，并带出用户名与过期时间', () => {
+  const now = 1_700_000_000_000
+  const { token, expiresAt } = issueSession({ username: 'admin', secret: 'k', ttl: 1000, now })
+  assert.equal(expiresAt, now + 1000)
+  const r = verifySession(token, 'k', now + 500)
+  assert.equal(r.ok, true)
+  assert.equal(r.username, 'admin')
+})
+
+test('SESSION_TTL_LONG_MS 为 90 天，且签发的会话按该时长过期', () => {
+  assert.equal(SESSION_TTL_LONG_MS, 90 * 24 * 60 * 60 * 1000)
+  assert.ok(SESSION_TTL_LONG_MS > SESSION_TTL_MS)
+  const now = 1_700_000_000_000
+  const { token, expiresAt } = issueSession({ username: 'admin', secret: 'k', ttl: SESSION_TTL_LONG_MS, now })
+  assert.equal(expiresAt - now, SESSION_TTL_LONG_MS)
+  assert.equal(verifySession(token, 'k', now + SESSION_TTL_MS + 1).ok, true) // 7 天后仍有效
+  assert.equal(verifySession(token, 'k', now + SESSION_TTL_LONG_MS + 1).reason, 'expired')
+})
+
+test('verifySession 拒绝过期、篡改签名与错误密钥', () => {
+  const now = 1_700_000_000_000
+  const { token } = issueSession({ username: 'admin', secret: 'k', ttl: 1000, now })
+  assert.equal(verifySession(token, 'k', now + 1001).reason, 'expired')
+  assert.equal(verifySession(token, 'other-secret', now).reason, 'bad-signature')
+  const tampered = token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A')
+  assert.equal(verifySession(tampered, 'k', now).ok, false)
+  assert.equal(verifySession('not-a-token', 'k', now).reason, 'malformed')
+  assert.equal(verifySession(token, '').reason, 'no-secret')
+})
+
+test('checkAuthHeader 先认会话 token，再回落共享密钥', () => {
+  const env = { AUTH_SECRET: 'sig', SITES_ADMIN_KEY: 'key-123', ADMIN_USERNAME: 'admin', ADMIN_PASSWORD_HASH: hashPassword('pw') }
+  const { token } = issueSession({ username: 'admin', secret: 'sig' })
+  const viaSession = checkAuthHeader({ headers: { authorization: `Bearer ${token}` } }, env)
+  assert.equal(viaSession.ok, true)
+  assert.equal(viaSession.via, 'session')
+  assert.equal(viaSession.username, 'admin')
+
+  const viaKey = checkAuthHeader({ headers: { authorization: 'Bearer key-123' } }, env)
+  assert.equal(viaKey.ok, true)
+  assert.equal(viaKey.via, 'key')
+
+  assert.equal(checkAuthHeader({ headers: { authorization: 'Bearer nope' } }, env).code, 401)
+  assert.equal(checkAuthHeader({ headers: {} }, env).code, 401)
+})
+
+test('checkAuthHeader 未配置签名密钥时返回 500 而非放行', () => {
+  const r = checkAuthHeader({ headers: { authorization: 'Bearer anything' } }, {})
+  assert.equal(r.ok, false)
+  assert.equal(r.code, 500)
+})
+
+test('authConfig 区分「可登录」与「可密钥直连」', () => {
+  const onlyKey = authConfig({ SITES_ADMIN_KEY: 'k' })
+  assert.equal(onlyKey.loginReady, false)
+  assert.equal(onlyKey.keyReady, true)
+  // 签名密钥缺省回退到共享密钥：既有部署零配置即可用上会话能力
+  assert.equal(onlyKey.secret, 'k')
+
+  const full = authConfig({ SITES_ADMIN_KEY: 'k', ADMIN_PASSWORD_HASH: 'h', ADMIN_USERNAME: 'root' })
+  assert.equal(full.loginReady, true)
+  assert.equal(full.username, 'root')
+})
+
+test('登录失败累加达阈值即锁定，窗口过后自动解锁', () => {
+  const now = 1_700_000_000_000
+  let entry
+  for (let i = 0; i < LOGIN_MAX_FAILS; i++) entry = registerFail(entry, now)
+  assert.equal(entry.fails, LOGIN_MAX_FAILS)
+  const locked = loginLockState(entry, now + 1000)
+  assert.equal(locked.locked, true)
+  assert.ok(locked.retryAfterMs > 0)
+  assert.equal(loginLockState(entry, now + LOGIN_WINDOW_MS + 1).locked, false)
+})
+
+/* ---------------- diffGroups（分类表对比） ---------------- */
+
+const GROUPS_BEFORE = [
+  { id: 'ai', label: 'AI 学习', categories: [{ id: 'starter', label: '入门', dotColor: '#111' }, { id: 'prompt', label: '提示词', dotColor: '#222' }] },
+  { id: 'tools', label: '工具', categories: [{ id: 'sms', label: '接码', dotColor: '#333' }] },
+]
+
+test('diffGroups 识别域重命名 / 分类新增 / 分类编辑 / 顺序调整', () => {
+  const after = [
+    { id: 'ai', label: 'AI 学堂', categories: [{ id: 'prompt', label: '提示词', dotColor: '#222' }, { id: 'starter', label: '入门对话', dotColor: '#111' }] },
+    { id: 'tools', label: '工具', categories: [{ id: 'sms', label: '接码', dotColor: '#333' }, { id: 'extra', label: '新分类', dotColor: '#444' }] },
+  ]
+  const d = diffGroups(GROUPS_BEFORE, after)
+  assert.deepEqual(d.groupsRenamed.map(g => g.id), ['ai'])
+  assert.deepEqual(d.catsAdded.map(c => c.id), ['extra'])
+  assert.deepEqual(d.catsUpdated.map(c => c.id), ['starter'])
+  assert.deepEqual(d.catsUpdated[0].fields, ['label'])
+  assert.equal(d.reordered, true)
+  assert.ok(d.total > 0 && d.changed)
+})
+
+test('diffGroups 识别域增删与分类跨域迁移', () => {
+  const d = diffGroups(
+    [{ id: 'a', label: 'A', categories: [{ id: 'x', label: 'X', dotColor: '#1' }] }],
+    [{ id: 'b', label: 'B', categories: [{ id: 'x', label: 'X', dotColor: '#1' }] }],
+  )
+  assert.deepEqual(d.groupsAdded.map(g => g.id), ['b'])
+  assert.deepEqual(d.groupsRemoved.map(g => g.id), ['a'])
+  assert.deepEqual(d.catsMoved.map(c => c.id), ['x'])
+  assert.equal(d.catsMoved[0].from, 'a')
+  assert.equal(d.catsMoved[0].to, 'b')
+})
+
+test('diffGroups 无改动时 total 为 0', () => {
+  const d = diffGroups(GROUPS_BEFORE, GROUPS_BEFORE)
+  assert.equal(d.total, 0)
+  assert.equal(d.changed, false)
+})
+
+/* ---------------- preflight（发布预检） ---------------- */
+
+const PF_GROUPS = [{ id: 'ai', label: 'AI', categories: [{ id: 'starter', label: '入门', dotColor: '#111' }] }]
+const pfSites = () => ([
+  { id: 's1', name: 'A', url: 'a.com', desc: 'd', categoryId: 'starter', sortOrder: 1 },
+])
+
+test('preflight 识别新增站点并给出摘要与线上步骤计划', () => {
+  const r = preflightPublish({ cloudSites: [], sites: pfSites(), cloudGroups: [], groups: PF_GROUPS, hasKey: true })
+  assert.equal(r.ok, true)
+  assert.equal(r.sites.added.length, 1)
+  assert.equal(r.changed, true)
+  assert.match(r.summary, /新增 1/)
+  // 线上后台只能跑「校验 → 热更新 → 验证」三步
+  assert.equal(r.plan.length, 3)
+})
+
+test('preflight 对会立刻弄坏前台的四种情况一律阻断', () => {
+  assert.ok(preflightPublish({ sites: [], groups: PF_GROUPS }).blockers.some(b => b.code === 'emptySites'))
+
+  const orphan = preflightPublish({
+    sites: [{ id: 's1', name: 'A', url: 'a.com', categoryId: 'nope', sortOrder: 1 }],
+    groups: PF_GROUPS,
+  })
+  assert.ok(orphan.blockers.some(b => b.code === 'orphanCategory'))
+  assert.equal(orphan.ok, false)
+
+  const badTable = preflightPublish({ sites: pfSites(), groups: [{ id: 'a', label: 'A', categories: [] }] })
+  assert.ok(badTable.blockers.some(b => b.code === 'invalidCategories'))
+
+  const noKey = preflightPublish({ sites: pfSites(), groups: PF_GROUPS, hasKey: false })
+  assert.ok(noKey.blockers.some(b => b.code === 'noKey'))
+  assert.equal(noKey.ok, false)
+})
+
+test('preflight 把「不理想」降级为警告，不阻断发布', () => {
+  const dup = [
+    { id: 's1', name: 'A', url: 'a.com', desc: 'd', categoryId: 'starter', sortOrder: 1 },
+    { id: 's2', name: 'B', url: 'www.a.com', desc: 'd', categoryId: 'starter', sortOrder: 1 },
+  ]
+  const r = preflightPublish({ cloudSites: [], sites: dup, groups: PF_GROUPS, hasKey: true })
+  assert.equal(r.ok, true)
+  assert.ok(r.warnings.some(w => w.code === 'dupHost'))
+  assert.ok(r.warnings.some(w => w.code === 'dupSortOrder'))
+})
+
+test('preflight 提示空分类，并在无改动时给出 noChanges', () => {
+  const groups = [
+    { id: 'ai', label: 'AI', categories: [{ id: 'starter', label: '入门', dotColor: '#111' }, { id: 'idle', label: '空分类', dotColor: '#222' }] },
+  ]
+  const r = preflightPublish({ cloudSites: [], sites: pfSites(), groups, hasKey: true })
+  assert.ok(r.warnings.some(w => w.code === 'emptyCategory'))
+
+  const same = preflightPublish({ cloudSites: pfSites(), sites: pfSites(), cloudGroups: PF_GROUPS, groups: PF_GROUPS, hasKey: true })
+  assert.equal(same.ok, true)
+  assert.equal(same.changed, false)
+  assert.ok(same.warnings.some(w => w.code === 'noChanges'))
+})
+
+test('summarizePreflight 有阻断时把阻断数写进摘要', () => {
+  const s = summarizePreflight({
+    siteDiff: { added: [], removed: [], modified: [] },
+    catDiff: { total: 0 },
+    blockers: [{ code: 'noKey' }],
+  })
+  assert.match(s, /1 项阻断/)
+})
+
+/* ---------------- proxy（本机代理端口自动探测） ---------------- */
+
+test('portOf 从代理 URL 提取端口，非端口结尾返回 null', () => {
+  assert.equal(portOf('http://127.0.0.1:7900'), 7900)
+  assert.equal(portOf('http://127.0.0.1:7897/'), 7897)
+  assert.equal(portOf('socks5://127.0.0.1:1080'), 1080)
+  assert.equal(portOf('http://127.0.0.1'), null)
+  assert.equal(portOf(''), null)
+})
+
+/** 起一个临时监听端口（拿系统分配的端口，避免与真实代理冲突） */
+async function listenEphemeral() {
+  const server = net.createServer()
+  await new Promise((res, rej) => { server.once('error', rej); server.listen(0, '127.0.0.1', res) })
+  return { port: server.address().port, close: () => new Promise(res => server.close(res)) }
+}
+
+/** 端口是否真的在监听 */
+function canConnect(port) {
+  return new Promise(resolve => {
+    const sock = net.connect({ host: '127.0.0.1', port })
+    const done = ok => { sock.destroy(); resolve(ok) }
+    sock.setTimeout(300)
+    sock.once('connect', () => done(true))
+    sock.once('timeout', () => done(false))
+    sock.once('error', () => done(false))
+  })
+}
+
+/** 临时改写代理环境变量，返回还原函数 */
+function withProxyEnv(value) {
+  const keys = ['https_proxy', 'HTTPS_PROXY', 'http_proxy', 'HTTP_PROXY']
+  const saved = Object.fromEntries(keys.map(k => [k, process.env[k]]))
+  for (const k of keys) process.env[k] = value
+  return () => {
+    for (const k of keys) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k] }
+  }
+}
+
+await testAsync('环境变量端口确实在监听时，原样采用（尊重显式配置）', async () => {
+  const { port, close } = await listenEphemeral()
+  const restore = withProxyEnv(`http://127.0.0.1:${port}`)
+  try {
+    assert.equal(await resolveProxyUrl({ force: true }), `http://127.0.0.1:${port}`)
+  } finally {
+    restore()
+    await close()
+    await resolveProxyUrl({ force: true })
+  }
+})
+
+await testAsync('环境变量端口失效时不再沿用该失效端口（免疫端口漂移）', async () => {
+  // 借一个「刚释放、必然无人监听」的端口充当滞后的环境变量配置
+  const { port: deadPort, close } = await listenEphemeral()
+  await close()
+  const restore = withProxyEnv(`http://127.0.0.1:${deadPort}`)
+  try {
+    const url = await resolveProxyUrl({ force: true })
+    assert.notEqual(url, `http://127.0.0.1:${deadPort}`)
+    if (url) assert.ok(await canConnect(portOf(url)), `返回的代理 ${url} 并未在监听`)
+  } finally {
+    restore()
+    await resolveProxyUrl({ force: true })
+  }
+})
+
+/* ---------------- clicks-core（点击统计纯规则） ---------------- */
+
+test('normalizeIncrements 丢弃非法项、累加重复 id 并钳制单站点增量', () => {
+  const r = normalizeIncrements([
+    { id: 'a', n: 1 },
+    { id: 'a', n: 2 },
+    { id: 'b', count: 3 },     // 兼容 count 字段
+    { id: '', n: 5 },          // 空 id 丢弃
+    { id: 'c', n: 0 },         // 非正数丢弃
+    { id: 'd', n: -4 },        // 负数丢弃
+    { id: 'e', n: MAX_STEP + 100 }, // 钳到 MAX_STEP
+    null, 'junk', 42,          // 非对象丢弃
+  ])
+  assert.deepEqual(r.entries, { a: 3, b: 3, e: MAX_STEP })
+  assert.equal(r.sites, 3)
+  assert.equal(r.total, 3 + 3 + MAX_STEP)
+})
+
+test('normalizeIncrements 同 id 累加仍受单站点上限约束', () => {
+  const r = normalizeIncrements([{ id: 'a', n: 40 }, { id: 'a', n: 40 }])
+  assert.equal(r.entries.a, MAX_STEP)
+})
+
+test('normalizeIncrements 空 / 非数组入参返回空结果而非抛错', () => {
+  assert.deepEqual(normalizeIncrements(undefined).entries, {})
+  assert.deepEqual(normalizeIncrements({}).entries, {})
+})
+
+test('normalizeIncrements 受站点数上限约束（截断而非报错）', () => {
+  const many = Array.from({ length: MAX_BATCH + 20 }, (_, i) => ({ id: `s${i}`, n: 1 }))
+  const r = normalizeIncrements(many)
+  assert.equal(r.sites, MAX_BATCH)
+})
+
+test('mergeClicks 逐站点累加 prev 与 incoming', () => {
+  const merged = mergeClicks({ a: 5, b: 2 }, { a: 3, c: 7 })
+  assert.deepEqual(merged, { a: 8, b: 2, c: 7 })
+})
+
+test('mergeClicks 传入 known 时剔除已删除站点（含 prev 中的残留）', () => {
+  const merged = mergeClicks({ a: 5, gone: 9 }, { b: 1, gone: 4 }, { known: new Set(['a', 'b']) })
+  assert.deepEqual(merged, { a: 5, b: 1 })
+})
+
+test('mergeClicks 未提供 known 时跳过剔除（读不到站点表宁可多留）', () => {
+  assert.deepEqual(mergeClicks({ a: 1 }, { b: 2 }, { known: null }), { a: 1, b: 2 })
+})
+
+test('mergeClicks 忽略非正增量，不产生 0 值脏键', () => {
+  assert.deepEqual(mergeClicks({ a: 1 }, { a: 0, b: -3 }), { a: 1 })
+})
+
+test('tallyClicks 汇总有点击的站点数与总点击量', () => {
+  assert.deepEqual(tallyClicks({ a: 3, b: 0, c: 7 }), { sites: 2, total: 10 })
+  assert.deepEqual(tallyClicks({}), { sites: 0, total: 0 })
+})
+
+test('countOf 缺失 / 非法一律按 0（前端角标不必各写兜底）', () => {
+  assert.equal(countOf({ a: 4 }, 'a'), 4)
+  assert.equal(countOf({ a: 4 }, 'b'), 0)
+  assert.equal(countOf({ a: 'x' }, 'a'), 0)
+  assert.equal(countOf(null, 'a'), 0)
+})
+
+test('rankByClicks 按点击量降序、同分按名称升序，且不改动入参', () => {
+  const sites = [
+    { id: 'a', name: 'Beta' },
+    { id: 'b', name: 'Alpha' },
+    { id: 'c', name: 'Gamma' },
+  ]
+  const ranked = rankByClicks(sites, { a: 1, b: 1, c: 9 })
+  assert.deepEqual(ranked.map(s => s.id), ['c', 'b', 'a'])
+  assert.deepEqual(sites.map(s => s.id), ['a', 'b', 'c']) // 原数组顺序不变
+})
+
+test('rankByClicks 支持 limit 且缺失点击按 0 参与排序', () => {
+  const sites = [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }]
+  assert.deepEqual(rankByClicks(sites, { b: 5 }, { limit: 2 }).map(s => s.id), ['b', 'a'])
 })
 
 /* ---------------- 汇总 ---------------- */

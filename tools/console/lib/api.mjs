@@ -320,6 +320,13 @@ export async function handleApi(req, res, path, url) {
       return true
     }
 
+    if (path === '/api/health/publish') {
+      // 把最近一轮本机判定推到云端（前端角标的来源）。不重新探测，只重发。
+      const r = await health.publishLatest({ actor: 'console' })
+      sendJson(res, r.ok ? 200 : 400, r)
+      return true
+    }
+
     if (path === '/api/jobs/selfcheck') {
       const job = startSelfCheck()
       sendJson(res, 200, { jobId: job.id })
