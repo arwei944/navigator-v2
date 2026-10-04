@@ -4618,5 +4618,23 @@
     "aliases": [
       "OpenChain Bench"
     ]
+  },
+  {
+    "id": "dt35",
+    "name": "AltVsBTC",
+    "url": "altvsbtc.com",
+    "desc": "把山寨币统一按比特币计价排名的数据看板：日线收盘叠加实时价格，按相对 BTC 的强弱排序，一眼看出谁在跑赢比特币。",
+    "categoryId": "data",
+    "color": "#f7931a",
+    "initial": "A",
+    "sortOrder": 302,
+    "visitCount": 0,
+    "createdAt": 1791125897775,
+    "updatedAt": 1791125897775,
+    "aliases": [
+      "alt vs btc",
+      "山寨币对比比特币"
+    ],
+    "icon": "icons/dt35.png"
   }
 ]

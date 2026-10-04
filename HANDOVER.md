@@ -2556,3 +2556,38 @@ X-Vercel-Error: DEPLOYMENT_DISABLED
 用户确认 **g12 继续观察**（`DEPLOYMENT_DISABLED` 常可逆 —— 作者恢复额度或重新启用后即可访问）。本轮**未改动任何数据**，站点表与云端判定保持 299 条。
 
 > 诊断要点留痕：`ricoui.com` 首次探测返回 `000`，复测为 200 —— 属瞬时失败，**单次 000 不足以定性失效**，需复测或结合响应头判断（与 §37.6「HEAD 误判」同一类教训）。
+
+---
+
+## 四十一、收录新站点 dt35 AltVsBTC（2026-10-04）
+
+**需求**：用户给出 `https://altvsbtc.com/`，要求收录到站点库。
+
+**站点画像**：把山寨币统一以比特币计价排名的数据看板（日线收盘 + 实时价格，按相对 BTC 的强弱排序）。官方自述 "Every alt, priced in Bitcoin … Research, not financial advice"。归入 **`data`（数据与研究）**。
+
+**新增条目**（`api/sites-data.json`，仅 +18 行）：
+
+| 字段 | 值 |
+|---|---|
+| id | `dt35`（data 分类顺延，原至 dt34） |
+| name / url | AltVsBTC / `altvsbtc.com` |
+| categoryId | `data` |
+| color | `#f7931a`（比特币橙） |
+| sortOrder | 302（全表顺延，原至 301） |
+| icon | `icons/dt35.png`（26,957 B） |
+| aliases | alt vs btc / 山寨币对比比特币 |
+
+**验证**：
+
+| 项 | 结果 |
+|---|---|
+| schema 校验 | `npm run validate` → 300 条通过（8 条历史缺图标警告，与本次无关） |
+| 数据发布 | `npm run publish` → **v112 / 300 站点 / 292 带图标**，轮询一致 |
+| 探活判定 | `nav sites check --ids dt35 --publish` → **v5 / 300 条**，dt35 = ok · 200 · 1.8s |
+| 线上核对 | `/api/sites` v112 含 dt35；`/api/health` v5 含其判定；`/icons/dt35.png` → 200 |
+
+**操作失误与修复（留痕）**：`npm run icons -- --only dt35` 中的 `--only` 被 npm 当作自身配置项吞掉（`npm warn invalid config only="dt35"`），脚本遂**全量重抓 300 站点**，已处理约 60 个。中断后 6 个站点图标被改写扩展名（旧文件已删、JSON 未更新 → 数据与文件不一致）。处置：`git checkout -- public/icons` 还原受跟踪文件 + 删除 6 个孤儿新文件，改用 `node scripts/fetch-favicons.mjs --only dt35` 直调脚本，最终 diff 仅 18 行。
+
+> 教训：**经 `npm run <script> -- <args>` 透传参数不可靠** —— `--only` 这类与 npm 自身同名的 flag 会被截胡，脚本收到的是空参。需要透传时直接 `node <script> <args>`。
+
+> 代理端口：本轮 `publish` 自报「代理环境: http://127.0.0.1:7897」，即 `shared/proxy.mjs` 自动探测生效；Clash 端口本轮再次漂移（7900 → 7897），环境变量已随之改回 7897。
