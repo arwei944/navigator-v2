@@ -53,7 +53,10 @@
     <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
 
     <!-- 添加站点：入口在右上角工具栏与站内搜索框，弹窗宿主上提到这里（原挂在左侧栏内） -->
-    <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" @close="closeAddSite" />
+    <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" />
+
+    <!-- 自动添加的预览卡片：只在成功/进行中渲染，失败直接退回上面的弹窗 -->
+    <AddSitePreviewCard v-if="autoAddState" :state="autoAddState" @close="closeAutoAddCard" />
   </div>
 </template>
 
@@ -79,6 +82,8 @@ import SettingsPanel from '@/components/SettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
+import AddSitePreviewCard from '@/components/AddSitePreviewCard.vue'
+import { autoAddSite } from '@/services/autoAdd'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,16 +100,52 @@ const showBookmarkImport = ref(false)
 const showAddModal = ref(false)
 // 搜索框里输入的网址：打开弹窗时带过去预填；从右上角按钮进来则为空
 const addPrefillUrl = ref('')
+// 自动添加被护栏拦下时，带进弹窗的原因提示
+const addNotice = ref('')
+
+// 自动添加进行中/成功的状态；为 null 表示没有卡片
+const autoAddState = ref(null)
+// 连续触发时丢弃过期结果，避免旧请求把新卡片覆盖回去
+let autoAddSeq = 0
 
 function openAddSite(payload) {
-  addPrefillUrl.value = payload?.url || ''
+  const url = payload?.url || ''
+  // 带网址且开关为开 → 走自动添加；工具栏「+」（无网址）与关掉开关时，行为与从前完全一致
+  if (url && preferencesStore.autoAddOnUrl) {
+    runAutoAdd(url)
+    return
+  }
+  addPrefillUrl.value = url
   showAddModal.value = true
 }
 
-// 关掉就清空预填，否则下次从按钮打开还会带着上一次的网址
+async function runAutoAdd(url) {
+  const seq = ++autoAddSeq
+  autoAddState.value = { phase: 'loading', url }
+
+  const res = await autoAddSite({ url })
+  if (seq !== autoAddSeq) return
+
+  if (res.ok) {
+    autoAddState.value = { phase: 'ok', url, site: res.site }
+    return
+  }
+  // 护栏拦下：不留半截卡片，带原因退回弹窗让用户自己确认
+  autoAddState.value = null
+  addPrefillUrl.value = url
+  addNotice.value = res.message
+  showAddModal.value = true
+}
+
+function closeAutoAddCard() {
+  autoAddState.value = null
+}
+
+// 关掉就清空预填与提示，否则下次从按钮打开还会带着上一次的内容
 function closeAddSite() {
   showAddModal.value = false
   addPrefillUrl.value = ''
+  addNotice.value = ''
 }
 
 function openBookmarkImport() {
