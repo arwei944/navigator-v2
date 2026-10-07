@@ -70,6 +70,8 @@
             </div>
           </template>
 
+          <AdminPreferences v-else-if="activeTab === 'preferences'" />
+
           <AdminSitesPanel v-else-if="activeTab === 'sites'" :admin-key="adminKey" />
 
           <AdminCategoryManager v-else-if="activeTab === 'categories'" />
@@ -150,6 +152,7 @@ import AdminSnapshots from '@/components/admin/AdminSnapshots.vue'
 import AdminPublishHistory from '@/components/admin/AdminPublishHistory.vue'
 import AdminAuditLog from '@/components/admin/AdminAuditLog.vue'
 import AdminNotifications from '@/components/admin/AdminNotifications.vue'
+import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { authApi } from '@/services/authApi'
 import { recordAudit, setAuditActor } from '@/services/auditLog'
@@ -179,6 +182,7 @@ const publishMsg = ref('')
  */
 const TABS = [
   { id: 'overview', label: '概览' },
+  { id: 'preferences', label: '偏好设置' },
   { id: 'sites', label: '站点管理' },
   { id: 'categories', label: '分类体系' },
   { id: 'publish', label: '云端发布' },
