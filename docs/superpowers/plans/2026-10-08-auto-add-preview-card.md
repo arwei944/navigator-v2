@@ -585,9 +585,8 @@ export async function autoAddSite({ url }) {
 
   const { site } = buildSiteFromDraft(draftFromMeta(meta))
   const created = sitesStore.addSite(site)
-  if (!created) {
-    return { ok: false, reason: 'fetch-failed', message: '入库失败，请手动添加。' }
-  }
+  // addSite 恒返回带 id 的新建对象（Task 3 契约），故无需 !created 兜底分支；
+  // 早先版本曾在此复用 'fetch-failed'，与护栏③「抓取失败」撞码，已删除（见 Ruling 5）。
   return { ok: true, site: created }
 }
 ```
@@ -1208,7 +1207,7 @@ cd 'c:\work\solo work\new\nav-v2' ; git status --short
 
 **类型一致性：**
 - `autoAddSite({ url })` 返回 `{ ok: true, site }` 或 `{ ok: false, reason, message }` —— 与 Task 7 `runAutoAdd` 的消费方式一致（只读 `res.ok` / `res.site` / `res.message`）。
-- `AUTO_ADD_REASON` 四个取值在 Task 1 定义，Task 5 未新增其它 reason 字面量（仅在 `addSite` 返回空时复用 `'fetch-failed'`）。
+- `AUTO_ADD_REASON` 四个取值在 Task 1 定义，Task 5 未新增其它 reason 字面量（入库失败兜底分支已按 Ruling 5 删除，成功支直接返回 `{ ok: true, site: created }`）。
 - `buildSiteFromDraft` 入参 `{ form, faviconUrl, faviconHost }` —— Task 2 传的是 `form` / `faviconUrl.value` / `faviconHost.value`，Task 5 传的是 `draftFromMeta()?.form/faviconUrl/faviconHost`，字段名一致。
 - `AddSitePreviewCard` 的 props `state` 形状 `{ phase, url, site? }` —— Task 7 三处赋值全部符合。
 - `preferences.autoAddOnUrl` / `setAutoAdd` —— Task 4 定义，Task 7 与 Task 8 消费。
