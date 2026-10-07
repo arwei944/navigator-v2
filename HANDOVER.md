@@ -2918,3 +2918,5 @@ X-Vercel-Error: DEPLOYMENT_DISABLED
 | `tools/console/test-url.mjs`（新增） | 补网址工具的归一化 / 主域名 / URL 识别用例 |
 
 **验证**：`npm run build` 通过；`npm run console:test:all` 全绿；浏览器实测 —— 点击搜索框建议下拉可见、点击外部可关闭、「添加站点」入口回归通过。
+
+**发布**：`nav publish run --gate e2e8014d`（`5c737367`）全流程通过 —— 提交 `3d48492`（43 个文件）→ 推送 `origin/master` → 数据备份 300 条 → schema 校验门禁通过 → 构建 → Vercel 部署（Production `navigator-v2-21qslx59n`，别名 `https://navigator-v2-two.vercel.app`）→ 云端热更新（version 120 → 121，300 站点 / 292 带图标，快照 `000120-2026-10-07T16-29-43-080Z.json`）→ 轮询一次收敛。全程约 93s。
