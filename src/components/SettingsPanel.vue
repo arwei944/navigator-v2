@@ -9,9 +9,10 @@
           </button>
         </div>
         <div class="settings-body">
-          <AppearanceSection />
+          <VisualSchemeSection />
           <DisplaySection />
           <SessionSyncSection @open-import="$emit('open-import')" />
+          <AdminSection @open-admin="$emit('open-admin')" />
         </div>
       </div>
     </div>
@@ -19,11 +20,12 @@
 </template>
 
 <script setup>
-import AppearanceSection from '@/components/settings/AppearanceSection.vue'
+import VisualSchemeSection from '@/components/settings/VisualSchemeSection.vue'
 import DisplaySection from '@/components/settings/DisplaySection.vue'
 import SessionSyncSection from '@/components/settings/SessionSyncSection.vue'
+import AdminSection from '@/components/settings/AdminSection.vue'
 
-const emit = defineEmits(['close', 'open-import'])
+const emit = defineEmits(['close', 'open-import', 'open-admin'])
 
 function close() {
   // emit('close') 由父组传入的 handler；这里通过 emits 声明触发

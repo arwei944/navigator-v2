@@ -51,7 +51,7 @@ const getCmd = {
 const addCmd = {
   path: 'sites add',
   summary: '新增站点（写入 api/sites-data.json，域名去重，ID/sortOrder 自动递增）',
-  usage: 'nav sites add --url <域名> --name <名称> --desc <描述> --category <分类ID> [--color #rrggbb] [--initial X] [--icon <路径>]',
+  usage: 'nav sites add --url <域名> --name <名称> --desc <描述> --category <分类ID> [--color #rrggbb] [--initial X] [--icon <路径>] [--purposes <用途id,..>]',
   mutating: true,
   flags: {
     url: { desc: '站点地址（只保留域名，必填）' },
@@ -61,6 +61,7 @@ const addCmd = {
     color: { desc: '卡片主色，默认取分类色' },
     initial: { desc: '卡片首字母，默认取名称首字母' },
     icon: { desc: '图标相对路径，如 icons/xx.png（通常交给 nav sites icon 抓取）' },
+    purposes: { desc: '用途标签 id，逗号分隔（最多 4 个；留空则由 nav sites meta 智能推断）' },
   },
   async run(argv, ctx) {
     const { values } = parseCommandArgs(argv, buildOptions(addCmd.flags), { usage: addCmd.usage })
@@ -72,6 +73,7 @@ const addCmd = {
       color: values.color,
       initial: values.initial,
       icon: values.icon,
+      purposes: values.purposes,
     }, { dryRun: ctx.dryRun })
     if (ctx.dryRun) return dryRunResult({ wouldAdd: created, totalAfter: sites.loadSites().length + 1 })
     return { data: { created, total: sites.loadSites().length } }
@@ -81,7 +83,7 @@ const addCmd = {
 const updateCmd = {
   path: 'sites update',
   summary: '修改站点字段（仅传入的字段会被改动）',
-  usage: 'nav sites update <id> [--url <域名>] [--name <名称>] [--desc <描述>] [--category <分类ID>] [--color #rrggbb] [--initial X] [--icon <路径>] [--sort-order <n>]',
+  usage: 'nav sites update <id> [--url <域名>] [--name <名称>] [--desc <描述>] [--category <分类ID>] [--color #rrggbb] [--initial X] [--icon <路径>] [--sort-order <n>] [--purposes <用途id,..>]',
   mutating: true,
   positionals: [{ name: 'id', required: true, desc: '站点 ID' }],
   flags: {
@@ -93,6 +95,7 @@ const updateCmd = {
     initial: { desc: '新首字母' },
     icon: { desc: '新图标路径' },
     'sort-order': { desc: '排序权重（数字）' },
+    purposes: { desc: '新用途标签 id，逗号分隔；传空串表示清空用途' },
   },
   async run(argv, ctx) {
     const { values, positionals } = parseCommandArgs(argv, buildOptions(updateCmd.flags), { allowPositionals: true, usage: updateCmd.usage })
@@ -106,6 +109,7 @@ const updateCmd = {
     if (values.initial !== undefined) patch.initial = values.initial
     if (values.icon !== undefined) patch.icon = values.icon
     if (values['sort-order'] !== undefined) patch.sortOrder = values['sort-order']
+    if (values.purposes !== undefined) patch.purposes = values.purposes
     if (Object.keys(patch).length === 0) {
       throw new CliError('未提供任何要修改的字段', { code: 'USAGE', exitCode: EXIT.USAGE, hint: `用法：${updateCmd.usage}` })
     }
@@ -183,8 +187,8 @@ const iconCmd = {
 
 const batchCmd = {
   path: 'sites batch',
-  summary: '批量操作多个站点：改分类 / 改配色 / 追加别名 / 替换别名 / 清空图标 / 删除（--dry-run 只预演影响面）',
-  usage: 'nav sites batch --op <category|color|aliasAdd|aliasSet|icon|remove> --ids <id,id,...> [--category <分类ID>] [--color #rrggbb] [--aliases "别名1,别名2"] [--yes]',
+  summary: '批量操作多个站点：改分类 / 改配色 / 追加别名 / 替换别名 / 追加用途 / 替换用途 / 清空图标 / 删除（--dry-run 只预演影响面）',
+  usage: 'nav sites batch --op <category|color|aliasAdd|aliasSet|purposeAdd|purposeSet|icon|remove> --ids <id,id,...> [--category <分类ID>] [--color #rrggbb] [--aliases "别名1,别名2"] [--purposes "trading,data"] [--yes]',
   mutating: true,
   flags: {
     op: { desc: `操作类型：${sites.BATCH_OP_LIST.map(o => o.id).join(' / ')}` },
@@ -192,6 +196,7 @@ const batchCmd = {
     category: { desc: 'op=category 的目标分类 ID；op=color 时可省略' },
     color: { desc: 'op=color 的主题色；op=category 一并给出则用该色，否则跟随新分类色' },
     aliases: { desc: 'op=aliasAdd / aliasSet 的别名，逗号分隔（aliasAdd 不覆盖既有别名）' },
+    purposes: { desc: 'op=purposeAdd / purposeSet 的用途标签 id，逗号分隔（purposeAdd 不覆盖既有用途）' },
     yes: { type: 'boolean', desc: 'op=remove 是不可逆操作，须显式加 --yes 才执行' },
   },
   async run(argv, ctx) {
@@ -209,6 +214,7 @@ const batchCmd = {
     if (values.category !== undefined) patch.categoryId = values.category
     if (values.color !== undefined) patch.color = values.color
     if (values.aliases !== undefined) patch.aliases = values.aliases
+    if (values.purposes !== undefined) patch.purposes = values.purposes
 
     // 删除不可撤销：预演放行，实写必须显式 --yes，避免一句命令抹掉整批站点
     if (def.destructive && !ctx.dryRun && !values.yes) {

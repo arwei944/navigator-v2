@@ -28,14 +28,18 @@
     <div v-if="!isList" class="card-body">
       <div class="card-desc">{{ site.desc }}</div>
     </div>
+    <!-- 用途标签：与分类是两把正交的尺子，分类说「属于哪」，用途说「拿来干嘛」 -->
+    <div v-if="!isList && purposeIds.length" class="card-purposes">
+      <PurposeTags :ids="purposeIds" />
+    </div>
     <div v-if="!batchMode" class="card-footer">
       <div class="card-footer-left">
         <span class="card-tag">
           <span class="card-tag-dot" :style="{ background: categoriesStore.getCategoryColor(site.categoryId) }"></span>
           {{ categoriesStore.getCategoryLabel(site.categoryId) }}
         </span>
-        <span v-if="clickCount > 0" class="card-clicks" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V6a2 2 0 0 1 4 0v5"/><path d="M13 11V4a2 2 0 0 1 4 0v9"/><path d="M17 13v-2a2 2 0 0 1 4 0v4a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7v-1a2 2 0 0 1 4 0"/></svg>
+        <span v-if="clickCount > 0" class="card-clicks" :class="heatClass" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
           {{ clickCount }}
         </span>
       </div>
@@ -96,6 +100,7 @@ import { useHistoryStore } from '@/stores/history'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
+import PurposeTags from '@/components/PurposeTags.vue'
 
 const props = defineProps({
   site: { type: Object, required: true },
@@ -118,6 +123,17 @@ const clicksStore = useClicksStore()
 
 // 全网点击量（所有访客累计）——点完立刻 +1，不等云端往返
 const clickCount = computed(() => clicksStore.countFor(props.site.id))
+
+// 热度分档：数字本身要说得出「这条站有多热」，光给个数字用户不会去比大小
+const heatClass = computed(() => {
+  const n = clickCount.value
+  if (n >= 1000) return 'hot'
+  if (n >= 100) return 'warm'
+  return ''
+})
+
+// 用途 id 列表（词表外的脏值由 PurposeTags 自行过滤）
+const purposeIds = computed(() => (Array.isArray(props.site.purposes) ? props.site.purposes : []))
 
 // 正式收录的站点有本地图标文件（icons/xx.png）；访客自己新增的只有远程图标地址
 const iconSrc = computed(() => props.site.icon ? '/' + props.site.icon : (props.site.iconUrl || ''))
@@ -223,13 +239,13 @@ onUnmounted(() => {
   background: var(--bg-white);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  transition: all .15s ease;
+  padding: var(--card-padding, 18px);
+  transition: all var(--transition);
   cursor: default;
   position: relative;
   border-left: 3px solid transparent;
   box-shadow: var(--shadow-card);
-  animation: fadeInUp 0.35s ease both;
+  animation: fadeInUp calc(0.35s * var(--card-anim, 1)) ease both;
 }
 .card:hover {
   box-shadow: var(--shadow-hover);
@@ -259,14 +275,36 @@ onUnmounted(() => {
 .health-unknown,
 .health-gray { background: #94a3b8; }
 .card-title-group { min-width: 0; }
-.card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.card-title { font-size: 14px; font-weight: var(--title-weight, 600); color: var(--text-primary); line-height: 1.3; }
 .card-url { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
 .card-body { flex: 1; }
-.card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-purposes { margin: 0 0 12px; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card-footer-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.card-clicks { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
+/* 点击量做成热度徽章：不再是角落里一行灰字，数字要一眼看出「这条站多热」 */
+.card-clicks {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  flex-shrink: 0;
+}
 .card-clicks svg { width: 12px; height: 12px; }
+.card-clicks.warm { color: #b45309; background: color-mix(in srgb, #f59e0b 18%, transparent); }
+.card-clicks.hot { color: #dc2626; background: color-mix(in srgb, #ef4444 16%, transparent); }
+.card-clicks.hot svg { animation: flamePulse 1.4s ease-in-out infinite; }
+
+@keyframes flamePulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: .8; }
+}
 .card-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
 .card-tag-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .card-actions { display: flex; align-items: center; gap: 4px; }

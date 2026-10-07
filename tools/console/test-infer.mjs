@@ -288,6 +288,14 @@ eq(e1.faviconUrl, 'https://chat.openai.com/apple-touch-icon.png', '端到端：�
 eq(e1.blocked, false, '端到端：非挑战页')
 ok(e1.name && e1.desc && e1.color && e1.categoryId, '端到端：只给网址即产出全部必填字段')
 
+// 用途与分类正交：分类基线打底，描述关键词补充，结果随 inferSite 一并返回
+ok(Array.isArray(e1.purposes), '端到端：产出用途数组')
+ok(e1.purposes.length > 0, '端到端：分类基线保证至少一个用途')
+ok(e1.purposes.includes('tool'), '端到端：aiapi 分类基线含「在线工具」')
+ok(e1.purposes.includes('ai-chat'), '端到端：描述里的「助手」补充出「AI 对话」')
+ok(e1.purposes.length <= 4, '端到端：用途数量不超过上限')
+eq(new Set(e1.purposes).size, e1.purposes.length, '端到端：用途不重复')
+
 const e2 = inferSite({ html: F.blocked, url: 'protected.example.com', categoryMeta: CATEGORY_META })
 eq(e2.blocked, true, '端到端：识别反爬挑战页')
 ok(e2.name !== 'Just a moment...', '端到端：挑战页不把 "Just a moment..." 当站名')

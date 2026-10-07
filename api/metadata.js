@@ -3,15 +3,18 @@
  * GET /api/metadata?url=https://example.com
  *
  * 返回 { name, desc, favicon, faviconUrl, domain, url, color, categoryId, categoryLabel,
- *        blocked, confidence, sources, warning }
+ *        purposes, blocked, confidence, sources, warning,
+ *        nameOriginal, descOriginal, translated, translateEngine }
  *
  * 推断逻辑全部在 shared/site-infer.mjs，分类白名单在 shared/categories.mjs ——
  * 与本地控制台 tools/console/lib/sites.mjs 同源，两个「新增站点」入口的推荐口径永远一致。
- * 这里只负责网络抓取、编码回退与安全校验。
+ * 自动翻译（非中文 → 中文）在 shared/translate.mjs，同样与本地控制台共用同一内核。
+ * 这里只负责网络抓取、编码回退、翻译传输与安全校验。
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../shared/site-infer.mjs'
+import { translateSiteFields } from '../shared/translate.mjs'
 import { categoryMeta } from '../shared/categories.mjs'
 
 // 已收录站点作为「像不像已有某站」的参照（域名同族 / 品牌词命中）。
@@ -213,7 +216,49 @@ export default async function handler(req, res) {
   // 挑战页返回 200，抓取层看不出异常，只有内容层知道这是拦截页：warning 必须盖过抓取层文案
   if (info.blocked) warning = BLOCKED_WARNING
 
+  // 自动翻译：把非中文的名称 / 描述译成中文，原文一并回传，让 UI 能展示「译文 + 原文」对照。
+  // 独立短超时（6s）：翻译是锦上添花，不能拖垮整个补全；失败就保留原文，绝不让字段变空。
+  const tr = await autoTranslate(info, UA)
+
   // 抓取结果随目标页变动，不缓存，避免同域名二次抓取拿到旧标题
   res.setHeader('Cache-Control', 'no-store')
-  res.status(200).json({ ...info, favicon: info.faviconUrl, warning })
+  res.status(200).json({
+    ...info,
+    favicon: info.faviconUrl,
+    warning,
+    nameOriginal: tr.original.name,
+    descOriginal: tr.original.desc,
+    translated: tr.translated,
+    translateEngine: tr.engines,
+  })
+}
+
+/**
+ * 就地把 info.name / info.desc 换成中文译文，并返回原文与翻译状态。
+ * 内核（shared/translate.mjs）负责「该不该译」，这里只提供传输层：
+ * 复用与抓取相同的 UA，带独立超时，任何异常都静默退回原文。
+ */
+async function autoTranslate(info, ua) {
+  const fallback = {
+    original: { name: info.name, desc: info.desc },
+    translated: { name: false, desc: false },
+    engines: { name: '', desc: '' },
+  }
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 6000)
+  const fetchText = async (url) => {
+    const r = await fetch(url, { headers: { 'user-agent': ua }, signal: controller.signal })
+    if (!r.ok) throw new Error(`translate http ${r.status}`)
+    return r.text()
+  }
+  try {
+    const t = await translateSiteFields({ name: info.name, desc: info.desc }, { fetchText })
+    info.name = t.name
+    info.desc = t.desc
+    return { original: t.original, translated: t.translated, engines: t.engines }
+  } catch {
+    return fallback
+  } finally {
+    clearTimeout(timer)
+  }
 }

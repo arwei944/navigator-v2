@@ -11,18 +11,20 @@
  * 否则前端 Vite 打包会失败 —— 它同时被浏览器侧（src/）与 Node 侧（api/、tools/）引用。
  */
 
+import { normalizePurposes, purposeLabel, PURPOSE_IDS, MAX_PURPOSES } from '../purposes.mjs'
+
 /* ---------------- 字段口径 ---------------- */
 
 /** 参与语义比较的字段（忽略 visitCount / updatedAt / createdAt 这类本地噪音） */
-export const SITE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'aliases']
+export const SITE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'aliases', 'purposes']
 
 export const FIELD_LABEL = {
   name: '名称', url: '链接', desc: '描述', categoryId: '分类', icon: '图标',
-  color: '配色', initial: '首字母', sortOrder: '排序', aliases: '别名',
+  color: '配色', initial: '首字母', sortOrder: '排序', aliases: '别名', purposes: '用途',
 }
 
 /** 允许被编辑 / 批量写入的字段 */
-export const EDITABLE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'color', 'initial', 'icon', 'sortOrder', 'aliases']
+export const EDITABLE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'color', 'initial', 'icon', 'sortOrder', 'aliases', 'purposes']
 
 /* ---------------- URL ---------------- */
 
@@ -139,6 +141,14 @@ export function validateSite(site, { sites = [], categoryMeta = {}, excludeId = 
     const dup = sites.find(s => s.id !== excludeId && hostOf(s.url) === host)
     if (dup) errors.push(`该域名已收录：${dup.id} ${dup.name}`)
   }
+  if (site.purposes !== undefined) {
+    if (!Array.isArray(site.purposes)) errors.push('用途必须是数组')
+    else {
+      const bad = site.purposes.filter(id => !PURPOSE_IDS.has(String(id)))
+      if (bad.length) errors.push(`未登记的用途：${bad.join('、')}`)
+      if (site.purposes.length > MAX_PURPOSES) errors.push(`用途最多 ${MAX_PURPOSES} 个`)
+    }
+  }
   return errors
 }
 
@@ -194,6 +204,8 @@ export const BATCH_OPS = {
   color: { id: 'color', label: '改配色', patchKeys: ['color'], requires: ['color'], hint: '统一所选站点的主题色' },
   aliasAdd: { id: 'aliasAdd', label: '追加别名', patchKeys: ['aliases'], requires: ['aliases'], hint: '在既有别名基础上追加（不覆盖）' },
   aliasSet: { id: 'aliasSet', label: '替换别名', patchKeys: ['aliases'], requires: ['aliases'], hint: '整体替换所选站点的别名列表' },
+  purposeAdd: { id: 'purposeAdd', label: '追加用途', patchKeys: ['purposes'], requires: ['purposes'], hint: '在既有用途基础上追加（不覆盖，最多 4 个）' },
+  purposeSet: { id: 'purposeSet', label: '替换用途', patchKeys: ['purposes'], requires: ['purposes'], hint: '整体替换所选站点的用途标签' },
   icon: { id: 'icon', label: '清空图标', patchKeys: ['icon'], hint: '清空图标引用，交给前端回落分类色块 + 首字母' },
   remove: { id: 'remove', label: '删除站点', patchKeys: [], destructive: true, hint: '从站点库中整体移除，不可撤销' },
 }
@@ -256,6 +268,13 @@ export function applyBatch(sites, { ids = [], op, patch = {}, categoryMeta = {} 
       const aliases = normalizeAliases([...base, ...toList(patch.aliases)], { name: next.name, url: next.url })
       if (aliases.length) next.aliases = aliases
       else delete next.aliases
+    }
+
+    if (op === 'purposeAdd' || op === 'purposeSet') {
+      const base = op === 'purposeAdd' ? (Array.isArray(site.purposes) ? site.purposes : []) : []
+      const purposes = normalizePurposes([...base, ...toList(patch.purposes)])
+      if (purposes.length) next.purposes = purposes
+      else delete next.purposes
     }
 
     const fields = SITE_FIELDS.filter(k => JSON.stringify(site[k]) !== JSON.stringify(next[k]))
@@ -330,5 +349,7 @@ export function matchSite(site, keyword) {
     String(site.url).toLowerCase().includes(kw) ||
     String(site.desc || '').toLowerCase().includes(kw) ||
     String(site.id).toLowerCase() === kw ||
-    (Array.isArray(site.aliases) && site.aliases.some(a => String(a).toLowerCase().includes(kw)))
+    (Array.isArray(site.aliases) && site.aliases.some(a => String(a).toLowerCase().includes(kw))) ||
+    // 用途既能按 id（英文）也能按中文标签命中，用户输入「查资料」或「reference」都能搜到
+    (Array.isArray(site.purposes) && site.purposes.some(p => String(p).toLowerCase().includes(kw) || purposeLabel(p).includes(kw)))
 }

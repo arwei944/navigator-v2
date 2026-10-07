@@ -108,7 +108,7 @@ const SITES_DOC = [
   '- icon        抓取并落盘站点图标（需 id，可选 faviconUrl）',
   '',
   'batch 的 op 取值：category（需 category）/ color（需 color）/ aliasAdd、aliasSet（需 aliases）',
-  '/ icon（清空图标）/ remove（删除，不可撤销，需 yes: true）。',
+  '/ purposeAdd、purposeSet（需 purposes）/ icon（清空图标）/ remove（删除，不可撤销，需 yes: true）。',
   '',
   '写操作（add / update / remove / batch / icon）默认只预演并返回将要发生的改动；',
   '确认无误后带 confirm: true 重新调用才会真正写入。',
@@ -126,8 +126,9 @@ const sitesSchema = {
   icon: z.string().optional().describe('图标相对路径，如 icons/dt33.png'),
   sortOrder: z.number().optional().describe('排序权重'),
   faviconUrl: z.string().optional().describe('显式指定图标地址，跳过页面声明探测'),
-  op: z.enum(['category', 'color', 'aliasAdd', 'aliasSet', 'icon', 'remove']).optional().describe('batch 的批量操作类型'),
+  op: z.enum(['category', 'color', 'aliasAdd', 'aliasSet', 'purposeAdd', 'purposeSet', 'icon', 'remove']).optional().describe('batch 的批量操作类型'),
   aliases: z.string().optional().describe('batch op=aliasAdd / aliasSet 的别名，逗号分隔（aliasAdd 不覆盖既有）'),
+  purposes: z.string().optional().describe('用途标签 id，逗号分隔，最多 4 个（add / update / batch op=purposeAdd|purposeSet）'),
   yes: z.boolean().optional().describe('batch op=remove 必须显式传 true 才执行删除'),
   q: z.string().optional().describe('list 的关键字：匹配名称/描述/域名/精确 ID'),
   limit: z.number().optional().describe('list / check 的条数上限'),
@@ -149,7 +150,7 @@ server.registerTool(
       get: { path: 'sites get', positionals: [args.id] },
       add: {
         path: 'sites add',
-        flags: { url: args.url, name: args.name, desc: args.desc, category: args.category, color: args.color, initial: args.initial, icon: args.icon },
+        flags: { url: args.url, name: args.name, desc: args.desc, category: args.category, color: args.color, initial: args.initial, icon: args.icon, purposes: args.purposes },
       },
       update: {
         path: 'sites update',
@@ -157,7 +158,7 @@ server.registerTool(
         flags: {
           url: args.url, name: args.name, desc: args.desc, category: args.category,
           color: args.color, initial: args.initial, icon: args.icon,
-          'sort-order': num(args.sortOrder),
+          'sort-order': num(args.sortOrder), purposes: args.purposes,
         },
       },
       remove: { path: 'sites remove', positionals: [args.id] },
@@ -165,7 +166,7 @@ server.registerTool(
         path: 'sites batch',
         flags: {
           op: args.op, ids: args.ids, category: args.category, color: args.color,
-          aliases: args.aliases, yes: args.yes,
+          aliases: args.aliases, purposes: args.purposes, yes: args.yes,
         },
       },
       categories: { path: 'sites categories' },

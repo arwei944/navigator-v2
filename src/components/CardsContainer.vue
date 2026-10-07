@@ -243,7 +243,7 @@ function onDragChange() {
 
 <style scoped>
 .cards-container { padding: 16px 28px 28px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-.cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.cards-grid { display: grid; grid-template-columns: repeat(var(--grid-cols, 3), 1fr); gap: var(--grid-gap, 14px); }
 .cards-list { display: flex; flex-direction: column; gap: 8px; }
 
 /* 卡片虚拟化：离屏卡片跳过渲染（content-visibility），站点增多时滚动仍流畅 */
@@ -333,15 +333,12 @@ function onDragChange() {
 .slide-up-enter-active, .slide-up-leave-active { transition: all .25s ease; }
 .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); opacity: 0; }
 
-@media (max-width: 1024px) {
-  .cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
-}
+/* 列数由视觉方案的 --grid-cols 决定（769px 以上全权生效）。
+   这里只保留移动端的强制单列 —— 那是另一套布局范式，不是「几列」的问题。
+   原先 ≥1440 强制 4 列、≤1024 强制 2 列的规则已移除：它们会把方案的列数设置静默盖掉。 */
 @media (max-width: 768px) {
   .cards-grid { grid-template-columns: 1fr !important; }
   /* 为底部 tab 栏留出空间，避免最后一行卡片被遮挡 */
   .cards-container { padding: 16px 16px calc(72px + env(safe-area-inset-bottom)); }
-}
-@media (min-width: 1440px) {
-  .cards-grid { grid-template-columns: repeat(4, 1fr) !important; }
 }
 </style>

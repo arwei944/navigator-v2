@@ -16,6 +16,12 @@
       "GPT",
       "chat gpt",
       "聊天GPT"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "community",
+      "coding"
     ]
   },
   {
@@ -33,6 +39,11 @@
     "icon": "icons/s2.png",
     "aliases": [
       "克劳德"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "data"
     ]
   },
   {
@@ -51,6 +62,10 @@
     "aliases": [
       "深度求索",
       "deep seek"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning"
     ]
   },
   {
@@ -69,6 +84,11 @@
     "aliases": [
       "月之暗面",
       "Moonshot"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "reference"
     ]
   },
   {
@@ -86,6 +106,10 @@
     "icon": "icons/s5.png",
     "aliases": [
       "字节豆包"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning"
     ]
   },
   {
@@ -100,7 +124,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1789881991356,
-    "icon": "icons/p1.png"
+    "icon": "icons/p1.png",
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "tool"
+    ]
   },
   {
     "id": "p2",
@@ -114,7 +143,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/p2.svg"
+    "icon": "icons/p2.svg",
+    "purposes": [
+      "ai-chat",
+      "learning"
+    ]
   },
   {
     "id": "p3",
@@ -131,6 +164,12 @@
     "icon": "icons/p3.ico",
     "aliases": [
       "Flow GPT"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "community",
+      "design"
     ]
   },
   {
@@ -145,7 +184,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/w1.png"
+    "icon": "icons/w1.png",
+    "purposes": [
+      "ai-chat",
+      "productivity",
+      "data",
+      "tool"
+    ]
   },
   {
     "id": "w2",
@@ -159,7 +204,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/w2.jpg"
+    "icon": "icons/w2.jpg",
+    "purposes": [
+      "ai-chat",
+      "productivity",
+      "reference"
+    ]
   },
   {
     "id": "w3",
@@ -173,7 +223,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/w3.ico"
+    "icon": "icons/w3.ico",
+    "purposes": [
+      "ai-chat",
+      "productivity",
+      "learning",
+      "trading"
+    ]
   },
   {
     "id": "w4",
@@ -187,7 +243,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/w4.ico"
+    "icon": "icons/w4.ico",
+    "purposes": [
+      "ai-chat",
+      "productivity",
+      "data",
+      "tool"
+    ]
   },
   {
     "id": "cd1",
@@ -201,7 +263,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd1.png"
+    "icon": "icons/cd1.png",
+    "purposes": [
+      "coding"
+    ]
   },
   {
     "id": "cd2",
@@ -218,6 +283,11 @@
     "icon": "icons/cd2.png",
     "aliases": [
       "Copilot"
+    ],
+    "purposes": [
+      "coding",
+      "ai-chat",
+      "productivity"
     ]
   },
   {
@@ -232,7 +302,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd3.png"
+    "icon": "icons/cd3.png",
+    "purposes": [
+      "coding",
+      "tool"
+    ]
   },
   {
     "id": "cd4",
@@ -249,6 +323,9 @@
     "icon": "icons/cd4.png",
     "aliases": [
       "Vercel v0"
+    ],
+    "purposes": [
+      "coding"
     ]
   },
   {
@@ -263,7 +340,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd5.png"
+    "icon": "icons/cd5.png",
+    "purposes": [
+      "coding",
+      "ai-chat",
+      "tool"
+    ]
   },
   {
     "id": "cd6",
@@ -277,7 +359,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd6.png"
+    "icon": "icons/cd6.png",
+    "purposes": [
+      "coding"
+    ]
   },
   {
     "id": "cd7",
@@ -291,7 +376,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd7.ico"
+    "icon": "icons/cd7.ico",
+    "purposes": [
+      "coding",
+      "tool"
+    ]
   },
   {
     "id": "g1",
@@ -308,6 +397,9 @@
     "icon": "icons/g1.png",
     "aliases": [
       "MJ"
+    ],
+    "purposes": [
+      "design"
     ]
   },
   {
@@ -325,6 +417,10 @@
     "icon": "icons/g2.webp",
     "aliases": [
       "SD"
+    ],
+    "purposes": [
+      "design",
+      "coding"
     ]
   },
   {
@@ -339,7 +435,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g3.png"
+    "icon": "icons/g3.png",
+    "purposes": [
+      "design",
+      "video"
+    ]
   },
   {
     "id": "g4",
@@ -353,7 +453,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g4.png"
+    "icon": "icons/g4.png",
+    "purposes": [
+      "design"
+    ]
   },
   {
     "id": "g5",
@@ -370,6 +473,9 @@
     "icon": "icons/g5.png",
     "aliases": [
       "11Labs"
+    ],
+    "purposes": [
+      "design"
     ]
   },
   {
@@ -387,6 +493,9 @@
     "icon": "icons/g6.ico",
     "aliases": [
       "可画"
+    ],
+    "purposes": [
+      "design"
     ]
   },
   {
@@ -401,7 +510,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f1.ico"
+    "icon": "icons/f1.ico",
+    "purposes": [
+      "productivity"
+    ]
   },
   {
     "id": "f2",
@@ -418,6 +530,9 @@
     "icon": "icons/f2.ico",
     "aliases": [
       "Integromat"
+    ],
+    "purposes": [
+      "productivity"
     ]
   },
   {
@@ -432,7 +547,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f3.svg"
+    "icon": "icons/f3.svg",
+    "purposes": [
+      "productivity",
+      "coding"
+    ]
   },
   {
     "id": "f4",
@@ -450,6 +569,11 @@
     "aliases": [
       "扣子",
       "Coze AI"
+    ],
+    "purposes": [
+      "productivity",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -467,6 +591,12 @@
     "icon": "icons/f5.png",
     "aliases": [
       "Lang Chain"
+    ],
+    "purposes": [
+      "productivity",
+      "coding",
+      "ai-chat",
+      "tool"
     ]
   },
   {
@@ -485,6 +615,12 @@
     "aliases": [
       "抱抱脸",
       "HF"
+    ],
+    "purposes": [
+      "productivity",
+      "community",
+      "coding",
+      "data"
     ]
   },
   {
@@ -499,7 +635,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f7.png"
+    "icon": "icons/f7.png",
+    "purposes": [
+      "productivity",
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "l1",
@@ -515,6 +656,11 @@
     "updatedAt": 1787184000000,
     "aliases": [
       "fastai"
+    ],
+    "purposes": [
+      "learning",
+      "news",
+      "coding"
     ]
   },
   {
@@ -529,7 +675,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l2.png"
+    "icon": "icons/l2.png",
+    "purposes": [
+      "learning",
+      "news",
+      "data"
+    ]
   },
   {
     "id": "l3",
@@ -546,6 +697,11 @@
     "icon": "icons/l3.ico",
     "aliases": [
       "谷歌Colab"
+    ],
+    "purposes": [
+      "learning",
+      "news",
+      "tool"
     ]
   },
   {
@@ -560,7 +716,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l4.ico"
+    "icon": "icons/l4.ico",
+    "purposes": [
+      "learning",
+      "news",
+      "data"
+    ]
   },
   {
     "id": "l5",
@@ -574,7 +735,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l5.ico"
+    "icon": "icons/l5.ico",
+    "purposes": [
+      "learning",
+      "news"
+    ]
   },
   {
     "id": "l6",
@@ -588,7 +753,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l6.ico"
+    "icon": "icons/l6.ico",
+    "purposes": [
+      "learning",
+      "news"
+    ]
   },
   {
     "id": "l7",
@@ -602,7 +771,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l7.png"
+    "icon": "icons/l7.png",
+    "purposes": [
+      "learning",
+      "news"
+    ]
   },
   {
     "id": "l8",
@@ -619,6 +792,12 @@
     "icon": "icons/l8.ico",
     "aliases": [
       "Product Hunt"
+    ],
+    "purposes": [
+      "learning",
+      "news",
+      "community",
+      "tool"
     ]
   },
   {
@@ -636,6 +815,12 @@
     "icon": "icons/l9.png",
     "aliases": [
       "GitHub热榜"
+    ],
+    "purposes": [
+      "learning",
+      "news",
+      "coding",
+      "tool"
     ]
   },
   {
@@ -653,6 +838,9 @@
     "icon": "icons/ex1.png",
     "aliases": [
       "币安"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -671,6 +859,9 @@
     "aliases": [
       "欧易",
       "OKEx"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -685,7 +876,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex3.png"
+    "icon": "icons/ex3.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "ex4",
@@ -699,7 +893,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ex4.ico"
+    "icon": "icons/ex4.ico",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "ex5",
@@ -716,6 +913,9 @@
     "icon": "icons/ex5.png",
     "aliases": [
       "库币"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -734,6 +934,9 @@
     "aliases": [
       "芝麻开门",
       "芝麻交易所"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -751,6 +954,9 @@
     "icon": "icons/ex7.png",
     "aliases": [
       "海妖"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -768,6 +974,9 @@
     "icon": "icons/ex8.png",
     "aliases": [
       "抹茶"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -786,6 +995,9 @@
     "aliases": [
       "火币",
       "Huobi"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -800,7 +1012,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx1.png"
+    "icon": "icons/dx1.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx2",
@@ -817,6 +1032,9 @@
     "icon": "icons/dx2.png",
     "aliases": [
       "薄饼"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -831,7 +1049,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx3.png"
+    "icon": "icons/dx3.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx4",
@@ -845,7 +1066,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx4.svg"
+    "icon": "icons/dx4.svg",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx5",
@@ -859,7 +1083,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx5.png"
+    "icon": "icons/dx5.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx6",
@@ -876,6 +1103,10 @@
     "icon": "icons/dx6.png",
     "aliases": [
       "寿司"
+    ],
+    "purposes": [
+      "trading",
+      "community"
     ]
   },
   {
@@ -890,7 +1121,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx7.png"
+    "icon": "icons/dx7.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx8",
@@ -904,7 +1138,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx8.ico"
+    "icon": "icons/dx8.ico",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "df1",
@@ -918,7 +1155,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df1.png"
+    "icon": "icons/df1.png",
+    "purposes": [
+      "trading",
+      "coding"
+    ]
   },
   {
     "id": "df2",
@@ -932,7 +1173,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df2.jpg"
+    "icon": "icons/df2.jpg",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "df3",
@@ -946,7 +1190,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df3.png"
+    "icon": "icons/df3.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "df4",
@@ -960,7 +1207,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df4.ico"
+    "icon": "icons/df4.ico",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "df5",
@@ -974,7 +1224,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df5.png"
+    "icon": "icons/df5.png",
+    "purposes": [
+      "trading",
+      "productivity"
+    ]
   },
   {
     "id": "df6",
@@ -988,7 +1242,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df6.png"
+    "icon": "icons/df6.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dt1",
@@ -1005,6 +1262,12 @@
     "icon": "icons/dt1.png",
     "aliases": [
       "CMC"
+    ],
+    "purposes": [
+      "data",
+      "reference",
+      "learning",
+      "trading"
     ]
   },
   {
@@ -1023,6 +1286,11 @@
     "aliases": [
       "壁虎",
       "币虎"
+    ],
+    "purposes": [
+      "data",
+      "reference",
+      "community"
     ]
   },
   {
@@ -1037,7 +1305,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt3.png"
+    "icon": "icons/dt3.png",
+    "purposes": [
+      "data",
+      "reference",
+      "community",
+      "trading"
+    ]
   },
   {
     "id": "dt4",
@@ -1055,6 +1329,10 @@
     "aliases": [
       "羊驼",
       "Defi Llama"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -1069,7 +1347,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt5.ico"
+    "icon": "icons/dt5.ico",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "dt6",
@@ -1083,7 +1365,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt6.png"
+    "icon": "icons/dt6.png",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "dt7",
@@ -1097,7 +1383,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt7.ico"
+    "icon": "icons/dt7.ico",
+    "purposes": [
+      "data",
+      "reference",
+      "community",
+      "tool"
+    ]
   },
   {
     "id": "dt8",
@@ -1111,7 +1403,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt8.png"
+    "icon": "icons/dt8.png",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "dt9",
@@ -1125,7 +1421,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt9.png"
+    "icon": "icons/dt9.png",
+    "purposes": [
+      "data",
+      "reference",
+      "trading"
+    ]
   },
   {
     "id": "wl1",
@@ -1142,6 +1443,9 @@
     "icon": "icons/wl1.svg",
     "aliases": [
       "小狐狸"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1160,6 +1464,9 @@
     "aliases": [
       "幻影",
       "幻影钱包"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1177,6 +1484,9 @@
     "icon": "icons/wl3.png",
     "aliases": [
       "Rabby Wallet"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1194,6 +1504,9 @@
     "icon": "icons/wl4.png",
     "aliases": [
       "信任钱包"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1212,6 +1525,10 @@
     "aliases": [
       "欧易钱包",
       "OKX Web3"
+    ],
+    "purposes": [
+      "tool",
+      "trading"
     ]
   },
   {
@@ -1226,7 +1543,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl6.png"
+    "icon": "icons/wl6.png",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "ch1",
@@ -1243,6 +1563,12 @@
     "icon": "icons/ch1.png",
     "aliases": [
       "以太坊浏览器"
+    ],
+    "purposes": [
+      "tool",
+      "data",
+      "coding",
+      "trading"
     ]
   },
   {
@@ -1260,6 +1586,11 @@
     "icon": "icons/ch2.png",
     "aliases": [
       "SOL浏览器"
+    ],
+    "purposes": [
+      "tool",
+      "data",
+      "trading"
     ]
   },
   {
@@ -1278,6 +1609,11 @@
     "aliases": [
       "BSC浏览器",
       "币安智能链浏览器"
+    ],
+    "purposes": [
+      "tool",
+      "data",
+      "trading"
     ]
   },
   {
@@ -1295,6 +1631,11 @@
     "icon": "icons/ch4.ico",
     "aliases": [
       "Arbitrum浏览器"
+    ],
+    "purposes": [
+      "tool",
+      "data",
+      "trading"
     ]
   },
   {
@@ -1309,7 +1650,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch5.png"
+    "icon": "icons/ch5.png",
+    "purposes": [
+      "tool",
+      "data"
+    ]
   },
   {
     "id": "ch6",
@@ -1322,7 +1667,11 @@
     "sortOrder": 85,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
+    "updatedAt": 1787184000000,
+    "purposes": [
+      "tool",
+      "data"
+    ]
   },
   {
     "id": "ch7",
@@ -1336,7 +1685,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch7.png"
+    "icon": "icons/ch7.png",
+    "purposes": [
+      "tool",
+      "data",
+      "trading"
+    ]
   },
   {
     "id": "in1",
@@ -1353,6 +1707,10 @@
     "icon": "icons/in1.ico",
     "aliases": [
       "以太坊"
+    ],
+    "purposes": [
+      "tool",
+      "trading"
     ]
   },
   {
@@ -1370,6 +1728,9 @@
     "icon": "icons/in2.png",
     "aliases": [
       "索拉纳"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1384,7 +1745,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in3.ico"
+    "icon": "icons/in3.ico",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "in4",
@@ -1398,7 +1762,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in4.png"
+    "icon": "icons/in4.png",
+    "purposes": [
+      "tool",
+      "trading"
+    ]
   },
   {
     "id": "in5",
@@ -1416,6 +1784,9 @@
     "aliases": [
       "Base链",
       "Coinbase Base"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -1430,7 +1801,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in6.png"
+    "icon": "icons/in6.png",
+    "purposes": [
+      "tool",
+      "trading",
+      "data"
+    ]
   },
   {
     "id": "in7",
@@ -1444,7 +1820,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in7.ico"
+    "icon": "icons/in7.ico",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "in8",
@@ -1458,7 +1837,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in8.ico"
+    "icon": "icons/in8.ico",
+    "purposes": [
+      "tool",
+      "data"
+    ]
   },
   {
     "id": "nf1",
@@ -1472,7 +1855,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/nf1.png"
+    "icon": "icons/nf1.png",
+    "purposes": [
+      "trading",
+      "design"
+    ]
   },
   {
     "id": "nf2",
@@ -1486,7 +1873,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/nf2.png"
+    "icon": "icons/nf2.png",
+    "purposes": [
+      "trading",
+      "design",
+      "tool"
+    ]
   },
   {
     "id": "nf3",
@@ -1500,7 +1892,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/nf3.png"
+    "icon": "icons/nf3.png",
+    "purposes": [
+      "trading",
+      "design"
+    ]
   },
   {
     "id": "nf4",
@@ -1514,7 +1910,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1790306706289,
-    "icon": "icons/nf4.png"
+    "icon": "icons/nf4.png",
+    "purposes": [
+      "trading",
+      "design",
+      "community"
+    ]
   },
   {
     "id": "sc1",
@@ -1528,7 +1929,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc1.png"
+    "icon": "icons/sc1.png",
+    "purposes": [
+      "reference",
+      "tool"
+    ]
   },
   {
     "id": "sc2",
@@ -1545,6 +1950,10 @@
     "icon": "icons/sc2.ico",
     "aliases": [
       "慢雾"
+    ],
+    "purposes": [
+      "reference",
+      "tool"
     ]
   },
   {
@@ -1562,6 +1971,12 @@
     "icon": "icons/sc3.ico",
     "aliases": [
       "DeFi Safety"
+    ],
+    "purposes": [
+      "reference",
+      "tool",
+      "community",
+      "trading"
     ]
   },
   {
@@ -1576,7 +1991,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc4.png"
+    "icon": "icons/sc4.png",
+    "purposes": [
+      "reference",
+      "tool"
+    ]
   },
   {
     "id": "md1",
@@ -1590,7 +2009,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md1.jpg"
+    "icon": "icons/md1.jpg",
+    "purposes": [
+      "news",
+      "data"
+    ]
   },
   {
     "id": "md2",
@@ -1604,7 +2027,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md2.png"
+    "icon": "icons/md2.png",
+    "purposes": [
+      "news",
+      "data"
+    ]
   },
   {
     "id": "md3",
@@ -1618,7 +2045,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md3.png"
+    "icon": "icons/md3.png",
+    "purposes": [
+      "news"
+    ]
   },
   {
     "id": "md4",
@@ -1632,7 +2062,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md4.ico"
+    "icon": "icons/md4.ico",
+    "purposes": [
+      "news",
+      "data"
+    ]
   },
   {
     "id": "md5",
@@ -1650,6 +2084,10 @@
     "aliases": [
       "吴说",
       "WuShuo"
+    ],
+    "purposes": [
+      "news",
+      "data"
     ]
   },
   {
@@ -1667,6 +2105,9 @@
     "icon": "icons/md6.ico",
     "aliases": [
       "Foresight"
+    ],
+    "purposes": [
+      "news"
     ]
   },
   {
@@ -1681,7 +2122,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/st1.png"
+    "icon": "icons/st1.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "st2",
@@ -1698,6 +2142,9 @@
     "icon": "icons/st2.png",
     "aliases": [
       "火箭池"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -1712,7 +2159,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/st3.png"
+    "icon": "icons/st3.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "st4",
@@ -1726,7 +2176,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/st4.png"
+    "icon": "icons/st4.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "sb1",
@@ -1744,6 +2197,9 @@
     "aliases": [
       "Maker",
       "DAI"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -1758,7 +2214,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sb2.png"
+    "icon": "icons/sb2.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "sb3",
@@ -1772,7 +2231,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sb3.ico"
+    "icon": "icons/sb3.ico",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "sb4",
@@ -1786,7 +2248,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sb4.svg"
+    "icon": "icons/sb4.svg",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "ac1",
@@ -1800,7 +2265,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac1.svg"
+    "icon": "icons/ac1.svg",
+    "purposes": [
+      "ai-chat",
+      "trading"
+    ]
   },
   {
     "id": "ac2",
@@ -1814,7 +2283,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac2.ico"
+    "icon": "icons/ac2.ico",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "learning"
+    ]
   },
   {
     "id": "ac3",
@@ -1828,7 +2302,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac3.ico"
+    "icon": "icons/ac3.ico",
+    "purposes": [
+      "ai-chat",
+      "trading"
+    ]
   },
   {
     "id": "ac4",
@@ -1842,7 +2320,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac4.png"
+    "icon": "icons/ac4.png",
+    "purposes": [
+      "ai-chat",
+      "trading"
+    ]
   },
   {
     "id": "ac5",
@@ -1859,6 +2341,12 @@
     "icon": "icons/ac5.ico",
     "aliases": [
       "文件币"
+    ],
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "data",
+      "reference"
     ]
   },
   {
@@ -1873,7 +2361,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac6.png"
+    "icon": "icons/ac6.png",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "data",
+      "tool"
+    ]
   },
   {
     "id": "ac7",
@@ -1887,7 +2381,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac7.png"
+    "icon": "icons/ac7.png",
+    "purposes": [
+      "ai-chat",
+      "trading"
+    ]
   },
   {
     "id": "s6",
@@ -1904,6 +2402,10 @@
     "icon": "icons/s6.png",
     "aliases": [
       "xAI"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning"
     ]
   },
   {
@@ -1923,6 +2425,12 @@
       "通义",
       "千问",
       "Qwen"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "coding",
+      "data"
     ]
   },
   {
@@ -1940,6 +2448,10 @@
     "icon": "icons/s8.png",
     "aliases": [
       "谷歌Gemini"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning"
     ]
   },
   {
@@ -1959,6 +2471,12 @@
       "文心",
       "百度文心",
       "ERNIE"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "community",
+      "tool"
     ]
   },
   {
@@ -1977,6 +2495,11 @@
     "aliases": [
       "智谱",
       "GLM"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "coding"
     ]
   },
   {
@@ -1996,6 +2519,11 @@
       "讯飞",
       "星火",
       "Spark"
+    ],
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "productivity"
     ]
   },
   {
@@ -2010,7 +2538,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/p4.png"
+    "icon": "icons/p4.png",
+    "purposes": [
+      "ai-chat",
+      "learning",
+      "trading"
+    ]
   },
   {
     "id": "cd8",
@@ -2024,7 +2557,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd8.ico"
+    "icon": "icons/cd8.ico",
+    "purposes": [
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "cd9",
@@ -2038,7 +2575,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/cd9.png"
+    "icon": "icons/cd9.png",
+    "purposes": [
+      "coding",
+      "ai-chat",
+      "tool"
+    ]
   },
   {
     "id": "g7",
@@ -2052,7 +2594,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g7.png"
+    "icon": "icons/g7.png",
+    "purposes": [
+      "design"
+    ]
   },
   {
     "id": "g8",
@@ -2069,6 +2614,10 @@
     "icon": "icons/g8.png",
     "aliases": [
       "可灵"
+    ],
+    "purposes": [
+      "design",
+      "video"
     ]
   },
   {
@@ -2083,7 +2632,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g9.ico"
+    "icon": "icons/g9.ico",
+    "purposes": [
+      "design",
+      "video",
+      "community"
+    ]
   },
   {
     "id": "g10",
@@ -2097,7 +2651,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g10.ico"
+    "icon": "icons/g10.ico",
+    "purposes": [
+      "design",
+      "video"
+    ]
   },
   {
     "id": "g11",
@@ -2111,7 +2669,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g11.png"
+    "icon": "icons/g11.png",
+    "purposes": [
+      "design",
+      "video",
+      "coding"
+    ]
   },
   {
     "id": "g12",
@@ -2128,6 +2691,11 @@
     "icon": "icons/g12.jpg",
     "aliases": [
       "DESIGN MD Editor"
+    ],
+    "purposes": [
+      "design",
+      "tool",
+      "reference"
     ]
   },
   {
@@ -2142,7 +2710,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/g13.ico"
+    "icon": "icons/g13.ico",
+    "purposes": [
+      "design",
+      "video"
+    ]
   },
   {
     "id": "f8",
@@ -2156,7 +2728,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f8.ico"
+    "icon": "icons/f8.ico",
+    "purposes": [
+      "productivity",
+      "coding"
+    ]
   },
   {
     "id": "f9",
@@ -2170,7 +2746,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/f9.ico"
+    "icon": "icons/f9.ico",
+    "purposes": [
+      "productivity",
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "f10",
@@ -2187,6 +2768,10 @@
     "icon": "icons/f10.png",
     "aliases": [
       "Auto GPT"
+    ],
+    "purposes": [
+      "productivity",
+      "ai-chat"
     ]
   },
   {
@@ -2205,6 +2790,10 @@
     "aliases": [
       "DeepLearning AI",
       "吴恩达"
+    ],
+    "purposes": [
+      "learning",
+      "news"
     ]
   },
   {
@@ -2219,7 +2808,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/l11.png"
+    "icon": "icons/l11.png",
+    "purposes": [
+      "learning",
+      "news",
+      "coding",
+      "data"
+    ]
   },
   {
     "id": "l12",
@@ -2237,6 +2832,12 @@
     "aliases": [
       "智源",
       "BAAI"
+    ],
+    "purposes": [
+      "learning",
+      "news",
+      "community",
+      "data"
     ]
   },
   {
@@ -2251,7 +2852,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/adl1.svg"
+    "icon": "icons/adl1.svg",
+    "purposes": [
+      "reference"
+    ]
   },
   {
     "id": "adl2",
@@ -2269,6 +2873,11 @@
     "aliases": [
       "Get Cheap AI",
       "便宜AI"
+    ],
+    "purposes": [
+      "reference",
+      "coding",
+      "tool"
     ]
   },
   {
@@ -2286,6 +2895,11 @@
     "icon": "icons/adl3.ico",
     "aliases": [
       "AIbase"
+    ],
+    "purposes": [
+      "reference",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -2303,6 +2917,10 @@
     "icon": "icons/adl4.svg",
     "aliases": [
       "Price AI"
+    ],
+    "purposes": [
+      "reference",
+      "coding"
     ]
   },
   {
@@ -2320,6 +2938,9 @@
     "icon": "icons/ex10.png",
     "aliases": [
       "Bit Get"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -2334,7 +2955,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx9.png"
+    "icon": "icons/dx9.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx10",
@@ -2348,7 +2972,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dx10.png"
+    "icon": "icons/dx10.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dx11",
@@ -2362,7 +2989,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787251978012,
-    "icon": "icons/dx11.png"
+    "icon": "icons/dx11.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "df7",
@@ -2380,6 +3010,9 @@
     "aliases": [
       "JustLend DAO",
       "波场借贷"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -2396,6 +3029,9 @@
     "updatedAt": 1787184000000,
     "aliases": [
       "维纳斯"
+    ],
+    "purposes": [
+      "trading"
     ]
   },
   {
@@ -2410,7 +3046,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/df9.png"
+    "icon": "icons/df9.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dt10",
@@ -2424,7 +3063,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt10.png"
+    "icon": "icons/dt10.png",
+    "purposes": [
+      "data",
+      "reference",
+      "coding"
+    ]
   },
   {
     "id": "dt11",
@@ -2438,7 +3082,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt11.png"
+    "icon": "icons/dt11.png",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "dt12",
@@ -2455,6 +3103,10 @@
     "icon": "icons/dt12.png",
     "aliases": [
       "Arkham Intelligence"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -2468,7 +3120,11 @@
     "sortOrder": 160,
     "visitCount": 0,
     "createdAt": 1787184000000,
-    "updatedAt": 1787184000000
+    "updatedAt": 1787184000000,
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "dt14",
@@ -2482,7 +3138,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt14.png"
+    "icon": "icons/dt14.png",
+    "purposes": [
+      "data",
+      "reference",
+      "news",
+      "trading"
+    ]
   },
   {
     "id": "dt15",
@@ -2496,7 +3158,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/dt15.png"
+    "icon": "icons/dt15.png",
+    "purposes": [
+      "data",
+      "reference",
+      "trading",
+      "tool"
+    ]
   },
   {
     "id": "wl7",
@@ -2513,6 +3181,10 @@
     "icon": "icons/wl7.png",
     "aliases": [
       "Coinbase钱包"
+    ],
+    "purposes": [
+      "tool",
+      "learning"
     ]
   },
   {
@@ -2527,7 +3199,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl8.png"
+    "icon": "icons/wl8.png",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "wl9",
@@ -2541,7 +3216,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/wl9.png"
+    "icon": "icons/wl9.png",
+    "purposes": [
+      "tool",
+      "design",
+      "trading"
+    ]
   },
   {
     "id": "ch8",
@@ -2555,7 +3235,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch8.svg"
+    "icon": "icons/ch8.svg",
+    "purposes": [
+      "tool",
+      "data",
+      "coding"
+    ]
   },
   {
     "id": "ch9",
@@ -2569,7 +3254,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch9.png"
+    "icon": "icons/ch9.png",
+    "purposes": [
+      "tool",
+      "data",
+      "coding"
+    ]
   },
   {
     "id": "ch10",
@@ -2583,7 +3273,13 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ch10.png"
+    "icon": "icons/ch10.png",
+    "purposes": [
+      "tool",
+      "data",
+      "coding",
+      "trading"
+    ]
   },
   {
     "id": "in9",
@@ -2597,7 +3293,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in9.png"
+    "icon": "icons/in9.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "trading"
+    ]
   },
   {
     "id": "in10",
@@ -2611,7 +3312,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in10.png"
+    "icon": "icons/in10.png",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "in11",
@@ -2628,6 +3332,9 @@
     "icon": "icons/in11.svg",
     "aliases": [
       "雪崩"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -2645,6 +3352,10 @@
     "icon": "icons/in12.png",
     "aliases": [
       "马蹄链"
+    ],
+    "purposes": [
+      "tool",
+      "trading"
     ]
   },
   {
@@ -2659,7 +3370,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/in13.png"
+    "icon": "icons/in13.png",
+    "purposes": [
+      "tool",
+      "learning"
+    ]
   },
   {
     "id": "nf5",
@@ -2673,7 +3388,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/nf5.ico"
+    "icon": "icons/nf5.ico",
+    "purposes": [
+      "trading",
+      "design",
+      "tool"
+    ]
   },
   {
     "id": "sc5",
@@ -2687,7 +3407,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sc5.ico"
+    "icon": "icons/sc5.ico",
+    "purposes": [
+      "reference",
+      "tool",
+      "trading"
+    ]
   },
   {
     "id": "sc6",
@@ -2704,6 +3429,10 @@
     "icon": "icons/sc6.png",
     "aliases": [
       "派盾"
+    ],
+    "purposes": [
+      "reference",
+      "tool"
     ]
   },
   {
@@ -2721,6 +3450,10 @@
     "icon": "icons/md7.png",
     "aliases": [
       "律动"
+    ],
+    "purposes": [
+      "news",
+      "data"
     ]
   },
   {
@@ -2739,6 +3472,10 @@
     "aliases": [
       "星球日报",
       "Odaily星球日报"
+    ],
+    "purposes": [
+      "news",
+      "data"
     ]
   },
   {
@@ -2753,7 +3490,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/md9.png"
+    "icon": "icons/md9.png",
+    "purposes": [
+      "news"
+    ]
   },
   {
     "id": "st5",
@@ -2767,7 +3507,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/st5.png"
+    "icon": "icons/st5.png",
+    "purposes": [
+      "trading",
+      "coding"
+    ]
   },
   {
     "id": "ac8",
@@ -2781,7 +3525,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac8.ico"
+    "icon": "icons/ac8.ico",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "coding"
+    ]
   },
   {
     "id": "ac9",
@@ -2795,7 +3544,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac9.ico"
+    "icon": "icons/ac9.ico",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "learning"
+    ]
   },
   {
     "id": "ac10",
@@ -2809,7 +3563,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac10.ico"
+    "icon": "icons/ac10.ico",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "data"
+    ]
   },
   {
     "id": "ac11",
@@ -2823,7 +3582,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ac11.png"
+    "icon": "icons/ac11.png",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "productivity"
+    ]
   },
   {
     "id": "fd1",
@@ -2840,6 +3604,11 @@
     "icon": "icons/fd1.jpg",
     "aliases": [
       "Root Data"
+    ],
+    "purposes": [
+      "news",
+      "reference",
+      "data"
     ]
   },
   {
@@ -2857,6 +3626,11 @@
     "icon": "icons/fd2.ico",
     "aliases": [
       "Crypto Fundraising"
+    ],
+    "purposes": [
+      "news",
+      "reference",
+      "data"
     ]
   },
   {
@@ -2874,6 +3648,11 @@
     "icon": "icons/fd3.ico",
     "aliases": [
       "Chain Broker"
+    ],
+    "purposes": [
+      "news",
+      "reference",
+      "data"
     ]
   },
   {
@@ -2891,6 +3670,10 @@
     "icon": "icons/fd4.png",
     "aliases": [
       "ICO"
+    ],
+    "purposes": [
+      "news",
+      "reference"
     ]
   },
   {
@@ -2908,6 +3691,11 @@
     "icon": "icons/fd5.ico",
     "aliases": [
       "Crypto Rank"
+    ],
+    "purposes": [
+      "news",
+      "reference",
+      "data"
     ]
   },
   {
@@ -2925,6 +3713,10 @@
     "icon": "icons/fd6.png",
     "aliases": [
       "Coin List"
+    ],
+    "purposes": [
+      "news",
+      "reference"
     ]
   },
   {
@@ -2939,7 +3731,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/fd7.ico"
+    "icon": "icons/fd7.ico",
+    "purposes": [
+      "news",
+      "reference",
+      "data"
+    ]
   },
   {
     "id": "fd8",
@@ -2957,6 +3754,10 @@
     "aliases": [
       "Token Unlocks",
       "代币解锁"
+    ],
+    "purposes": [
+      "news",
+      "reference"
     ]
   },
   {
@@ -2971,7 +3772,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad2.png"
+    "icon": "icons/ad2.png",
+    "purposes": [
+      "news",
+      "trading",
+      "learning"
+    ]
   },
   {
     "id": "ad3",
@@ -2988,6 +3794,10 @@
     "icon": "icons/ad3.png",
     "aliases": [
       "Airdrop Alert"
+    ],
+    "purposes": [
+      "news",
+      "trading"
     ]
   },
   {
@@ -3002,7 +3812,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad4.png"
+    "icon": "icons/ad4.png",
+    "purposes": [
+      "news",
+      "trading"
+    ]
   },
   {
     "id": "ad5",
@@ -3019,6 +3833,10 @@
     "icon": "icons/ad5.png",
     "aliases": [
       "Airdrop King"
+    ],
+    "purposes": [
+      "news",
+      "trading"
     ]
   },
   {
@@ -3036,6 +3854,10 @@
     "icon": "icons/ad6.webp",
     "aliases": [
       "99 Airdrops"
+    ],
+    "purposes": [
+      "news",
+      "trading"
     ]
   },
   {
@@ -3053,6 +3875,11 @@
     "icon": "icons/ad7.png",
     "aliases": [
       "Drops Earn"
+    ],
+    "purposes": [
+      "news",
+      "trading",
+      "learning"
     ]
   },
   {
@@ -3070,6 +3897,10 @@
     "icon": "icons/ad8.png",
     "aliases": [
       "Earn Drop"
+    ],
+    "purposes": [
+      "news",
+      "trading"
     ]
   },
   {
@@ -3087,6 +3918,10 @@
     "icon": "icons/ad9.png",
     "aliases": [
       "CMC Airdrop"
+    ],
+    "purposes": [
+      "news",
+      "trading"
     ]
   },
   {
@@ -3101,7 +3936,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad10.png"
+    "icon": "icons/ad10.png",
+    "purposes": [
+      "news",
+      "trading"
+    ]
   },
   {
     "id": "ad11",
@@ -3115,7 +3954,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/ad11.png"
+    "icon": "icons/ad11.png",
+    "purposes": [
+      "news",
+      "trading",
+      "community"
+    ]
   },
   {
     "id": "ad12",
@@ -3132,6 +3976,11 @@
     "icon": "icons/ad12.png",
     "aliases": [
       "Crypto Airdrops"
+    ],
+    "purposes": [
+      "news",
+      "trading",
+      "reference"
     ]
   },
   {
@@ -3149,6 +3998,10 @@
     "icon": "icons/sm1.png",
     "aliases": [
       "鲁班"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3166,6 +4019,9 @@
     "icon": "icons/sm2.png",
     "aliases": [
       "疾驰"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3183,6 +4039,9 @@
     "icon": "icons/sm4.png",
     "aliases": [
       "SMS Activate"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3197,7 +4056,11 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/sm5.png"
+    "icon": "icons/sm5.png",
+    "purposes": [
+      "tool",
+      "coding"
+    ]
   },
   {
     "id": "aiapi1",
@@ -3211,7 +4074,12 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/aiapi1.png"
+    "icon": "icons/aiapi1.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "aiapi2",
@@ -3228,6 +4096,10 @@
     "icon": "icons/aiapi2.png",
     "aliases": [
       "启悟"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3245,6 +4117,10 @@
     "icon": "icons/aiapi3.svg",
     "aliases": [
       "AMD Token Factory"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3262,6 +4138,10 @@
     "icon": "icons/sm6.ico",
     "aliases": [
       "SMS Pool"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3280,6 +4160,9 @@
     "aliases": [
       "Receive SMS",
       "免费接码"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3297,6 +4180,10 @@
     "icon": "icons/sm8.png",
     "aliases": [
       "Hero SMS"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3314,6 +4201,9 @@
     "icon": "icons/bs1.png",
     "aliases": [
       "良心云机场"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3328,7 +4218,10 @@
     "visitCount": 0,
     "createdAt": 1787184000000,
     "updatedAt": 1787184000000,
-    "icon": "icons/bs2.svg"
+    "icon": "icons/bs2.svg",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "bs3",
@@ -3344,6 +4237,10 @@
     "updatedAt": 1787184000000,
     "aliases": [
       "三毛"
+    ],
+    "purposes": [
+      "tool",
+      "reference"
     ]
   },
   {
@@ -3358,7 +4255,12 @@
     "visitCount": 0,
     "createdAt": 1787244686449,
     "updatedAt": 1787244686453,
-    "icon": "icons/fd9.png"
+    "icon": "icons/fd9.png",
+    "purposes": [
+      "news",
+      "reference",
+      "data"
+    ]
   },
   {
     "id": "dt16",
@@ -3372,7 +4274,12 @@
     "visitCount": 0,
     "createdAt": 1787249885210,
     "updatedAt": 1787249885213,
-    "icon": "icons/dt16.png"
+    "icon": "icons/dt16.png",
+    "purposes": [
+      "data",
+      "reference",
+      "tool"
+    ]
   },
   {
     "id": "dx12",
@@ -3386,7 +4293,10 @@
     "visitCount": 0,
     "createdAt": 1787249999518,
     "updatedAt": 1787249999522,
-    "icon": "icons/dx12.png"
+    "icon": "icons/dx12.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "aiapi4",
@@ -3400,7 +4310,13 @@
     "visitCount": 0,
     "createdAt": 1787253048653,
     "updatedAt": 1787253048657,
-    "icon": "icons/aiapi4.png"
+    "icon": "icons/aiapi4.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "data",
+      "ai-chat"
+    ]
   },
   {
     "id": "sm9",
@@ -3417,6 +4333,11 @@
     "icon": "icons/sm9.png",
     "aliases": [
       "233"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "reference"
     ]
   },
   {
@@ -3434,6 +4355,9 @@
     "icon": "icons/sm10.ico",
     "aliases": [
       "闪电"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3452,6 +4376,10 @@
     "aliases": [
       "USAPI",
       "美卡接码"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3469,6 +4397,9 @@
     "icon": "icons/sm12.ico",
     "aliases": [
       "快客"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3483,7 +4414,10 @@
     "visitCount": 0,
     "createdAt": 1787316466454,
     "updatedAt": 1787316466457,
-    "icon": "icons/sm13.ico"
+    "icon": "icons/sm13.ico",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "aiapi5",
@@ -3497,7 +4431,12 @@
     "visitCount": 0,
     "createdAt": 1787319920447,
     "updatedAt": 1787319920451,
-    "icon": "icons/aiapi5.ico"
+    "icon": "icons/aiapi5.ico",
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "aiapi6",
@@ -3515,6 +4454,11 @@
     "aliases": [
       "阶跃星辰",
       "跃问"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -3532,6 +4476,12 @@
     "icon": "icons/aiapi7.png",
     "aliases": [
       "Agnes"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "video",
+      "ai-chat"
     ]
   },
   {
@@ -3550,6 +4500,10 @@
     "aliases": [
       "牛牛",
       "苹果ID"
+    ],
+    "purposes": [
+      "tool",
+      "trading"
     ]
   },
   {
@@ -3567,6 +4521,9 @@
     "icon": "icons/acc2.png",
     "aliases": [
       "苹果ID"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3584,6 +4541,11 @@
     "icon": "icons/aiapi8.ico",
     "aliases": [
       "云码平台"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "learning"
     ]
   },
   {
@@ -3598,7 +4560,11 @@
     "visitCount": 0,
     "createdAt": 1787391572514,
     "updatedAt": 1787391572521,
-    "icon": "icons/dx13.png"
+    "icon": "icons/dx13.png",
+    "purposes": [
+      "trading",
+      "data"
+    ]
   },
   {
     "id": "ac12",
@@ -3612,7 +4578,13 @@
     "visitCount": 0,
     "createdAt": 1787405797209,
     "updatedAt": 1787405797215,
-    "icon": "icons/ac12.png"
+    "icon": "icons/ac12.png",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "coding",
+      "data"
+    ]
   },
   {
     "id": "bs4",
@@ -3626,7 +4598,12 @@
     "visitCount": 0,
     "createdAt": 1787420775707,
     "updatedAt": 1787420775711,
-    "icon": "icons/bs4.png"
+    "icon": "icons/bs4.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "data"
+    ]
   },
   {
     "id": "aiapi9",
@@ -3640,7 +4617,13 @@
     "visitCount": 0,
     "createdAt": 1787423455457,
     "updatedAt": 1787423455462,
-    "icon": "icons/aiapi9.png"
+    "icon": "icons/aiapi9.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "video",
+      "ai-chat"
+    ]
   },
   {
     "id": "aiapi10",
@@ -3657,6 +4640,11 @@
     "icon": "icons/aiapi10.png",
     "aliases": [
       "BAI"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -3674,6 +4662,9 @@
     "icon": "icons/sm14.ico",
     "aliases": [
       "Mail td"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3691,6 +4682,11 @@
     "icon": "icons/aiapi11.png",
     "aliases": [
       "AI Hub Mix"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -3705,7 +4701,11 @@
     "visitCount": 0,
     "createdAt": 1787498835714,
     "updatedAt": 1787498835721,
-    "icon": "icons/cd10.ico"
+    "icon": "icons/cd10.ico",
+    "purposes": [
+      "coding",
+      "tool"
+    ]
   },
   {
     "id": "ac13",
@@ -3719,7 +4719,12 @@
     "visitCount": 0,
     "createdAt": 1787505824704,
     "updatedAt": 1787505824708,
-    "icon": "icons/ac13.jpg"
+    "icon": "icons/ac13.jpg",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "data"
+    ]
   },
   {
     "id": "dt17",
@@ -3733,7 +4738,13 @@
     "visitCount": 0,
     "createdAt": 1787508586045,
     "updatedAt": 1790763376177,
-    "icon": "icons/dt17.jpg"
+    "icon": "icons/dt17.jpg",
+    "purposes": [
+      "data",
+      "reference",
+      "trading",
+      "tool"
+    ]
   },
   {
     "id": "aiapi12",
@@ -3750,6 +4761,10 @@
     "icon": "icons/aiapi12.ico",
     "aliases": [
       "Go Router"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -3764,7 +4779,12 @@
     "visitCount": 0,
     "createdAt": 1787541764315,
     "updatedAt": 1787541764320,
-    "icon": "icons/sc7.png"
+    "icon": "icons/sc7.png",
+    "purposes": [
+      "reference",
+      "tool",
+      "learning"
+    ]
   },
   {
     "id": "dt18",
@@ -3778,7 +4798,12 @@
     "visitCount": 0,
     "createdAt": 1787577278372,
     "updatedAt": 1787577278376,
-    "icon": "icons/dt18.png"
+    "icon": "icons/dt18.png",
+    "purposes": [
+      "data",
+      "reference",
+      "trading"
+    ]
   },
   {
     "id": "g14",
@@ -3792,7 +4817,12 @@
     "visitCount": 0,
     "createdAt": 1787601078553,
     "updatedAt": 1787601078557,
-    "icon": "icons/g14.png"
+    "icon": "icons/g14.png",
+    "purposes": [
+      "design",
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "aiapi13",
@@ -3809,6 +4839,11 @@
     "icon": "icons/aiapi13.png",
     "aliases": [
       "GMI"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "video"
     ]
   },
   {
@@ -3823,7 +4858,11 @@
     "visitCount": 0,
     "createdAt": 1787676552472,
     "updatedAt": 1787676552480,
-    "icon": "icons/aiapi14.svg"
+    "icon": "icons/aiapi14.svg",
+    "purposes": [
+      "tool",
+      "coding"
+    ]
   },
   {
     "id": "cd11",
@@ -3837,7 +4876,12 @@
     "visitCount": 0,
     "createdAt": 1787752396798,
     "updatedAt": 1787752396803,
-    "icon": "icons/cd11.svg"
+    "icon": "icons/cd11.svg",
+    "purposes": [
+      "coding",
+      "design",
+      "ai-chat"
+    ]
   },
   {
     "id": "aiapi15",
@@ -3851,7 +4895,12 @@
     "visitCount": 0,
     "createdAt": 1787753033785,
     "updatedAt": 1787753033792,
-    "icon": "icons/aiapi15.png"
+    "icon": "icons/aiapi15.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
+    ]
   },
   {
     "id": "bs5",
@@ -3868,6 +4917,11 @@
     "icon": "icons/bs5.webp",
     "aliases": [
       "挂梯"
+    ],
+    "purposes": [
+      "tool",
+      "community",
+      "reference"
     ]
   },
   {
@@ -3885,6 +4939,9 @@
     "icon": "icons/bs6.jpg",
     "aliases": [
       "一分"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -3899,7 +4956,11 @@
     "visitCount": 0,
     "createdAt": 1787765927870,
     "updatedAt": 1787765927874,
-    "icon": "icons/bs7.ico"
+    "icon": "icons/bs7.ico",
+    "purposes": [
+      "tool",
+      "learning"
+    ]
   },
   {
     "id": "cd12",
@@ -3913,7 +4974,11 @@
     "visitCount": 0,
     "createdAt": 1787768171661,
     "updatedAt": 1787768171665,
-    "icon": "icons/cd12.png"
+    "icon": "icons/cd12.png",
+    "purposes": [
+      "coding",
+      "data"
+    ]
   },
   {
     "id": "dt19",
@@ -3927,7 +4992,13 @@
     "visitCount": 0,
     "createdAt": 1787782393157,
     "updatedAt": 1787782393162,
-    "icon": "icons/dt19.png"
+    "icon": "icons/dt19.png",
+    "purposes": [
+      "data",
+      "reference",
+      "video",
+      "news"
+    ]
   },
   {
     "id": "dt20",
@@ -3941,7 +5012,12 @@
     "visitCount": 0,
     "createdAt": 1787838737488,
     "updatedAt": 1787838737493,
-    "icon": "icons/dt20.ico"
+    "icon": "icons/dt20.ico",
+    "purposes": [
+      "data",
+      "reference",
+      "trading"
+    ]
   },
   {
     "id": "aiapi16",
@@ -3955,7 +5031,13 @@
     "visitCount": 0,
     "createdAt": 1787869264857,
     "updatedAt": 1787869264864,
-    "icon": "icons/aiapi16.png"
+    "icon": "icons/aiapi16.png",
+    "purposes": [
+      "tool",
+      "coding",
+      "data",
+      "ai-chat"
+    ]
   },
   {
     "id": "cd13",
@@ -3969,7 +5051,11 @@
     "visitCount": 0,
     "createdAt": 1787924366386,
     "updatedAt": 1787924366390,
-    "icon": "icons/cd13.ico"
+    "icon": "icons/cd13.ico",
+    "purposes": [
+      "coding",
+      "design"
+    ]
   },
   {
     "id": "sm15",
@@ -3983,7 +5069,10 @@
     "visitCount": 0,
     "createdAt": 1788000442762,
     "updatedAt": 1788000442767,
-    "icon": "icons/sm15.png"
+    "icon": "icons/sm15.png",
+    "purposes": [
+      "tool"
+    ]
   },
   {
     "id": "dt21",
@@ -4000,6 +5089,12 @@
     "icon": "icons/dt21.png",
     "aliases": [
       "熊猫寨"
+    ],
+    "purposes": [
+      "data",
+      "reference",
+      "community",
+      "trading"
     ]
   },
   {
@@ -4017,6 +5112,12 @@
     "icon": "icons/cd14.png",
     "aliases": [
       "LinuxDo"
+    ],
+    "purposes": [
+      "coding",
+      "community",
+      "learning",
+      "ai-chat"
     ]
   },
   {
@@ -4035,6 +5136,12 @@
     "aliases": [
       "呱呱助手",
       "呱呱"
+    ],
+    "purposes": [
+      "data",
+      "reference",
+      "trading",
+      "ai-chat"
     ]
   },
   {
@@ -4049,7 +5156,12 @@
     "visitCount": 0,
     "createdAt": 1788044762249,
     "updatedAt": 1788044762253,
-    "icon": "icons/dt23.png"
+    "icon": "icons/dt23.png",
+    "purposes": [
+      "data",
+      "reference",
+      "tool"
+    ]
   },
   {
     "id": "acc3",
@@ -4066,6 +5178,9 @@
     "aliases": [
       "车久",
       "X Premium"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -4085,6 +5200,9 @@
       "极点云",
       "PolarNode",
       "内网穿透"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -4099,7 +5217,11 @@
     "visitCount": 0,
     "createdAt": 1788195902752,
     "updatedAt": 1788195902758,
-    "icon": "icons/l13.png"
+    "icon": "icons/l13.png",
+    "purposes": [
+      "learning",
+      "news"
+    ]
   },
   {
     "id": "dt24",
@@ -4113,7 +5235,12 @@
     "visitCount": 0,
     "createdAt": 1788212737904,
     "updatedAt": 1788212737908,
-    "icon": "icons/dt24.png"
+    "icon": "icons/dt24.png",
+    "purposes": [
+      "data",
+      "reference",
+      "trading"
+    ]
   },
   {
     "id": "acc4",
@@ -4130,6 +5257,9 @@
     "icon": "icons/acc4.svg",
     "aliases": [
       "RON"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -4144,7 +5274,12 @@
     "visitCount": 0,
     "createdAt": 1788277716098,
     "updatedAt": 1788277716102,
-    "icon": "icons/cd15.png"
+    "icon": "icons/cd15.png",
+    "purposes": [
+      "coding",
+      "ai-chat",
+      "tool"
+    ]
   },
   {
     "id": "l14",
@@ -4158,7 +5293,12 @@
     "visitCount": 0,
     "createdAt": 1788282255284,
     "updatedAt": 1788282255288,
-    "icon": "icons/l14.ico"
+    "icon": "icons/l14.ico",
+    "purposes": [
+      "learning",
+      "news",
+      "ai-chat"
+    ]
   },
   {
     "id": "sm17",
@@ -4176,6 +5316,9 @@
     "aliases": [
       "HeroSMS",
       "Hero SMS"
+    ],
+    "purposes": [
+      "tool"
     ]
   },
   {
@@ -4193,6 +5336,10 @@
     "icon": "icons/aiapi17.svg",
     "aliases": [
       "免费Token"
+    ],
+    "purposes": [
+      "tool",
+      "coding"
     ]
   },
   {
@@ -4207,7 +5354,12 @@
     "visitCount": 0,
     "createdAt": 1788357846714,
     "updatedAt": 1788357846718,
-    "icon": "icons/acc5.png"
+    "icon": "icons/acc5.png",
+    "purposes": [
+      "tool",
+      "news",
+      "coding"
+    ]
   },
   {
     "id": "aiapi18",
@@ -4221,7 +5373,11 @@
     "visitCount": 0,
     "createdAt": 1788358291002,
     "updatedAt": 1788358291006,
-    "icon": "icons/aiapi18.png"
+    "icon": "icons/aiapi18.png",
+    "purposes": [
+      "tool",
+      "coding"
+    ]
   },
   {
     "id": "dt25",
@@ -4238,6 +5394,10 @@
     "icon": "icons/dt25.png",
     "aliases": [
       "X榜"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -4255,6 +5415,10 @@
     "icon": "icons/dt26.png",
     "aliases": [
       "AI价格雷达"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -4272,6 +5436,10 @@
     "icon": "icons/dt27.svg",
     "aliases": [
       "听风"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -4289,6 +5457,11 @@
     "icon": "icons/sc8.svg",
     "aliases": [
       "腾讯安全"
+    ],
+    "purposes": [
+      "reference",
+      "tool",
+      "data"
     ]
   },
   {
@@ -4306,6 +5479,11 @@
     "icon": "icons/aiapi19.ico",
     "aliases": [
       "Orca Router"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -4320,7 +5498,11 @@
     "visitCount": 0,
     "createdAt": 1788819801681,
     "updatedAt": 1788819801685,
-    "icon": "icons/dt28.png"
+    "icon": "icons/dt28.png",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "aiapi20",
@@ -4337,6 +5519,12 @@
     "icon": "icons/aiapi20.png",
     "aliases": [
       "Kira"
+    ],
+    "purposes": [
+      "tool",
+      "coding",
+      "video",
+      "ai-chat"
     ]
   },
   {
@@ -4351,7 +5539,11 @@
     "visitCount": 0,
     "createdAt": 1788972284225,
     "updatedAt": 1788972284232,
-    "icon": "icons/f11.png"
+    "icon": "icons/f11.png",
+    "purposes": [
+      "productivity",
+      "ai-chat"
+    ]
   },
   {
     "id": "cd16",
@@ -4368,6 +5560,12 @@
     "icon": "icons/cd16.svg",
     "aliases": [
       "DESIGN MD"
+    ],
+    "purposes": [
+      "coding",
+      "community",
+      "design",
+      "tool"
     ]
   },
   {
@@ -4382,7 +5580,13 @@
     "visitCount": 0,
     "createdAt": 1789153498825,
     "updatedAt": 1789153498829,
-    "icon": "icons/nf6.png"
+    "icon": "icons/nf6.png",
+    "purposes": [
+      "trading",
+      "design",
+      "data",
+      "tool"
+    ]
   },
   {
     "id": "dt29",
@@ -4396,7 +5600,13 @@
     "visitCount": 0,
     "createdAt": 1789245665935,
     "updatedAt": 1789245665945,
-    "icon": "icons/dt29.ico"
+    "icon": "icons/dt29.ico",
+    "purposes": [
+      "data",
+      "reference",
+      "community",
+      "tool"
+    ]
   },
   {
     "id": "dt30",
@@ -4410,7 +5620,13 @@
     "visitCount": 0,
     "createdAt": 1789335035393,
     "updatedAt": 1789335035398,
-    "icon": "icons/dt30.ico"
+    "icon": "icons/dt30.ico",
+    "purposes": [
+      "data",
+      "reference",
+      "community",
+      "learning"
+    ]
   },
   {
     "id": "pj1",
@@ -4427,6 +5643,10 @@
     "aliases": [
       "双盲训练器",
       "K线训练"
+    ],
+    "purposes": [
+      "reference",
+      "coding"
     ]
   },
   {
@@ -4440,7 +5660,12 @@
     "sortOrder": 289,
     "visitCount": 0,
     "createdAt": 1789428462821,
-    "updatedAt": 1789428462821
+    "updatedAt": 1789428462821,
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "tool"
+    ]
   },
   {
     "id": "s12",
@@ -4454,7 +5679,11 @@
     "visitCount": 0,
     "createdAt": 1789460057756,
     "updatedAt": 1789460057756,
-    "icon": "icons/s12.png"
+    "icon": "icons/s12.png",
+    "purposes": [
+      "ai-chat",
+      "learning"
+    ]
   },
   {
     "id": "dt31",
@@ -4471,6 +5700,11 @@
     "icon": "icons/dt31.png",
     "aliases": [
       "Traderax"
+    ],
+    "purposes": [
+      "data",
+      "reference",
+      "trading"
     ]
   },
   {
@@ -4485,7 +5719,11 @@
     "visitCount": 0,
     "createdAt": 1789878471478,
     "updatedAt": 1789878471478,
-    "icon": "icons/dx14.png"
+    "icon": "icons/dx14.png",
+    "purposes": [
+      "trading",
+      "data"
+    ]
   },
   {
     "id": "ac15",
@@ -4499,7 +5737,13 @@
     "visitCount": 0,
     "createdAt": 1789897138817,
     "updatedAt": 1789897138817,
-    "icon": "icons/ac15.svg"
+    "icon": "icons/ac15.svg",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "learning",
+      "data"
+    ]
   },
   {
     "id": "pj2",
@@ -4516,6 +5760,11 @@
     "icon": "icons/pj2.png",
     "aliases": [
       "jev"
+    ],
+    "purposes": [
+      "reference",
+      "coding",
+      "ai-chat"
     ]
   },
   {
@@ -4530,7 +5779,13 @@
     "visitCount": 0,
     "createdAt": 1790080697915,
     "updatedAt": 1790080697915,
-    "icon": "icons/ac16.jpg"
+    "icon": "icons/ac16.jpg",
+    "purposes": [
+      "ai-chat",
+      "trading",
+      "community",
+      "coding"
+    ]
   },
   {
     "id": "pj3",
@@ -4544,7 +5799,11 @@
     "visitCount": 0,
     "createdAt": 1790082844452,
     "updatedAt": 1790082844452,
-    "icon": "icons/pj3.png"
+    "icon": "icons/pj3.png",
+    "purposes": [
+      "reference",
+      "coding"
+    ]
   },
   {
     "id": "dt32",
@@ -4558,7 +5817,11 @@
     "visitCount": 0,
     "createdAt": 1790167495719,
     "updatedAt": 1790167495719,
-    "icon": "icons/dt32.svg"
+    "icon": "icons/dt32.svg",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   },
   {
     "id": "ex11",
@@ -4572,7 +5835,10 @@
     "visitCount": 0,
     "createdAt": 1790176878492,
     "updatedAt": 1790176878492,
-    "icon": "icons/ex11.png"
+    "icon": "icons/ex11.png",
+    "purposes": [
+      "trading"
+    ]
   },
   {
     "id": "dt33",
@@ -4586,7 +5852,12 @@
     "visitCount": 0,
     "createdAt": 1790656871393,
     "updatedAt": 1790656883607,
-    "icon": "icons/dt33.png"
+    "icon": "icons/dt33.png",
+    "purposes": [
+      "data",
+      "reference",
+      "tool"
+    ]
   },
   {
     "id": "bs9",
@@ -4600,7 +5871,11 @@
     "visitCount": 0,
     "createdAt": 1790764565600,
     "updatedAt": 1790862256572,
-    "icon": "icons/bs9.png"
+    "icon": "icons/bs9.png",
+    "purposes": [
+      "tool",
+      "coding"
+    ]
   },
   {
     "id": "dt34",
@@ -4617,6 +5892,10 @@
     "icon": "icons/dt34.png",
     "aliases": [
       "OpenChain Bench"
+    ],
+    "purposes": [
+      "data",
+      "reference"
     ]
   },
   {
@@ -4635,6 +5914,10 @@
       "alt vs btc",
       "山寨币对比比特币"
     ],
-    "icon": "icons/dt35.png"
+    "icon": "icons/dt35.png",
+    "purposes": [
+      "data",
+      "reference"
+    ]
   }
 ]

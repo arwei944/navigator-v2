@@ -183,6 +183,25 @@ test('applyBatch 追加别名不覆盖既有，替换别名则整体换掉', () 
   assert.deepEqual(set.next.find(s => s.id === 'cex1').aliases, ['安币'])
 })
 
+test('applyBatch 追加用途不覆盖既有，替换用途则整体换掉', () => {
+  const withPurpose = sample().map(s => s.id === 'cex1' ? { ...s, purposes: ['trading'] } : s)
+  const add = applyBatch(withPurpose, { ids: ['cex1'], op: 'purposeAdd', patch: { purposes: ['reference', 'tool'] } })
+  assert.deepEqual(add.next.find(s => s.id === 'cex1').purposes, ['trading', 'reference', 'tool'])
+  const set = applyBatch(withPurpose, { ids: ['cex1'], op: 'purposeSet', patch: { purposes: 'data' } })
+  assert.deepEqual(set.next.find(s => s.id === 'cex1').purposes, ['data'])
+  // 词表外的脏值被静默剔除
+  const dirty = applyBatch(withPurpose, { ids: ['cex1'], op: 'purposeAdd', patch: { purposes: ['nope', 'tool'] } })
+  assert.deepEqual(dirty.next.find(s => s.id === 'cex1').purposes, ['trading', 'tool'])
+})
+
+test('validateSite 校验用途：非数组 / 词表外 / 超上限', () => {
+  const base = { name: 'X', desc: 'd', categoryId: 'cex', url: 'new.com' }
+  assert.deepEqual(validateSite({ ...base, purposes: ['trading'] }, { categoryMeta: CATS }), [])
+  assert.deepEqual(validateSite({ ...base, purposes: 'trading' }, { categoryMeta: CATS }), ['用途必须是数组'])
+  assert.deepEqual(validateSite({ ...base, purposes: ['trading', 'nope'] }, { categoryMeta: CATS }), ['未登记的用途：nope'])
+  assert.deepEqual(validateSite({ ...base, purposes: ['trading', 'tool', 'data', 'news', 'video'] }, { categoryMeta: CATS }), ['用途最多 4 个'])
+})
+
 test('applyBatch 清空图标后该键被移除', () => {
   const r = applyBatch(sample(), { ids: ['cex1'], op: 'icon' })
   assert.equal('icon' in r.next.find(s => s.id === 'cex1'), false)
@@ -210,6 +229,8 @@ test('BATCH_OPS 只暴露已声明的操作，删除被标记为破坏性', () =
   assert.equal(BATCH_OPS.remove.destructive, true)
   assert.equal(BATCH_OPS.category.destructive, undefined)
   assert.deepEqual(BATCH_OPS.aliasAdd.patchKeys, ['aliases'])
+  assert.deepEqual(BATCH_OPS.purposeAdd.patchKeys, ['purposes'])
+  assert.deepEqual(BATCH_OPS.purposeSet.requires, ['purposes'])
 })
 
 test('batchSummary 汇总更新/删除/跳过数量', () => {
@@ -223,6 +244,13 @@ test('matchSite 命中别名与 id，且大小写无关', () => {
   assert.equal(matchSite(s, 'CEX1'), true)
   assert.equal(matchSite(s, 'binance'), true)
   assert.equal(matchSite(s, '不存在的词'), false)
+})
+
+test('matchSite 命中用途：中文标签与英文 id 都能搜到', () => {
+  const s = { ...sample()[0], purposes: ['trading'] }
+  assert.equal(matchSite(s, '交易'), true)
+  assert.equal(matchSite(s, 'trading'), true)
+  assert.equal(matchSite(s, '查资料'), false)
 })
 
 test('SITE_FIELDS 不包含本地噪音字段', () => {

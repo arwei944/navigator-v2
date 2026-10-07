@@ -23,7 +23,8 @@
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
         <MainToolbar v-if="scope !== 'trash'"
-                     @open-settings="showSettings = true" @open-todo="showTodo = true" />
+                     @open-settings="showSettings = true" @open-todo="showTodo = true"
+                     @open-add="openAddSite" />
         <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示 -->
         <FilterBar v-if="scope !== 'trash'" />
         <CardsContainer />
@@ -43,13 +44,16 @@
     <CommandPalette ref="commandPaletteRef" @navigate="onPaletteNavigate" />
 
     <!-- 设置面板 -->
-    <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" />
+    <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin" />
 
     <!-- 待办面板：入口在中间栏工具栏 -->
     <TodoPanel v-if="showTodo" @close="showTodo = false" />
 
     <!-- 导入导出面板 -->
     <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
+
+    <!-- 添加站点：入口在右上角工具栏与站内搜索框，弹窗宿主上提到这里（原挂在左侧栏内） -->
+    <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" @close="closeAddSite" />
   </div>
 </template>
 
@@ -74,6 +78,7 @@ import CommandPalette from '@/components/CommandPalette.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
+import AddSiteModal from '@/components/AddSiteModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -87,10 +92,30 @@ const shortcutsRef = ref(null)
 const showSettings = ref(false)
 const showTodo = ref(false)
 const showBookmarkImport = ref(false)
+const showAddModal = ref(false)
+// 搜索框里输入的网址：打开弹窗时带过去预填；从右上角按钮进来则为空
+const addPrefillUrl = ref('')
+
+function openAddSite(payload) {
+  addPrefillUrl.value = payload?.url || ''
+  showAddModal.value = true
+}
+
+// 关掉就清空预填，否则下次从按钮打开还会带着上一次的网址
+function closeAddSite() {
+  showAddModal.value = false
+  addPrefillUrl.value = ''
+}
 
 function openBookmarkImport() {
   showSettings.value = false
   showBookmarkImport.value = true
+}
+
+// 管理后台入口收敛进设置面板：先关面板再跳转，避免返回时面板还盖在上面
+function openAdmin() {
+  showSettings.value = false
+  router.push('/admin')
 }
 
 const wallpaperStyle = computed(() => {
@@ -139,6 +164,11 @@ function categoryFromRoute() {
   const id = route.query.c
   return id && id !== 'all' ? id : 'all'
 }
+// 用途（Axis 4）：同样放 query，才能和分类、范围任意组合
+function purposeFromRoute() {
+  const id = route.query.p
+  return id && id !== 'all' ? id : 'all'
+}
 function queryFromRoute() {
   return route.query.q || ''
 }
@@ -148,6 +178,9 @@ function applyRouteToStore() {
 
   const cat = categoryFromRoute()
   if (sitesStore.currentCategory !== cat) sitesStore.setCategory(cat)
+
+  const purpose = purposeFromRoute()
+  if (sitesStore.currentPurpose !== purpose) sitesStore.setPurpose(purpose)
 
   const q = queryFromRoute()
   if (sitesStore.searchQuery !== q) sitesStore.setSearchQuery(q)

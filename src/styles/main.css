@@ -32,6 +32,17 @@
   --text-sidebar-dim: #86868b;
   --sidebar-hover: rgba(0, 113, 227, 0.08);
   --sidebar-active: rgba(0, 113, 227, 0.12);
+
+  /* 视觉方案令牌的兜底值。运行时由 preferences store 按当前方案写到 :root 行内样式上，
+     这里只是首帧兜底（行内样式优先级更高，会覆盖这些）。真值来源见 utils/visualScheme.js。 */
+  --card-padding: 18px;
+  --grid-gap: 14px;
+  --grid-cols: 3;
+  --nav-item-h: 40px;
+  --glass-blur: 20px;
+  --font-size-base: 14px;
+  --title-weight: 600;
+  --card-anim: 1;
 }
 
 [data-theme="dark"] {
@@ -63,7 +74,7 @@
 html, body { height: 100%; overflow: hidden; }
 body {
   font-family: var(--font);
-  font-size: 14px;
+  font-size: var(--font-size-base, 14px);
   line-height: 1.5;
   color: var(--text-primary);
   background: var(--bg-primary);
@@ -93,8 +104,8 @@ button { font-family: inherit; }
   margin-left: 0;
   overflow: hidden;
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
   border-radius: 0;
   transition: margin-left var(--transition);
 }
@@ -107,8 +118,9 @@ button { font-family: inherit; }
 }
 .app-layout[style*="background-image"] .main {
   background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  /* 壁纸场景本来就更吃模糊，跟着令牌翻倍 */
+  backdrop-filter: blur(calc(var(--glass-blur, 20px) * 2));
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur, 20px) * 2));
 }
 [data-theme="dark"] .app-layout[style*="background-image"] .main {
   background: rgba(0, 0, 0, 0.6);
@@ -144,12 +156,12 @@ button { font-family: inherit; }
   to { opacity: 1; }
 }
 
-/* 卡片入场动画 */
+/* 卡片入场动画。时长乘 --card-anim（0/1），关掉动画时压成 0 而不是换类名 */
 .card-enter-active {
-  animation: fadeInUp 0.35s ease both;
+  animation: fadeInUp calc(0.35s * var(--card-anim, 1)) ease both;
 }
 .card-leave-active {
-  animation: fadeInUp 0.2s ease reverse both;
+  animation: fadeInUp calc(0.2s * var(--card-anim, 1)) ease reverse both;
 }
 .card-move {
   transition: transform 0.3s ease;

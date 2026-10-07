@@ -20,6 +20,12 @@
       </span>
     </div>
 
+    <!-- 用途：与分类正交的第二把尺子 —— 分类说「属于哪」，用途说「拿来干嘛」 -->
+    <div v-if="purposeIds.length" class="detail-section">
+      <div class="section-label">用途</div>
+      <PurposeTags :ids="purposeIds" size="md" />
+    </div>
+
     <!-- 描述 -->
     <div class="detail-section">
       <div class="section-label">简介</div>
@@ -95,6 +101,7 @@ import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useHistoryStore } from '@/stores/history'
 import { useClicksStore } from '@/stores/clicks'
+import PurposeTags from '@/components/PurposeTags.vue'
 
 const props = defineProps({
   site: { type: Object, default: null }
@@ -115,6 +122,8 @@ const categoryLabel = computed(() =>
 const categoryColor = computed(() =>
   props.site ? categoriesStore.getCategoryColor(props.site.categoryId) : '#64748b'
 )
+// 用途 id 列表（词表外的脏值由 PurposeTags 过滤），空数组时整段不渲染
+const purposeIds = computed(() => (Array.isArray(props.site?.purposes) ? props.site.purposes : []))
 const isFav = computed(() => (props.site ? favoritesStore.isFavorite(props.site.id) : false))
 // 全网点击量（所有访客累计），与「我的访问次数」不是一回事
 const clickCount = computed(() => (props.site ? clicksStore.countFor(props.site.id) : 0))

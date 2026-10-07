@@ -1,6 +1,6 @@
 <template>
   <div class="main-toolbar">
-    <SiteSearchBar class="toolbar-search" />
+    <SiteSearchBar class="toolbar-search" @add-site="$emit('open-add', $event)" />
     <ExternalSearchBox class="toolbar-external" />
 
     <div class="toolbar-actions">
@@ -44,6 +44,11 @@
       <button class="view-toggle settings-btn" @click="$emit('open-settings')" aria-label="设置" title="设置">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
+
+      <!-- 添加站点：常驻右上角的主操作（原在左侧栏底部，带文字，已移除） -->
+      <button class="view-toggle add-site-btn" @click="$emit('open-add')" aria-label="添加网站" title="添加网站">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
     </div>
   </div>
 </template>
@@ -55,7 +60,7 @@ import { usePreferencesStore } from '@/stores/preferences'
 import SiteSearchBar from '@/components/SiteSearchBar.vue'
 import ExternalSearchBox from '@/components/ExternalSearchBox.vue'
 
-defineEmits(['open-settings', 'open-todo'])
+defineEmits(['open-settings', 'open-todo', 'open-add'])
 
 const sitesStore = useSitesStore()
 const preferencesStore = usePreferencesStore()
@@ -118,6 +123,10 @@ function toggleViewMode() {
 .toolbar-btn.active, .view-toggle.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .toolbar-btn:disabled { opacity: .4; cursor: not-allowed; }
 .toolbar-btn svg, .view-toggle svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+/* 添加站点：右上角主操作，用实心强调色与其余描边图标按钮拉开层级 */
+.add-site-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
+.add-site-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; opacity: .9; }
 
 @media (max-width: 1024px) {
   .toolbar-btn { padding: 0 8px; }

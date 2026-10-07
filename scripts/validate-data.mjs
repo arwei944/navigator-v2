@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { PURPOSE_IDS, MAX_PURPOSES } from '../shared/purposes.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const file = process.argv[2] || join(root, 'api', 'sites-data.json')
@@ -69,6 +70,25 @@ sites.forEach((s, i) => {
         if (lower === name) warnings.push(`[${s.id}] 别名与站名相同: ${a}`)
         if (lower === host) warnings.push(`[${s.id}] 别名与域名相同: ${a}`)
       })
+    }
+  }
+
+  // purposes 可选；一旦出现必须是「词表内的 id 数组、无重复、不超过上限」
+  if (s.purposes !== undefined) {
+    if (!Array.isArray(s.purposes)) {
+      errors.push(`[${s.id}] purposes 不是数组`)
+    } else {
+      const seen = new Set()
+      s.purposes.forEach((p, pi) => {
+        const id = String(p ?? '').trim()
+        if (!id || !PURPOSE_IDS.has(id)) {
+          errors.push(`[${s.id}] purposes[${pi}] 不在用途词表内: ${p}`)
+          return
+        }
+        if (seen.has(id)) errors.push(`[${s.id}] 用途重复: ${id}`)
+        seen.add(id)
+      })
+      if (s.purposes.length > MAX_PURPOSES) errors.push(`[${s.id}] 用途超过上限 ${MAX_PURPOSES} 个`)
     }
   }
 })

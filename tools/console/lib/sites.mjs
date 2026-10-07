@@ -15,6 +15,8 @@ import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
 import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
+import { translateSiteFields } from '../../../shared/translate.mjs'
+import { normalizePurposes } from '../../../shared/purposes.mjs'
 import { diffSites } from './changes.mjs'
 import {
   EDITABLE_FIELDS, BATCH_OPS, BATCH_OP_LIST, applyBatch, batchSummary,
@@ -54,7 +56,7 @@ function saveSites(list) {
 
 /* ---------------- 列表 / 分类 ---------------- */
 
-const LIST_FIELDS = ['id', 'name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'createdAt', 'aliases']
+const LIST_FIELDS = ['id', 'name', 'url', 'desc', 'categoryId', 'icon', 'color', 'initial', 'sortOrder', 'createdAt', 'aliases', 'purposes']
 
 export function list({ q = '', category = '' } = {}) {
   const all = loadSites()
@@ -129,6 +131,8 @@ export function addSite(input = {}, { dryRun = false } = {}) {
   if (input.icon) site.icon = input.icon
   const aliases = normalizeAliases(input.aliases, { name, url })
   if (aliases.length) site.aliases = aliases
+  const purposes = normalizePurposes(input.purposes)
+  if (purposes.length) site.purposes = purposes
 
   if (dryRun) return site
   sites.push(site)
@@ -145,7 +149,7 @@ export function updateSite(id, patch = {}, { dryRun = false } = {}) {
 
   const next = { ...site }
   for (const k of EDITABLE_FIELDS) {
-    if (k === 'aliases' || patch[k] === undefined) continue
+    if (k === 'aliases' || k === 'purposes' || patch[k] === undefined) continue
     next[k] = k === 'sortOrder' ? Number(patch[k]) : String(patch[k]).trim()
   }
 
@@ -167,6 +171,13 @@ export function updateSite(id, patch = {}, { dryRun = false } = {}) {
     const aliases = normalizeAliases(patch.aliases, { name: next.name, url: next.url })
     if (aliases.length) next.aliases = aliases
     else delete next.aliases
+  }
+
+  // 用途同样是数组字段，不能走上面的字符串循环；清空即删除字段
+  if (patch.purposes !== undefined) {
+    const purposes = normalizePurposes(patch.purposes)
+    if (purposes.length) next.purposes = purposes
+    else delete next.purposes
   }
 
   next.updatedAt = Date.now()
@@ -218,6 +229,14 @@ async function curlBuffer(url, { maxTime = 15, fail = true } = {}) {
   const { stdout } = await pExecFile('curl.exe', args, {
     encoding: 'buffer', maxBuffer: 16 * 1024 * 1024, windowsHide: true,
   })
+  return stdout
+}
+
+/** 取纯文本（翻译接口用）：不带 -f，非 2xx 也让上层按空内容处理 */
+async function curlText(url, { maxTime = 8 } = {}) {
+  const { stdout } = await pExecFile('curl.exe', [
+    '-sSL', '--max-time', String(maxTime), '-A', UA, url,
+  ], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, windowsHide: true })
   return stdout
 }
 
@@ -313,7 +332,23 @@ export async function fetchMeta(rawUrl) {
   })
   // 挑战页返回 200，抓取层看不出异常：warning 必须盖过抓取层文案
   if (info.blocked) warning = BLOCKED_WARNING
-  return { ...info, url, domain: url, warning }
+
+  // 自动翻译：非中文的名称 / 描述译成中文，原文一并回传供控制台表单对照。
+  // 走 curl（本机 Node fetch 不走系统代理），失败静默保留原文，不影响补全主流程。
+  const tr = await translateSiteFields({ name: info.name, desc: info.desc }, { fetchText: (u) => curlText(u) })
+  info.name = tr.name
+  info.desc = tr.desc
+
+  return {
+    ...info,
+    url,
+    domain: url,
+    warning,
+    nameOriginal: tr.original.name,
+    descOriginal: tr.original.desc,
+    translated: tr.translated,
+    translateEngine: tr.engines,
+  }
 }
 
 /* ---------------- 图标下载 ---------------- */

@@ -25,6 +25,10 @@
           <input type="text" v-model="form.aliases" placeholder="例如: 币安、Binance" class="form-input">
         </div>
         <div class="form-group">
+          <label>用途 <span class="hint">（最多 {{ MAX_PURPOSES }} 个，可多选）</span></label>
+          <PurposePicker :model-value="form.purposes" @update:model-value="form.purposes = normalizePurposes($event)" />
+        </div>
+        <div class="form-group">
           <label>分类</label>
           <select v-model="form.categoryId" required class="form-input">
             <option v-for="cat in categoriesStore.categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
@@ -50,6 +54,8 @@
 import { reactive, onMounted } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import PurposePicker from '@/components/PurposePicker.vue'
+import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
 
 const props = defineProps({
   site: { type: Object, required: true }
@@ -65,7 +71,8 @@ const form = reactive({
   desc: '',
   categoryId: 'ai',
   color: '#3b82f6',
-  aliases: ''
+  aliases: '',
+  purposes: []
 })
 
 onMounted(() => {
@@ -75,6 +82,7 @@ onMounted(() => {
   form.categoryId = props.site.categoryId
   form.color = props.site.color
   form.aliases = Array.isArray(props.site.aliases) ? props.site.aliases.join('、') : ''
+  form.purposes = normalizePurposes(props.site.purposes)
 })
 
 /** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
@@ -101,6 +109,7 @@ function autoCompleteUrl() {
 
 function submit() {
   const domain = form.url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase().replace(/^www\./, '')
+  const purposes = normalizePurposes(form.purposes)
   sitesStore.updateSite(props.site.id, {
     name: form.name,
     url: domain,
@@ -108,7 +117,9 @@ function submit() {
     categoryId: form.categoryId,
     color: form.color,
     initial: form.name.charAt(0).toUpperCase(),
-    aliases: parseAliases(form.aliases, form.name, domain)
+    aliases: parseAliases(form.aliases, form.name, domain),
+    // 清空时传 undefined 而不是空数组：空数组会让卡片渲染出「有用途但一个标签都没有」的空行
+    purposes: purposes.length ? purposes : undefined
   })
   emit('saved', { name: form.name, url: domain })
   emit('close')

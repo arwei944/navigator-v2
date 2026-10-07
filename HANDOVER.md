@@ -1,6 +1,6 @@
 # Navigator V2 项目交接文档
 
-> 最后更新：2026-10-03
+> 最后更新：2026-10-07
 > 线上地址：https://navigator-v2-two.vercel.app
 > 仓库本地路径：`c:\work\solo work\new\nav-v2`
 
@@ -171,6 +171,7 @@ nav-v2/
   categoryId: 'starter', // 所属分类 ID
   color: '#22c55e',      // 图标背景色
   initial: 'C',          // 图标首字母（支持中文）
+  purposes: ['ai-chat', 'learning'], // 用途标签（受控词表，可多选，最多 4 个；见 §42）
   sortOrder: 0,          // 排序权重
   visitCount: 0,         // 访问次数
   createdAt: Date.now(),
@@ -2591,3 +2592,329 @@ X-Vercel-Error: DEPLOYMENT_DISABLED
 > 教训：**经 `npm run <script> -- <args>` 透传参数不可靠** —— `--only` 这类与 npm 自身同名的 flag 会被截胡，脚本收到的是空参。需要透传时直接 `node <script> <args>`。
 
 > 代理端口：本轮 `publish` 自报「代理环境: http://127.0.0.1:7897」，即 `shared/proxy.mjs` 自动探测生效；Clash 端口本轮再次漂移（7900 → 7897），环境变量已随之改回 7897。
+
+---
+
+## 四十二、添加站点增强：自动翻译 · 站点用途 · 点击热度（2026-10-07）
+
+**需求**（用户原话）：增强「添加站点」功能 —— ① 自动翻译，非中文译成中文；② 新增站点用途，智能推断用途；③ 前端展示点击次数（要求卡片上更醒目）。
+
+### 42.1 三个子功能一句话
+
+| 子功能 | 内核 | 落点 |
+|---|---|---|
+| 自动翻译 | `shared/translate.mjs` | 添加站点时把外文 name / desc 译成中文，原文对照展示 |
+| 站点用途 | `shared/purposes.mjs` | 新增 `purposes` 字段，多标签、可筛选、可搜索 |
+| 点击热度 | `src/stores/clicks.js`（已有）+ `SiteCard.vue` | 卡片上由角落灰字改为热度徽章 |
+
+### 42.2 用途（purposes）：与分类正交的第二把尺子
+
+**关键设计取舍 —— 用途 ≠ 分类，不能互相替代：**
+
+- 分类回答「这是什么方向的站」（AI 学习 / 币圈 / 工具），**归属唯一**，决定站点位置；
+- 用途回答「我用它来干什么」（查资料 / 交易 / 写代码），**可多选、跨分类存在** —— 同一个「查资料」既可能落在数据研究站，也可能落在媒体站。
+
+因此用途必须是**独立字段**，而不是从分类反推的展示文案。
+
+**受控词表**（12 个，封闭集合，`PURPOSE_TAGS`）：`reference` 查资料 · `tool` 在线工具 · `data` 看数据 · `ai-chat` AI 对话 · `coding` 写代码 · `design` 设计素材 · `learning` 学习 · `news` 资讯 · `video` 看视频 · `community` 社区交流 · `trading` 交易 · `productivity` 办公协作。单站点上限 `MAX_PURPOSES = 4`。
+
+> 为什么是封闭词表而非自由文本：自由文本做不了筛选条，也统计不出「哪些用途最常用」。
+
+**推断口径**（`inferPurposes`）：分类基线打底（`BY_CATEGORY`，人工确认过的强信号，保证至少有一个用途）→ 关键词命中补充（`BY_KEYWORD`）→ 按上限截断。分类在前、关键词在后。规则之间**不共享同一个词**（曾把「行情」同时写进 data 与 trading）。
+
+**归一校验**（`normalizePurposes`）：接受数组或「逗号/顿号/换行」分隔字符串，剔除词表外脏值、去重、按上限截断 —— 与 `normalizeAliases` 同风格，非法项静默丢弃而非抛错（同时服务「读旧数据」与「写入前清洗」）。
+
+### 42.3 自动翻译：无 AI 密钥的免密钥方案
+
+项目**没有任何 AI 集成、也没有可用 API Key**。翻译只是「把外文简介变中文」这一个窄用途，不值得引入密钥管理与计费链路，故走公开免密钥接口：**Google 非官方翻译接口为主，MyMemory 为兜底**（`translateToZh`）。
+
+**判定规则（避免把品牌名译坏）：**
+
+- `looksChinese` —— 出现任意汉字即视为中文，不再翻译（混合文案 "ChatGPT 中文站" 里的汉字已承载语义）；
+- `needsTranslation` —— 非空、含字母、且非中文，纯数字/符号不译；
+- `shouldTranslateName` —— 名称额外要求「词组型」（含空格，如 "Best Free Online Tools"）。**单词型基本是品牌名**（Uniswap / OpenAI / DeepSeek），翻成中文只会得到音译垃圾，保持原样；描述是散文，非中文一律译。
+- 译文与原文相同时视为未译成功，继续尝试兜底引擎；两个引擎都失败则返回空串，**调用方保留原文，绝不写入空译文**。
+
+**传输层注入**：内核只负责「该不该译 / 怎么解析 / 怎么兜底」，不关心怎么发请求 —— 线上 `api/metadata.js` 用 Node 原生 fetch，本地控制台 `tools/console/lib/sites.mjs` 用 `curl.exe`（本机 Node fetch 不走系统代理会连不通）。硬约束：`translate.mjs` 只在 Node 侧被引用，**不得被 `src/` 引用**，否则会把不存在的传输层打进浏览器包。
+
+### 42.4 数据口径与多入口一致
+
+- `shared/ops/site-ops.mjs`：`SITE_FIELDS` / `EDITABLE_FIELDS` 增加 `purposes`；`validateSite` 校验「必须是数组、词表内 id、无重复、不超上限」；新增批量操作 `purposeAdd`（追加）/ `purposeSet`（替换）；`matchSite` 支持按用途 id 或中文标签命中。
+- `shared/site-infer.mjs`：`inferSite` 返回 `purposes`，用推断出的分类做基线 —— **线上与控制台两个「新增站点」入口共用同一内核，口径必然一致**（各写一套规则迟早漂移，同一网址两个入口拿到不同用途，用户会以为功能坏了）。
+- `scripts/validate-data.mjs`：新增 `purposes` schema 校验。
+- 四端同步：`api/metadata.js`（线上）、`tools/console/lib/sites.mjs`（本地控制台）、`tools/cli/commands/sites.mjs`（CLI）、`tools/mcp/server.mjs`（MCP）。
+
+### 42.5 前端落点
+
+| 位置 | 改动 |
+|---|---|
+| `AddSiteModal.vue` | 用途多选（`PurposePicker`）+ 「自动推断」标记 + 翻译状态与原文对照提示（`已自动译为中文（原文：…）`） |
+| `EditSiteModal.vue` | 用途多选；清空时传 `undefined` 而非空数组（空数组会让卡片渲染出空标签行） |
+| `PurposePicker.vue`（新） | 用途多选组件，到上限后未选中项置灰 |
+| `PurposeTags.vue`（新） | 用途标签展示，词表外脏值直接丢弃 |
+| `FilterBar.vue` | 新增「用途」筛选行（`Axis 4`），与分类正交，可跨分类聚合「所有查资料站」；只列出现过的用途 |
+| `SiteCard.vue` | 卡片新增用途标签行；点击量由角落灰字改为**热度徽章** |
+| `SiteDetailPanel.vue` | 新增「用途」分区 |
+| `src/utils/search.js` | `scoreSite` 新增用途命中档 `PURPOSE_INCLUDES: 500`（介于域名与描述之间，受控词表命中比描述里顺带提及更可信）；支持中文标签与英文 id 两种写法 |
+| `src/stores/sites.js` | 新增 `currentPurpose` 状态与正交筛选逻辑 |
+| `src/App.vue` | 用途放 `?p=` query，与分类 `?c=`、范围、搜索词任意组合（路由是唯一事实来源） |
+
+**点击热度徽章**（子需求③）：不再是 `--text-secondary` 的小灰字，改为着色药丸徽章 + 火焰图标，并按量级分档 —— `>=1000` 红（`hot`，火焰脉动）、`>=100` 橙（`warm`）、其余主题蓝。数字用 `tabular-nums` 对齐。仅在 `clickCount > 0` 时渲染，避免 0 值铺满卡片。
+
+### 42.6 存量回填
+
+存量 300 站点均无用途（字段是后加的）。新增一次性回填脚本 `scripts/seed-purposes.mjs`：
+
+- 直接调用 `shared/purposes.mjs` 的 `inferPurposes`，**不另写规则**（与新增入口同源）；
+- 幂等：只补「尚无用途」的站点，人工确认过的原样保留；
+- 备份 + 原子写（`.tmp` → rename），与 `seed-aliases.mjs` 同款。
+
+```
+回填 300 个，跳过（已有用途）0 个，无从推断 0 个
+  118 在线工具 · 106 交易 · 83 看数据 · 77 写代码 · 68 查资料 · 65 AI 对话
+   46 资讯 · 44 学习 · 25 设计素材 · 21 社区交流 · 19 办公协作 · 11 看视频
+```
+
+12 个标签全部被用到，无「无从推断」的站点。备份：`backups/sites-data-2026-10-07-11-36-04.json`。
+
+### 42.7 验证
+
+| 项 | 结果 |
+|---|---|
+| 数据校验 | `node scripts/validate-data.mjs` → 300 条通过（8 条历史缺图标警告，与本次无关） |
+| 用途 + 翻译单测 | `npm run console:test:purposes` → **156 条断言全部通过**（内联 fixture，不联网） |
+| 控制台全量单测 | `npm run console:test:all` → 全绿 |
+| 生产构建 | `npm run build` → 178 模块转换成功，PWA 289 条预缓存 |
+
+> 未执行线上发布（`npm run publish`）—— 待用户确认后再发布。
+
+### 42.8 单测覆盖（`tools/console/test-purposes.mjs`，156 条断言）
+
+内联 fixture、零依赖、**不联网** —— 翻译的传输层用注入的假 `fetchText` 驱动，因此「Google 成功 / Google 失败退兜底 / 两个引擎都失败」三条分支都能覆盖，而不真的打外部接口。
+
+| 分区 | 覆盖要点 |
+|---|---|
+| 词表 | id 唯一、色值合法、未知 / 非字符串 id 的容错 |
+| 推断 | 分类基线、关键词补充、四字段（name/desc/keywords/url）参与匹配、大小写不敏感、分类 id 去空白、分类与关键词重叠去重、上限截断（含 `max:0` / 放大）、**单关键词 → 单用途映射表**（锁住词与用途的对应，防后续加规则时一词点亮两用途）、结果只含词表内 id |
+| 归一 | 数组 / 逗号 / 全角逗号 / 顿号 / 换行入参、非字符串项丢弃、去重后再截断（重复项不占名额）、自定义上限、null 安全 |
+| 统计 | 计数正确、脏值不计入、计数守恒、零数据返回完整词表、排序稳定（并列按 label） |
+| 翻译判定 | 汉字判定（含混合文案、全角空格、纯符号）、字母混数字需译、词组型名称才译（品牌名保护）、首尾空白不算词组 |
+| 解析 | Google 多段拼接 / 空段过滤 / 非数组段忽略 / 非 JSON / 源语言非字符串；MyMemory 实体还原（`&amp;` `&quot;` `&lt;` `&#39;`）、非字符串字段、缺字段、空白裁剪 |
+| 地址 | 目标语言可覆盖、查询串精确截到 480 字符、语言对编码、空文本不抛错 |
+| 引擎链路 | Google 优先、Google 失败 / 空译文 / 非 JSON 均退兜底、译文回显原文视为未译（含兜底引擎回显）、`from` 透传、入参先 trim、传输层返回 null / 非函数不抛错 |
+| 字段编排 | 名称与描述独立判定、部分翻译、失败保留原文不写空串、原文对照字段、引擎标记、缺省字段安全 |
+
+> 断言框架已用「变异探针」自检：故意写错一条期望值，确认测试以退出码 1 报错并打印实际差异，而非静默通过。
+
+---
+
+## 四十三、管理后台入口收敛进设置面板（2026-10-07）
+
+**背景**：侧栏底部原有一枚常驻的「管理后台」按钮，与「添加站点」上下并排、长期占用底部空间。用户要求把它收敛进设置入口。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/components/Sidebar.vue` | 删除底部 `sidebar-admin-btn` 按钮、配套的 `goAdmin()` 与折叠态专属样式；折叠态底部改为无内边距、无分隔线（底部内容整体收起后不再留一条空边框） |
+| `src/components/settings/AdminSection.vue`（新） | 设置面板新增「管理」分区：`管理后台` 说明 + 「进入」按钮 |
+| `src/components/SettingsPanel.vue` | 挂载 `AdminSection`，新增 `open-admin` emit |
+| `src/App.vue` | `openAdmin()` —— 先关设置面板再 `router.push('/admin')`，避免返回时面板仍盖在页面上 |
+
+**可达性**：管理后台仍有两条入口 —— 设置面板「管理」分区，以及命令面板（`Cmd/Ctrl+K`）的「管理后台」项。侧栏折叠态不再需要为它保留常驻位。
+
+**验证**：`npm run build` 通过；浏览器实测确认 —— 侧栏底部已无管理按钮、折叠圆钮不再压住「添加网站」按钮、设置面板底部出现「管理」分区、点「进入」后 URL 变为 `/admin` 且页面显示「管理后台」标题。
+
+## 四十四、右侧详情面板默认展开 · 添加站点入口移到右上角（2026-10-07）
+
+**背景**：右侧站点详情面板的折叠状态被写进 localStorage，用户折叠一次后长期处于收起态；同时左侧栏底部的「添加网站」带文字按钮与统计/时钟挤在同一块底部区域，用户要求整枚移除，改为右上角工具栏的图标按钮。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/stores/sidebar.js` | `rightCollapsed` 移出持久化字段（`versionedPersist('sidebar', ['width','collapsed'])`）：右侧详情面板每次进入默认展开，折叠状态不再跨会话记忆 |
+| `src/components/Sidebar.vue` | 删除底部「添加网站」按钮、`AddSiteModal` 宿主、`showAddModal` 状态与 `sidebar-btn*` 样式；底部只保留统计与时钟 |
+| `src/components/MainToolbar.vue` | 工具栏最右端（设置齿轮右侧）新增 `add-site-btn`：强调色实心 `+` 图标按钮，emit `open-add` |
+| `src/App.vue` | 接管 `AddSiteModal` 宿主（原挂在左侧栏内），新增 `showAddModal` 状态并接线 `@open-add` |
+
+**取舍**：`rightCollapsed` 只从持久化中移除，未改动 `RightSidebar.vue` 的响应式断点 —— ≤1024px 宽度收成 0、≤768px 隐藏（触屏无 hover，详情面板在该区间本就没有入口）仍按原策略生效。因此若窗口宽度 ≤768px，右侧面板依旧不会出现，这属于既有窄屏策略而非本次回归。
+
+**验证**：`npm run build` 通过；构建产物核对持久化配置为 `{persist: ea("sidebar",["width","collapsed"])}`，确认 `rightCollapsed` 不再落盘；浏览器实测（603px 窄视口）—— 左侧栏底部已无「添加网站」按钮，右上角 `add-site-btn` 计算样式 `background-color: rgb(37,99,235)`（即强调色 `#2563eb`）实心填充，点击后弹出「添加站点」模态并含网址 / 站点名称 / 描述字段；控制台无报错。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份、schema 校验门禁、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 113 → 114，300 站点 / 292 带图标，快照 `000113-2026-10-07T12-57-38-045Z.json`）、轮询验证一次收敛。线上产物指纹 `assets/index-BHqc81DK.js` 与本地构建完全一致，且产物内确认含 `add-site-btn`、`open-add` 与 `["width","collapsed"]` 持久化配置。
+
+## 四十五、修复持久化字段过滤失效 · 右侧详情面板不再被记忆为收起（2026-10-07）
+
+**现象**：四十四节改完后用户仍反馈右侧站点详情面板不显示。
+
+**定位**：截图 1913×923，先用右上角那个「+」按钮标定缩放 —— 它在设计上是 32×32px，实测正好 32×32 图像像素，说明截图是 1:1，**窗口宽度 1913px**，远大于 `RightSidebar` 的 ≤1024px 收起断点。响应式断点排除后，只剩一个能让面板宽度归零的因素：`rightCollapsed === true`。
+
+**根因**：`src/utils/storeVersioning.js` 的 `versionedPersist` 把字段过滤项写成了 `cfg.pick`，而 `pinia-plugin-persistedstate@3.2.3` 识别的配置项名是 **`paths`** —— 类型定义 `paths?: Array<string>`，运行时 `persistState(state, { storage, serializer, key, paths, debug })` 解构的也是 `paths`。`pick` 被**静默忽略** → `paths` 为 `null` → **整份 state 都落盘**。于是 `rightCollapsed` 被持久化，右侧面板「折叠一次 → 永久收起」。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/utils/storeVersioning.js` | `cfg.pick` → `cfg.paths`（形参同步改名为 `paths`）；`STORE_VERSION` 1 → 2；注册 `MIGRATIONS.sidebar`，清除历史落盘的 `rightCollapsed` / `open` / `hoveredSite` 瞬态字段 |
+
+**影响面**：全项目只有两个 store 传了字段清单 —— `preferences`（清单恰好等于它的全部 5 个 state 字段，行为不变）与 `sidebar`（清单为 `width`/`collapsed`）；`favorites`、`history` 不传清单，`paths` 为 `undefined`，仍整份持久化。修正后 `sidebar` 不再持久化 `open` / `activeNav` / `hoveredSite`（`activeNav` 本就由路由派生，`hoveredSite` 是悬停瞬态，本就不该落盘）。
+
+**验证**：临时脚本 17 条断言全绿（`paths` 生效、`pick` 消失、v1 脏数据被清、无版本号数据同样清理、v2 数据原样返回、其他 store 不受影响）；`npm run build` 通过，产物内 `.paths=` 存在、`.pick=` 消失、迁移函数与 `tu=2`（STORE_VERSION）已打包；发布 version 114 → 115，线上产物指纹 `assets/index-x_caUlmC.js` 与本地构建一致且含修复。
+
+**用户侧生效条件**：刷新一次页面即可（迁移在读取 localStorage 时执行，早于 `$patch` 回填），无需手动清缓存。
+
+## 四十六、左侧栏折叠后无法展开 · 移除左下角时间块（2026-10-07）
+
+**现象**：点击左侧栏折叠后，找不到重新展开的按钮；另外左侧栏左下角的时间块要去掉。
+
+**定位**：折叠开关 `.sidebar-collapse-toggle` 原本是「悬浮在侧栏右边缘外」的圆形按钮 —— `position: absolute; bottom: 12px; right: -14px`。但 `.sidebar` 同时设了 `overflow-y: auto; overflow-x: hidden`，超出边框盒的部分会被裁剪，按钮实际只剩贴着右边缘的一条，命中面积很小；侧栏折叠成 60px 后这个残条更难被点到，观感上就是「没有展开按钮」。
+
+问题会被固化：`collapsed` 本来就在持久化清单 `['width','collapsed']` 里（这是有意保留的用户偏好），所以一旦折叠过，刷新后仍是折叠态，用户会持续卡在无按钮可点的状态。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/components/Sidebar.vue` | 折叠开关从绝对定位浮球改为 `.sidebar-bottom` 内的常规流按钮，不再依赖负偏移，因此不会被 `overflow` 裁剪：展开态整行显示图标 + 「折叠侧边栏」（215×35），折叠态收成图标居中的 44×36 方按钮；`.sidebar.collapsed .sidebar-bottom` 由 `padding: 0; border-top: none` 改为 `padding: 8px`，给按钮保留落点；移除 `DigitalClock` 组件引用、`.sidebar-clock` 相关样式与底部时钟 |
+
+**影响面**：只动左侧栏自身布局，未改折叠状态语义（`collapsed` 仍持久化，用户偏好照旧被记住）。折叠态宽度、导航图标居中、badge 角标等既有规则不变。≤768px 的移动端媒体查询仍隐藏该按钮 —— 窄屏下侧栏是抽屉，由顶部汉堡按钮开关，折叠概念不适用（`isCollapsed` 在该区间本就恒为 `false`）。
+
+**验证**：`npm run build` 通过。Playwright 1440×900 桌面视口实测 —— 展开态侧栏 240px、开关 `display: flex`、包围盒 215×35、文案「折叠侧边栏」；点击后侧栏收缩到 60px、开关仍 `display: flex` 且包围盒 44×36（x=8, y=856），完整落在视口内；再次点击可回到 240px 且统计文案重新出现；折叠态刷新后（`localStorage.sidebar` = `{"width":240,"collapsed":true,"__navDataVersion":2}`）按钮依旧可见可点。`.digital-clock` / `.sidebar-clock` 匹配数 0，底部时钟已移除。控制台无报错。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份 300 条、schema 校验门禁通过（8 个站点缺 icon 仅为警告）、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 115 → 116，300 站点 / 292 带图标，快照 `000115-2026-10-07T13-25-05-013Z.json`）、轮询一次收敛。
+
+线上产物与本地构建 **逐字节一致**（SHA256 相同）：`assets/index-C8FM2QQA.js`、`assets/index-CJ1GqeZ6.css`。线上 CSS 已确认含新规则 `.sidebar-collapse-toggle{display:flex;...}` 与 `.sidebar.collapsed .sidebar-bottom{padding:8px;...}`，旧 `.sidebar-collapse-toggle{position:absolute;right:-14px}` 与 `.sidebar-clock` 均已消失；线上 JS 内含「折叠侧边栏」文案且已无 `DigitalClock` 引用。
+
+## 四十七、左侧栏去掉统计与按钮文字 · 右侧栏折叠后露出展开按钮（2026-10-07）
+
+**现象**（用户反馈三项）：
+1. 左侧栏底部的「共 N 个站点 / 今日访问 N / 收藏 N」统计文案要去掉。
+2. 左侧栏折叠按钮不需要文字说明。
+3. 右侧边栏在折叠状态下仍然没有展开按钮。
+
+**根因（第 3 项）**：`RightSidebar.vue` 里同时存在两条会「把按钮藏起来」的规则 —— `.right-sidebar.collapsed { width: 0; overflow: hidden }` 让面板宽度归零并裁剪溢出内容，再加上显式的 `.right-sidebar.collapsed .right-collapse-toggle { display: none }`。按钮既被 `display: none` 摘掉，又被 `overflow: hidden` 裁掉，折叠后就再也点不到了，和四十六节左侧栏是同一类问题。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/components/Sidebar.vue` | 删除底部统计块（`.sidebar-footer` / `.sidebar-stats` / `.sidebar-stat`）及配套的 `todayCount` 计算属性与 `useHistoryStore` 依赖；折叠按钮去掉文字，改为 32×32 纯图标按钮，展开/折叠态同尺寸（折叠态由 `.sidebar-bottom { justify-content: center }` 居中） |
+| `src/components/RightSidebar.vue` | 折叠态由 `overflow: hidden` 改为 `overflow: visible`，并新增 `.right-sidebar.collapsed > *:not(.right-collapse-toggle) { display: none }` 自行隐藏面板内容（不裁剪就得自己藏，否则内容会溢出盖到主内容区）；删掉 `.right-sidebar.collapsed .right-collapse-toggle { display: none }`；按钮折叠态改用 `left: auto; right: 8px` —— 面板宽度归零时面板左边缘即视口右缘，按钮因此溢出到视口右缘露出来，并补上白底 / 边框 / 阴影使其像个按钮 |
+
+**关键点**：`.right-sidebar` 是 `position: relative`，绝对定位按钮的包含块就是面板本身，所以不需要把按钮挪到 `App.vue` 外层；只要面板不再 `overflow: hidden`，`right: 8px` 就能让按钮落在视口右缘。
+
+**验证**：`npm run build` 通过。Playwright 在 1440×900 与 1100×800 两个桌面视口实测（结论一致）——
+- 左侧栏：`.sidebar-stats / .sidebar-stat / .sidebar-footer` 节点数 0，侧栏文本不含「个站点」「今日访问」；折叠按钮 `innerText` 为空串、包围盒 32×32；折叠后侧栏 60px、按钮仍可见（32×32 居中），再点回到 240px。
+- 右侧栏：展开态面板 280px、按钮可见（28×28 @ x=1169）；点击后面板归零到 x=1440、按钮仍可见且完整落在视口内（x=1404, y=12, 28×28），`elementFromPoint` 命中测试为真（即真的能点到）；再点击恢复 280px 且详情面板可见。
+- 折叠态刷新后面板回到展开 —— 这是四十五节的既定行为（`rightCollapsed` 不入持久化，每次进入默认展开），非缺陷。
+- 控制台无报错。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份 300 条、schema 校验门禁通过（8 个站点缺 icon 仍为警告）、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 116 → 117，300 站点 / 292 带图标，快照 `000116-2026-10-07T13-38-32-307Z.json`）、轮询一次收敛。
+
+线上产物与本地构建 **逐字节一致**（SHA256 相同）：`assets/index-DdnPT7e3.js`、`assets/index-DT1rzp7G.css`。线上 CSS 已确认含 `.right-sidebar.collapsed{...;overflow:visible}`、`.right-sidebar.collapsed>*:not(.right-collapse-toggle){display:none}`、`.right-collapse-toggle.collapsed{left:auto;right:8px;...}`，且 `.sidebar-stats` / `.sidebar-footer` / 旧的 `.right-sidebar.collapsed .right-collapse-toggle{display:none}` 均已消失。线上 JS 中「折叠侧边栏」仅剩 1 处、且只出现在按钮的 `title` 与 `aria-label` 里（悬停提示与无障碍标签），按钮本身渲染为纯图标。
+
+## 四十八、左侧栏可拖到纯图标 · 右侧把手移到右缘垂直居中（2026-10-07）
+
+**需求**：
+1. 左侧栏宽度不设最小限制，可以拖到只剩图标。
+2. 右侧栏的折叠把手放到右侧边缘的正中间，且是窄长形状。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/stores/sidebar.js` | `setWidth` 下限从 160px 降到 60px（上限仍 400px） |
+| `src/components/Sidebar.vue` | 新增 `iconOnly` 计算属性 = 显式折叠 **或** `width <= 110`；新增 `sidebarWidth` 统一算出实际宽度。模板里原本由 `isCollapsed` 驱动的所有 `v-show` / `title` / 箭头旋转改用 `iconOnly`；CSS 里 `.sidebar.collapsed *` 全部改名为 `.sidebar.icon-only *`；拖拽手柄改为 `v-if="!isCollapsed"` 并删掉 `.sidebar.collapsed .sidebar-resize-handle { display: none }` |
+| `src/components/RightSidebar.vue` | 把手由 `top: 12px; left: 8px` 的 28×28 方块改为 `top: 50%; right: 0; transform: translateY(-50%)` 的 18×64 竖条（`border-radius: 8px 0 0 8px`，悬停加宽到 24px） |
+
+**关键点**
+- 「无最小宽度限制」的物理下限是 **60px**：nav 项宽 44px + 两侧各 8px 内边距 = 60px，再窄图标本身就会被裁。所以下限设成图标宽度，而不是真的允许趋近 0。
+- 宽度阈值 110px 是「文字放不下」的经验值：超过它就显示完整标签，拖到 110px 以下自动切纯图标 —— 这样「拖窄」和「按折叠按钮」视觉上收敛到同一套样式，不必非得点按钮。
+- 拖窄成纯图标时**必须保留拖拽手柄**，否则用户被卡在窄态拖不回来。原先的 `.sidebar.collapsed .sidebar-resize-handle { display: none }` 在改名后会误伤（`icon-only` 同时覆盖「拖窄」和「显式折叠」两种来源），所以删掉该规则、改由 `v-if="!isCollapsed"` 只对显式折叠生效。
+- 右侧把手用 `right: 0` 一个值就同时适配两种状态：面板右边缘在任何状态下都等于视口右缘（折叠时面板宽度归零），所以展开态和折叠态落点一致，不再需要分状态写定位。
+
+**验证**：`npm run build` 通过。Playwright 1440×900 实测 ——
+- 左侧栏：从 240px 拖 -170px 后宽度 70px、`icon-only` class 生效、`Navigator` 品牌与导航文字 `isVisible() === false`、拖拽手柄仍在（count=1）、折叠按钮可见；再拖 +160px 回到 230px 且文字恢复、`icon-only` 移除；极限拖到最左时宽度停在 **60px**（下限生效）。
+- 右侧栏：展开态面板 280px、把手 18×64 @ x=1422,y=418；折叠态面板归零到 x=1440、把手仍在 x=1416,y=418。两态均满足「右缘 = 视口右缘 1440」「中心 y = 450 = 视口垂直中点」「宽 < 高」「`elementFromPoint` 命中为真」；再点一次恢复 280px。
+- 控制台无报错。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份 300 条、schema 校验门禁通过（8 个站点缺 icon 仍为警告）、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 117 → 118，300 站点 / 292 带图标，快照 `000117-2026-10-07T14-04-25-255Z.json`）、轮询一次收敛。
+
+线上产物与本地构建 **逐字节一致**（SHA256 相同）：`assets/index-BJLuvHE3.js`、`assets/index-DmH25HNE.css`。线上 CSS 已确认含 `.sidebar.icon-only .sidebar-header/.sidebar-nav-item/.sidebar-bottom` 与新的 `.right-collapse-toggle{position:absolute;top:50%;right:0;transform:translateY(-50%);width:18px;height:64px;...}`，旧的 `.sidebar.collapsed` 系列规则与 `.right-collapse-toggle.collapsed{left:auto;...}` 均已消失；线上 JS 中 `setWidth` 边界已是 `Math.max(60,Math.min(400`，旧 `Math.max(160,Math.min(400` 已不存在。
+
+## 四十九、左侧把手改为左缘竖条 · 右侧面板可自由拖拽宽度（2026-10-07）
+
+**需求**：
+1. 左侧栏的折叠按钮「做同样的」—— 与右侧把手同款式（贴边缘、垂直居中、窄长竖条）。
+2. 右侧栏要和左侧栏一样，可以自由拖拽改变宽度。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/stores/sidebar.js` | 新增 `rightWidth`（默认 280）与 `setRightWidth`（同样 [60, 400] 钳制）；`rightWidth` 加入持久化 paths |
+| `src/components/Sidebar.vue` | 折叠按钮从 `.sidebar-bottom`（32×32 图标按钮）移到 `.sidebar` 直接子级，改为 `top: 50%; left: 0; translateY(-50%)` 的 18×64 竖条（`border-radius: 0 8px 8px 0`、`border-left: none`、阴影朝右），与右侧把手左右对称；删除 `.sidebar-bottom` 容器及其样式 |
+| `src/components/RightSidebar.vue` | 面板宽度改由 `panelWidth` 计算并经内联样式下发（折叠或 ≤1024px 时为 0，否则 `rightWidth`）；新增 `.right-resize-handle`（贴面板左缘 6px，向左拖变宽）；新增 `NARROW_QUERY` 媒体查询监听 —— 宽度一旦走内联样式，媒体查询里的 `width: 0` 就会被盖掉，所以 ≤1024px 的收起必须同时由 JS 判断 |
+
+**关键点**
+- 左侧把手**不会**被 `overflow-x: hidden` 裁掉：侧栏宽度下限 60px 大于把手最大宽 24px，它始终在侧栏盒子内部，不需要像右侧那样改成 `overflow: visible`。
+- 右侧面板的拖拽方向是**反的**：面板贴右，所以 `startWidth + (startX - ev.clientX)`，向左拖才是变宽。
+- 右侧面板宽度由内联样式统一下发后，CSS 里的 `width: 280px` 与媒体查询里的 `width: 0` 都成了死代码，一并删除，只留 store 一个来源，避免两处打架。
+- 箭头方向：左侧原始折线是 `15 18 9 12 15 6`（顶点在左，即 `‹`），所以展开态不旋转、纯图标态转 180°；右侧原始折线是 `9 18 15 12 9 6`（顶点在右，即 `›`），规则相反。两者都满足「箭头指向点击后侧栏移动的方向」。
+
+**验证**：`npm run build` 通过。Playwright 1440×900 实测 ——
+- 左侧把手：展开态 box `x=0 y=418 18×64`（贴左缘、中心 y=450 = 视口垂直中点、宽<高）；折叠态侧栏 60px、把手仍在 `x=0 y=418`；与右侧把手（`x=1422`，右缘 = 1440）左右对称。
+- 箭头方向（解析 `polyline` 顶点 + `getComputedStyle` 的旋转矩阵）：左侧展开 `‹`、折叠 `›`；右侧展开 `›`、折叠 `‹`，四项全部符合预期。
+- 右侧拖拽：向左拖 -120px → 宽度 400（触上限）；向右拖 +300px → 宽度 100；极限向右拖 → 停在 **60**（与左侧同下限）；手柄 `elementFromPoint` 命中为真。刷新后宽度保持 60（`rightWidth` 已入持久化）。
+- 折叠态右侧手柄数量 0、展开后回到 1；折叠态把手仍可见（`x=1416 24×64`，悬停加宽）。
+- 控制台无报错。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份 300 条、schema 校验门禁通过、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 118 → 119，300 站点 / 292 带图标，快照 `000118-2026-10-07T14-20-26-170Z.json`）、轮询一次收敛。
+
+线上产物与本地构建 **逐字节一致**（SHA256 相同）：`assets/index-DuYwEm6b.js`、`assets/index-C7kwLnxs.css`。线上 CSS 已确认含 `.sidebar-collapse-toggle{position:absolute;top:50%;left:0;transform:translateY(-50%);width:18px;height:64px;border-radius:0 8px 8px 0;...}` 与 `.right-resize-handle{position:absolute;top:0;left:0;bottom:0;width:6px;cursor:col-resize;...}`，且 `.sidebar-bottom`、`.right-sidebar{width:280px`、`.right-sidebar.collapsed{width:0` 均已消失；线上 JS 含 `setRightWidth` / `rightWidth` 与 `Math.max(60,Math.min(400`。
+
+## 五十、两个折叠把手改贴中间内容区两侧（2026-10-07）
+
+**需求**：两个折叠按钮要吸附到中间页面的两侧，而不是吸附在屏幕的左边缘和右边缘。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/components/Sidebar.vue` | 把手锚点由 `left: 0`（视口左缘）改为 `right: 0`（本侧栏右缘 = 中间内容区左缘）；形状随之翻转成 `border-radius: 8px 0 0 8px`、`border-right: none`、阴影 `-2px` 朝内；`.sidebar-resize-handle` 的 `z-index` 由 20 降到 10 |
+| `src/components/RightSidebar.vue` | 展开态把手锚点由 `right: 0`（视口右缘）改为 `left: 0`（本面板左缘 = 中间内容区右缘），形状 `border-radius: 0 8px 8px 0`、`border-left: none`、阴影 `+2px` 朝内；新增 `.right-collapse-toggle.collapsed { left: auto; right: 0; ... }` 覆写形状与锚点；`.right-resize-handle` 的 `z-index` 由 20 降到 10 |
+
+**关键点**
+- 右侧面板折叠后宽度归零，若继续用 `left: 0`，把手会被推到视口外（`x = 1440 ~ 1458`）。此时中间内容区已铺满到视口右缘，所以折叠态改锚 `right: 0`，把手依旧贴在内容区右侧 —— 两种状态落点语义一致，不是特例。
+- 左侧栏折叠后仍有 60px 宽度，`right: 0` 天然就落在内容区左缘，无需分状态处理。
+- 把手与拖拽手柄现在共用同一条边缘（左：侧栏右缘；右：面板左缘），两者重叠。把手 `z-index: 20` 高于手柄 `10`，所以把手在其覆盖的 64px 内仍可点，拖拽改从该竖带上下两侧进行（可用边缘仍有 836px）。
+- 形状规则统一为「贴分界线那侧是平的、探出来那侧是圆的」，因此两侧把手在各自状态下都是圆角朝内容区、平边朝分界线。
+
+**验证**：`npm run build` 通过。Playwright 1440×900 实测 ——
+- 展开态：中间内容区 x 范围 `240 ~ 1160`；左把手 `x=221 w=18`（右缘 239 = 侧栏 padding box 右缘）、右把手 `x=1161 w=18`（左缘 1161 = 面板 padding box 左缘），各差 1px 即各自 1px 边框；两侧均不再贴屏幕边缘（`x≠0`、右缘 `≠1440`）；均垂直居中（中心 y=450）、均 18×64、`elementFromPoint` 命中为真。
+- 折叠态：左侧栏 60px、左把手 `x=35 w=24`（悬停加宽，右缘 59）；右面板归零到 `x=1440`、右把手 `x=1422 w=18` 且完全在视口内；两者仍垂直居中且可点。
+- 往返：再点一次恢复 240 / 280。拖拽仍可用：左侧拖 -60 → 180，右侧拖 -60 → 340。
+- 控制台无报错。
+
+**遗留观察（非本次引入）**：点击折叠后，内联宽度**立即**变为 `0px`，但渲染宽度会滞留 0.45~1.5s 才动画到 0。原因是面板/侧栏的 `transition: width .28s` 会触发 300 张卡片的整体重排，配合 `backdrop-filter: blur(20px)` 每帧渲染很贵，过渡被拖成几帧跳跃。终态始终正确，属既有性能特征；若嫌点按手感迟钝，可去掉这两处宽度过渡（改为瞬时切换）或改用 `transform` 动画。
+
+**发布**：`npm run publish` 全流程通过 —— 数据备份 300 条、schema 校验门禁通过、构建、Vercel 部署（别名 `https://navigator-v2-two.vercel.app`）、云端热更新（version 119 → 120，300 站点 / 292 带图标，快照 `000119-2026-10-07T14-35-52-423Z.json`）、轮询一次收敛。
+
+线上产物与本地构建 **逐字节一致**（SHA256 相同）：`assets/index-BP0JzLiu.js`、`assets/index-DzR3shRD.css`。线上 CSS 已确认左把手为 `top:50%;right:0;border-right:none;border-radius:8px 0 0 8px;box-shadow:-2px 0 8px`，右把手展开态为 `top:50%;left:0;border-left:none;border-radius:0 8px 8px 0;box-shadow:2px 0 8px`、折叠态覆写为 `left:auto;right:0;border-left:1px solid;border-right:none;border-radius:8px 0 0 8px;box-shadow:-2px 0 8px`，两个拖拽手柄的 `z-index` 均为 10。
+
+## 五十一、搜索栏「添加站点」入口 · 建议下拉可见性修复（2026-10-08）
+
+**需求**：把「添加站点」入口扩充到站内搜索栏 —— 输入像网址时置顶给出「添加站点」（回车即带着网址进入添加），搜不到时给一条出路，其余情况在底部留一条淡入口；同时修复搜索建议下拉「点一下就不显示」的问题。
+
+**改动**
+
+| 文件 | 改动 |
+|---|---|
+| `src/utils/url.js`（新增） | 搜索栏与「添加站点」弹窗共用的网址工具：`normalizeUrl`（补协议）、`hostOf`（取主域名、去 `www`）、`looksLikeUrl`（要求 TLD ≥ 2 位字母，故 `chatgpt` / `a.b` / `1.2` 不会被误判）。两边用同一把尺子判断「是否已收录」，避免搜索栏说没收录、弹窗却拦重复 |
+| `src/components/SiteSearchBar.vue` | 建议下拉新增三类条目：网址类输入置顶「添加站点」、域名已收录时提示「无需重复添加」并可跳转、其余场景底部淡入口；接入 ↑/↓ 选择 + 回车直达；可见性改用根元素 `ref` + `document` 的 `mousedown` 判定外部点击，配合 CSS keyframe 淡入，替换原先依赖 `<Transition>` 的写法 |
+| `src/components/AddSiteModal.vue` | 支持 `prefillUrl` 预填并自动补全，改用共用网址工具 |
+| `src/components/MainToolbar.vue` · `src/App.vue` | 打通事件链，把搜索栏识别的网址透传给弹窗 |
+| `tools/console/test-url.mjs`（新增） | 补网址工具的归一化 / 主域名 / URL 识别用例 |
+
+**验证**：`npm run build` 通过；`npm run console:test:all` 全绿；浏览器实测 —— 点击搜索框建议下拉可见、点击外部可关闭、「添加站点」入口回归通过。

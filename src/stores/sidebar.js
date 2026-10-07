@@ -7,7 +7,8 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const collapsed = ref(false)
   const rightCollapsed = ref(false)
   const activeNav = ref('discover')
-  const width = ref(240) // 可拖拽宽度，默认240px
+  const width = ref(240) // 左侧栏可拖拽宽度，默认240px
+  const rightWidth = ref(280) // 右侧详情面板可拖拽宽度，默认280px
   const hoveredSite = ref(null) // 鼠标悬停的站点详情
 
   function toggle() { open.value = !open.value }
@@ -16,16 +17,20 @@ export const useSidebarStore = defineStore('sidebar', () => {
   function setActiveNav(nav) { activeNav.value = nav }
   function toggleCollapse() { collapsed.value = !collapsed.value }
   function toggleRightCollapse() { rightCollapsed.value = !rightCollapsed.value }
-  function setWidth(val) { width.value = Math.max(160, Math.min(400, val)) }
+  // 两侧宽度下限都是 60px：左侧图标的物理下限（nav 项 44px + 两侧各 8px 内边距），
+  // 拖到这个宽度以下就只剩图标了，再窄连图标都放不下。上限 400px。
+  function setWidth(val) { width.value = Math.max(60, Math.min(400, val)) }
+  function setRightWidth(val) { rightWidth.value = Math.max(60, Math.min(400, val)) }
   function setHoveredSite(site) { hoveredSite.value = site }
   function clearHoveredSite() { hoveredSite.value = null }
 
   return {
-    open, collapsed, rightCollapsed, activeNav, width, hoveredSite,
+    open, collapsed, rightCollapsed, activeNav, width, rightWidth, hoveredSite,
     toggle, close, openSidebar, setActiveNav,
-    toggleCollapse, toggleRightCollapse, setWidth,
+    toggleCollapse, toggleRightCollapse, setWidth, setRightWidth,
     setHoveredSite, clearHoveredSite
   }
 }, {
-  persist: versionedPersist('sidebar', ['width', 'collapsed', 'rightCollapsed'])
+  // rightCollapsed 不入持久化：右侧详情面板每次进入都默认展开，避免折叠一次被长期记住
+  persist: versionedPersist('sidebar', ['width', 'rightWidth', 'collapsed'])
 })

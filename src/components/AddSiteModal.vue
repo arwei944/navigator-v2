@@ -31,6 +31,7 @@
           <input type="text" v-model="form.name" required placeholder="例如: ChatGPT" class="form-input"
                  @input="touched.name = true">
           <div v-if="meta && !touched.name" class="field-note">{{ sourceText('name') }}</div>
+          <div v-if="meta && !touched.name && translatedNote('name')" class="field-note translated">{{ translatedNote('name') }}</div>
         </div>
 
         <div class="form-group">
@@ -41,12 +42,23 @@
           <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"
                     @input="touched.desc = true"></textarea>
           <div v-if="meta && !touched.desc" class="field-note">{{ sourceText('desc') }}</div>
+          <div v-if="meta && !touched.desc && translatedNote('desc')" class="field-note translated">{{ translatedNote('desc') }}</div>
         </div>
 
         <div class="form-group">
           <label>别名 <span class="hint">（俗称 / 曾用名 / 缩写，逗号分隔，可选）</span></label>
           <input type="text" v-model="form.aliases" placeholder="例如: 币安、Binance" class="form-input">
           <div class="field-note">补充常用叫法，搜索时也能命中这个站点</div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            用途
+            <span class="hint">（最多 {{ MAX_PURPOSES }} 个，可多选）</span>
+            <span v-if="meta && !touched.purposes && form.purposes.length" class="field-tag ok">自动推断</span>
+          </label>
+          <PurposePicker :model-value="form.purposes" @update:model-value="onPurposes" />
+          <div class="field-note">用途回答「用它来干什么」，与分类（归属）是两回事，可跨分类筛选</div>
         </div>
 
         <div class="form-group">
@@ -104,6 +116,14 @@
 import { reactive, ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import PurposePicker from '@/components/PurposePicker.vue'
+import { normalizeUrl, hostOf } from '@/utils/url'
+import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
+
+// 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
+const props = defineProps({
+  prefillUrl: { type: String, default: '' }
+})
 
 const emit = defineEmits(['close', 'saved'])
 const sitesStore = useSitesStore()
@@ -119,7 +139,7 @@ const statusKind = ref('')
 const submitError = ref('')
 
 // 用户手动改过的字段不再被自动补全覆盖；换到另一个域名时整体重置，避免换了站还留着上一站的手改值
-const touched = reactive({ name: false, desc: false, categoryId: false, color: false })
+const touched = reactive({ name: false, desc: false, categoryId: false, color: false, purposes: false })
 
 const form = reactive({
   name: '',
@@ -130,6 +150,7 @@ const form = reactive({
   categoryId: '',
   color: '#3b82f6',
   aliases: '',
+  purposes: [],
 })
 
 const CONF_TEXT = { high: '高置信', medium: '中置信', low: '低置信，请复核' }
@@ -154,14 +175,21 @@ function sourceText(field) {
   return m.scope?.[field] === 'root' ? `${base}（取自主域名，非当前子页）` : base
 }
 
-function normalizeUrl(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return ''
-  return /^https?:\/\//i.test(s) ? s : 'https://' + s
+/**
+ * 自动翻译提示：仅在该字段确实被译过、且用户没改过时展示。
+ * 原文一并给出，让用户能判断译得准不准，也方便识别品牌名被误译的情况。
+ */
+function translatedNote(field) {
+  const m = meta.value
+  if (!m?.translated?.[field]) return ''
+  const original = field === 'name' ? m.nameOriginal : m.descOriginal
+  if (!original || original === (field === 'name' ? form.name : form.desc)) return ''
+  return `已自动译为中文（原文：${original}）`
 }
 
-function hostOf(raw) {
-  try { return new URL(normalizeUrl(raw)).hostname.replace(/^www\./, '').toLowerCase() } catch { return '' }
+function onPurposes(next) {
+  form.purposes = normalizePurposes(next)
+  touched.purposes = true
 }
 
 function hasCategory(id) {
@@ -174,6 +202,8 @@ function applyMeta(data) {
   if (!touched.desc && data.desc) form.desc = data.desc
   if (!touched.color && data.color) form.color = data.color
   if (!touched.categoryId && hasCategory(data.categoryId)) form.categoryId = data.categoryId
+  // 用途是智能推断结果，作为默认值；用户一旦手动勾选就不再被覆盖
+  if (!touched.purposes && Array.isArray(data.purposes)) form.purposes = normalizePurposes(data.purposes)
   if (data.faviconUrl || data.favicon) {
     faviconUrl.value = data.faviconUrl || data.favicon
     // 记在响应自带的域名上（而非当前输入框），响应晚到时也不会张冠李戴
@@ -190,6 +220,7 @@ function resetTouched() {
   touched.desc = false
   touched.categoryId = false
   touched.color = false
+  touched.purposes = false
 }
 
 /**
@@ -204,6 +235,7 @@ function resetForNewHost() {
   form.categoryId = ''
   form.color = '#3b82f6'
   form.aliases = ''
+  form.purposes = []
   faviconUrl.value = ''
   faviconHost.value = ''
   meta.value = null
@@ -317,9 +349,19 @@ function submit() {
   const aliases = parseAliases(form.aliases, form.name, domain)
   if (aliases.length) site.aliases = aliases
 
+  const purposes = normalizePurposes(form.purposes)
+  if (purposes.length) site.purposes = purposes
+
   sitesStore.addSite(site)
   emit('saved', { name: site.name, url: site.url })
   emit('close')
+}
+
+// 从搜索框带网址进来时，挂载即预填并触发自动补全，省去用户再贴一次。
+// 放在脚本末尾调用：此时 lastHost / reqSeq 等状态都已初始化完毕。
+if (props.prefillUrl) {
+  form.url = normalizeUrl(props.prefillUrl)
+  fetchMeta()
 }
 </script>
 
@@ -370,6 +412,7 @@ function submit() {
 .field-tag.ok { color: #047857; background: #d1fae5; }
 .field-tag.warn { color: #b45309; background: #fef3c7; }
 .field-note { margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
+.field-note.translated { color: #0d9488; }
 .url-row { display: flex; gap: 8px; }
 .url-row .form-input { flex: 1; }
 .status-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }

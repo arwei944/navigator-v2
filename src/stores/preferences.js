@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { versionedPersist } from '@/utils/storeVersioning'
+import {
+  SCHEMES, TOKENS, getScheme, resolveTokens, tokensToCssVars
+} from '@/utils/visualScheme'
 
 const THEME_PRESETS = {
   'default': {
@@ -79,6 +82,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const searchEngine = ref('google')
   const wallpaper = ref('')
   const wallpaperBlur = ref(true)
+  // 视觉方案：scheme 决定整套令牌，overrides 是用户在其上的逐项微调
+  const visualScheme = ref(SCHEMES[0].id)
+  const visualOverrides = ref({})
 
   const engines = [
     { id: 'google', label: 'Google', url: 'https://www.google.com/search' },
@@ -130,6 +136,42 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
   }
 
+  /* ---------- 视觉方案 ---------- */
+
+  const activeTokens = computed(() => resolveTokens(visualScheme.value, visualOverrides.value))
+  const activeScheme = computed(() => getScheme(visualScheme.value))
+  const isVisualCustomized = computed(() => Object.keys(visualOverrides.value).length > 0)
+
+  /** 把当前令牌写成 :root 上的 CSS 变量，全站组件通过变量响应 */
+  function applyVisual() {
+    const vars = tokensToCssVars(activeTokens.value, theme.value)
+    const root = document.documentElement
+    for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
+  }
+
+  /** 切换方案：清空微调，并把方案自带的配色与主题模式一并应用 */
+  function setVisualScheme(id) {
+    const s = getScheme(id)
+    visualScheme.value = s.id
+    visualOverrides.value = {}
+    if (s.accent && s.accent !== themePreset.value) setThemePreset(s.accent)
+    if (s.mode && s.mode !== theme.value) theme.value = s.mode
+  }
+
+  function setVisualToken(key, value) {
+    if (!TOKENS[key]) return
+    visualOverrides.value = { ...visualOverrides.value, [key]: value }
+  }
+
+  function resetVisualTokens() {
+    visualOverrides.value = {}
+  }
+
+  watch(activeTokens, applyVisual, { immediate: true, deep: true })
+
+  // 令牌里有随主题模式变化的部分（描边色、阴影浓度、玻璃底色），切主题要重算
+  watch(theme, applyVisual)
+
   // 监听主题变化，同步当前预设
   watch(theme, (val) => {
     document.documentElement.setAttribute('data-theme', val)
@@ -144,9 +186,11 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   return {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, engines,
+    visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
     toggleTheme, setSearchEngine, getCurrentEngine,
-    setThemePreset, setWallpaper, THEME_PRESETS
+    setThemePreset, setWallpaper, THEME_PRESETS,
+    setVisualScheme, setVisualToken, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'visualScheme', 'visualOverrides'])
 })

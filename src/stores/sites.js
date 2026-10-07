@@ -51,6 +51,8 @@ export const useSitesStore = defineStore('sites', () => {
   let pollTimer = null
   const searchQuery = ref('')
   const currentCategory = ref('all')
+  // 用途筛选（Axis 4）：与分类正交，可跨分类聚合「所有查资料站」
+  const currentPurpose = ref('all')
   const sortBy = ref('default')
   const viewMode = ref('grid') // grid | list
 
@@ -63,16 +65,23 @@ export const useSitesStore = defineStore('sites', () => {
   const dragEnabled = ref(false)
   const selectedIds = ref(new Set())
 
-  // 分类筛选后的列表（不含搜索词），作为页面搜索框的检索基底。
+  // 分类 + 用途筛选后的列表（不含搜索词），作为页面搜索框的检索基底。
   // currentCategory 有三种取值：'all'（不筛）/ 域 id（整域）/ 子分类 id（单个分类）。
+  // 用途（currentPurpose）是正交的第二把筛子，叠加在分类结果之上。
   const categorySites = computed(() => {
     const v = currentCategory.value
-    if (!v || v === 'all') return sites.value
-    if (categoriesStore.isDomainScope(v)) {
-      const ids = new Set(categoriesStore.categoriesOfDomain(v).map(c => c.id))
-      return sites.value.filter(s => ids.has(s.categoryId))
+    let list = sites.value
+    if (v && v !== 'all') {
+      if (categoriesStore.isDomainScope(v)) {
+        const ids = new Set(categoriesStore.categoriesOfDomain(v).map(c => c.id))
+        list = list.filter(s => ids.has(s.categoryId))
+      } else {
+        list = list.filter(s => s.categoryId === v)
+      }
     }
-    return sites.value.filter(s => s.categoryId === v)
+    const p = currentPurpose.value
+    if (p && p !== 'all') list = list.filter(s => Array.isArray(s.purposes) && s.purposes.includes(p))
+    return list
   })
 
   // 点击量走云端全局口径（clicksStore.countFor），不再用本机 visitCount 冒充热度 ——
@@ -226,6 +235,7 @@ export const useSitesStore = defineStore('sites', () => {
 
   function setSearchQuery(q) { searchQuery.value = q }
   function setCategory(cat) { currentCategory.value = cat }
+  function setPurpose(p) { currentPurpose.value = p || 'all' }
   function setSortBy(s) { sortBy.value = s }
   function setViewMode(m) { viewMode.value = m }
 
@@ -366,11 +376,11 @@ export const useSitesStore = defineStore('sites', () => {
   rebuild()
 
   return {
-    sites, cloudSites, searchQuery, currentCategory, sortBy, viewMode,
+    sites, cloudSites, searchQuery, currentCategory, currentPurpose, sortBy, viewMode,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded,
     addSite, updateSite, updateSiteField, deleteSite, recordVisit, reorderSites,
-    setSearchQuery, setCategory, setSortBy, setViewMode,
+    setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,
     initCloudSites, pollCloudSites, startPolling, stopPolling

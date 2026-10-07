@@ -1,5 +1,6 @@
 import Fuse from 'fuse.js'
 import { pinyin } from 'pinyin-pro'
+import { purposeLabel } from '../../shared/purposes.mjs'
 
 /**
  * 站点检索内核：页面搜索框与命令面板共用同一套评分与排序，
@@ -7,7 +8,7 @@ import { pinyin } from 'pinyin-pro'
  *
  * 评分分档（越高越靠前）：
  *   名称精确 > 别名精确 > 名称前缀 > 别名前缀 > 名称包含 > 别名包含
- *   > 域名包含 > 描述包含 > 拼音首字母前缀 > 别名拼音首字母前缀
+ *   > 域名包含 > 用途命中 > 描述包含 > 拼音首字母前缀 > 别名拼音首字母前缀
  *   > 拼音名包含 > 别名拼音包含 > 拼音描述包含
  * 别名是站点的「另一个叫法」（币安 / 小狐狸 / 抱抱脸），因此排在主名称
  * 同名档位之后、域名与描述之前——既让俗称找得到，又不喧宾夺主。
@@ -22,11 +23,15 @@ function keysOf(site) {
   const name = String(site?.name ?? '')
   const desc = String(site?.desc ?? '')
   const aliases = Array.isArray(site?.aliases) ? site.aliases.map(a => String(a ?? '')) : []
+  // 用途既能按中文标签（查资料）也能按英文 id（reference）命中，两种写法拼成一段可搜文本
+  const purposes = (Array.isArray(site?.purposes) ? site.purposes : []).map(p => String(p ?? ''))
   k = {
     name: name.toLowerCase(),
     desc: desc.toLowerCase(),
     url: String(site?.url ?? '').toLowerCase(),
     aliases: aliases.map(a => a.toLowerCase()),
+    purposes: purposes.map(p => p.toLowerCase()),
+    purposeText: purposes.map(p => purposeLabel(p)).filter(Boolean).join(' ').toLowerCase(),
     pyName: pinyin(name, { toneType: 'none', separator: '' }).toLowerCase(),
     pyInitial: pinyin(name, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase(),
     pyDesc: pinyin(desc, { toneType: 'none', separator: '' }).toLowerCase(),
@@ -45,6 +50,7 @@ export const SCORE = {
   NAME_INCLUDES: 640,
   ALIAS_INCLUDES: 580,
   URL_INCLUDES: 520,
+  PURPOSE_INCLUDES: 500,
   DESC_INCLUDES: 440,
   PY_INITIAL_PREFIX: 400,
   PY_ALIAS_INITIAL_PREFIX: 380,
@@ -66,6 +72,8 @@ export function scoreSite(site, q) {
   if (k.name.includes(q)) return SCORE.NAME_INCLUDES
   if (anyIncludes(k.aliases, q)) return SCORE.ALIAS_INCLUDES
   if (k.url.includes(q)) return SCORE.URL_INCLUDES
+  // 用途是受控词表，命中即「这条站就是干这个的」，比描述里的顺带提及更可信，故排在描述之前
+  if (anyIncludes(k.purposes, q) || k.purposeText.includes(q)) return SCORE.PURPOSE_INCLUDES
   if (k.desc.includes(q)) return SCORE.DESC_INCLUDES
   if (k.pyInitial.startsWith(q)) return SCORE.PY_INITIAL_PREFIX
   if (anyStarts(k.pyAliasInitial, q)) return SCORE.PY_ALIAS_INITIAL_PREFIX

@@ -1,79 +1,58 @@
 <template>
-  <aside class="sidebar" :class="{ open: sidebarStore.open, collapsed: isCollapsed }"
-         :style="isCollapsed
-           ? { width: 'var(--sidebar-w-collapsed, 60px)', minWidth: 'var(--sidebar-w-collapsed, 60px)' }
-           : { width: sidebarStore.width + 'px', minWidth: sidebarStore.width + 'px' }"
+  <aside class="sidebar" :class="{ open: sidebarStore.open, 'icon-only': iconOnly }"
+         :style="{ width: sidebarWidth, minWidth: sidebarWidth }"
          role="navigation" aria-label="主导航">
     <div class="sidebar-header">
       <div class="sidebar-logo" aria-hidden="true">N</div>
-      <span class="sidebar-brand" v-show="!isCollapsed">Navigator</span>
+      <span class="sidebar-brand" v-show="!iconOnly">Navigator</span>
     </div>
 
     <!-- 侧栏只负责「范围」这一轴；方向与子分类的筛选在中间栏的筛选条上 -->
     <nav class="sidebar-nav">
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'discover' }"
-           @click="navigate('Home')" @keydown.enter="navigate('Home')" :title="isCollapsed ? '全部' : ''" tabindex="0" role="button">
+           @click="navigate('Home')" @keydown.enter="navigate('Home')" :title="iconOnly ? '全部' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <span v-show="!isCollapsed">全部</span>
+        <span v-show="!iconOnly">全部</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'favorites' }"
-           @click="navigate('Favorites')" @keydown.enter="navigate('Favorites')" :title="isCollapsed ? '收藏' : ''" tabindex="0" role="button">
+           @click="navigate('Favorites')" @keydown.enter="navigate('Favorites')" :title="iconOnly ? '收藏' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-        <span v-show="!isCollapsed">收藏</span>
+        <span v-show="!iconOnly">收藏</span>
         <span v-if="favoritesStore.count > 0" class="badge">{{ favoritesStore.count }}</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'recent' }"
-           @click="navigate('Recent')" @keydown.enter="navigate('Recent')" :title="isCollapsed ? '最近' : ''" tabindex="0" role="button">
+           @click="navigate('Recent')" @keydown.enter="navigate('Recent')" :title="iconOnly ? '最近' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span v-show="!isCollapsed">最近</span>
+        <span v-show="!iconOnly">最近</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'feed' }"
-           @click="navigate('Feed')" @keydown.enter="navigate('Feed')" :title="isCollapsed ? '内容聚合' : ''" tabindex="0" role="button">
+           @click="navigate('Feed')" @keydown.enter="navigate('Feed')" :title="iconOnly ? '内容聚合' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
-        <span v-show="!isCollapsed">内容聚合</span>
+        <span v-show="!iconOnly">内容聚合</span>
       </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'trash' }"
-           @click="navigate('Trash')" @keydown.enter="navigate('Trash')" :title="isCollapsed ? '回收站' : ''" tabindex="0" role="button">
+           @click="navigate('Trash')" @keydown.enter="navigate('Trash')" :title="iconOnly ? '回收站' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        <span v-show="!isCollapsed">回收站</span>
+        <span v-show="!iconOnly">回收站</span>
         <span v-if="sitesStore.trash.length > 0" class="badge">{{ sitesStore.trash.length }}</span>
       </div>
     </nav>
 
-    <!-- 底部区：统计/时钟/添加在折叠时整体收起；管理入口常驻，折叠态收为图标，保证任何状态都可达 -->
-    <div class="sidebar-bottom">
-      <div class="sidebar-footer" v-show="!isCollapsed">
-        <!-- 统计与时钟从首屏工具栏下沉到这里，把首屏让给内容 -->
-        <div class="sidebar-stats">
-          <div class="sidebar-stat">共 <strong>{{ sitesStore.sites.length }}</strong> 个站点</div>
-          <div class="sidebar-stat">今日访问 <strong>{{ todayCount }}</strong></div>
-          <div class="sidebar-stat">收藏 <strong>{{ favoritesStore.count }}</strong></div>
-        </div>
-        <DigitalClock class="sidebar-clock" />
-        <button class="sidebar-btn sidebar-btn-primary" @click="showAddModal = true" aria-label="添加网站">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          添加网站
-        </button>
-      </div>
-      <!-- 纯前端管理入口：直达 /admin（发布热更新、批量操作、快照回滚、通知） -->
-      <button class="sidebar-btn sidebar-admin-btn" @click="goAdmin" aria-label="管理后台" :title="isCollapsed ? '管理后台' : ''">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span v-show="!isCollapsed">管理后台</span>
-      </button>
-    </div>
-
-    <!-- 折叠/展开切换按钮 -->
-    <button class="sidebar-collapse-toggle" @click="sidebarStore.toggleCollapse()" :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: isCollapsed ? 'rotate(180deg)' : '' }">
+    <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。
+         折叠后按钮常驻，保证还能展开。「添加网站」在右上角工具栏，「管理后台」在「设置」面板内 -->
+    <button class="sidebar-collapse-toggle" type="button"
+            @click="sidebarStore.toggleCollapse()"
+            :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
+            :aria-label="isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
+            :aria-expanded="!isCollapsed">
+      <!-- 箭头：展开态指向左（点击即向左收起），纯图标态指向右（点击即向右展开） -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: iconOnly ? 'rotate(180deg)' : '' }">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
     </button>
 
-    <!-- 拖拽调节宽度手柄 -->
-    <div class="sidebar-resize-handle" @mousedown="startResize" title="拖拽调节宽度"></div>
-
-    <!-- 弹窗 -->
-    <AddSiteModal v-if="showAddModal" @close="showAddModal = false" />
+    <!-- 拖拽调节宽度手柄：显式折叠时收起（此时没有可调宽度的余地） -->
+    <div v-if="!isCollapsed" class="sidebar-resize-handle" @mousedown="startResize" title="拖拽调节宽度"></div>
   </aside>
 </template>
 
@@ -83,23 +62,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useSitesStore } from '@/stores/sites'
 import { useFavoritesStore } from '@/stores/favorites'
-import { useHistoryStore } from '@/stores/history'
-import AddSiteModal from '@/components/AddSiteModal.vue'
-import DigitalClock from '@/components/DigitalClock.vue'
 
 const route = useRoute()
 const router = useRouter()
 const sidebarStore = useSidebarStore()
 const sitesStore = useSitesStore()
 const favoritesStore = useFavoritesStore()
-const historyStore = useHistoryStore()
-const showAddModal = ref(false)
-
-const todayCount = computed(() => {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  return historyStore.records.filter(r => r.timestamp >= today.getTime()).length
-})
 
 // 移动端（≤768px）侧栏是 off-canvas 抽屉，此时忽略桌面折叠态，始终展开显示完整内容
 const MOBILE_QUERY = '(max-width: 768px)'
@@ -107,7 +75,17 @@ const isMobile = ref(false)
 let mq = null
 function syncIsMobile(e) { isMobile.value = e.matches }
 
+// 显式折叠：宽度锁到图标栏宽度（--sidebar-w-collapsed）
 const isCollapsed = computed(() => sidebarStore.collapsed && !isMobile.value)
+
+// 纯图标态：显式折叠，或者把宽度拖到图标宽度以下 —— 拖窄就自动收标签，不必非得按折叠按钮。
+// 60px 是图标的物理下限（nav 项 44px + 两侧各 8px 内边距），所以「无最小宽度限制」的下限就是它。
+const ICON_ONLY_W = 110
+const iconOnly = computed(() => !isMobile.value && (isCollapsed.value || sidebarStore.width <= ICON_ONLY_W))
+
+const sidebarWidth = computed(() =>
+  isCollapsed.value ? 'var(--sidebar-w-collapsed, 60px)' : sidebarStore.width + 'px'
+)
 
 function navigate(name) {
   // 已在目标范围：清掉筛选，回到该范围的干净状态
@@ -116,11 +94,6 @@ function navigate(name) {
   } else {
     router.push({ name })
   }
-  sidebarStore.close()
-}
-
-function goAdmin() {
-  router.push('/admin')
   sidebarStore.close()
 }
 
@@ -169,8 +142,8 @@ onUnmounted(() => {
   width: var(--sidebar-w, 240px);
   min-width: var(--sidebar-w, 240px);
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
   color: var(--text-sidebar);
   display: flex;
   flex-direction: column;
@@ -185,32 +158,32 @@ onUnmounted(() => {
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-/* 折叠状态 */
-.sidebar.collapsed .sidebar-header {
+/* 纯图标状态：显式折叠，或宽度被拖到图标宽度以下 */
+.sidebar.icon-only .sidebar-header {
   justify-content: center;
   padding: 16px 8px 12px;
 }
-.sidebar.collapsed .sidebar-logo {
+.sidebar.icon-only .sidebar-logo {
   width: 32px;
   height: 32px;
   font-size: 13px;
   border-radius: 8px;
 }
-.sidebar.collapsed .sidebar-nav {
+.sidebar.icon-only .sidebar-nav {
   padding: 8px 8px;
   align-items: center;
 }
-.sidebar.collapsed .sidebar-nav-item {
+.sidebar.icon-only .sidebar-nav-item {
   justify-content: center;
   padding: 9px 0;
   width: 44px;
   margin: 0 auto;
 }
-.sidebar.collapsed .sidebar-nav-item svg {
+.sidebar.icon-only .sidebar-nav-item svg {
   width: 20px;
   height: 20px;
 }
-.sidebar.collapsed .badge {
+.sidebar.icon-only .badge {
   position: absolute;
   top: 2px;
   right: 2px;
@@ -223,15 +196,6 @@ onUnmounted(() => {
   padding: 0 4px;
   border-radius: 8px;
 }
-/* 折叠态：管理入口收为图标并居中，保持底部可达 */
-.sidebar.collapsed .sidebar-bottom { padding: 8px; }
-.sidebar.collapsed .sidebar-admin-btn {
-  justify-content: center;
-  padding: 9px 0;
-  width: 44px;
-  margin: 0 auto;
-}
-
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -271,13 +235,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 12px;
+  min-height: var(--nav-item-h, 40px);
+  padding: 0 12px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   color: var(--text-sidebar-dim);
-  transition: all .15s ease;
+  transition: all var(--transition);
   position: relative;
 }
 .sidebar-nav-item:hover { background: var(--sidebar-hover); color: var(--text-sidebar); }
@@ -285,60 +250,39 @@ onUnmounted(() => {
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
 .sidebar-nav-item.active svg { opacity: 1; }
 .badge { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
-.sidebar-bottom { margin-top: auto; padding: 16px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
-.sidebar-footer { display: flex; flex-direction: column; gap: 8px; }
-.sidebar-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 0 4px; }
-.sidebar-stat { font-size: 12px; color: var(--text-sidebar-dim); }
-.sidebar-stat strong { color: var(--text-sidebar); font-weight: 600; }
-.sidebar-clock { padding: 2px 0 0; }
-.sidebar-clock :deep(.clock-time) { color: var(--text-sidebar); }
-.sidebar-clock :deep(.digital-clock) { align-items: flex-start; }
-.sidebar-btn {
-  display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-sm);
-  cursor: pointer; font-size: 13px; font-weight: 500; color: var(--text-sidebar-dim);
-  transition: all .15s ease; border: 1px dashed var(--border); background: transparent;
-  width: 100%; text-align: left; font-family: inherit;
-}
-.sidebar-btn:hover { background: var(--sidebar-hover); color: var(--text-sidebar); border-color: var(--accent); }
-.sidebar-btn svg { width: 16px; height: 16px; opacity: .7; }
-/* 唯一的固定动作：实心，区别于曾经的四个虚线按钮 */
-.sidebar-btn-primary {
-  border-style: solid;
-  border-color: transparent;
-  background: var(--accent);
-  color: #fff;
-}
-.sidebar-btn-primary:hover { background: var(--accent); color: #fff; opacity: .9; border-color: transparent; }
-.sidebar-btn-primary svg { opacity: 1; }
 
-/* 折叠切换按钮 */
+/* 折叠/展开把手：贴中间内容区的左侧 —— 即本侧栏的右边缘、垂直居中、窄长竖条。
+   默认极淡（无边框、无底色、30% 不透明度），只在悬停时显形，避免抢视觉焦点。
+   侧栏宽度下限 60px > 把手最大宽 18px，所以它始终在侧栏盒子内部，不会被 overflow 裁掉。 */
 .sidebar-collapse-toggle {
   position: absolute;
-  bottom: 12px;
-  right: -14px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--bg-white);
-  color: var(--text-secondary);
-  cursor: pointer;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 12px;
+  height: 48px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
-  box-shadow: 0 2px 8px rgba(0,0,0,.12);
-  transition: all .15s ease;
-  padding: 0;
+  border: none;
+  border-radius: 6px 0 0 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  opacity: .3;
+  cursor: pointer;
+  transition: width .18s ease, opacity .18s ease, background .18s ease, color .18s ease;
 }
 .sidebar-collapse-toggle:hover {
-  color: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 2px 12px rgba(0,0,0,.18);
+  width: 18px;
+  opacity: 1;
+  background: var(--border-light);
+  color: var(--text-primary);
 }
 .sidebar-collapse-toggle svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   transition: transform .28s ease;
 }
 
@@ -350,7 +294,8 @@ onUnmounted(() => {
   bottom: 0;
   width: 6px;
   cursor: col-resize;
-  z-index: 20;
+  /* 低于折叠把手(20)：两者都贴右边缘，让把手在被它覆盖的那 64px 里仍可点，拖拽可从上下两侧进行 */
+  z-index: 10;
   background: transparent;
   transition: background .15s ease;
 }
@@ -359,9 +304,7 @@ onUnmounted(() => {
   background: var(--accent);
   opacity: .3;
 }
-.sidebar.collapsed .sidebar-resize-handle {
-  display: none;
-}
+/* 手柄由 v-if="!isCollapsed" 控制显隐：拖窄成纯图标态时手柄必须留着，否则拖不回去 */
 
 /* 移动端：off-canvas 抽屉，脱离文档流，不再挤压内容区 */
 @media (max-width: 768px) {

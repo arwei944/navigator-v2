@@ -11,6 +11,7 @@
  *     让 UI 能提示「这条是猜的」，而不是静默写进脏数据。
  *   - 分类用加权打分而非首个命中：关键词只是信号之一，域名同族与品牌词命中权重更高。
  */
+import { inferPurposes } from './purposes.mjs'
 
 /* ---------------- 文本与标签工具 ---------------- */
 
@@ -684,6 +685,17 @@ export function inferSite({ html, rootHtml = '', manifestTheme = '', url, existi
     seed: host,
   })
 
+  // 用途与分类正交：分类是归属（唯一），用途是「拿它干什么」（可多选）。
+  // 用推断出的分类做基线打底，再用站名 / 描述 / 关键词命中补充，
+  // 口径与 shared/purposes.mjs 同源，保证线上与控制台两个入口结果一致。
+  const purposes = inferPurposes({
+    categoryId: category.categoryId,
+    name: nameInfo.name,
+    desc: descInfo.desc,
+    keywords: joinMeta(['keywords', 'og:keywords']),
+    url: target.href,
+  })
+
   return {
     url: target.href,
     domain: host,
@@ -693,6 +705,7 @@ export function inferSite({ html, rootHtml = '', manifestTheme = '', url, existi
     color: colorInfo.color,
     categoryId: category.categoryId,
     categoryLabel,
+    purposes,
     blocked,
     // 该字段取自根页还是子页：贴子页时 UI 要说明「描述来自主域名」，否则用户对不上当前页面
     scope: { name: nameInfo.scope, desc: descInfo.scope },

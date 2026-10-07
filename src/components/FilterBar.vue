@@ -38,6 +38,21 @@
         </button>
       </div>
     </div>
+
+    <!-- 三级：用途，与分类正交，可跨分类聚合（如「所有查资料站」） -->
+    <div v-if="purposeChips.length" class="chip-row purpose-row">
+      <span class="chip-group-label">用途</span>
+      <button
+        v-for="item in purposeChips" :key="item.id"
+        class="chip purpose-chip" :class="{ active: activePurpose === item.id }"
+        :aria-pressed="activePurpose === item.id"
+        @click="selectPurpose(item.id)"
+      >
+        <span v-if="item.color" class="chip-dot" :style="{ background: item.color }"></span>
+        {{ item.label }}
+        <span class="chip-count">{{ item.count }}</span>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -48,6 +63,7 @@ import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSidebarStore } from '@/stores/sidebar'
+import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
 const route = useRoute()
 const router = useRouter()
@@ -125,6 +141,51 @@ function selectCategory(item) {
   // 再点一次已选中的子分类 = 退回它所属的域，避免「只能前进不能后退」
   const next = current.value === item.id ? activeDomain.value : item.id
   go(next)
+}
+
+/* ---------------- 用途（Axis 4） ---------------- */
+
+// 当前用途筛选值：'all' 或用途 id
+const activePurpose = computed(() => sitesStore.currentPurpose || 'all')
+
+// 用途计数基准：先按分类轴收窄，数字才与「选中用途后看到的列表」对得上
+const categoryScoped = computed(() => {
+  const v = current.value
+  if (!v || v === 'all') return baseSites.value
+  if (categoriesStore.isDomainScope(v)) {
+    const ids = new Set(categoriesStore.categoriesOfDomain(v).map(c => c.id))
+    return baseSites.value.filter(s => ids.has(s.categoryId))
+  }
+  return baseSites.value.filter(s => s.categoryId === v)
+})
+
+// 只列出现过的用途，避免把 12 个标签全铺出来、每个还挂着 0
+const purposeChips = computed(() => {
+  const counts = new Map()
+  for (const s of categoryScoped.value) {
+    for (const id of Array.isArray(s.purposes) ? s.purposes : []) {
+      counts.set(id, (counts.get(id) || 0) + 1)
+    }
+  }
+  const chips = []
+  if (activePurpose.value !== 'all') {
+    chips.push({ id: 'all', label: '全部用途', count: categoryScoped.value.length })
+  }
+  for (const tag of PURPOSE_TAGS) {
+    const count = counts.get(tag.id) || 0
+    if (!count) continue
+    chips.push({ id: tag.id, label: tag.label, color: tag.color, count })
+  }
+  return chips
+})
+
+function selectPurpose(id) {
+  // 再点一次已选中的用途 = 取消该筛选，回到「全部用途」
+  const next = id === 'all' || activePurpose.value === id ? 'all' : id
+  const query = { ...route.query }
+  if (next === 'all') delete query.p
+  else query.p = next
+  router.push({ name: route.name, query })
 }
 </script>
 
@@ -226,6 +287,9 @@ function selectCategory(item) {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* 用途行与分类行用一条浅分隔线区隔：两把筛子正交，视觉上也要分得清 */
+.purpose-row { border-top: 1px dashed var(--border-light); padding-top: 8px; }
 
 @media (max-width: 768px) {
   .filter-bar { padding: 0 16px 10px; gap: 7px; }
