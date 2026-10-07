@@ -647,8 +647,8 @@ cd 'c:\work\solo work\new\nav-v2' ; git add src/services/autoAdd.js ; git commit
           </div>
 
           <div class="preview-actions">
-            <button type="button" class="btn" @click="undo">撤销添加</button>
-            <button type="button" class="btn" @click="editing = true">编辑</button>
+            <button type="button" class="btn btn-cancel" @click="undo">撤销添加</button>
+            <button type="button" class="btn btn-cancel" @click="editing = true">编辑</button>
             <button type="button" class="btn btn-primary" @click="close">完成</button>
           </div>
         </template>
@@ -813,6 +813,22 @@ function undo() {
   gap: 8px;
   margin-top: 14px;
 }
+
+/* `.btn` 系类在本项目只存在于各弹窗组件自己的 scoped 样式里，没有全局样式表，
+   故本组件必须自带这几条（取值对齐 AddSiteModal.vue）。 */
+.btn {
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .15s ease;
+}
+.btn-cancel { background: var(--border-light); color: var(--text-secondary); }
+.btn-cancel:hover { background: var(--border); }
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { filter: brightness(1.1); }
 </style>
 ```
 
