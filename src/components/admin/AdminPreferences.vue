@@ -30,8 +30,9 @@ const preferencesStore = usePreferencesStore()
 
 <style scoped>
 /* 区块外壳必须自带一份：这些类名在本项目里都是各组件 scoped 定义的，
-   父级 AdminView.vue 的 scoped 样式只能命中子组件根节点，命中不了 header 与版本号，
-   不自带就会出现「标题栏掉样式」，与兄弟面板不一致。取值对齐 AdminInsights.vue。 */
+   父级 AdminView.vue 的 scoped 样式只能命中子组件根节点，命中不了 header、
+   标题 h2 与版本号，不自带就会出现「标题栏掉样式」，与兄弟面板不一致。
+   取值对齐 AdminInsights.vue。 */
 .admin-section { padding: 0 32px 32px; }
 
 .admin-section-header {
@@ -40,6 +41,10 @@ const preferencesStore = usePreferencesStore()
   justify-content: space-between;
   margin-bottom: 16px;
 }
+
+/* h2 也必须自带：全局样式 src/styles/main.css 只做 `* { margin:0; padding:0 }` 重置，
+   未定义 h2 的字号/字重，缺失会落回浏览器默认（≈1.5em/bold），与兄弟面板的 16px/600 不一致。 */
+.admin-section-header h2 { font-size: 16px; font-weight: 600; }
 
 .admin-cloud-version { font-size: 12px; color: var(--accent); font-weight: 600; }
 
