@@ -1000,6 +1000,20 @@ const preferencesStore = usePreferencesStore()
 </script>
 
 <style scoped>
+/* 区块外壳必须自带一份：这些类名在本项目里都是各组件 scoped 定义的，
+   父级 AdminView.vue 的 scoped 样式只能命中子组件根节点，命中不了 header 与版本号，
+   不自带就会出现「标题栏掉样式」，与兄弟面板不一致。取值对齐 AdminInsights.vue。 */
+.admin-section { padding: 0 32px 32px; }
+
+.admin-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.admin-cloud-version { font-size: 12px; color: var(--accent); font-weight: 600; }
+
 .pref-list {
   display: flex;
   flex-direction: column;
