@@ -156,16 +156,19 @@ export const useSitesStore = defineStore('sites', () => {
 
   function addSite(site) {
     const now = Date.now()
-    localAdds.value.push({
+    const created = {
       id: now.toString(36) + Math.random().toString(36).slice(2, 6),
       sortOrder: cloudSites.value.length + localAdds.value.length,
       visitCount: 0,
       createdAt: now,
       updatedAt: now,
       ...site
-    })
+    }
+    localAdds.value.push(created)
     rebuild()
     saveOverlay()
+    // 自动添加需要拿这条记录去做预览卡片与撤销，故返回创建结果
+    return created
   }
 
   function updateSite(id, data) {
@@ -179,6 +182,21 @@ export const useSitesStore = defineStore('sites', () => {
 
   function updateSiteField(id, key, value) {
     updateSite(id, { [key]: value })
+  }
+
+  /**
+   * 撤销一次「自动添加」：只从本地新增层摘掉，不进回收站。
+   * 自动添加没有人工确认这一步，撤销就要能彻底当没发生过。
+   * 返回是否真的摘掉了一条。
+   */
+  function undoAdd(id) {
+    const idx = localAdds.value.findIndex(s => s.id === id)
+    if (idx === -1) return false
+    localAdds.value.splice(idx, 1)
+    delete localEdits.value[id]
+    rebuild()
+    saveOverlay()
+    return true
   }
 
   /** 从本地视图移除：本地新增的连数据一起删，云端来的记一条「本地隐藏」墓碑 */
@@ -379,7 +397,7 @@ export const useSitesStore = defineStore('sites', () => {
     sites, cloudSites, searchQuery, currentCategory, currentPurpose, sortBy, viewMode,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded,
-    addSite, updateSite, updateSiteField, deleteSite, recordVisit, reorderSites,
+    addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
     setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,
