@@ -655,7 +655,7 @@ cd 'c:\work\solo work\new\nav-v2' ; git add src/services/autoAdd.js ; git commit
       </div>
 
       <EditSiteModal v-if="editing" :site="state.site"
-                     @close="editing = false" @saved="close" />
+                     @close="editing = false" @saved="onSaved" />
     </div>
   </Teleport>
 </template>
@@ -703,6 +703,16 @@ watch(() => [props.state.phase, props.state.site?.id], () => {
 /** 编辑中不允许被遮罩 / Esc 关掉，否则用户正在填的表单会凭空消失 */
 function close() {
   if (!editing.value) emit('close')
+}
+
+/**
+ * 保存编辑后关闭卡片。EditSiteModal 是先 emit('saved') 再 emit('close')，
+ * 走到这里时 editing 仍为 true，若复用 close() 会被编辑守卫拦下、卡片不关；
+ * 故这里显式清掉 editing 再关闭。
+ */
+function onSaved() {
+  editing.value = false
+  emit('close')
 }
 
 function onKey(e) {
@@ -814,8 +824,9 @@ function undo() {
   margin-top: 14px;
 }
 
-/* `.btn` 系类在本项目只存在于各弹窗组件自己的 scoped 样式里，没有全局样式表，
-   故本组件必须自带这几条（取值对齐 AddSiteModal.vue）。 */
+/* 全局样式表 src/styles/main.css 只提供 CSS 变量，并未定义 `.btn` 系类；
+   它们只存在于各弹窗组件自己的 scoped 样式里，故本组件必须自带这几条
+   （取值对齐 AddSiteModal.vue）。 */
 .btn {
   padding: 8px 20px;
   border-radius: var(--radius-sm);
