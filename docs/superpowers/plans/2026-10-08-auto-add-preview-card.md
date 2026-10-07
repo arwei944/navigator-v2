@@ -70,7 +70,7 @@ eq(findDuplicate(lib, 'gitee.com'), null, 'findDuplicate 未收录返回 null')
 const draft = {
   form: {
     name: 'GitHub', url: 'https://www.github.com/x', desc: 'd',
-    categoryId: 'c1', color: '#111111', aliases: '', purposes: ['code'],
+    categoryId: 'c1', color: '#111111', aliases: '', purposes: ['coding'],
   },
   faviconUrl: 'https://github.com/favicon.ico',
   faviconHost: 'github.com',
@@ -91,7 +91,7 @@ eq(noName.site.initial, '', 'buildSiteFromDraft 站名为空时 initial 为空�
 /* ---- 元数据 → 草稿 ---- */
 const fromMeta = draftFromMeta({
   name: 'GitHub', desc: 'd', categoryId: 'c1', color: '#222222',
-  purposes: ['code', 'not-a-real-purpose'], faviconUrl: 'https://github.com/f.ico', domain: 'github.com',
+  purposes: ['coding', 'not-a-real-purpose'], faviconUrl: 'https://github.com/f.ico', domain: 'github.com',
 })
 eq(fromMeta.form.name, 'GitHub', 'draftFromMeta 透传站名')
 eq(fromMeta.form.url, 'github.com', 'draftFromMeta 用响应域名作 url')
