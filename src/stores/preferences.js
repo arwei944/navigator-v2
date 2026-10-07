@@ -82,6 +82,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const searchEngine = ref('google')
   const wallpaper = ref('')
   const wallpaperBlur = ref(true)
+  // 网址自动添加：搜索栏粘贴网址时跳过确认弹窗，直接入库并弹预览卡片
+  const autoAddOnUrl = ref(true)
   // 视觉方案：scheme 决定整套令牌，overrides 是用户在其上的逐项微调
   const visualScheme = ref(SCHEMES[0].id)
   const visualOverrides = ref({})
@@ -100,6 +102,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   function setSearchEngine(id) {
     searchEngine.value = id
+  }
+
+  function setAutoAdd(v) {
+    autoAddOnUrl.value = Boolean(v)
   }
 
   function getCurrentEngine() {
@@ -185,12 +191,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
   }, { immediate: true })
 
   return {
-    theme, themePreset, searchEngine, wallpaper, wallpaperBlur, engines,
+    theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
-    toggleTheme, setSearchEngine, getCurrentEngine,
+    toggleTheme, setSearchEngine, setAutoAdd, getCurrentEngine,
     setThemePreset, setWallpaper, THEME_PRESETS,
     setVisualScheme, setVisualToken, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'visualScheme', 'visualOverrides'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'visualScheme', 'visualOverrides'])
 })
