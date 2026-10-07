@@ -8,6 +8,10 @@
         </button>
       </div>
       <form @submit.prevent="submit" class="modal-body">
+        <div v-if="notice" class="status-line warn">
+          <span class="status-dot"></span>
+          <span>{{ notice }}</span>
+        </div>
         <div class="form-group">
           <label>网址 <span class="hint">（粘贴后自动补全下方全部信息）</span></label>
           <div class="url-row">
@@ -119,10 +123,13 @@ import { useCategoriesStore } from '@/stores/categories'
 import PurposePicker from '@/components/PurposePicker.vue'
 import { normalizeUrl, hostOf } from '@/utils/url'
 import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
+import { findDuplicate, buildSiteFromDraft } from '@/utils/siteDraft'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
-  prefillUrl: { type: String, default: '' }
+  prefillUrl: { type: String, default: '' },
+  // 自动添加被护栏拦下时带过来的原因，讲清楚为什么又退回弹窗
+  notice: { type: String, default: '' }
 })
 
 const emit = defineEmits(['close', 'saved'])
@@ -307,50 +314,20 @@ function onUrlBlur() {
   if (form.url.trim() && hostOf(form.url) !== lastHost) fetchMeta()
 }
 
-/** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
-function parseAliases(raw, name, host) {
-  const nameLower = String(name || '').trim().toLowerCase()
-  const out = []
-  const seen = new Set()
-  for (const part of String(raw || '').split(/[,，、\n]/)) {
-    const a = part.trim()
-    if (!a) continue
-    const lower = a.toLowerCase()
-    if (seen.has(lower) || lower === nameLower || lower === host) continue
-    seen.add(lower)
-    out.push(a)
-  }
-  return out
-}
-
 function submit() {
-  const rawDomain = form.url.replace(/^https?:\/\//, '').split('/')[0]
-  const domain = rawDomain.toLowerCase().replace(/^www\./, '')
   // 同域名已在库里就别再插一条：卡片与分类会重复，云端同步时还会被当作两个站点
-  const dup = sitesStore.sites.find(s => hostOf(s.url) === domain)
+  const dup = findDuplicate(sitesStore.sites, form.url)
   if (dup) {
     submitError.value = `该域名已收录：${dup.name}（${dup.url}）。如需变更请编辑该站点，避免重复条目。`
     return
   }
   submitError.value = ''
 
-  const site = {
-    name: form.name,
-    url: rawDomain,
-    desc: form.desc,
-    categoryId: form.categoryId,
-    color: form.color,
-    initial: form.name.charAt(0).toUpperCase(),
-  }
-  // 本地新增的站点不会有脚本去抓图标，把远程图标地址一并存下，卡片据此直接加载。
-  // 只认「图标确实抓自这个域名」的情况：换过网址又抓取失败时，宁可让卡片回落字母块，也不挂错图
-  if (/^https?:\/\//i.test(faviconUrl.value) && faviconHost.value === domain) site.iconUrl = faviconUrl.value
-
-  const aliases = parseAliases(form.aliases, form.name, domain)
-  if (aliases.length) site.aliases = aliases
-
-  const purposes = normalizePurposes(form.purposes)
-  if (purposes.length) site.purposes = purposes
+  const { site } = buildSiteFromDraft({
+    form,
+    faviconUrl: faviconUrl.value,
+    faviconHost: faviconHost.value,
+  })
 
   sitesStore.addSite(site)
   emit('saved', { name: site.name, url: site.url })
