@@ -46,8 +46,5 @@ export async function autoAddSite({ url }) {
 
   const { site } = buildSiteFromDraft(draftFromMeta(meta))
   const created = sitesStore.addSite(site)
-  if (!created) {
-    return { ok: false, reason: 'fetch-failed', message: '入库失败，请手动添加。' }
-  }
   return { ok: true, site: created }
 }
