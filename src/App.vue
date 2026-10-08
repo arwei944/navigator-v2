@@ -55,6 +55,9 @@
     <!-- 添加站点：入口在右上角工具栏与站内搜索框，弹窗宿主上提到这里（原挂在左侧栏内） -->
     <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" />
 
+    <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
+    <ToastHost />
+
     <!-- 自动添加的预览卡片：只在成功/进行中渲染，失败直接退回上面的弹窗 -->
     <AddSitePreviewCard v-if="autoAddState" :state="autoAddState" @close="closeAutoAddCard" />
   </div>
@@ -82,6 +85,7 @@ import SettingsPanel from '@/components/SettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
+import ToastHost from '@/components/ToastHost.vue'
 import AddSitePreviewCard from '@/components/AddSitePreviewCard.vue'
 import { autoAddSite } from '@/services/autoAdd'
 
