@@ -65,6 +65,23 @@ export const useSitesStore = defineStore('sites', () => {
   const dragEnabled = ref(false)
   const selectedIds = ref(new Set())
 
+  // 正在高亮的卡片 id：跨组件共享（App 发起 → SiteCard 描边 → CardsContainer 滚动定位）
+  const highlightSiteId = ref('')
+  let highlightTimer = null
+
+  function highlightSite(id) {
+    clearTimeout(highlightTimer)
+    highlightSiteId.value = id || ''
+    if (!id) return
+    // 自动消失，避免用户滚动时还挂着一圈描边
+    highlightTimer = setTimeout(() => { highlightSiteId.value = '' }, 2500)
+  }
+
+  function clearHighlight() {
+    clearTimeout(highlightTimer)
+    highlightSiteId.value = ''
+  }
+
   // 分类 + 用途筛选后的列表（不含搜索词），作为页面搜索框的检索基底。
   // currentCategory 有三种取值：'all'（不筛）/ 域 id（整域）/ 子分类 id（单个分类）。
   // 用途（currentPurpose）是正交的第二把筛子，叠加在分类结果之上。
@@ -395,6 +412,7 @@ export const useSitesStore = defineStore('sites', () => {
 
   return {
     sites, cloudSites, searchQuery, currentCategory, currentPurpose, sortBy, viewMode,
+    highlightSiteId, highlightSite, clearHighlight,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded,
     addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
