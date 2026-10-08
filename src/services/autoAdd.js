@@ -58,42 +58,42 @@ export async function autoAddSite({ url }) {
 
   const meta = await fetchMeta(normalized)
 
-  // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」
-  const plan = suggestCategory({
-    categoryId: meta?.categoryId || '',
-    categoryConfidence: meta?.confidence?.category || '',
-    name: meta?.name || '',
-    desc: meta?.desc || '',
-    domain: meta?.domain || hostOf(normalized),
-    purposes: meta?.purposes || [],
-    existing: categoriesStore.categories.map(c => ({
-      id: c.id,
-      label: c.label,
-      groupId: categoriesStore.getGroupByCategory(c.id)?.id || '',
-    })),
-    domainIds: categoriesStore.domains.map(d => d.id),
-  })
-
-  let categoryId = ''
-  let categoryLabel = ''
-  let createdCategory = false
-
-  if (plan.kind === 'create') {
-    // 新建分类失败（id 撞车 / 域不存在）不阻断添加：站点按未分类入库，Toast 照常出
-    const r = categoriesStore.addCategory(plan.groupId, {
-      id: plan.id, label: plan.label, dotColor: plan.dotColor,
-    })
-    if (r.ok) {
-      categoryId = r.id
-      categoryLabel = plan.label
-      createdCategory = true
-    }
-  } else {
-    categoryId = plan.categoryId
-    categoryLabel = plan.label
-  }
-
   try {
+    // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」
+    const plan = suggestCategory({
+      categoryId: meta?.categoryId || '',
+      categoryConfidence: meta?.confidence?.category || '',
+      name: meta?.name || '',
+      desc: meta?.desc || '',
+      domain: meta?.domain || hostOf(normalized),
+      purposes: meta?.purposes || [],
+      existing: categoriesStore.categories.map(c => ({
+        id: c.id,
+        label: c.label,
+        groupId: categoriesStore.getGroupByCategory(c.id)?.id || '',
+      })),
+      domainIds: categoriesStore.domains.map(d => d.id),
+    })
+
+    let categoryId = ''
+    let categoryLabel = ''
+    let createdCategory = false
+
+    if (plan.kind === 'create') {
+      // 新建分类失败（id 撞车 / 域不存在）不阻断添加：站点按未分类入库，Toast 照常出
+      const r = categoriesStore.addCategory(plan.groupId, {
+        id: plan.id, label: plan.label, dotColor: plan.dotColor,
+      })
+      if (r.ok) {
+        categoryId = r.id
+        categoryLabel = plan.label
+        createdCategory = true
+      }
+    } else {
+      categoryId = plan.categoryId
+      categoryLabel = plan.label
+    }
+
     const draft = fallbackDraftFromMeta({ url: normalized, meta, categoryId })
     const { site } = buildSiteFromDraft(draft)
     const created = sitesStore.addSite(site)
@@ -103,7 +103,7 @@ export async function autoAddSite({ url }) {
       category: { id: categoryId, label: categoryLabel, created: createdCategory },
     }
   } catch {
-    // 本机存储写入被拒（配额 / 隐私模式）是唯一可能的写库失败
+    // 落库阶段的任何异常都归为写库失败
     return { ok: false, reason: AUTO_ADD_REASON.WRITE_FAILED, message: '添加失败：本机存储写入被拒绝，请稍后重试。' }
   }
 }
