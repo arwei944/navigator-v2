@@ -137,7 +137,7 @@ ok(DOT_PALETTE.includes(t3.dotColor), '② 配色取自调色板')
 /* ② id 冲突自增（AI 音乐 / AI 语音 拼音同为 aiyy，这是真实撞车场景） */
 const t3b = suggestCategory({
   desc: 'AI 音乐生成',
-  existing: [...existing, { id: 'aiyy', label: 'AI 音乐', groupId: 'ai' }],
+  existing: [...existing, { id: 'aiyy', label: 'AI 语音', groupId: 'ai' }],
   domainIds,
 })
 eq(t3b.id, 'aiyy2', '② id 冲突自增到 aiyy2')
