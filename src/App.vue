@@ -57,14 +57,11 @@
 
     <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
     <ToastHost />
-
-    <!-- 自动添加的预览卡片：只在成功/进行中渲染，失败直接退回上面的弹窗 -->
-    <AddSitePreviewCard v-if="autoAddState" :state="autoAddState" @close="closeAutoAddCard" />
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -86,8 +83,9 @@ import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
 import ToastHost from '@/components/ToastHost.vue'
-import AddSitePreviewCard from '@/components/AddSitePreviewCard.vue'
 import { autoAddSite } from '@/services/autoAdd'
+import { AUTO_ADD_REASON } from '@/utils/siteDraft'
+import { useToastStore } from '@/stores/toast'
 
 const route = useRoute()
 const router = useRouter()
@@ -96,6 +94,7 @@ const preferencesStore = usePreferencesStore()
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const clicksStore = useClicksStore()
+const toastStore = useToastStore()
 const commandPaletteRef = ref(null)
 const shortcutsRef = ref(null)
 const showSettings = ref(false)
@@ -107,8 +106,6 @@ const addPrefillUrl = ref('')
 // 自动添加被护栏拦下时，带进弹窗的原因提示
 const addNotice = ref('')
 
-// 自动添加进行中/成功的状态；为 null 表示没有卡片
-const autoAddState = ref(null)
 // 连续触发时丢弃过期结果，避免旧请求把新卡片覆盖回去
 let autoAddSeq = 0
 
@@ -125,24 +122,70 @@ function openAddSite(payload) {
 
 async function runAutoAdd(url) {
   const seq = ++autoAddSeq
-  autoAddState.value = { phase: 'loading', url }
+  // 抓取最长 8s，先给一条「进行中」提示，否则用户按回车后会以为没反应
+  const pendingId = toastStore.push({ message: '正在识别站点信息…', tone: 'info', duration: 60000 })
 
-  const res = await autoAddSite({ url })
+  let res
+  try {
+    res = await autoAddSite({ url })
+  } catch {
+    res = { ok: false, reason: AUTO_ADD_REASON.WRITE_FAILED, message: '添加失败，请稍后重试。' }
+  }
+  toastStore.dismiss(pendingId)
   if (seq !== autoAddSeq) return
 
   if (res.ok) {
-    autoAddState.value = { phase: 'ok', url, site: res.site }
+    toastStore.push({
+      message: res.category.created
+        ? `已添加「${res.site.name}」，并新建分类「${res.category.label}」`
+        : `已添加「${res.site.name}」到「${res.category.label}」`,
+      tone: 'ok',
+      actionLabel: '撤销',
+      onAction: () => undoAutoAdd(res.site.id, res.category),
+    })
+    await locateSite(res.site)
     return
   }
-  // 护栏拦下：不留半截卡片，带原因退回弹窗让用户自己确认
-  autoAddState.value = null
-  addPrefillUrl.value = url
-  addNotice.value = res.message
-  showAddModal.value = true
+
+  if (res.reason === AUTO_ADD_REASON.DUPLICATE) {
+    const existing = res.existing
+    toastStore.push({
+      message: res.message,
+      tone: 'info',
+      actionLabel: '查看',
+      onAction: () => locateSite({ id: existing.id, categoryId: existing.categoryId }),
+    })
+    await locateSite({ id: existing.id, categoryId: existing.categoryId })
+    return
+  }
+
+  // 网址不成立 / 写库失败：报错即可，自动路径不再退回弹窗
+  toastStore.push({ message: res.message, tone: 'error' })
 }
 
-function closeAutoAddCard() {
-  autoAddState.value = null
+/**
+ * 自动切到站点所属分类并高亮定位。路由是唯一事实来源，改范围 / 分类都走这里。
+ * 清掉 p、q 是必须的：不清掉用途与搜索词，新卡片会被筛掉，定位就落空了。
+ */
+async function locateSite(site) {
+  const target = site.categoryId || 'all'
+  const current = (route.query.c && route.query.c !== 'all') ? route.query.c : 'all'
+  const needNav = route.name !== 'Home' || current !== target || Boolean(route.query.p) || Boolean(route.query.q)
+  if (needNav) {
+    await router.push({ name: 'Home', query: site.categoryId ? { c: site.categoryId } : {} })
+  }
+  await nextTick()
+  sitesStore.highlightSite(site.id)
+}
+
+/** 撤销一次自动添加；本次顺带新建、且现已无人使用的分类一并回收 */
+function undoAutoAdd(siteId, category) {
+  const undone = sitesStore.undoAdd(siteId)
+  if (undone && category?.created && category.id) {
+    const stillUsed = sitesStore.sites.some(s => s.categoryId === category.id)
+    if (!stillUsed) categoriesStore.removeCategory(category.id)
+  }
+  toastStore.push({ message: '已撤销', tone: 'info', duration: 2000 })
 }
 
 // 关掉就清空预填与提示，否则下次从按钮打开还会带着上一次的内容
