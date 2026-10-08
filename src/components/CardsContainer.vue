@@ -1,5 +1,5 @@
 <template>
-  <div class="cards-container">
+  <div class="cards-container" ref="containerRef">
     <!-- 回收站视图 -->
     <template v-if="sidebarStore.activeNav === 'trash'">
       <div class="trash-header">
@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useFavoritesStore } from '@/stores/favorites'
@@ -198,6 +198,16 @@ const viewClass = computed(() => {
 const batchMode = computed({
   get: () => sitesStore.batchMode,
   set: (v) => { if (!v) sitesStore.toggleBatchMode() }
+})
+
+// 自动添加成功后要把新卡片滚到视野中间，否则列表长时「加了但看不见」
+const containerRef = ref(null)
+
+watch(() => sitesStore.highlightSiteId, async (id) => {
+  if (!id) return
+  await nextTick()
+  const el = containerRef.value?.querySelector(`[data-site-id="${id}"]`)
+  el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
 })
 
 function openEdit(site) {

@@ -1,5 +1,7 @@
 <template>
-  <div class="card" :class="{ 'card-list': isList, 'card-batch': batchMode, 'card-selected': selected }"
+  <div class="card"
+       :class="{ 'card-list': isList, 'card-batch': batchMode, 'card-selected': selected, 'card-highlight': isHighlighted }"
+       :data-site-id="site.id"
        @click="onCardClick" @contextmenu.prevent="batchMode ? null : showContextMenu($event)"
        @mouseenter="onHover" @mouseleave="onHoverLeave">
     <!-- 批量选择复选框 -->
@@ -134,6 +136,9 @@ const heatClass = computed(() => {
 
 // 用途 id 列表（词表外的脏值由 PurposeTags 自行过滤）
 const purposeIds = computed(() => (Array.isArray(props.site.purposes) ? props.site.purposes : []))
+
+// 自动添加 / 定位复看时的高亮描边：由 sitesStore 统一计时清除
+const isHighlighted = computed(() => sitesStore.highlightSiteId === props.site.id)
 
 // 正式收录的站点有本地图标文件（icons/xx.png）；访客自己新增的只有远程图标地址
 const iconSrc = computed(() => props.site.icon ? '/' + props.site.icon : (props.site.iconUrl || ''))
@@ -342,6 +347,18 @@ onUnmounted(() => {
 .card-batch { cursor: pointer; }
 .card-batch:hover { border-left-color: var(--accent); }
 .card-selected { background: var(--accent-light); border-color: var(--accent); border-left-color: var(--accent); box-shadow: 0 0 0 1px rgba(0,113,227,.2); }
+/* 高亮：描边 + 一圈光晕。走 transition 而非 animation —— .card 已占了 animation（fadeInUp），
+   再叠一个会互相覆盖，导致卡片入场跳变。2.5s 后由 store 清掉 class，自然淡出。 */
+.card.card-highlight {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-left-color: var(--accent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 18%, transparent), var(--shadow-hover);
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .card.card-highlight { transform: none; }
+}
 .card-checkbox {
   position: absolute; top: 12px; right: 12px; z-index: 2;
   width: 22px; height: 22px; border-radius: 50%;
