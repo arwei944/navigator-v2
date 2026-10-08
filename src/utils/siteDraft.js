@@ -4,18 +4,24 @@
  * 两边必须用同一把尺子判断「这个域名是否已收录」、用同一段代码组装站点对象，
  * 否则会出现搜索栏说没收录、弹窗却拦下来说重复的死路。
  *
+ * 抓取失败与站名低置信在自动路径上不拦人，统一走域名兜底（fallbackDraftFromMeta）。
  * 只允许相对路径导入：tools/console 下的纯 node 测试要直接加载本模块。
  */
 
 import { hostOf, looksLikeUrl } from './url.js'
 import { normalizePurposes } from '../../shared/purposes.mjs'
+import { hashColor } from '../../shared/site-infer.mjs'
 
-/** 自动添加被拦下的原因码 */
+/** 自动添加被拦下的原因码。抓取失败与站名低置信已改为域名兜底照常入库，故退役。 */
 export const AUTO_ADD_REASON = {
   INVALID_URL: 'invalid-url',
   DUPLICATE: 'duplicate',
-  FETCH_FAILED: 'fetch-failed',
-  LOW_CONFIDENCE: 'low-confidence',
+  WRITE_FAILED: 'write-failed',
+}
+
+/** 无品牌色时按域名派生稳定色：同一域名每次一致，不同域名不会撞成一片 */
+export function colorFromHost(domain) {
+  return hashColor(domain)
 }
 
 /** 存放用的主机名：去协议、去路径，保留用户输入的大小写与 www */
@@ -80,16 +86,23 @@ export function buildSiteFromDraft({ form, faviconUrl = '', faviconHost = '' }) 
   return { site, domain }
 }
 
-/** 元数据响应 → 表单草稿。自动添加无人工干预，故不做 touched 判断，直接取识别结果 */
-export function draftFromMeta(meta) {
+/**
+ * 站点草稿：抓到了就用元数据，抓不到 / 站名不可靠就用域名兜底 —— 自动添加不再退回人工。
+ * `categoryId` 由调用方（autoAdd）经分类决策解析后传入，本函数不猜分类。
+ */
+export function fallbackDraftFromMeta({ url, meta = null, categoryId = '' }) {
   const m = meta || {}
+  const rawName = String(m.name || '').trim()
+  // 站名不可靠 = 没抓到名字，或抓到的是「按域名拼的」低置信结果 → 一律退回域名兜底
+  const nameReliable = Boolean(rawName) && m?.confidence?.name !== 'low'
+
   return {
     form: {
-      name: m.name || '',
-      url: m.domain || '',
+      name: nameReliable ? rawName : rawHostOf(url),
+      url: String(m.domain || '').trim() || rawHostOf(url),
       desc: m.desc || '',
-      categoryId: m.categoryId || '',
-      color: m.color || '#3b82f6',
+      categoryId,
+      color: m.color || colorFromHost(domainOf(url)),
       aliases: '',
       purposes: normalizePurposes(m.purposes),
     },
@@ -98,28 +111,10 @@ export function draftFromMeta(meta) {
   }
 }
 
-/** 发请求前的把关：网址不成立 / 同域已收录 → 直接拦下，不必联网 */
-export function preflightOf({ url, duplicate }) {
+/** 发请求前的把关：网址不成立就直接拦下，不必联网。重复判据见 autoAdd 里的 findDuplicate */
+export function preflightOf({ url }) {
   if (!looksLikeUrl(url)) {
     return { reason: AUTO_ADD_REASON.INVALID_URL, message: '没能识别出有效网址，请检查后重试。' }
-  }
-  if (duplicate) {
-    return {
-      reason: AUTO_ADD_REASON.DUPLICATE,
-      message: `该域名已收录：${duplicate.name}（${duplicate.url}）。如需变更请编辑该站点。`,
-    }
-  }
-  return null
-}
-
-/** 抓取结果的把关：抓不到 / 站名不可信 → 不自动入库，交回人工确认 */
-export function metaGuardrailOf({ meta }) {
-  if (!meta) {
-    return { reason: AUTO_ADD_REASON.FETCH_FAILED, message: '抓取站点信息失败，请手动确认后再添加。' }
-  }
-  const name = String(meta.name || '').trim()
-  if (!name || meta?.confidence?.name === 'low') {
-    return { reason: AUTO_ADD_REASON.LOW_CONFIDENCE, message: '没能可靠识别站点名称，请手动确认后再添加。' }
   }
   return null
 }
