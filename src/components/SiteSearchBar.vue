@@ -48,6 +48,9 @@
               <span class="suggestion-desc">该域名已收录，无需重复添加</span>
             </div>
             <span class="suggestion-cat">{{ getCategoryLabel(item.site.categoryId) }}</span>
+            <a :href="'https://' + item.site.url" target="_blank" class="suggestion-visit" @click.stop>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+            </a>
           </template>
 
           <!-- 站点 -->
@@ -196,7 +199,8 @@ function requestAdd(url) {
 }
 
 function activate(item) {
-  if (item.kind === 'site' || item.kind === 'collected') jumpToSite(item.site)
+  if (item.kind === 'site') jumpToSite(item.site)
+  else if (item.kind === 'collected') requestAdd('https://' + item.site.url)
   else if (item.kind === 'add') requestAdd(item.url)
 }
 
