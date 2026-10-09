@@ -1290,3 +1290,36 @@ git commit -m "test: 自动分类测试接入全量链并跑通构建"
    - `highlightSiteId` / `highlightSite(id)` → Task 4 定义、Task 5（两处）与 Task 7 使用一致 ✅
    - `toastStore.push/dismiss/pause/resume` → Task 3 定义、Task 7 使用一致；`push` 返回 id ✅
    - `category: { id, label, created }` → Task 6 返回、Task 7 消费一致 ✅
+
+---
+
+## 终审与 Major 修复记录（裁定 6 / 7）
+
+全分支 code review + 手动验收发现 2 个 Major，专项脚本复现确认后，用户裁定「两个都修」：
+
+### Major 1：自动创建的分类刷新即丢
+- **复现**：添加触发新建分类 → 刷新 → 分类标签变成拼音 id（如「qt」），分类表重置。
+- **根因**：`categories` store 无本地持久化，站点有 `nav-sites-overlay` 落盘而分类表没有。
+- **修复**（对齐站点 overlay 模式）：`src/stores/categories.js` 新增「本地新增分类覆盖层」
+  （`nav-categories-overlay`，`encodeStored/decodeStored` 版本化）——初始化叠默认表、
+  `applyCloudGroups` 先存云端基线再叠、`addCategory` 写入 / `updateCategory`·`removeCategory` 同步、
+  `resetToDefault` 清空、新增 `clearLocalAdds`（**只清已出现在当前分类表里的记录**，被云端表挡下的记录保留）。
+- **接入**：`AdminView.publishToCloud` 成功后清覆盖层；`onRolled` 回滚时先清（与站点覆盖层同口径）。
+
+### Major 2：快速连按两次回车重复入库
+- **复现**：`/api/metadata` 延迟 3s 下连发两次回车 → `localAdds` 出现 2 条同域记录。
+- **根因**：`findDuplicate` 在 `fetchMeta` 异步窗口之前执行，第二次提交查重扑空。
+- **修复**（`src/services/autoAdd.js`）：① 模块级 `inFlight` 在途锁，键为**域名**（与查重口径对齐），
+  并发提交共享同一 promise；② `fetchMeta` 之后、入库之前复检 `findDuplicate`，
+  复检到 `addSite` 之间无 await（单线程原子块）。
+
+### 评审跟进（独立评审子代理：通过，附 2 Minor + 1 Nit，均已修）
+1. Minor：无分类表的发布也会 `clearLocalAdds`，可能清掉未发布记录 → 改为「按当前分类表存在性过滤」清理。
+2. Minor：回滚只清站点覆盖层、留分类孤儿 → `onRolled` 在回填基底前调 `clearLocalAdds`。
+3. Minor：在途锁键是完整 URL、查重口径是域名 → 锁键改 `hostOf` 域名。
+4. Nit：`loadOverlay` 未要求 `groupId` 非空（死记录）→ 过滤条件补上。
+
+### 验证
+- `pnpm run console:test:all` 11 个套件全过；`pnpm run build` 通过。
+- Playwright E2E（脚本验证后已删）：① 新建分类「其他/qt」刷新后标签保留、无裸 id；
+  ② 抓取延迟下同步连发两次回车只入库 1 条；③ 撤销后站点与新建分类一并回收、刷新不复活。

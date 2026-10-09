@@ -327,8 +327,9 @@ watch(webhookUrl, (v) => {
   else localStorage.removeItem('nav_admin_webhook')
 })
 
-/** 回滚成功：先把响应回填为云端基底再清覆盖层，顺序反了会瞬间回退到旧数据 */
+/** 回滚成功：先丢弃未发布的本地分类新建（与站点覆盖层同口径），再把响应回填为云端基底后清覆盖层 —— 顺序反了，自动建的分类会被重新叠进旧表 */
 function onRolled(data) {
+  categoriesStore.clearLocalAdds()
   sitesStore.applyCloudData(data)
   sitesStore.clearLocalOverlay()
   recordAudit('rollback.apply', { target: data.restoredFrom || '', detail: `回滚到 v${data.version} · ${data.sites?.length || 0} 站点` })
@@ -382,6 +383,9 @@ async function publishToCloud() {
     // 否则本地改动会长期遮蔽后续云端变更。
     sitesStore.applyCloudData(data)
     sitesStore.clearLocalOverlay()
+    // 分类同理：发布成功的响应带着云端新表（applyCloudData 已回填基线），
+    // 已进云端的本地新增记录在这里撤掉；被云端表挡下的记录保留，等域回来再生效
+    categoriesStore.clearLocalAdds()
     recordAudit('publish.done', { target: `v${data.version}`, detail: `${data.sites?.length || sitesStore.sites.length} 站点热更新到云端${cats ? '（含分类表）' : ''}` })
     recordPublish(data)
     if (webhookUrl.value.trim()) {
