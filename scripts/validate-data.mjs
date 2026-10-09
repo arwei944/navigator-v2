@@ -73,6 +73,15 @@ sites.forEach((s, i) => {
     }
   }
 
+  // archived / pinned 可选；一旦出现必须是布尔值。
+  // 两者都是「本站状态」而非内容字段：归档 = 不再日常用但保留，置顶 = 固定在前。
+  // 缺省等价于 false，故只做类型把关，不做存在性要求。
+  for (const flag of ['archived', 'pinned']) {
+    if (s[flag] !== undefined && typeof s[flag] !== 'boolean') {
+      errors.push(`[${s.id}] ${flag} 不是布尔值`)
+    }
+  }
+
   // purposes 可选；一旦出现必须是「词表内的 id 数组、无重复、不超过上限」
   if (s.purposes !== undefined) {
     if (!Array.isArray(s.purposes)) {

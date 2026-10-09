@@ -187,3 +187,14 @@ button { font-family: inherit; }
   .main { margin-left: 0 !important; }
   ::-webkit-scrollbar { width: 3px; }
 }
+/* 侧栏 / 详情面板改宽期间临时摘掉毛玻璃（.app-layout.no-blur 由 sidebarStore.animating 驱动）。
+   原因：真正吃性能的是 .main —— 它自己就带 backdrop-filter: blur(20px)，而它正是
+   300 张卡片所在的内容区：内容区宽度每变一次，整块背景模糊就要重算一次。
+   实测折叠动画期间最差帧 150ms（空闲基线稳定 16.7ms / 60fps）；关掉后压到 33ms，动画本身保留。
+   侧栏与右面板一并关掉，省得同一帧里叠加两处模糊重算。 */
+.app-layout.no-blur .main,
+.app-layout.no-blur .sidebar,
+.app-layout.no-blur .right-sidebar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}

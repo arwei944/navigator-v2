@@ -153,10 +153,21 @@ const expectKeys = [
   '--shadow', '--shadow-hover', '--shadow-card', '--card-padding', '--grid-gap',
   '--grid-cols', '--nav-item-h', '--glass-blur', '--glass-bg', '--font',
   '--font-size-base', '--title-weight', '--transition', '--card-anim',
+  // 语义状态色（卡片/控件的 ok·warn·danger·收藏·热度·实底前景），随主题模式取明暗两套值
+  '--color-ok', '--color-warn', '--color-danger', '--color-muted',
+  '--color-favorite', '--color-favorite-bg', '--color-favorite-border',
+  '--color-heat-warm', '--color-heat-warm-bg', '--color-heat-hot', '--color-heat-hot-bg',
+  '--color-on-solid',
 ]
 deepEq(Object.keys(vars).sort(), expectKeys.slice().sort(), 'CSS 变量键集完整')
 ok(Object.values(vars).every(v => typeof v === 'string'), '所有 CSS 变量值都是字符串（setProperty 只吃字符串）')
 ok(Object.keys(vars).every(k => k.startsWith('--')), '所有变量名以 -- 开头')
+
+// 语义色必须随主题模式切换：若两套同值，深色主题下会出现 #fefce8 这种亮黄块
+const darkSemantic = tokensToCssVars(apple, 'dark')
+ok(darkSemantic['--color-favorite-bg'] !== vars['--color-favorite-bg'], '收藏底色随主题模式取不同值')
+ok(darkSemantic['--color-ok'] !== vars['--color-ok'], '在线状态色随主题模式取不同值')
+ok(darkSemantic['--color-danger'] !== vars['--color-danger'], '失效状态色随主题模式取不同值')
 
 eq(vars['--radius'], '12px', '卡片圆角落成 px')
 eq(vars['--radius-sm'], '8px', '控件圆角落成 px')

@@ -11,6 +11,7 @@ const routes = [
   { path: '/', name: 'Home', component: HomeView },
   { path: '/favorites', name: 'Favorites', component: HomeView },
   { path: '/recent', name: 'Recent', component: HomeView },
+  { path: '/archived', name: 'Archived', component: HomeView },
   { path: '/feed', name: 'Feed', component: HomeView },
   { path: '/trash', name: 'Trash', component: HomeView },
   // 旧链接兼容：分类曾在路径里，统一重定向到 query 形式（保留范围与其余 query）

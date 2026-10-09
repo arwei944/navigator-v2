@@ -54,6 +54,8 @@ export const useSitesStore = defineStore('sites', () => {
   // 用途筛选（Axis 4）：与分类正交，可跨分类聚合「所有查资料站」
   const currentPurpose = ref('all')
   const sortBy = ref('default')
+  // 是否处于「归档」范围（由 App 按路由下发）
+  const archivedScope = ref(false)
   const viewMode = ref('grid') // grid | list
 
   // 回收站（持久化，否则刷新后「恢复」就没了）
@@ -86,8 +88,11 @@ export const useSitesStore = defineStore('sites', () => {
   // currentCategory 有三种取值：'all'（不筛）/ 域 id（整域）/ 子分类 id（单个分类）。
   // 用途（currentPurpose）是正交的第二把筛子，叠加在分类结果之上。
   const categorySites = computed(() => {
+    // 「归档」是范围轴，不是筛选项：只有站在归档范围里才看得到归档站，
+    // 其余范围（全部 / 收藏 / 最近 / 搜索）一律不进列表 —— 归档的语义就是
+    // 「这条站我不再日常用，但别删」，它不该继续占正常视野。
+    let list = sites.value.filter(s => (archivedScope.value ? s.archived === true : s.archived !== true))
     const v = currentCategory.value
-    let list = sites.value
     if (v && v !== 'all') {
       if (categoriesStore.isDomainScope(v)) {
         const ids = new Set(categoriesStore.categoriesOfDomain(v).map(c => c.id))
@@ -331,6 +336,20 @@ export const useSitesStore = defineStore('sites', () => {
     return next
   }
 
+  /** 归档 / 取消归档，返回切换后的状态 */
+  function toggleArchive(id) {
+    const site = sites.value.find(s => s.id === id)
+    if (!site) return false
+    const next = !site.archived
+    updateSite(id, { archived: next })
+    return next
+  }
+
+  /** 归档站点的总数（sidebar 徽章用） */
+  const archivedCount = computed(() => sites.value.filter(s => s.archived === true).length)
+
+  function setArchivedScope(v) { archivedScope.value = Boolean(v) }
+
   function setSearchQuery(q) { searchQuery.value = q }
   function setCategory(cat) { currentCategory.value = cat }
   function setPurpose(p) { currentPurpose.value = p || 'all' }
@@ -479,7 +498,8 @@ export const useSitesStore = defineStore('sites', () => {
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded,
     addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
-    batchUpdate, batchSetCategory, batchAddPurpose, togglePin,
+    batchUpdate, batchSetCategory, batchAddPurpose, togglePin, toggleArchive, setArchivedScope,
+    archivedCount, archivedScope,
     setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,

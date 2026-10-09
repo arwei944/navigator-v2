@@ -4265,7 +4265,7 @@
   {
     "id": "dt16",
     "name": "TradingBeats",
-    "url": "www.tradingbeats.xyz",
+    "url": "tradingbeats.xyz",
     "desc": "链上监控与聪明钱跟踪工具（原名 Hyperinsight），持续监控大额地址持仓与盈利排行，辅助发现市场异动。",
     "categoryId": "data",
     "color": "#7c3aed",
@@ -4284,7 +4284,7 @@
   {
     "id": "dx12",
     "name": "Hyperbot",
-    "url": "www.hyperbot.network",
+    "url": "hyperbot.network",
     "desc": "Hyperliquid 生态 AI 聚合交易网关，统一入口接入 perp DEX，集成聪明钱跟踪、一键复制交易与 Telegram 机器人。",
     "categoryId": "dex",
     "color": "#0ea5e9",
@@ -4301,7 +4301,7 @@
   {
     "id": "aiapi4",
     "name": "xAPI",
-    "url": "www.xapi.to",
+    "url": "xapi.to",
     "desc": "面向 AI Agent 的通用 API 网关，一次付费调用所有 API（网页搜索、Twitter、AI 模型、链上数据等），也可发布自有 API 按调用分成。",
     "categoryId": "aiapi",
     "color": "#6366f1",
@@ -4343,7 +4343,7 @@
   {
     "id": "sm10",
     "name": "闪电接码",
-    "url": "www.k20.cc",
+    "url": "k20.cc",
     "desc": "实卡短信接码平台，聚合境内号码，可注册任何 APP/网站，SIM 卡可复接，支持接码、短信代发一体化服务，失败不扣费。",
     "categoryId": "sms",
     "color": "#ec4899",
@@ -4363,7 +4363,7 @@
   {
     "id": "sm11",
     "name": "USAPI 美卡接码",
-    "url": "www.usapi6.com",
+    "url": "usapi6.com",
     "desc": "美卡/美国接码 API 平台，长期供应 TG、WhatsApp、PayPal、亚马逊、抖音等冷热项目接码，号码可复接、可定制号段、支持语音接码。",
     "categoryId": "sms",
     "color": "#14b8a6",
@@ -4385,7 +4385,7 @@
   {
     "id": "sm12",
     "name": "快客接码",
-    "url": "www.kuaikejm.com/kk/index.html",
+    "url": "kuaikejm.com/kk/index.html",
     "desc": "实卡短信接码平台，号码可在 7 天内重复使用、到期续费，支持国内与国外号码，接码/短信代发一体化，失败不扣费。",
     "categoryId": "sms",
     "color": "#f43f5e",
@@ -4422,7 +4422,7 @@
   {
     "id": "aiapi5",
     "name": "TeamoRouter",
-    "url": "www.teamorouter.com",
+    "url": "teamorouter.com",
     "desc": "OpenAI 兼容的 AI 模型 API 路由平台，聚合 DeepSeek、GPT 等模型接口，支持一键接入多国智能体工具（含 DeepSeek Harness 集成）。",
     "categoryId": "aiapi",
     "color": "#0ea5e9",
@@ -4441,7 +4441,7 @@
   {
     "id": "aiapi6",
     "name": "StepFun",
-    "url": "www.stepfun.com",
+    "url": "stepfun.com",
     "desc": "阶跃星辰大模型开放平台，提供 Step 系列语言、语音、多模态/GUI 模型 API（Step 1/2、Step 3.5 Flash 等），稳定高性能易集成，用于构建 AI 应用与 Agent。",
     "categoryId": "aiapi",
     "color": "#8b5cf6",
@@ -4464,7 +4464,7 @@
   {
     "id": "aiapi7",
     "name": "Agnes AI",
-    "url": "www.agnes-ai.com",
+    "url": "agnes-ai.com",
     "desc": "新加坡 Sapiens AI 全模态大模型 API 平台，同一 Key 与 Base URL 调用文本、图像、视频及多模态理解（含 agnes-2.0-flash 等），轻量高性能。",
     "categoryId": "aiapi",
     "color": "#db2777",
@@ -4487,7 +4487,7 @@
   {
     "id": "acc1",
     "name": "牛牛苹果ID",
-    "url": "www.id10.cn",
+    "url": "id10.cn",
     "desc": "苹果 Apple ID 账号批发/出租商城，全球各地区 ID 现货（双重号、密保号、余额号、小火箭成品号等），量大优惠，支持定制任意地区。",
     "categoryId": "account",
     "color": "#f59e0b",
@@ -4509,7 +4509,7 @@
   {
     "id": "acc2",
     "name": "苹果ID批发",
-    "url": "www.idpifa.net",
+    "url": "idpifa.net",
     "desc": "全球苹果 Apple ID 账号批发商城，24 小时极速自动发货，各区域双重号/老号/小火箭成品号，批发 1.5 元起，量大优惠。",
     "categoryId": "account",
     "color": "#f59e0b",
@@ -4529,7 +4529,7 @@
   {
     "id": "aiapi8",
     "name": "云码",
-    "url": "www.jfbym.com",
+    "url": "jfbym.com",
     "desc": "专业图像验证码云识别服务，AI 深度学习识别图片验证码（数字/字母/汉字/图像），秒级返回，提供多语言 API 接口与开发者分成。",
     "categoryId": "aiapi",
     "color": "#2563eb",
@@ -4789,7 +4789,7 @@
   {
     "id": "dt18",
     "name": "Derivatives Monkey",
-    "url": "www.derivativesmonkey.com",
+    "url": "derivativesmonkey.com",
     "desc": "领先的加密货币期权分析平台，跨多交易所（Derive/Deribit/Bybit/OKX/Binance/Thalex/Paradex/Aevo/Delta）统一呈现实时期权链、Greeks 希腊值、GEX 做市商 delta 曝险、隐含波动率微笑与期限结构，支持策略回测与对冲模拟，数据均标注交易所与时间戳，免费使用。",
     "categoryId": "data",
     "color": "#0891b2",
@@ -4886,7 +4886,7 @@
   {
     "id": "aiapi15",
     "name": "TinyFish AI",
-    "url": "www.tinyfish.ai",
+    "url": "tinyfish.ai",
     "desc": "面向 AI Agent 的一站式网页能力 API 平台，提供 Search（实时浏览器渲染搜索，永不过期缓存）、Fetch（将任意页面转为干净结构化内容）、Browser（真实浏览器自动化）与 Agents 部署能力，一套 API 覆盖 AI 接入网页所需的全部工具，Search 与 Fetch 永久免费，适合智能体开发者快速接入网页能力。",
     "categoryId": "aiapi",
     "color": "#0ea5e9",
@@ -5123,7 +5123,7 @@
   {
     "id": "dt22",
     "name": "呱呱助手 · 实时信号",
-    "url": "www.yss-signal.com",
+    "url": "yss-signal.com",
     "desc": "呱呱助手实时交易信号与行情工具，提供实时 K 线数据与交易信号推送，辅助交易者跟踪行情、捕捉买卖机会，是面向量化与合约/现货交易的中文实时信号平台。",
     "categoryId": "data",
     "color": "#dc2626",
@@ -5186,7 +5186,7 @@
   {
     "id": "bs8",
     "name": "极点云 PolarNode",
-    "url": "www.cpolar.com",
+    "url": "cpolar.com",
     "desc": "极点云 PolarNode 高性能 VPS 云服务器服务商，机器即将上线，官网开放内测预约，前 5,000 名预约用户可获免费 VPS，适合有 VPS 建站、代理、自建节点等需求的用户。",
     "categoryId": "cloud",
     "color": "#3b82f6",
@@ -5208,7 +5208,7 @@
   {
     "id": "l13",
     "name": "书格",
-    "url": "www.shuge.org",
+    "url": "shuge.org",
     "desc": "有品格的数字图书馆，专注于公开版权领域的古籍善本、绘画、艺术品等高清数字图书资源，免费开放浏览与下载，让每个人都能自由地看到人类文明。",
     "categoryId": "learning",
     "color": "#92400e",
@@ -5265,7 +5265,7 @@
   {
     "id": "cd15",
     "name": "AICSS",
-    "url": "www.aicss.dev",
+    "url": "aicss.dev",
     "desc": "AI 智能体 UI 组件库，提供漂亮且可复制粘贴的 AI 对话界面组件：思考状态、工具调用、流式文本、引用、表格等，支持 React、Vue、Svelte，方便快速构建 AI 应用界面。",
     "categoryId": "coding",
     "color": "#0d9488",
@@ -5467,7 +5467,7 @@
   {
     "id": "aiapi19",
     "name": "OrcaRouter",
-    "url": "www.orcarouter.ai",
+    "url": "orcarouter.ai",
     "desc": "统一 AI 网关（OpenAI 兼容）：自适应路由、负载均衡、护栏、Agent 防火墙、可观测性与治理，一个网关接入 200+ 模型，适合生产环境集中管理模型调用。",
     "categoryId": "aiapi",
     "color": "#0d9488",
@@ -5826,7 +5826,7 @@
   {
     "id": "ex11",
     "name": "QFEX",
-    "url": "www.qfex.com",
+    "url": "qfex.com",
     "desc": "首家 24/7 仅面向美股、大宗商品与外汇的交易所，无需券商即可高频直连交易（股票、黄金、白银、永续合约）。",
     "categoryId": "cex",
     "color": "#1a9e6c",

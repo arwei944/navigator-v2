@@ -2,7 +2,7 @@
   <!-- 独立页面（管理后台 / 404）：不套导航壳，直接渲染路由组件 -->
   <router-view v-if="isStandalone" />
 
-  <div v-else class="app-layout" :class="{ 'sidebar-collapsed': sidebarStore.collapsed }" :style="wallpaperStyle">
+  <div v-else class="app-layout" :class="{ 'sidebar-collapsed': sidebarStore.collapsed, 'no-blur': sidebarStore.animating }" :style="wallpaperStyle">
     <!-- 移动端顶部栏 -->
     <MobileHeader />
 
@@ -25,8 +25,9 @@
         <MainToolbar v-if="scope !== 'trash'"
                      @open-settings="showSettings = true" @open-todo="showTodo = true"
                      @open-add="openAddSite" />
-        <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示 -->
-        <FilterBar v-if="scope !== 'trash'" />
+        <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示；归档同理（筛选条的计数
+             基于在册站点，在归档范围内会虚高） -->
+        <FilterBar v-if="scope !== 'trash' && scope !== 'archived'" />
         <CardsContainer />
       </template>
     </main>
@@ -240,11 +241,13 @@ const SCOPE_BY_ROUTE = {
   Favorites: 'favorites',
   Recent: 'recent',
   Feed: 'feed',
-  Trash: 'trash'
+  Trash: 'trash',
+  Archived: 'archived'
 }
 const SCOPE_LABEL = {
   favorites: '收藏',
   recent: '最近',
+  archived: '归档',
   feed: '内容聚合',
   trash: '回收站'
 }
@@ -271,6 +274,9 @@ function queryFromRoute() {
 
 function applyRouteToStore() {
   if (sidebarStore.activeNav !== scope.value) sidebarStore.setActiveNav(scope.value)
+
+  // 「归档」是范围轴：只有在这个范围内才把 archived 站点放出来，其余范围一律不显示
+  sitesStore.setArchivedScope(scope.value === 'archived')
 
   const cat = categoryFromRoute()
   if (sitesStore.currentCategory !== cat) sitesStore.setCategory(cat)

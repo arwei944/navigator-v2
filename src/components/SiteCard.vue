@@ -1,7 +1,7 @@
 <template>
   <div class="card"
        :class="[
-         { 'card-list': isList, 'card-batch': batchMode, 'card-selected': selected, 'card-highlight': isHighlighted },
+         { 'card-list': isList, 'card-batch': batchMode, 'card-selected': selected, 'card-highlight': isHighlighted, 'card-archived': site.archived },
          isList ? '' : 'density-' + density
        ]"
        :data-site-id="site.id"
@@ -58,7 +58,8 @@
         <span v-if="site.pinned" class="card-pinned" title="已置顶">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 4 19 4"/><line x1="12" y1="8" x2="12" y2="20"/><polyline points="8 12 12 8 16 12"/></svg>
         </span>
-        <span v-if="!visited" class="card-unvisited" title="还没访问过">未访问</span>
+        <span v-if="site.archived" class="card-archived-tag" title="已归档：不参与日常浏览">已归档</span>
+        <span v-if="showUnvisited && !visited" class="card-unvisited" title="还没访问过">未访问</span>
         <span v-if="clickCount > 0" class="card-clicks" :class="heatClass" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
           {{ clickCount }}
@@ -129,6 +130,11 @@ const clickCount = computed(() => clicksStore.countFor(props.site.id))
 
 // 是否访问过（本机浏览历史）。300 个站"哪些还没看过"是高频诉求
 const visited = computed(() => Boolean(historyStore.getLastVisitTime(props.site.id)))
+
+// 「未访问」徽章只在「详细」档出现。默认档若常驻会在首次访问时铺满全部卡片
+// （浏览器实测：新会话下 300 张卡全挂「未访问」，纯噪音），而信息量只有在
+// 你已经看过一部分之后才成立 —— 所以做成 opt-in。
+const showUnvisited = computed(() => props.density === 'rich')
 
 const isFav = computed(() => favoritesStore.isFav(props.site.id))
 
@@ -276,6 +282,19 @@ function onHoverLeave() {
 .density-compact .card-header { margin-bottom: 4px; }
 .card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card-footer-left { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* 归档：只在归档范围内出现，用降饱和 + 灰边把「不再日常用」表达出来，
+   但不做整卡 disable —— 它仍可打开、可取消归档 */
+.card-archived { opacity: .72; border-style: dashed; }
+.card-archived:hover { opacity: 1; }
+.card-archived-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--border-light);
+  flex-shrink: 0;
+}
 /* 置顶：与「未访问」同为底栏小徽章，一左一右表达「常用」与「没看过」 */
 .card-pinned {
   display: inline-flex;

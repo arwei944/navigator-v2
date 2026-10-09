@@ -218,6 +218,7 @@ const emptyMessage = computed(() => {
   switch (sidebarStore.activeNav) {
     case 'favorites': return '还没有收藏的站点'
     case 'recent': return '还没有访问记录'
+    case 'archived': return '还没有归档的站点'
     default: return '没有找到匹配的站点'
   }
 })

@@ -27,6 +27,11 @@
         {{ site.pinned ? '取消置顶' : '置顶' }}
       </button>
 
+      <button type="button" class="context-menu-item" role="menuitem" @click="toggleArchive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+        {{ site.archived ? '取消归档' : '归档' }}
+      </button>
+
       <template v-if="!menu.readOnly">
         <div class="context-menu-divider"></div>
         <button type="button" class="context-menu-item" role="menuitem" @click="run('edit')">
@@ -89,9 +94,14 @@ function run(action) {
   fn?.()
 }
 
-/** 置顶不需要打开方参与：直接改站点数据即可 */
+/** 置顶 / 归档都不需要打开方参与：直接改站点数据即可 */
 function togglePin() {
   if (site.value) sitesStore.togglePin(site.value.id)
+  menu.close()
+}
+
+function toggleArchive() {
+  if (site.value) sitesStore.toggleArchive(site.value.id)
   menu.close()
 }
 

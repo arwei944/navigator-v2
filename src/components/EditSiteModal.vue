@@ -41,6 +41,19 @@
             <span class="color-hex">{{ form.color }}</span>
           </div>
         </div>
+        <div class="form-group">
+          <label>状态 <span class="hint">（两条都与「删除」不同：站还在，只是换个位置）</span></label>
+          <div class="flag-row">
+            <label class="flag-item">
+              <input type="checkbox" v-model="form.pinned">
+              <span>置顶</span>
+            </label>
+            <label class="flag-item">
+              <input type="checkbox" v-model="form.archived">
+              <span>归档</span>
+            </label>
+          </div>
+        </div>
         <div class="form-actions">
           <button type="button" class="btn btn-cancel" @click="$emit('close')">取消</button>
           <button type="submit" class="btn btn-primary">保存修改</button>
@@ -72,7 +85,9 @@ const form = reactive({
   categoryId: 'ai',
   color: '#3b82f6',
   aliases: '',
-  purposes: []
+  purposes: [],
+  pinned: false,
+  archived: false
 })
 
 onMounted(() => {
@@ -83,6 +98,8 @@ onMounted(() => {
   form.color = props.site.color
   form.aliases = Array.isArray(props.site.aliases) ? props.site.aliases.join('、') : ''
   form.purposes = normalizePurposes(props.site.purposes)
+  form.pinned = props.site.pinned === true
+  form.archived = props.site.archived === true
 })
 
 /** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
@@ -119,7 +136,10 @@ function submit() {
     initial: form.name.charAt(0).toUpperCase(),
     aliases: parseAliases(form.aliases, form.name, domain),
     // 清空时传 undefined 而不是空数组：空数组会让卡片渲染出「有用途但一个标签都没有」的空行
-    purposes: purposes.length ? purposes : undefined
+    purposes: purposes.length ? purposes : undefined,
+    // false 显式写回，便于用户在此处取消置顶 / 取消归档
+    pinned: form.pinned,
+    archived: form.archived
   })
   emit('saved', { name: form.name, url: domain })
   emit('close')
@@ -185,6 +205,9 @@ function submit() {
 .form-textarea { resize: vertical; min-height: 60px; }
 .color-picker-row { display: flex; align-items: center; gap: 10px; }
 .color-input { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; padding: 2px; }
+.flag-row { display: flex; gap: 18px; align-items: center; }
+.flag-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.flag-item input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
 .color-hex { font-size: 13px; color: var(--text-secondary); font-family: monospace; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .btn {

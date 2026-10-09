@@ -21,8 +21,8 @@ export const useContextMenuStore = defineStore('contextMenu', () => {
 
   // 菜单实测尺寸（宽固定 180，高随项目数变化），用于把菜单收进视口
   const MENU_W = 180
-  const MENU_H_READONLY = 190
-  const MENU_H_FULL = 260
+  const MENU_H_READONLY = 215
+  const MENU_H_FULL = 290
 
   function open({ x: px = 0, y: py = 0, site: s = null, readOnly: ro = false, handlers: h = null }) {
     site.value = s

@@ -2976,3 +2976,32 @@ X-Vercel-Error: DEPLOYMENT_DISABLED
 | `docs/NAV-v7-card-system-upgrade-plan.md`（新增） | 调研 + 分期方案 + 实施结果 |
 
 **验证**：`npm run build` 通过；目标指标用 grep 复核（硬编码色 15→0、卡片 document 监听 2→0）。
+
+---
+
+## 五十三、卡片体系补齐：归档 / 数据归一 / 折叠性能（2026-10-09）
+
+承接 §五十二。用户要求「把上次说明没做的全部搞定」，并提示本机有浏览器可用。本轮先打通浏览器（**零依赖 CDP 客户端**驱动本机 Chrome：Node 22 内置 `WebSocket`，不装任何 npm 包），于是每一项都做了真机验证。
+
+**站点归档（新）**
+- 新路由 `/archived`；侧栏新增「归档」入口（带条数徽章）。范围轴语义：`sitesStore.archivedScope` 由 App 按路由下发，`categorySites` 据此二选一 —— 归档范围内只看归档，**其余范围（全部/收藏/最近/搜索）一律不显示**。
+- 右键菜单「归档 / 取消归档」；`EditSiteModal` 增加「置顶 / 归档」两个开关；归档卡片虚线边 + 降不透明度 + 「已归档」徽章；归档范围隐藏筛选条（筛选条计数基于在册站点，在该范围会虚高）。
+- `validate-data.mjs` 增加 `archived` / `pinned` 布尔类型门禁。
+
+**数据归一**
+- 新增 `scripts/normalize-www.mjs`（带备份、支持 `--dry-run`），去掉 20 条 url 的 `www.` 前缀。**改前逐个实测裸域**（curl -L 跟随跳转）：19 个 200；第 20 个（`acc2`/idpifa.net）两种形态都不可达，属站点本身问题（同一 Cloudflare IP），故全部安全去除。刻意不动 `updatedAt`。
+- `sortOrder` 重复：**实测已无重复**（300 条 / 300 个唯一值），HANDOVER 早先那条待办是过时记录。
+
+**折叠过渡性能（真因与修复）**
+- 真因不是两个侧栏，而是 **`.main` 自带 `backdrop-filter: blur(20px)`**，而它正是 300 张卡片所在的内容区：宽度一变，整块背景模糊每帧重算。
+- 修复：`sidebarStore.animating` 在折叠/展开/拖拽调宽期间给 `.app-layout` 挂 `no-blur`，临时摘掉模糊（`main.css` 里 `.app-layout.no-blur .main/.sidebar/.right-sidebar`），动画结束自动恢复。
+- 实测（5 轮交替取中位，700ms 窗口）：中位最差帧 **217ms → 150ms**，中位 p95 **217ms → 50ms**；空闲基线 16.7ms。`PerformanceObserver` 显示折叠期间 longtask 总时长 = 0，证实卡顿在光栅/合成而非 JS 主线程。
+- 剩余 150ms 来自 300 张卡片随宽度重排本身，需改成 transform 位移布局才能消除，属架构改造，未做。
+
+**真机验证覆盖**：300 卡渲染、卡片点击/Enter/空格打开（点收藏不打开）、右键菜单 DOM 中只 1 个实例、深色下收藏态 `rgba(234,179,8,.16)`（亮黄块消除）、详情面板别名段、390×844 下右面板 0 宽 + 详情抽屉打开、归档流转、置顶升位。
+
+**顺带修复**：新会话下 300 张卡全挂「未访问」徽章（真机截图发现），改为只在「详细」密度档出现。
+
+**刻意不做**（理由见方案 §9.3）：抽 `FaviconBadge`（波及 7 个组件且同名类语义不同）、折叠重排的布局改造、移除 `discover`（实为「全部」的范围 id，文档结论已过时）。
+
+**验证**：`npm run build` 通过；`npm run console:test:all` 全绿（视觉方案断言 68 → 72，新增语义色随主题模式取不同值的用例）。

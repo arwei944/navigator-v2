@@ -30,6 +30,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1"/></svg>
         <span v-show="!iconOnly">内容聚合</span>
       </div>
+      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'archived' }"
+           @click="navigate('Archived')" @keydown.enter="navigate('Archived')" :title="iconOnly ? '归档' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+        <span v-show="!iconOnly">归档</span>
+        <span v-if="sitesStore.archivedCount > 0" class="badge">{{ sitesStore.archivedCount }}</span>
+      </div>
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'trash' }"
            @click="navigate('Trash')" @keydown.enter="navigate('Trash')" :title="iconOnly ? '回收站' : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
