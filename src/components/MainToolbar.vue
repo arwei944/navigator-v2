@@ -1,7 +1,7 @@
 <template>
   <div class="main-toolbar">
-    <!-- 站内检索与站外搜索已合并为一个统一搜索框（引擎选择器为其左侧前缀） -->
-    <UnifiedSearchBox class="toolbar-search" @add-site="$emit('open-add', $event)" />
+    <!-- 全能框：站内检索、命令执行、页面跳转共用这一个框 -->
+    <UnifiedSearchBox class="toolbar-search" @open-palette="$emit('open-palette')" />
 
     <div class="toolbar-actions">
       <select class="sort-select" v-model="sortValue" aria-label="排序方式" title="排序方式">
@@ -64,7 +64,7 @@ import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
 import UnifiedSearchBox from '@/components/UnifiedSearchBox.vue'
 
-defineEmits(['open-settings', 'open-todo', 'open-add', 'open-card-settings'])
+defineEmits(['open-settings', 'open-todo', 'open-add', 'open-card-settings', 'open-palette'])
 
 const sitesStore = useSitesStore()
 const preferencesStore = usePreferencesStore()
@@ -149,8 +149,11 @@ function toggleViewMode() {
   .toolbar-search { flex-basis: 150px; }
 }
 @media (max-width: 768px) {
-  .main-toolbar { flex-direction: column; align-items: stretch; padding: 12px 16px 0; gap: 8px; }
-  .toolbar-search { flex: 1 1 auto; padding: 0; }
+  /* flex-wrap 必须显式复位：桌面是 row+wrap，改成 column 后若仍允许 wrap，
+     高度一旦被压缩就会**按列折行**，每列宽度不再是容器宽度（实测搜索框被撑到 417px、右侧按钮出屏）。
+     这是「改 flex-direction 忘了改 flex-wrap」的经典坑。 */
+  .main-toolbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; padding: 12px 16px 0; gap: 8px; }
+  .toolbar-search { flex: 0 0 auto; width: 100%; max-width: 100%; min-width: 0; padding: 0; }
   .toolbar-actions { margin-left: 0; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
   .toolbar-actions::-webkit-scrollbar { display: none; }
 }

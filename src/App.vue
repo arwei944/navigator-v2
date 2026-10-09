@@ -24,7 +24,8 @@
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
         <MainToolbar v-if="scope !== 'trash'"
                      @open-settings="showSettings = true" @open-todo="showTodo = true"
-                     @open-add="openAddSite" @open-card-settings="showCardSettings = true" />
+                     @open-add="openAddSite" @open-card-settings="showCardSettings = true"
+                     @open-palette="commandPaletteRef?.open()" />
         <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示；归档同理（筛选条的计数
              基于在册站点，在归档范围内会虚高） -->
         <FilterBar v-if="scope !== 'trash' && scope !== 'archived'" />
@@ -37,37 +38,53 @@
 
     <!-- 移动端底部 tab 栏 -->
     <MobileTabBar />
-
-    <!-- 快捷键面板 -->
-    <ShortcutsPanel ref="shortcutsRef" />
-
-    <!-- 全局命令面板 -->
-    <CommandPalette ref="commandPaletteRef" @navigate="onPaletteNavigate" />
-
-    <!-- 设置面板 -->
-    <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin" />
-
-    <!-- 卡片设置：右侧抽屉，改动在左侧网格即时可见 -->
-    <CardSettingsPanel v-if="showCardSettings" @close="showCardSettings = false" />
-
-    <!-- 待办面板：入口在中间栏工具栏 -->
-    <TodoPanel v-if="showTodo" @close="showTodo = false" />
-
-    <!-- 导入导出面板 -->
-    <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
-
-    <!-- 添加站点：入口在右上角工具栏与站内搜索框，弹窗宿主上提到这里（原挂在左侧栏内） -->
-    <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" />
-
-    <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
-    <ToastHost />
-
-    <!-- 全局单例右键菜单：替代每张卡片各自一份（300 卡 = 600 个 document 监听） -->
-    <ContextMenuHost />
-
-    <!-- 移动端站点详情抽屉：≤768px 没有 hover，右侧面板又整体隐藏，详情在这里兜住 -->
-    <MobileDetailDrawer />
   </div>
+
+  <!-- ── 全局浮层区 ──
+       刻意放在路由壳之外：/admin、404 这类独立页面不套 app-layout，
+       浮层若挂在里面，这些页面下 Ctrl+K 与命令唤起的弹窗就全部失效。 -->
+  <ShortcutsPanel ref="shortcutsRef" />
+
+  <!-- 全能框（Ctrl+K）：与顶部搜索框共用同一套命令与检索内核 -->
+  <CommandPalette ref="commandPaletteRef" />
+
+  <!-- 设置面板 -->
+  <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin" />
+
+  <!-- 卡片设置：右侧抽屉，改动在左侧网格即时可见 -->
+  <CardSettingsPanel v-if="showCardSettings" @close="showCardSettings = false" />
+
+  <!-- 待办面板：入口在中间栏工具栏 -->
+  <TodoPanel v-if="showTodo" @close="showTodo = false" />
+
+  <!-- 导入导出面板 -->
+  <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
+
+  <!-- 添加站点：入口在右上角工具栏与全能框，弹窗宿主上提到这里（原挂在左侧栏内） -->
+  <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" />
+
+  <!-- 编辑站点：全能框「编辑」命令的宿主。卡片上的编辑仍走 CardsContainer 自己的实例，
+       这里只补命令层够不着的那一条路径 -->
+  <EditSiteModal v-if="editSite" :site="editSite" @close="closeEditSite" @saved="closeEditSite" />
+
+  <!-- 删除确认：全能框「删除」命令的二次确认 -->
+  <ConfirmDialog
+    v-if="deleteSite"
+    title="删除站点"
+    :message="`确定要把「${deleteSite.name}」移入回收站吗？可以在回收站里恢复。`"
+    confirm-text="删除"
+    @cancel="cancelDeleteSite"
+    @confirm="confirmDeleteSite"
+  />
+
+  <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
+  <ToastHost />
+
+  <!-- 全局单例右键菜单：替代每张卡片各自一份（300 卡 = 600 个 document 监听） -->
+  <ContextMenuHost />
+
+  <!-- 移动端站点详情抽屉：≤768px 没有 hover，右侧面板又整体隐藏，详情在这里兜住 -->
+  <MobileDetailDrawer />
 </template>
 
 <script setup>
@@ -93,12 +110,15 @@ import CardSettingsPanel from '@/components/CardSettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
+import EditSiteModal from '@/components/EditSiteModal.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import ContextMenuHost from '@/components/ContextMenuHost.vue'
 import MobileDetailDrawer from '@/components/MobileDetailDrawer.vue'
 import { autoAddSite } from '@/services/autoAdd'
 import { AUTO_ADD_REASON } from '@/utils/siteDraft'
 import { useToastStore } from '@/stores/toast'
+import { useOmniStore } from '@/stores/omni'
 
 const route = useRoute()
 const router = useRouter()
@@ -108,6 +128,7 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const clicksStore = useClicksStore()
 const toastStore = useToastStore()
+const omniStore = useOmniStore()
 const commandPaletteRef = ref(null)
 const shortcutsRef = ref(null)
 const showSettings = ref(false)
@@ -116,6 +137,9 @@ const showCardSettings = ref(false)
 const showTodo = ref(false)
 const showBookmarkImport = ref(false)
 const showAddModal = ref(false)
+// 全能框「编辑 / 删除」命令的宿主状态：命令只发请求，弹窗由这里渲染
+const editSite = ref(null)
+const deleteSite = ref(null)
 // 搜索框里输入的网址：打开弹窗时带过去预填；从右上角按钮进来则为空
 const addPrefillUrl = ref('')
 // 自动添加被护栏拦下时，带进弹窗的原因提示
@@ -233,10 +257,57 @@ const wallpaperStyle = computed(() => {
   return {}
 })
 
-function onPaletteNavigate(action) {
-  if (action === 'shortcuts') {
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))
-  }
+/* ---- 全能框：命令只发请求，弹窗宿主在这里落地 ----
+   命令层因此完全不持有 DOM 状态，也不必知道每个面板挂在谁的 v-if 里。 */
+
+watch(() => omniStore.panel, (name) => {
+  if (!name) return
+  if (name === 'settings') showSettings.value = true
+  else if (name === 'cardSettings') showCardSettings.value = true
+  else if (name === 'todo') showTodo.value = true
+  else if (name === 'bookmarkImport') { showSettings.value = false; showBookmarkImport.value = true }
+  else if (name === 'shortcuts') nextTick(() => shortcutsRef.value?.open())
+  // 一次性请求：消费后立即清空，不带到下一次
+  omniStore.panel = ''
+})
+
+watch(() => omniStore.editTarget, (site) => {
+  if (!site) return
+  editSite.value = site
+  omniStore.editTarget = null
+})
+
+watch(() => omniStore.deleteTarget, (site) => {
+  if (!site) return
+  deleteSite.value = site
+  omniStore.deleteTarget = null
+})
+
+watch(() => omniStore.addOpen, (v) => {
+  if (!v) return
+  openAddSite({ url: omniStore.addPrefillUrl || '' })
+  omniStore.addOpen = false
+})
+
+function closeEditSite() {
+  editSite.value = null
+}
+
+function cancelDeleteSite() {
+  deleteSite.value = null
+}
+
+function confirmDeleteSite() {
+  const site = deleteSite.value
+  deleteSite.value = null
+  if (!site) return
+  sitesStore.deleteSite(site.id)
+  toastStore.push({
+    message: `已把「${site.name}」移入回收站`,
+    tone: 'ok',
+    actionLabel: '撤销',
+    onAction: () => sitesStore.restoreFromTrash(site.id)
+  })
 }
 
 /* ---- 路由 ⇄ 状态：路由是唯一事实来源 ---- */
@@ -339,12 +410,17 @@ onMounted(() => {
   document.addEventListener('visibilitychange', onVisibility)
 
   document.addEventListener('keydown', (e) => {
-    // Ctrl+K 打开全局命令面板
+    // Ctrl+K 打开全能框（命令面板形态）
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
       e.preventDefault()
-      if (commandPaletteRef.value) {
-        commandPaletteRef.value.open()
-      }
+      commandPaletteRef.value?.open()
+      return
+    }
+    // Ctrl+D 切换主题：快捷键面板里写了这条但一直没实现，这里补上
+    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+      e.preventDefault()
+      preferencesStore.toggleTheme()
+      return
     }
     if (e.key === 'Escape') {
       sidebarStore.close()

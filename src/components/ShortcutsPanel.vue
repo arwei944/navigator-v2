@@ -27,11 +27,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
 
 const visible = ref(false)
 
+// 这几条必须与真实绑定一致：此前 Ctrl+D 写了却没实现，是纯误导
 const shortcuts = [
-  { id: 'search', label: '打开搜索', key: 'Ctrl+K' },
+  { id: 'omni', label: '打开全能框（命令）', key: 'Ctrl+K' },
+  { id: 'search', label: '聚焦顶部搜索框', key: 'Ctrl+F' },
+  { id: 'theme', label: '切换主题', key: 'Ctrl+D' },
   { id: 'shortcuts', label: '查看快捷键', key: '?' },
   { id: 'close', label: '关闭面板/弹窗', key: 'Escape' },
-  { id: 'theme', label: '切换主题', key: 'Ctrl+D' },
 ]
 
 function open() {
@@ -59,6 +61,9 @@ function handleKeydown(e) {
     close()
   }
 }
+
+// 全能框的「查看快捷键」命令直接调 open()，不再靠伪造 KeyboardEvent 绕一圈
+defineExpose({ open, close })
 
 onMounted(() => {
   document.addEventListener('keydown', handleKeydown)

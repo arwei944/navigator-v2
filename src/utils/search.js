@@ -143,6 +143,68 @@ export function matchedAlias(site, query) {
   return i === -1 ? '' : aliases[i]
 }
 
+/* ─────────────────────────────────────────────────────────────
+ * 通用文本打分：命令名 / 页面名 / 分类名 / 用途名复用。
+ * 与站点打分同源（同一个 pinyin-pro、同一套「精确 > 前缀 > 包含 > 拼音」档位序），
+ * 这样「切换主题」打 zhuti / zt 能和站点一样被搜到——命令面板时代这四类
+ * 只有 String.includes，中文命令靠拼音根本搜不出来。
+ * ───────────────────────────────────────────────────────────── */
+
+const TEXT_SCORE = {
+  EXACT: 900,
+  PREFIX: 700,
+  INCLUDES: 500,
+  PY_INITIAL_PREFIX: 380,
+  PY_PREFIX: 360,
+  PY_INCLUDES: 260
+}
+
+// 文本量级远小于站点且基本固定（命令 45 条 + 分类 37 + 用途 12），用 Map 裸缓存即可
+const textKeyCache = new Map()
+
+function textKeys(text) {
+  const src = String(text ?? '')
+  let k = textKeyCache.get(src)
+  if (k) return k
+  let py = ''
+  let pyInitial = ''
+  try {
+    py = pinyin(src, { toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
+    pyInitial = pinyin(src, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
+  } catch {
+    // 拼音库对个别符号串会抛，退化为「无拼音命中」而不是让整次检索失败
+  }
+  k = { lower: src.toLowerCase(), py, pyInitial }
+  textKeyCache.set(src, k)
+  return k
+}
+
+/** 单条文本对 query 的相关度，0 = 未命中。字符串数组（如关键词表）用 matchAny。 */
+export function scoreText(text, query) {
+  const q = String(query ?? '').trim().toLowerCase()
+  if (!q) return 0
+  const k = textKeys(text)
+  if (!k.lower) return 0
+  if (k.lower === q) return TEXT_SCORE.EXACT
+  if (k.lower.startsWith(q)) return TEXT_SCORE.PREFIX
+  if (k.lower.includes(q)) return TEXT_SCORE.INCLUDES
+  if (k.pyInitial && k.pyInitial.startsWith(q)) return TEXT_SCORE.PY_INITIAL_PREFIX
+  if (k.py && k.py.startsWith(q)) return TEXT_SCORE.PY_PREFIX
+  if (k.py && k.py.includes(q)) return TEXT_SCORE.PY_INCLUDES
+  return 0
+}
+
+/** 对一组文本（标题 + 副标题 + 关键词表）打分，取最高值。 */
+export function matchAny(list, query) {
+  let best = 0
+  for (const t of list) {
+    if (!t) continue
+    const s = scoreText(t, query)
+    if (s > best) best = s
+  }
+  return best
+}
+
 /** 把 text 按 query 切成分段，供模板用 <mark> 渲染，替代 v-html。 */
 export function splitHighlight(text, query) {
   const src = String(text ?? '')
