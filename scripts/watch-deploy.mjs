@@ -85,6 +85,10 @@ function log(msg) {
 let dirty = { code: false, data: false }
 let debounceTimer = null
 let deploying = false
+// 部署**进行中**到来的新变更：决定结束后要不要补跑一次。
+// 必须与「失败后把标记放回 dirty」区分开 —— 若只看 dirty，构建持续失败时
+// 会每次失败都立刻重排，变成无限自动重试（曾把构建每 50s 空跑一次持续 49 分钟）。
+let arrivedDuringDeploy = false
 
 function schedule() {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -107,6 +111,7 @@ function sh(cmd, label) {
 function runDeploy() {
   const task = { ...dirty }
   dirty = { code: false, data: false }
+  arrivedDuringDeploy = false
   deploying = true
   const t0 = Date.now()
   const what = [task.code && '代码', task.data && '数据'].filter(Boolean).join(' + ')
@@ -128,13 +133,15 @@ function runDeploy() {
     record({ action: 'watch.deploy.done', actor: 'watch-deploy', target: what, detail: `${secs}s` })
   } catch (e) {
     log(`❌ 部署失败：${String(e.message).split('\n')[0]}`)
-    log('   已保留待部署标记，下次改动会重试；也可直接重跑 npm run publish')
-    // 失败时把标记放回去，避免一次失败后变更被静默吞掉
+    log('   已保留待部署标记：下次改动会连同一起重试；也可直接重跑 npm run publish')
+    // 只把本次的类型放回 dirty，**不**在此重排 —— 构建持续失败时若立刻重排就是死循环。
+    // 真需要立即重来，改一下任意被监听文件即可再次触发。
     dirty = { code: dirty.code || task.code, data: dirty.data || task.data }
     record({ action: 'watch.deploy.fail', actor: 'watch-deploy', result: 'fail', target: what, detail: String(e.message).slice(0, 300) })
   } finally {
     deploying = false
-    if (dirty.code || dirty.data) schedule()
+    // 只有「部署期间又来了新改动」才补跑一次（排空编辑期间积压的变更）
+    if (arrivedDuringDeploy) schedule()
   }
 }
 
@@ -149,6 +156,7 @@ function onEvent(absPath) {
   } else {
     dirty.code = true
   }
+  if (deploying) arrivedDuringDeploy = true
   schedule()
 }
 
