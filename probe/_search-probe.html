@@ -65,7 +65,7 @@ async function mount(w, h, path) {
     f.addEventListener('load', fin, { once: true })
     setTimeout(fin, 12000)
   })
-  await waitFor(() => f.contentDocument?.querySelector('.site-search-input'), 10000)
+  await waitFor(() => f.contentDocument?.querySelector('.unified-search-input'), 10000)
   await sleep(1500)
   return f
 }
@@ -92,7 +92,7 @@ async function runXSS() {
   const d = f.contentDocument, w = f.contentWindow
   w.__xssFired = 0
 
-  const input = d.querySelector('.site-search-input')
+  const input = d.querySelector('.unified-search-input')
   typeInto(input, w, 'XSSProbe')
   await sleep(900)
 
@@ -126,7 +126,7 @@ async function runXSS() {
   check('A1.8', '全程无脚本执行', w.__xssFired === 0, 'fired=' + w.__xssFired)
 
   // ── A5 空态 ──
-  const pInput = d.querySelector('.site-search-input')
+  const pInput = d.querySelector('.unified-search-input')
   typeInto(pInput, w, NOHIT)
   await sleep(900)
   const empty = d.querySelector('.search-empty')
@@ -169,7 +169,7 @@ async function runLayout() {
       f = await mount(w, 900, '/')
       const d = f.contentDocument, win = f.contentWindow
       const overflow = d.documentElement.scrollWidth - win.innerWidth
-      const inputRect = d.querySelector('.site-search-input')?.getBoundingClientRect()
+      const inputRect = d.querySelector('.unified-search-input')?.getBoundingClientRect()
       const wrapRect = d.querySelector('.search-input-wrap')?.getBoundingClientRect()
       const rec = {
         width: w,

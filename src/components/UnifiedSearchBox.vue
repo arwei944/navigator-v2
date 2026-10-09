@@ -1,9 +1,22 @@
 <template>
-  <div class="site-search" ref="rootEl">
+  <div class="unified-search" ref="rootEl">
     <div class="search-input-wrap" :class="{ focused: focused }">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="search" class="search-input site-search-input" v-model="localQuery"
-             placeholder="搜索站点名称、别名、描述、拼音..." aria-label="搜索站点"
+      <!-- 引擎前缀：站外搜索用哪个引擎常驻可见、随手可切（原 ExternalSearchBox 的下拉） -->
+      <label class="engine-select" title="选择搜索引擎">
+        <select v-model="engineId" aria-label="选择搜索引擎">
+          <option v-for="e in preferencesStore.engines" :key="e.id" :value="e.id">{{ shortLabel(e) }}</option>
+        </select>
+        <svg class="engine-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </label>
+
+      <!-- 放大镜兼作「立即站外搜索」的显式按钮（回车走智能路由，这里是手动出口） -->
+      <button type="button" class="search-go" @mousedown.prevent="externalSearch"
+              :title="`用 ${currentEngine.label} 搜索`" aria-label="用外部搜索引擎搜索">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+
+      <input type="search" class="search-input unified-search-input" v-model="localQuery"
+             placeholder="搜索站点名称、别名、描述、拼音..." aria-label="搜索站点或站外搜索"
              @mousedown="onInputPointerDown"
              @focus="focused = true" @blur="onBlur" @keydown.escape="focused = false"
              @keydown.down.prevent="moveDown" @keydown.up.prevent="moveUp"
@@ -17,8 +30,8 @@
       <button class="search-palette-hint" type="button" @click="openPalette" title="打开命令面板">⌘K</button>
     </div>
 
-    <!-- 建议下拉：把「添加站点」也收进搜索框。
-         网址类输入置顶（回车即带着网址进入添加）；搜不到时给一条出路；其余情况在底部留一条淡入口。 -->
+    <!-- 建议下拉：站内站点在上，站外搜索作为常驻页脚在下。
+         网址类输入置顶（回车即带着网址进入添加）；搜不到时给一条出路。 -->
     <div v-if="focused && trimmedQuery" class="search-suggestions">
       <div v-if="suggestions.length === 0" class="suggestion-note">未找到「{{ trimmedQuery }}」相关站点</div>
 
@@ -73,12 +86,22 @@
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
             </a>
           </template>
-        </div>
+      </div>
 
-        <!-- 库里搜不到时的外部出口，只在无结果时出现，避免平时占用列表 -->
-        <a v-if="suggestions.length === 0" class="suggestion-google" :href="googleUrl" target="_blank" rel="noopener">
-          用 Google 搜索「{{ trimmedQuery }}」
-        </a>
+      <!-- 站外搜索出口：常驻页脚，跟随所选引擎，可被 ↑/↓ 选中后回车 -->
+      <button type="button" class="suggestion-external"
+              :class="{ active: activeIndex === externalIndex }"
+              @mousedown.prevent="activate({ kind: 'external' })"
+              @mouseenter="activeIndex = externalIndex">
+        <span class="suggestion-icon is-external">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </span>
+        <div class="suggestion-info">
+          <span class="suggestion-name"><span class="suggestion-name-text">用 {{ currentEngine.label }} 搜索「{{ trimmedQuery }}」</span></span>
+          <span class="suggestion-desc">在浏览器新标签页打开站外搜索</span>
+        </div>
+        <span class="suggestion-cat">站外</span>
+      </button>
     </div>
   </div>
 </template>
@@ -87,6 +110,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import { usePreferencesStore } from '@/stores/preferences'
 import { rankSites, splitHighlight, matchedAlias } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
 
@@ -94,6 +118,7 @@ const emit = defineEmits(['add-site'])
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
+const preferencesStore = usePreferencesStore()
 
 const searchInput = ref(null)
 const rootEl = ref(null)
@@ -124,7 +149,32 @@ const filteredCount = computed(() => sitesStore.filteredSites.length)
 
 const suggestions = computed(() => rankSites(sitesStore.categorySites, localQuery.value, { limit: 6 }))
 
-const googleUrl = computed(() => 'https://www.google.com/search?q=' + encodeURIComponent(trimmedQuery.value))
+/* ---------- 站外搜索（原 ExternalSearchBox 的能力） ---------- */
+
+// 下拉宽度取决于最长选项，用短标签避免被 "DuckDuckGo" 撑宽（设置面板里仍是全称）
+const SHORT_LABELS = { google: 'Google', bing: 'Bing', baidu: '百度', duckduckgo: 'DDG', perplexity: 'PPLX' }
+function shortLabel(e) {
+  return SHORT_LABELS[e.id] || e.label
+}
+
+const engineId = computed({
+  get: () => preferencesStore.searchEngine,
+  set: (id) => preferencesStore.setSearchEngine(id)
+})
+
+const currentEngine = computed(() => preferencesStore.getCurrentEngine())
+
+/**
+ * 站外搜索统一出口：键盘（回车 / 上下键选中）、点击放大镜、点击下拉页脚三条路径共用。
+ * 拼接方式与旧 `<form method="GET" name="q">` 等价（`?q=` + encodeURIComponent），
+ * 因此 duckduckgo.com/ 这类没有 /search 路径的引擎照常可用。
+ */
+function externalSearch() {
+  const q = trimmedQuery.value
+  if (!q) return
+  window.open(`${currentEngine.value.url}?q=${encodeURIComponent(q)}`, '_blank', 'noopener')
+  focused.value = false
+}
 
 // 输入已经像网址（chat.openai.com / https://…）时，才有资格拿它去新增站点
 const domainCandidate = computed(() => {
@@ -144,6 +194,7 @@ const collected = computed(() => {
 /**
  * 下拉里的可导航行（含键盘上下选择）。
  * 只有网址类输入才把网址预填进弹窗；关键词不是网址，塞进网址框只会让用户先删一遍。
+ * 末尾恒有一条站外搜索出口，因此上下键可以一路选到它。
  */
 const navItems = computed(() => {
   const q = trimmedQuery.value
@@ -167,8 +218,14 @@ const navItems = computed(() => {
   if (!col && !cand && list.length > 0) {
     items.push({ kind: 'add', url: '', label: '', hint: '添加一个还没收录的站点', subtle: true })
   }
+
+  // 站外搜索出口：常驻页脚
+  items.push({ kind: 'external' })
   return items
 })
+
+// 站外行恒为最后一项（仅在有 query 时存在），供页脚高亮与键盘导航定位
+const externalIndex = computed(() => navItems.value.length - 1)
 
 function itemKey(item, i) {
   return item.kind === 'site' ? item.site.id : `${item.kind}-${i}`
@@ -202,6 +259,7 @@ function activate(item) {
   if (item.kind === 'site') jumpToSite(item.site)
   else if (item.kind === 'collected') requestAdd('https://' + item.site.url)
   else if (item.kind === 'add') requestAdd(item.url)
+  else if (item.kind === 'external') externalSearch()
 }
 
 function moveDown() {
@@ -214,10 +272,26 @@ function moveUp() {
   activeIndex.value = activeIndex.value <= 0 ? navItems.value.length - 1 : activeIndex.value - 1
 }
 
+/**
+ * 回车路由（站内优先，其次站外）：
+ *   1. 用户已用 ↑/↓ 显式选过 → 尊重选择（可能落在站外行上）
+ *   2. 已收录域名     → 定位到已有站点
+ *   3. 输入像网址     → 一键添加（既有能力，优先于站外搜索）
+ *   4. 站内有命中     → 打开第一个站点
+ *   5. 其余           → 用当前引擎搜站外
+ */
 function onEnter() {
-  const idx = activeIndex.value >= 0 ? activeIndex.value : 0
-  const item = navItems.value[idx]
-  if (item) activate(item)
+  if (activeIndex.value >= 0) {
+    const item = navItems.value[activeIndex.value]
+    if (item) return activate(item)
+  }
+  const col = collected.value
+  if (col) return activate({ kind: 'collected', site: col })
+  const cand = domainCandidate.value
+  if (cand) return requestAdd(cand.url)
+  const first = suggestions.value[0]
+  if (first) return jumpToSite(first)
+  externalSearch()
 }
 
 function onBlur() {
@@ -259,7 +333,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* 由所在工具栏负责外边距，这里只管自身与下拉定位 */
-.site-search {
+.unified-search {
   padding: 0;
   position: relative;
 }
@@ -270,7 +344,7 @@ onUnmounted(() => {
   background: var(--bg-white);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 0 14px;
+  padding: 0 14px 0 0;
   height: 40px;
   transition: all .15s ease;
   max-width: 600px;
@@ -285,7 +359,6 @@ onUnmounted(() => {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
 }
-.search-input-wrap svg { width: 16px; height: 16px; color: var(--text-secondary); flex-shrink: 0; }
 .search-input {
   flex: 1;
   border: none;
@@ -297,6 +370,65 @@ onUnmounted(() => {
   min-width: 0;
 }
 .search-input::placeholder { color: var(--text-secondary); }
+.search-input::-webkit-search-cancel-button { display: none; }
+
+/* 引擎前缀：贴左边缘，浅底 + 右分隔线，与输入区区分开 */
+.engine-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  align-self: stretch;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  background: var(--border-light);
+  border-radius: calc(var(--radius) - 1px) 0 0 calc(var(--radius) - 1px);
+}
+.search-input-wrap.focused .engine-select {
+  border-bottom-left-radius: 0;
+}
+.engine-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  height: 100%;
+  padding: 0 24px 0 12px;
+  cursor: pointer;
+}
+.engine-select select:hover { color: var(--accent); }
+.engine-caret {
+  position: absolute;
+  right: 7px;
+  width: 12px;
+  height: 12px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+/* 放大镜：兼作「立即站外搜索」按钮 */
+.search-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color .15s ease;
+}
+.search-go:hover { color: var(--accent); }
+.search-go svg { width: 16px; height: 16px; }
+
 .search-count {
   font-size: 11px;
   color: var(--text-secondary);
@@ -378,7 +510,9 @@ onUnmounted(() => {
   transition: background .1s ease;
   border-bottom: 1px solid var(--border-light);
 }
-.suggestion-item:last-child { border-bottom: none; }
+/* 最后一条建议行不画下边线：站外页脚自带 border-top 作为分隔，
+   这里用 last-of-type 而非 last-child——页脚是 <button>，:last-child 已经不再命中最后一条建议行 */
+.suggestion-item:last-of-type { border-bottom: none; }
 .suggestion-item:hover { background: var(--accent-light); }
 .suggestion-item.active { background: var(--accent-light); }
 
@@ -414,6 +548,8 @@ onUnmounted(() => {
   position: relative;
   overflow: hidden;
 }
+.suggestion-icon.is-external { background: var(--border-light); color: var(--text-secondary); }
+.suggestion-icon.is-external svg { width: 15px; height: 15px; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 1px; background: #fff; box-sizing: border-box; }
 .suggestion-info {
@@ -475,17 +611,23 @@ onUnmounted(() => {
 .suggestion-visit:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
 .suggestion-visit svg { width: 12px; height: 12px; }
 
-/* 无结果时的外部出口 */
-.suggestion-google {
-  display: block;
+/* 站外搜索出口：下拉的常驻页脚，用按钮实现以获得原生语义（回车/空格可达） */
+.suggestion-external {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
   padding: 10px 14px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-decoration: none;
-  border-top: 1px solid var(--border-light);
-  transition: all .1s ease;
+  border: none;
+  border-top: 1px solid var(--border);
+  background: var(--bg-white);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background .1s ease;
 }
-.suggestion-google:hover { background: var(--accent-light); color: var(--accent); }
+.suggestion-external:hover,
+.suggestion-external.active { background: var(--accent-light); }
 
 /* 高亮 */
 :deep(mark) {

@@ -183,7 +183,7 @@ async function runDesktopFlow() {
   const cex = Array.from(d.querySelectorAll('.sidebar-category')).find(c => c.textContent.includes('交易所 CEX'))
   if (cex) { cex.click(); await sleep(700) }
   step('click-category')
-  const input = d.querySelector('.site-search-input')
+  const input = d.querySelector('.unified-search-input')
   input.value = 'binance'
   input.dispatchEvent(new w.Event('input', { bubbles: true }))
   await sleep(1100); step('search-type')

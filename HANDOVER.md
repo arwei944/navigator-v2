@@ -73,7 +73,7 @@ nav-v2/
 │   │   ├── ShortcutsPanel.vue     # 快捷键面板
 │   │   ├── Sidebar.vue            # 左侧导航栏（可拖拽宽度）
 │   │   ├── SiteCard.vue           # 站点卡片
-│   │   ├── SiteSearchBar.vue      # 站点搜索栏
+│   │   ├── UnifiedSearchBox.vue   # 统一搜索框（站内检索 + 站外引擎搜索）
 │   │   ├── StatsBar.vue           # 顶部状态栏
 │   │   ├── ThemePicker.vue        # 主题选择器
 │   │   └── TodoPanel.vue         # 待办事项面板
@@ -1812,11 +1812,15 @@ V5 是一次**大版本升级**（不是增量小改），方案见 [`docs/NAV-v
 
 ### 32.4 工具栏合并（`MainToolbar.vue`）
 
-- 站内搜索 `SiteSearchBar` + 外部搜索 `ExternalSearchBox` 同排。外部搜索用原生 `<form method="GET">`
-  提交（`target="_blank"` + `rel="noopener noreferrer"`），引擎下拉 Google / Bing / 百度 / DDG / PPLX，
-  下拉用短标签避免被 `DuckDuckGo` 撑宽（设置面板内仍是全称），引擎选择持久化。
+- **站内检索与站外搜索合并为一个统一搜索框** `UnifiedSearchBox`（由 `SiteSearchBar` 改名并吸收
+  `ExternalSearchBox`）。框内左侧是引擎前缀下拉（Google / Bing / 百度 / DDG / PPLX，短标签避免被
+  `DuckDuckGo` 撑宽，设置面板内仍是全称），引擎选择持久化；放大镜兼作「立即站外搜索」按钮。
+  下拉 = 站内站点建议（上）+ **常驻的站外搜索页脚**（下，跟随所选引擎、可被 ↑/↓ 选中）。
+  回车路由：↑↓已选 → 尊重选择；已收录 → 定位；输入像网址 → 一键添加；站内有命中 → 打开第一个站点；
+  其余 → 用当前引擎搜站外。站外搜索用 `window.open(\`${engine.url}?q=…\`)`，等价于旧原生
+  `<form method="GET" name="q">` 的拼接。
 - 排序 / 批量选择 / 手动排序 / 视图切换 / 待办 / 主题 / 设置 收敛为一行，统计信息下沉。
-- 响应式收敛：≤1500px「选择 / 手动排序」只留图标（tooltip 补文案）；≤1360px、≤1300px 逐级收窄外部搜索输入。
+- 响应式收敛：≤1500px「选择 / 手动排序」只留图标（tooltip 补文案）；≤1360px、≤1300px 逐级收窄统一搜索框宽度。
 
 ### 32.5 URL 状态化与旧链接兼容（`router/index.js`）
 

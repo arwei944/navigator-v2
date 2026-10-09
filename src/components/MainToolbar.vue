@@ -1,7 +1,7 @@
 <template>
   <div class="main-toolbar">
-    <SiteSearchBar class="toolbar-search" @add-site="$emit('open-add', $event)" />
-    <ExternalSearchBox class="toolbar-external" />
+    <!-- 站内检索与站外搜索已合并为一个统一搜索框（引擎选择器为其左侧前缀） -->
+    <UnifiedSearchBox class="toolbar-search" @add-site="$emit('open-add', $event)" />
 
     <div class="toolbar-actions">
       <select class="sort-select" v-model="sortValue" aria-label="排序方式" title="排序方式">
@@ -57,8 +57,7 @@
 import { ref, watch } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
-import SiteSearchBar from '@/components/SiteSearchBar.vue'
-import ExternalSearchBox from '@/components/ExternalSearchBox.vue'
+import UnifiedSearchBox from '@/components/UnifiedSearchBox.vue'
 
 defineEmits(['open-settings', 'open-todo', 'open-add'])
 
@@ -84,7 +83,6 @@ function toggleViewMode() {
   flex-shrink: 0;
 }
 .toolbar-search { flex: 1 1 260px; min-width: 0; padding: 0; }
-.toolbar-external { flex: 0 0 auto; }
 .toolbar-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 
 .sort-select {

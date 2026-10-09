@@ -101,9 +101,9 @@ async function run(cfg) {
       log(`      · ${(child.className || child.tagName).toString().padEnd(18)} w=${String(mw(child)).padStart(6)}`)
     }
     const sw = bar.querySelector('.search-input-wrap')
-    const ext = bar.querySelector('.ext-search')
+    const engine = bar.querySelector('.engine-select')
     const acts = bar.querySelector('.toolbar-actions')
-    log(`      · search-input-wrap w=${mw(sw)}  ext-search w=${mw(ext)}  actions w=${mw(acts)}`)
+    log(`      · search-input-wrap w=${mw(sw)}  engine-select w=${mw(engine)}  actions w=${mw(acts)}`)
   }
   const fb = doc.querySelector('.filter-bar')
   log(`   -- 筛选条：h=${mw(fb) === null ? null : round(rect(fb).height)} domain-tabs=${round(rect(doc.querySelector('.domain-tabs'))?.height)} chip-row=${round(rect(doc.querySelector('.chip-row'))?.height)} 组数=${doc.querySelectorAll('.chip-group').length} chip数=${doc.querySelectorAll('.chip-row .chip').length}`)

@@ -118,7 +118,7 @@ async function runDesktop() {
   if (cex) { cex.click(); await sleep(700) }
   snap('after-click-category')
 
-  const input = d.querySelector('.site-search-input')
+  const input = d.querySelector('.unified-search-input')
   input.value = 'binance'
   input.dispatchEvent(new w.Event('input', { bubbles: true }))
   await sleep(1100); snap('after-search-type')
