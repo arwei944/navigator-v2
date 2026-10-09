@@ -70,6 +70,7 @@
 - **攒批**：每次事件重置防抖计时器，连续保存只在停下来后跑一次。
 - **排队**：部署进行中到来的变更只累积 `dirty` 标记，当前部署结束后自动补跑一次（不并发、不丢改动）。
 - **失败不吞**：任一步失败即打印首行错误 + 审计记录，并把本次的变更标记**放回** `dirty`，下次改动会连同一起重试。
+- **失败后不自动重排**（首版实现的缺陷，已修）：`dirty` 里既有「失败保留的标记」又有「部署期间新到的变更」，若一律据此重排，构建持续失败时就会变成**无限自动重试** —— 首版实测以约 50s 一轮空转 49 分钟。现在用独立的 `arrivedDuringDeploy` 区分：只有「部署进行中又来了新变更」才在结束后补跑一次；失败保留的标记静静等下一次真实改动。
 - 审计：通过 `tools/console/lib/audit.mjs#record` 记录 `watch.start / watch.deploy.done / watch.deploy.fail`，与 publish 事件同一审计流。
 
 ### 4.4 参数
@@ -109,6 +110,7 @@
   - 触碰 `api/sites-data.json` → `检测到数据变更` → `publish.mjs --skip-build`
   - 触碰 `dist/index.html`、`docs/*.md`、`probe/_probe.html`、根 `_chrome-report.json` → **零触发**（忽略规则生效）
 - 组成步骤各自在真机跑通：`npm run build` ✅、`npx --yes vercel deploy --prod` ✅（本轮已把合并后的搜索框发布上线，线上 `assets/index-BtNrp2iL.js` 内含 `unified-search-input`）。
+- **失败路径回归**：复现同一构建失败（本沙箱下 vite 清 `dist` 被删除保护拦下），确认**触发 1 次、失败 1 次、70s 内无重试** —— 修复前该场景会每 ~50s 无限重试。
 
 **待用户环境确认**：
 
