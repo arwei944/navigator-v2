@@ -77,6 +77,7 @@ pnpm run nav         # 智能体 CLI：站点/发布/Git/数据 四域 35 条命
 pnpm run mcp         # MCP 服务：把同一套能力收敛成 5 个域级工具，供智能体原生调用（stdio）
 pnpm run mcp:test    # MCP 端到端用例：真实 stdio 握手 + 工具契约与写操作闸门断言
 pnpm run publish     # 一键发布：备份 → 数据校验 → 构建 → 部署 → 云端热更新 → 轮询验证
+pnpm run watch:deploy # 保存即部署：常驻监听本地变更，自动构建并发布到生产（见下）
 pnpm run console:test # 控制台来源校验用例（Host/Origin/自定义头，13 条断言）
 pnpm run console:test:all # 控制台全量用例：来源校验 + 元信息推断 + SSRF 防护 + hunk 分块
 pnpm run validate    # 站点数据 schema 校验（发布门禁与 CI 会自动调用）
@@ -96,6 +97,26 @@ pnpm run publish -- --skip-build   # 跳过前端构建，仅热更新云端数�
 pnpm run publish -- -k <密钥>      # 显式传管理密钥（-k / --key=，否则读 .env.local / 环境变量）
 pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知（-w / --webhook=）
 ```
+
+### 保存即部署（`watch:deploy`）
+
+`pnpm run watch:deploy` 常驻监听 `src/ shared/ api/ public/` 与 `index.html / vite.config.js / vercel.json / package.json`，
+停止编辑 8 秒后自动发布到生产。**按变更类型分流**，避免误伤云端数据：
+
+| 变更 | 执行 |
+| --- | --- |
+| 只有代码 | `npm run build` → `vercel deploy --prod`（完全不碰云端 Blob 数据） |
+| 数据变了（`api/sites-data.json`） | `publish --skip-build`：复用其备份 / schema 校验 / 快照 / 热更新 / 收敛验证 |
+| 两者都变 | 构建一次，再走 `publish --skip-build` |
+
+```bash
+pnpm run watch:deploy -- --dry-run       # 只打印将要执行的命令，不真正构建/部署
+pnpm run watch:deploy -- --no-data       # 只同步代码，不推送站点数据
+pnpm run watch:deploy -- --debounce=3000 # 自定义防抖（最小 1000ms）
+```
+
+`dist` / `node_modules` / `backups` / `tools` / `probe` / `docs` 及编辑器临时文件不触发部署；改 `scripts/` 本身也不触发。
+部署失败会保留待部署标记并在下次改动时重试，审计写入同一条 `tools/console` 审计流。
 
 > CLI 参数统一用 Node 内置 `parseArgs` 解析（`publish.mjs`、`check-sites.mjs` 均支持）。
 

@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "deploy": "vite build && vercel deploy --prod --yes --name=navigator-v2",
     "publish": "node scripts/publish.mjs",
+    "watch:deploy": "node scripts/watch-deploy.mjs",
     "validate": "node scripts/validate-data.mjs",
     "auth:hash": "node scripts/hash-password.mjs",
     "check": "node scripts/check-sites.mjs",

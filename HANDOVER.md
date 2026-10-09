@@ -520,6 +520,12 @@ node -e "const d=require('./api/sites-data.json'); console.log(d.length, d.filte
 - 自动提醒缺失 favicon 的站点（可运行 `npm run icons` 补抓）
 - 参数：`--skip-build` 跳过本地构建、`--key xxx` 覆盖管理密钥
 - 发布数据默认使用内置管理密钥，也可用环境变量 `SITES_ADMIN_KEY` 覆盖
+- **保存即部署（2026-10-09）**：`npm run watch:deploy`（`scripts/watch-deploy.mjs`）常驻监听
+  `src/ shared/ api/ public/` 与 `index.html / vite.config.js / vercel.json / package.json`，
+  停止编辑 8s 后自动发布。**按变更类型分流**——只有代码变 → 构建 + `vercel deploy --prod`（不碰云端数据）；
+  `api/sites-data.json` 变了 → 走 `publish --skip-build`（复用备份 / 校验 / 快照 / 热更新 / 收敛验证）。
+  连续保存攒批、部署重叠排队、失败保留标记下次重试。参数 `--debounce=ms` / `--no-data` / `--dry-run`。
+  详见 `docs/superpowers/specs/2026-10-09-watch-deploy-design.md`。
 
 ### 13.2 站点健康检查
 
