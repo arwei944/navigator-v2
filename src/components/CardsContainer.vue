@@ -188,8 +188,11 @@ const batchCategory = ref('')
 const batchPurpose = ref('')
 
 const selectedCount = computed(() => sitesStore.selectedIds.size)
-// 工具栏已上移到 MainToolbar，拖拽开关由 store 承载
-const dragEnabled = computed(() => sitesStore.dragEnabled)
+// 排列方式（固定列数 / 自适应 / 瀑布流），来自「卡片设置」
+const layoutMode = computed(() => preferencesStore.cardLayoutMode)
+// 工具栏已上移到 MainToolbar，拖拽开关由 store 承载。
+// 瀑布流按列分栏，「第几个位置」本身没有意义，拖拽落点会与视觉顺序错位，故强制关闭。
+const dragEnabled = computed(() => sitesStore.dragEnabled && layoutMode.value !== 'masonry')
 // 卡片信息密度（简洁 / 标准 / 详细），由「设置 → 显示」决定
 const cardDensity = computed(() => preferencesStore.cardDensity)
 
@@ -224,7 +227,9 @@ const emptyMessage = computed(() => {
 })
 
 const viewClass = computed(() => {
-  return sitesStore.viewMode === 'list' ? 'cards-list' : 'cards-grid'
+  if (sitesStore.viewMode === 'list') return 'cards-list'
+  // 网格三种排布，由「卡片设置」决定：固定列数 / 自适应卡片宽度 / 瀑布流
+  return ['cards-grid', 'layout-' + layoutMode.value]
 })
 
 const batchMode = computed({
@@ -317,7 +322,19 @@ function onDragChange() {
 
 <style scoped>
 .cards-container { padding: 16px 28px 28px; flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
-.cards-grid { display: grid; grid-template-columns: repeat(var(--grid-cols, 3), 1fr); gap: var(--grid-gap, 14px); }
+.cards-grid { display: grid; gap: var(--grid-gap, 14px); }
+/* 固定列数：列数由设置决定，卡片宽度均分 */
+.cards-grid.layout-fixed { grid-template-columns: repeat(var(--grid-cols, 3), minmax(0, 1fr)); }
+/* 自适应：列数由容器宽度与「卡片最小宽度」推出来，窗口变化时自动增减列 */
+.cards-grid.layout-auto { grid-template-columns: repeat(auto-fill, minmax(var(--card-min, 300px), 1fr)); }
+/* 瀑布流：CSS 多栏（column-count）。注意条目是「按列自上而下」流动的，
+   视觉顺序与 DOM 顺序不一致 —— 这是 CSS 多栏的固有行为，用 grid 表达不了
+   （grid-template-rows: masonry 仍未落地）。因此该模式下禁用拖拽排序。 */
+.cards-grid.layout-masonry { display: block; column-count: var(--grid-cols, 3); column-gap: var(--grid-gap, 14px); }
+.cards-grid.layout-masonry > * { break-inside: avoid; margin-bottom: var(--grid-gap, 14px); }
+/* 瀑布流要让高度真的错落起来：描述不再截断到 2 行，卡片取自然高度。
+   否则清一色等高，只是把「逐行阅读」换成了「逐列阅读」，不如不做。 */
+.cards-grid.layout-masonry :deep(.card-desc) { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .cards-list { display: flex; flex-direction: column; gap: 8px; }
 
 /* 卡片虚拟化：离屏卡片跳过渲染（content-visibility），站点增多时滚动仍流畅 */
@@ -431,6 +448,8 @@ function onDragChange() {
    原先 ≥1440 强制 4 列、≤1024 强制 2 列的规则已移除：它们会把方案的列数设置静默盖掉。 */
 @media (max-width: 768px) {
   .cards-grid { grid-template-columns: 1fr !important; }
+  /* 移动端一律单列，瀑布流也不例外 */
+  .cards-grid.layout-masonry { column-count: 1; }
   /* 为底部 tab 栏留出空间，避免最后一行卡片被遮挡 */
   .cards-container { padding: 16px 16px calc(72px + env(safe-area-inset-bottom)); }
 }

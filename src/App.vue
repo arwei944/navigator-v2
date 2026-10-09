@@ -24,7 +24,7 @@
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
         <MainToolbar v-if="scope !== 'trash'"
                      @open-settings="showSettings = true" @open-todo="showTodo = true"
-                     @open-add="openAddSite" />
+                     @open-add="openAddSite" @open-card-settings="showCardSettings = true" />
         <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示；归档同理（筛选条的计数
              基于在册站点，在归档范围内会虚高） -->
         <FilterBar v-if="scope !== 'trash' && scope !== 'archived'" />
@@ -46,6 +46,9 @@
 
     <!-- 设置面板 -->
     <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin" />
+
+    <!-- 卡片设置：右侧抽屉，改动在左侧网格即时可见 -->
+    <CardSettingsPanel v-if="showCardSettings" @close="showCardSettings = false" />
 
     <!-- 待办面板：入口在中间栏工具栏 -->
     <TodoPanel v-if="showTodo" @close="showTodo = false" />
@@ -86,6 +89,7 @@ import ShortcutsPanel from '@/components/ShortcutsPanel.vue'
 import ContentFeed from '@/components/ContentFeed.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
 import SettingsPanel from '@/components/SettingsPanel.vue'
+import CardSettingsPanel from '@/components/CardSettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
@@ -107,6 +111,8 @@ const toastStore = useToastStore()
 const commandPaletteRef = ref(null)
 const shortcutsRef = ref(null)
 const showSettings = ref(false)
+// 卡片设置面板：右侧抽屉，与「设置」一样由工具栏触发
+const showCardSettings = ref(false)
 const showTodo = ref(false)
 const showBookmarkImport = ref(false)
 const showAddModal = ref(false)

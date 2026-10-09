@@ -59,8 +59,41 @@ export const TOKENS = {
   titleWeight: { dim: 'type', label: '标题字重', type: 'range', min: 400, max: 800, step: 100, unit: '', default: 600 },
 
   motionDuration: { dim: 'motion', label: '过渡时长', type: 'range', min: 0, max: 400, step: 20, unit: 'ms', default: 150 },
-  cardAnim: { dim: 'motion', label: '卡片入场动画', type: 'toggle', default: true }
+  cardAnim: { dim: 'motion', label: '卡片入场动画', type: 'toggle', default: true },
+
+  /* ---- 卡片布局与元素（panel:'card' → 只在「卡片设置」面板出现，不挤进视觉方案面板） ---- */
+
+  layoutMode: {
+    dim: 'density', panel: 'card', label: '排列方式', type: 'select',
+    options: ['fixed', 'auto', 'masonry'],
+    optionLabels: { fixed: '固定列数', auto: '自适应宽度', masonry: '瀑布流' },
+    default: 'fixed'
+  },
+  cardMinWidth: { dim: 'density', panel: 'card', label: '卡片最小宽度', type: 'range', min: 200, max: 420, step: 20, unit: 'px', default: 300 },
+  cardScale: { dim: 'density', panel: 'card', label: '卡片大小', type: 'range', min: 80, max: 130, step: 5, unit: '%', default: 100 },
+
+  showHealth: { dim: 'motion', panel: 'card', label: '在线状态角标', type: 'toggle', default: true },
+  showHeat: { dim: 'motion', panel: 'card', label: '热度徽章', type: 'toggle', default: true },
+  showCategoryTag: { dim: 'motion', panel: 'card', label: '分类标签', type: 'toggle', default: true },
+  showPurposes: { dim: 'motion', panel: 'card', label: '用途标签', type: 'toggle', default: true },
+  showBadges: { dim: 'motion', panel: 'card', label: '置顶 / 未访问徽章', type: 'toggle', default: true }
 }
+
+/**
+ * 「卡片设置」面板的分组与取值来源。
+ *
+ * 刻意**复用同一批令牌**：同一个 store、同一套校验、同一份持久化，
+ * 因此这里改的任何一项都能被方案预设覆盖、被「恢复方案默认」重置，
+ * 不会出现「两个地方各存一份、谁生效说不清」。
+ * 面板只是这批令牌的一个聚焦入口，不是第二套设置。
+ */
+export const CARD_PANEL = [
+  { id: 'arrange', label: '排列', tokens: ['layoutMode', 'gridCols', 'cardMinWidth'] },
+  { id: 'size', label: '尺寸与间距', tokens: ['cardScale', 'gridGap', 'cardPadding', 'radiusCard'], extra: 'density' },
+  { id: 'elements', label: '显示的元素', tokens: ['showHealth', 'showHeat', 'showCategoryTag', 'showPurposes', 'showBadges'] },
+  { id: 'motion', label: '动效', tokens: ['cardAnim'] }
+]
+
 
 /** 强调色沿用「外观」里的主题配色预设，不另立一套，避免两个真值来源 */
 export const ACCENT_PRESETS = [
@@ -76,33 +109,47 @@ export const DEFAULT_TOKENS = Object.fromEntries(
 )
 
 /**
+ * 布局类令牌的中性取值。
+ *
+ * 这批是「卡片设置」面板新增的（排列方式 / 卡片大小 / 元素显隐），**不属于任何一套方案的个性**，
+ * 所以各方案统一取中性值 —— 加它们不会改变任何一套既有方案的外观。
+ * 但每套方案仍必须显式带上它们：测试里那条「每套方案都是完整取值」的守卫是故意的，
+ * 防的是「方案漏定义令牌 → 悄悄继承默认值 → 谁生效说不清」。这里用展开常量而不是继承，
+ * 得到的结果对象仍是完整的。
+ */
+const NEUTRAL_LAYOUT = {
+  layoutMode: 'fixed', cardMinWidth: 300, cardScale: 100,
+  showHealth: true, showHeat: true, showCategoryTag: true, showPurposes: true, showBadges: true
+}
+
+/**
  * 预设方案。每套都是完整取值，不依赖继承，切换即整体换装。
  * accent / mode 直接驱动现有的 themePreset / theme，所以配色也是方案的一部分。
  */
 export const SCHEMES = [
   {
     id: 'apple', name: '苹果原生', desc: '当前默认，均衡克制', accent: 'default', mode: 'light',
-    tokens: { radiusCard: 12, radiusControl: 8, borderStrength: 100, shadowLevel: 100, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 20, glassAlpha: 72, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: true }
+    tokens: { radiusCard: 12, radiusControl: 8, borderStrength: 100, shadowLevel: 100, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 20, glassAlpha: 72, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: true, ...NEUTRAL_LAYOUT }
   },
   {
     id: 'flat', name: '极简扁平', desc: '去阴影、小圆角、边界靠描边', accent: 'default', mode: 'light',
-    tokens: { radiusCard: 4, radiusControl: 4, borderStrength: 55, shadowLevel: 0, cardPadding: 16, gridGap: 12, gridCols: 3, navItemHeight: 38, glassBlur: 0, glassAlpha: 100, fontFamily: 'system', fontSizeBase: 14, titleWeight: 500, motionDuration: 120, cardAnim: false }
+    tokens: { radiusCard: 4, radiusControl: 4, borderStrength: 55, shadowLevel: 0, cardPadding: 16, gridGap: 12, gridCols: 3, navItemHeight: 38, glassBlur: 0, glassAlpha: 100, fontFamily: 'system', fontSizeBase: 14, titleWeight: 500, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT }
   },
   {
     id: 'glass', name: '玻璃拟态', desc: '大圆角、强模糊、半透明面板', accent: 'purple', mode: 'light',
-    tokens: { radiusCard: 18, radiusControl: 12, borderStrength: 70, shadowLevel: 55, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 34, glassAlpha: 52, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 220, cardAnim: true }
+    tokens: { radiusCard: 18, radiusControl: 12, borderStrength: 70, shadowLevel: 55, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 34, glassAlpha: 52, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 220, cardAnim: true, ...NEUTRAL_LAYOUT }
   },
   {
     id: 'compact', name: '紧凑高密度', desc: '小内边距、5 列、矮导航', accent: 'green', mode: 'light',
-    tokens: { radiusCard: 8, radiusControl: 6, borderStrength: 100, shadowLevel: 60, cardPadding: 10, gridGap: 8, gridCols: 5, navItemHeight: 32, glassBlur: 12, glassAlpha: 88, fontFamily: 'system', fontSizeBase: 13, titleWeight: 600, motionDuration: 100, cardAnim: false }
+    tokens: { radiusCard: 8, radiusControl: 6, borderStrength: 100, shadowLevel: 60, cardPadding: 10, gridGap: 8, gridCols: 5, navItemHeight: 32, glassBlur: 12, glassAlpha: 88, fontFamily: 'system', fontSizeBase: 13, titleWeight: 600, motionDuration: 100, cardAnim: false, ...NEUTRAL_LAYOUT }
   },
   {
     id: 'cozy', name: '宽松舒适', desc: '大内边距、2 列、慢过渡', accent: 'orange', mode: 'light',
-    tokens: { radiusCard: 16, radiusControl: 10, borderStrength: 80, shadowLevel: 110, cardPadding: 26, gridGap: 22, gridCols: 2, navItemHeight: 48, glassBlur: 26, glassAlpha: 82, fontFamily: 'system', fontSizeBase: 15, titleWeight: 600, motionDuration: 240, cardAnim: true }
+    tokens: { radiusCard: 16, radiusControl: 10, borderStrength: 80, shadowLevel: 110, cardPadding: 26, gridGap: 22, gridCols: 2, navItemHeight: 48, glassBlur: 26, glassAlpha: 82, fontFamily: 'system', fontSizeBase: 15, titleWeight: 600, motionDuration: 240, cardAnim: true, ...NEUTRAL_LAYOUT }
   },
   {
     id: 'contrast', name: '高对比硬朗', desc: '直角、重阴影、深色底', accent: 'default', mode: 'dark',
-    tokens: { radiusCard: 2, radiusControl: 2, borderStrength: 100, shadowLevel: 140, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 42, glassBlur: 0, glassAlpha: 100, fontFamily: 'sans', fontSizeBase: 15, titleWeight: 700, motionDuration: 120, cardAnim: false }
+    tokens: { radiusCard: 2, radiusControl: 2, borderStrength: 100, shadowLevel: 140, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 42, glassBlur: 0, glassAlpha: 100, fontFamily: 'sans', fontSizeBase: 15, titleWeight: 700, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT }
   }
 ]
 
@@ -217,6 +264,11 @@ export function tokensToCssVars(tokens, mode = 'light') {
     '--grid-gap': px(tokens.gridGap),
     '--grid-cols': String(tokens.gridCols),
     '--nav-item-h': px(tokens.navItemHeight),
+
+    // 卡片大小：无单位乘数（供 calc() 用），控制图标/字号等内容的整体比例
+    '--card-scale': String(tokens.cardScale / 100),
+    // 自适应排列下的卡片最小宽度；瀑布流下不直接用（那里按列数分栏）
+    '--card-min': px(tokens.cardMinWidth),
 
     '--glass-blur': px(tokens.glassBlur),
     '--glass-bg': `rgba(${gr}, ${gg}, ${gb}, ${alpha(tokens.glassAlpha / 100)})`,

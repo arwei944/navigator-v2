@@ -98,8 +98,9 @@ const schemes = SCHEMES
 const dimensions = DIMENSIONS
 const accents = ACCENT_PRESETS
 
+// panel:'card' 的令牌归「卡片设置」面板管，这里不重复列出（同一 store，只是换个入口）
 const tokensOf = dimId => Object.entries(TOKENS)
-  .filter(([, t]) => t.dim === dimId)
+  .filter(([, t]) => t.dim === dimId && t.panel !== 'card')
   .map(([key, t]) => ({ key, ...t }))
 
 /** 预览缩略图：把该方案的圆角/阴影/描边/内边距/密度映射到小样上，一眼能看出差别 */

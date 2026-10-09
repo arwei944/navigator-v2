@@ -30,7 +30,7 @@
         <span class="favicon-fallback">{{ site.initial }}</span>
         <img v-if="iconSrc" :src="iconSrc" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
         <!-- 在线状态角标 -->
-        <span class="health-dot" :class="'health-' + healthNode"
+        <span v-if="display.health" class="health-dot" :class="'health-' + healthNode"
               :title="healthTip" @click.stop></span>
       </div>
       <div v-if="!isList" class="card-title-group">
@@ -46,21 +46,21 @@
       别名 · {{ aliases.join(' / ') }}
     </div>
     <!-- 用途标签：与分类是两把正交的尺子，分类说「属于哪」，用途说「拿来干嘛」 -->
-    <div v-if="!isList && showPurposes && purposeIds.length" class="card-purposes">
+    <div v-if="!isList && showPurposesByDensity && display.purposes && purposeIds.length" class="card-purposes">
       <PurposeTags :ids="purposeIds" />
     </div>
     <div v-if="!batchMode" class="card-footer">
       <div class="card-footer-left">
-        <span class="card-tag">
+        <span v-if="display.categoryTag" class="card-tag">
           <span class="card-tag-dot" :style="{ background: categoriesStore.getCategoryColor(site.categoryId) }"></span>
           {{ categoriesStore.getCategoryLabel(site.categoryId) }}
         </span>
-        <span v-if="site.pinned" class="card-pinned" title="已置顶">
+        <span v-if="display.badges && site.pinned" class="card-pinned" title="已置顶">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 4 19 4"/><line x1="12" y1="8" x2="12" y2="20"/><polyline points="8 12 12 8 16 12"/></svg>
         </span>
         <span v-if="site.archived" class="card-archived-tag" title="已归档：不参与日常浏览">已归档</span>
-        <span v-if="showUnvisited && !visited" class="card-unvisited" title="还没访问过">未访问</span>
-        <span v-if="clickCount > 0" class="card-clicks" :class="heatClass" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
+        <span v-if="display.badges && showUnvisited && !visited" class="card-unvisited" title="还没访问过">未访问</span>
+        <span v-if="display.heat && clickCount > 0" class="card-clicks" :class="heatClass" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
           {{ clickCount }}
         </span>
@@ -94,6 +94,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { useContextMenuStore } from '@/stores/contextMenu'
+import { usePreferencesStore } from '@/stores/preferences'
 import PurposeTags from '@/components/PurposeTags.vue'
 
 const props = defineProps({
@@ -117,11 +118,16 @@ const sidebarStore = useSidebarStore()
 const healthStore = useHealthStore()
 const clicksStore = useClicksStore()
 const contextMenuStore = useContextMenuStore()
+const preferencesStore = usePreferencesStore()
+
+/** 卡片元素显隐（在线角标 / 热度 / 分类标签 / 用途标签 / 徽章），由「卡片设置」控制 */
+const display = computed(() => preferencesStore.cardDisplay)
 
 /* ---------- 信息密度分层 ---------- */
 
 const showDesc = computed(() => props.density !== 'compact')
-const showPurposes = computed(() => props.density !== 'compact')
+// 用途标签受两道开关约束：信息密度（紧凑档不铺开）与「卡片设置」里的显隐
+const showPurposesByDensity = computed(() => props.density !== 'compact')
 const aliases = computed(() => (Array.isArray(props.site.aliases) ? props.site.aliases.filter(Boolean) : []))
 const showAliases = computed(() => props.density === 'rich' && aliases.value.length > 0)
 
@@ -247,7 +253,10 @@ function onHoverLeave() {
   outline-offset: 2px;
 }
 .card-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
-.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: var(--color-on-solid); transition: transform .2s ease; position: relative; overflow: hidden; }
+/* 卡片大小：内容整体缩放（图标、字号、控件），间距另有 --card-padding 与 --grid-gap 管。
+   --card-scale 是无单位乘数，来自「卡片设置 → 卡片大小」。 */
+.card { --cs: var(--card-scale, 1); }
+.card-favicon { width: calc(38px * var(--cs)); height: calc(38px * var(--cs)); border-radius: calc(10px * var(--cs)); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(15px * var(--cs)); color: var(--color-on-solid); transition: transform .2s ease; position: relative; overflow: hidden; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: var(--bg-white); box-sizing: border-box; }
 .card:hover .card-favicon { transform: scale(1.05); }
@@ -270,13 +279,13 @@ function onHoverLeave() {
 .health-unknown,
 .health-gray { background: var(--color-muted); }
 .card-title-group { min-width: 0; }
-.card-title { font-size: 14px; font-weight: var(--title-weight, 600); color: var(--text-primary); line-height: 1.3; }
-.card-url { font-size: 11px; color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
+.card-title { font-size: calc(14px * var(--cs, 1)); font-weight: var(--title-weight, 600); color: var(--text-primary); line-height: 1.3; }
+.card-url { font-size: calc(11px * var(--cs, 1)); color: var(--text-secondary); margin-top: 2px; font-weight: 400; }
 .card-body { flex: 1; }
-.card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 12px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.card-desc { font-size: calc(13px * var(--cs, 1)); color: var(--text-secondary); line-height: 1.55; margin-bottom: calc(12px * var(--cs, 1)); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 /* 详细档多给一行描述，把「别名」让出来的空间补回去 */
 .density-rich .card-desc { -webkit-line-clamp: 3; }
-.card-aliases { font-size: 11px; color: var(--text-secondary); opacity: .85; margin: 0 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card-aliases { font-size: calc(11px * var(--cs, 1)); color: var(--text-secondary); opacity: .85; margin: 0 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card-purposes { margin: 0 0 12px; }
 /* 简洁档：不给描述与用途留位，只保留「图标 + 名称 + 域名 + 底栏」 */
 .density-compact .card-header { margin-bottom: 4px; }
@@ -327,7 +336,7 @@ function onHoverLeave() {
   gap: 3px;
   padding: 3px 9px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: calc(11px * var(--cs, 1));
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
@@ -343,11 +352,11 @@ function onHoverLeave() {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.18); opacity: .8; }
 }
-.card-tag { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+.card-tag { font-size: calc(11px * var(--cs, 1)); font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
 .card-tag-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 .card-actions { display: flex; align-items: center; gap: 4px; }
 .card-visit, .card-fav-btn {
-  width: 30px; height: 30px;
+  width: calc(30px * var(--cs, 1)); height: calc(30px * var(--cs, 1));
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-white);
@@ -405,7 +414,7 @@ function onHoverLeave() {
 /* 列表模式 */
 .card-list { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-left-width: 3px; }
 .card-list .card-header { margin-bottom: 0; flex: 0 0 auto; }
-.card-list .card-favicon { width: 34px; height: 34px; border-radius: 8px; font-size: 13px; }
+.card-list .card-favicon { width: calc(34px * var(--cs, 1)); height: calc(34px * var(--cs, 1)); border-radius: 8px; font-size: calc(13px * var(--cs, 1)); }
 .card-list .card-body-inline { flex: 1; min-width: 0; }
 .card-list .card-body-inline .card-desc { margin-bottom: 0; -webkit-line-clamp: 1; }
 .card-list .card-footer { flex: 0 0 auto; }

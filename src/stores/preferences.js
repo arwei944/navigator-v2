@@ -154,6 +154,25 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const activeScheme = computed(() => getScheme(visualScheme.value))
   const isVisualCustomized = computed(() => Object.keys(visualOverrides.value).length > 0)
 
+  /** 排列方式：固定列数 / 自适应宽度 / 瀑布流 */
+  const cardLayoutMode = computed(() => activeTokens.value.layoutMode || 'fixed')
+
+  /**
+   * 卡片元素的显隐开关，统一在这里解算一次。
+   * 300 张卡片各自去读 activeTokens（一个深比较的 computed 对象）会重复解算，
+   * 这里收成一份，卡片只订阅这几个布尔值。
+   */
+  const cardDisplay = computed(() => {
+    const t = activeTokens.value
+    return {
+      health: t.showHealth !== false,
+      heat: t.showHeat !== false,
+      categoryTag: t.showCategoryTag !== false,
+      purposes: t.showPurposes !== false,
+      badges: t.showBadges !== false
+    }
+  })
+
   /** 把当前令牌写成 :root 上的 CSS 变量，全站组件通过变量响应 */
   function applyVisual() {
     const vars = tokensToCssVars(activeTokens.value, theme.value)
@@ -200,6 +219,7 @@ export const usePreferencesStore = defineStore('preferences', () => {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
+    cardLayoutMode, cardDisplay,
     toggleTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity,
     setThemePreset, setWallpaper, THEME_PRESETS,
     setVisualScheme, setVisualToken, resetVisualTokens

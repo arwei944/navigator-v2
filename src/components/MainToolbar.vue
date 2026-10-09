@@ -19,10 +19,15 @@
       </button>
 
       <button class="toolbar-btn drag-toggle" :class="{ active: sitesStore.dragEnabled }"
-              :disabled="sitesStore.batchMode" @click="sitesStore.toggleDragMode()"
-              title="开启后拖拽卡片手动排序">
+              :disabled="sitesStore.batchMode || isMasonry" @click="sitesStore.toggleDragMode()"
+              :title="isMasonry ? '瀑布流按列分栏，拖拽排序的落点与视觉顺序对不上，已停用' : '开启后拖拽卡片手动排序'">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
         <span class="btn-label">{{ sitesStore.dragEnabled ? '完成排序' : '手动排序' }}</span>
+      </button>
+
+      <button class="view-toggle" @click="$emit('open-card-settings')"
+              :aria-label="'卡片设置：排列方式、卡片大小与显示元素'" title="卡片设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M17.5 14v7M14 17.5h7"/></svg>
       </button>
 
       <button class="view-toggle" @click="toggleViewMode"
@@ -54,12 +59,12 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
 import UnifiedSearchBox from '@/components/UnifiedSearchBox.vue'
 
-defineEmits(['open-settings', 'open-todo', 'open-add'])
+defineEmits(['open-settings', 'open-todo', 'open-add', 'open-card-settings'])
 
 const sitesStore = useSitesStore()
 const preferencesStore = usePreferencesStore()
@@ -67,6 +72,9 @@ const preferencesStore = usePreferencesStore()
 const sortValue = ref(sitesStore.sortBy)
 watch(sortValue, (val) => sitesStore.setSortBy(val))
 watch(() => sitesStore.sortBy, (val) => { if (val !== sortValue.value) sortValue.value = val })
+
+// 瀑布流下容器已强制关闭拖拽，这里把按钮也置灰，免得按了没反应
+const isMasonry = computed(() => preferencesStore.cardLayoutMode === 'masonry')
 
 function toggleViewMode() {
   sitesStore.setViewMode(sitesStore.viewMode === 'grid' ? 'list' : 'grid')
