@@ -4,9 +4,17 @@
   "outputDirectory": "dist",
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/assets/(.*)", "dest": "/assets/$1" },
-    { "src": "/icons/(.*)", "dest": "/icons/$1" },
-    { "src": "/favicon.svg", "dest": "/favicon.svg" },
+    {
+      "src": "/sw.js",
+      "headers": { "Cache-Control": "public, max-age=0, must-revalidate" },
+      "continue": true
+    },
+    {
+      "src": "/manifest.webmanifest",
+      "headers": { "Cache-Control": "public, max-age=0, must-revalidate" },
+      "continue": true
+    },
+    { "handle": "filesystem" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }

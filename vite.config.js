@@ -9,7 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null,
-      includeAssets: ['favicon.ico'],
+      // 这里引用的文件必须真实存在，否则预缓存清单会挂一个 404（原来是 favicon.ico，实际只有 favicon.svg）
+      includeAssets: ['favicon.svg'],
       manifest: {
         name: 'Navigator - 网站导航中心',
         short_name: 'Navigator',

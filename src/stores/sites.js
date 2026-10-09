@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import SEED_SITES from '../../api/sites-data.json'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
 import { rankSites } from '@/utils/search'
+import { safeSetItem } from '@/utils/safeStorage'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
 
@@ -138,7 +139,7 @@ export const useSitesStore = defineStore('sites', () => {
 
   // ── 覆盖层落盘与视图重建 ──
   function saveOverlay() {
-    localStorage.setItem(OVERLAY_KEY, encodeStored({
+    safeSetItem(OVERLAY_KEY, encodeStored({
       adds: localAdds.value,
       edits: localEdits.value,
       deletes: localDeletes.value,
@@ -148,7 +149,7 @@ export const useSitesStore = defineStore('sites', () => {
   }
 
   function saveTrash() {
-    localStorage.setItem(TRASH_KEY, encodeStored(trash.value))
+    safeSetItem(TRASH_KEY, encodeStored(trash.value))
   }
 
   /** 用「云端基底 + 本地覆盖层」重新拼出渲染用的列表 */
@@ -291,8 +292,10 @@ export const useSitesStore = defineStore('sites', () => {
     if (site) trash.value.push({ ...site, deletedAt: Date.now() })
     removeLocally(id)
     rebuild()
-    saveOverlay()
+    // 先落回收站再落覆盖层：回收站是「删过什么」的唯一证据，
+    // 万一配额溢出只能写入一处，宁可丢墓碑也不能让这条记录凭空消失。
     saveTrash()
+    saveOverlay()
   }
 
   function recordVisit(id) {
@@ -451,30 +454,61 @@ export const useSitesStore = defineStore('sites', () => {
     return true
   }
 
+  /**
+   * 云端请求收口：同一时刻只保留一个在途请求，并给 10s 超时。
+   *
+   * 不做这两件事会发生什么：`visibilitychange` 的立即重拉会与 30s 定时轮询并发，
+   * 弱网下连接一直挂着、请求越堆越多；两个响应乱序回来时，先发的慢响应会把
+   * 整站数据覆盖回旧版本（分类表一起回退），最长持续一个轮询周期才自愈。
+   */
+  let cloudInflight = null
+  const CLOUD_TIMEOUT = 10000
+
+  function fetchCloud() {
+    if (cloudInflight) return cloudInflight
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), CLOUD_TIMEOUT)
+    cloudInflight = (async () => {
+      try {
+        const res = await fetch('/api/sites', { signal: ctrl.signal })
+        if (!res.ok) return null
+        return await res.json()
+      } catch {
+        return null
+      } finally {
+        clearTimeout(timer)
+        cloudInflight = null
+      }
+    })()
+    return cloudInflight
+  }
+
+  /**
+   * version 必须**单调递增**才应用。
+   * 旧判据是 `version !== cloudVersion`，只要求「不等」——于是慢响应的旧版本也满足，
+   * 成了数据回滚的通道。
+   */
+  function applyIfNewer(data) {
+    if (!data || !Array.isArray(data.sites)) return false
+    const v = Number(data.version)
+    if (!Number.isFinite(v)) {
+      console.warn('[sites] 云端响应缺少合法的 version，已忽略本次更新')
+      return false
+    }
+    if (v <= cloudVersion.value) return false
+    return applyCloudData(data)
+  }
+
   async function initCloudSites() {
     try {
-      const res = await fetch('/api/sites')
-      if (!res.ok) return
-      const data = await res.json()
-      applyCloudData(data)
-    } catch {
-      // 离线时使用本地种子兜底
+      applyIfNewer(await fetchCloud())
     } finally {
       cloudLoaded.value = true
     }
   }
 
   async function pollCloudSites() {
-    try {
-      const res = await fetch('/api/sites')
-      if (!res.ok) return
-      const data = await res.json()
-      if (data && data.version && data.version !== cloudVersion.value) {
-        applyCloudData(data)
-      }
-    } catch {
-      // 忽略轮询失败，下次再试
-    }
+    applyIfNewer(await fetchCloud())
   }
 
   function startPolling(interval = 30000) {

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
+import { safeSetItem } from '@/utils/safeStorage'
 
 export const useTodosStore = defineStore('todos', () => {
   // 从 localStorage 恢复（版本化，含迁移钩子）
@@ -8,7 +9,7 @@ export const useTodosStore = defineStore('todos', () => {
 
   // 持久化（版本化写入）
   function persist() {
-    localStorage.setItem('nav-todos', encodeStored(todos.value))
+    safeSetItem('nav-todos', encodeStored(todos.value))
   }
 
   function addTodo(text, category = 'work') {

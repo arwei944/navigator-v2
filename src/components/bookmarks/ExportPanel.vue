@@ -35,8 +35,13 @@ const sitesStore = useSitesStore()
 const favoritesStore = useFavoritesStore()
 const historyStore = useHistoryStore()
 
+/**
+ * store 暴露的是 `favoriteIds` / `records`，不是 `favorites` / `visitHistory` ——
+ * 后两个名字全项目只在这里出现过，取到的是 undefined，JSON.stringify 会直接丢键，
+ * 于是「备份文件」里既没有收藏也没有访问记录。
+ */
 function exportJSON() {
-  const data = buildExportJSON(sitesStore.sites, favoritesStore.favorites, historyStore.visitHistory)
+  const data = buildExportJSON(sitesStore.sites, favoritesStore.favoriteIds, historyStore.records)
   downloadBlob(JSON.stringify(data, null, 2), `nav-sites-${Date.now()}.json`, 'application/json')
 }
 function exportHTML() {

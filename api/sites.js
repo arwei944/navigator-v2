@@ -119,26 +119,56 @@ export default async function handler(req, res) {
     }
 
     noStore(res)
+
+    /**
+     * 「Blob 里没有数据」与「读取失败 / 数据损坏」必须分开处理。
+     *
+     * 早期版本把两者混为一谈（同一个 catch），后果是：Blob 任何一次抖动
+     * （5xx / 超时 / token 失效）都会被当成「没存过」，随即用部署包里的构建期快照
+     * 覆盖线上真实数据 —— version 被打回 1、categories 字段丢失、所有热更新蒸发，
+     * 而这条路径还不写快照，等于没有回退。
+     *
+     * 现在只有「明确读到 null（对象不存在）」才允许写种子初始化；其余情况一律
+     * 返回 503 让客户端保留自己已有的数据，**绝不写 Blob**。
+     */
+    let stored
     try {
-      const data = await readStored()
-      if (data && Array.isArray(data.sites) && data.sites.length > 0) {
-        res.status(200).json(data)
-        return
-      }
-    } catch {
-      // 未存储或读取失败时使用本地种子兜底
+      stored = await readStored()
+    } catch (e) {
+      console.error('[sites] blob read failed:', String(e?.message || e))
+      res.status(503).json({ error: 'Blob 读取失败', degraded: true })
+      return
     }
 
+    // 存了但结构不对：多半是被脏写污染过，覆盖它只会把证据也毁掉 —— 交给运维用快照回滚
+    if (stored && (!Array.isArray(stored.sites) || stored.sites.length === 0)) {
+      console.error('[sites] stored data invalid, refusing to overwrite')
+      res.status(503).json({ error: '已存储的数据不合法', degraded: true })
+      return
+    }
+
+    if (stored) {
+      res.status(200).json(stored)
+      return
+    }
+
+    // 确认为空（首次部署）：这是唯一允许写 Blob 的路径
     const seeded = {
       version: 1,
       sites: SEED_SITES,
       updatedAt: new Date().toISOString()
     }
-    await put(PATHNAME, JSON.stringify(seeded), {
-      access: 'private',
-      addRandomSuffix: false,
-      allowOverwrite: true
-    })
+    try {
+      await put(PATHNAME, JSON.stringify(seeded), {
+        access: 'private',
+        addRandomSuffix: false,
+        // 不加 allowOverwrite：并发的首次请求里只有一个能写成功，其余自然失败，
+        // 避免两个冷启动互相覆盖（也避免覆盖掉刚刚可能已存在的数据）
+        allowOverwrite: false
+      })
+    } catch (e) {
+      console.error('[sites] seed init failed:', String(e?.message || e))
+    }
     res.status(200).json(seeded)
     return
   }

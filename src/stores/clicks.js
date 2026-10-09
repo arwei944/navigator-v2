@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { countOf } from '../../shared/clicks-core.mjs'
 import { decodeStored, encodeStored } from '@/utils/storeVersioning'
+import { safeSetItem } from '@/utils/safeStorage'
 
 /**
  * 点击统计 store —— **全局口径**，与「我的访问次数」区分开。
@@ -48,7 +49,7 @@ export const useClicksStore = defineStore('clicks', () => {
   let flushing = null
 
   function persistPending() {
-    localStorage.setItem(PENDING_KEY, encodeStored(pending.value))
+    safeSetItem(PENDING_KEY, encodeStored(pending.value))
   }
 
   /** 展示用点击量 = 云端已确认 + 本地待发（点完立刻 +1，不等云端往返） */

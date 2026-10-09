@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { CATEGORY_GROUPS, cloneGroups, sanitizeGroups } from '../../shared/categories.mjs'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
+import { safeSetItem } from '@/utils/safeStorage'
 
 const OVERLAY_KEY = 'nav-categories-overlay'
 
@@ -32,7 +33,7 @@ export const useCategoriesStore = defineStore('categories', () => {
   const cloudGroups = ref(null)
 
   function saveOverlay() {
-    localStorage.setItem(OVERLAY_KEY, encodeStored(localAdds.value))
+    safeSetItem(OVERLAY_KEY, encodeStored(localAdds.value))
   }
 
   /**
