@@ -7,8 +7,10 @@
 import { fileURLToPath } from 'node:url'
 import { writeFileSync } from 'node:fs'
 
-// vite preview 只绑 [::1]，用 localhost（Chrome 会解析到 ::1）而不是 127.0.0.1
-const BASE = 'http://localhost:4173'
+// 用法: node probe/omni-verify.mjs <cdp-port> [base-url]
+// 默认打本地 preview（vite preview 只绑 [::1]，所以要写 localhost 而非 127.0.0.1）；
+// 传第二个参数即可打线上，例：node probe/omni-verify.mjs 9338 https://navigator-v2-two.vercel.app
+const BASE = process.argv[3] || 'http://localhost:4173'
 const CDP_PORT = process.argv[2] || '9333'
 const OUT = fileURLToPath(new URL('.', import.meta.url))
 
@@ -96,17 +98,30 @@ async function main() {
 
   // PWA 会注册 Service Worker 并缓存上一版 bundle —— 不清掉就会拿旧代码验证新改动，
   // 表现是「明明改了，页面行为却没变」。清完必须 reload 一次才生效。
-  const sw = await evaluate(`(async () => {
-    if (!navigator.serviceWorker) return 'no-sw'
-    const rs = await navigator.serviceWorker.getRegistrations()
-    await Promise.all(rs.map(r => r.unregister()))
-    if (window.caches) for (const k of await caches.keys()) await caches.delete(k)
-    return 'cleared:' + rs.length
-  })()`)
+  //
+  // 这里必须容错：SW 正在下载体量很大的预缓存时（本项目会预缓存 278 个图标 / 6.25 MB），
+  // getRegistrations() / unregister() 可能长时间挂起，把整段验证卡死。
+  // 清理只是「为了拿到最新代码」的辅助动作，超时就跳过，不该阻断验证。
+  const sw = await Promise.race([
+    evaluate(`(async () => {
+      if (!navigator.serviceWorker) return 'no-sw'
+      const rs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(rs.map(r => r.unregister()))
+      if (window.caches) for (const k of await caches.keys()) await caches.delete(k)
+      return 'cleared:' + rs.length
+    })()`).catch(e => 'skip:' + e.message),
+    new Promise(r => setTimeout(() => r('skip:timeout'), 8000))
+  ])
   console.log('  SW:', sw)
+  // 无论如何都 reload：拿不到旧缓存时，新导航也能拿新代码
   await send('Page.navigate', { url: BASE + '/' })
   await sleep(2500)
   await waitFor('.unified-search-input')
+  // 关掉 SW 注册，避免后台继续下载预缓存干扰后续断言
+  await Promise.race([
+    evaluate(`(navigator.serviceWorker?.getRegistrations?.() || Promise.resolve([])).then(rs => rs.forEach(r => r.unregister())).then(() => 'ok')`).catch(() => 'skip'),
+    new Promise(r => setTimeout(() => r('skip'), 5000))
+  ])
 
   const siteCount = await evaluate(`(window.__nav_sites_len__ = document.querySelectorAll('.site-card').length)`).catch(() => 0)
   console.log('  卡片数:', siteCount)
