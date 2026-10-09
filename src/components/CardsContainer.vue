@@ -20,13 +20,13 @@
       <div v-else class="trash-list">
         <div v-for="site in sitesStore.trash" :key="site.id" class="trash-item">
           <div class="trash-item-left">
-            <div class="card-favicon" :style="{ background: site.color }">
-              <span class="favicon-fallback">{{ site.initial }}</span>
-              <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="favicon-img" loading="lazy" @error="$event.target.remove()">
+            <div class="trash-favicon" :style="{ background: site.color }">
+              <span class="trash-favicon-text">{{ site.initial }}</span>
+              <img v-if="site.icon" :src="'/' + site.icon" :alt="site.name" class="trash-favicon-img" loading="lazy" @error="$event.target.remove()">
             </div>
             <div class="trash-item-info">
-              <div class="card-title">{{ site.name }}</div>
-              <div class="card-desc">{{ site.desc }}</div>
+              <div class="trash-item-name">{{ site.name }}</div>
+              <div class="trash-item-desc">{{ site.desc }}</div>
             </div>
           </div>
           <div class="trash-item-actions">
@@ -57,6 +57,7 @@
         <template #item="{ element: site }">
           <SiteCard :site="site" :is-list="sitesStore.viewMode === 'list'"
                     :show-drag-handle="dragEnabled"
+                    :density="cardDensity"
                     :batch-mode="batchMode"
                     :selected="sitesStore.selectedIds.has(site.id)"
                     :is-read-only="batchMode"
@@ -78,6 +79,7 @@
         <template #item="{ element: site }">
           <SiteCard :site="site" :is-list="sitesStore.viewMode === 'list'"
                     :show-drag-handle="true"
+                    :density="cardDensity"
                     :batch-mode="batchMode"
                     :selected="sitesStore.selectedIds.has(site.id)"
                     :is-read-only="batchMode"
@@ -99,6 +101,14 @@
         <div class="batch-actions">
           <button class="batch-btn" @click="sitesStore.selectAll(displaySites.map(s => s.id))">全选</button>
           <button class="batch-btn" @click="sitesStore.clearSelection()">取消全选</button>
+          <select v-model="batchCategory" class="batch-select" aria-label="批量修改分类" @change="applyBatchCategory">
+            <option value="">改分类…</option>
+            <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.label }}</option>
+          </select>
+          <select v-model="batchPurpose" class="batch-select" aria-label="批量添加用途" @change="applyBatchPurpose">
+            <option value="">加用途…</option>
+            <option v-for="p in purposeOptions" :key="p.id" :value="p.id">{{ p.label }}</option>
+          </select>
           <button class="batch-btn batch-btn-danger" @click="showBatchDeleteConfirm = true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             批量删除
@@ -149,6 +159,11 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useHistoryStore } from '@/stores/history'
+import { useCategoriesStore } from '@/stores/categories'
+import { usePreferencesStore } from '@/stores/preferences'
+import { useToastStore } from '@/stores/toast'
+import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 import SiteCard from '@/components/SiteCard.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -157,6 +172,10 @@ import Draggable from 'vuedraggable'
 const sitesStore = useSitesStore()
 const sidebarStore = useSidebarStore()
 const favoritesStore = useFavoritesStore()
+const historyStore = useHistoryStore()
+const categoriesStore = useCategoriesStore()
+const preferencesStore = usePreferencesStore()
+const toastStore = useToastStore()
 
 const editingSite = ref(null)
 const deletingSite = ref(null)
@@ -164,20 +183,32 @@ const showBatchDeleteConfirm = ref(false)
 const permanentDeletingSite = ref(null)
 const showEmptyConfirm = ref(false)
 
+// 批量改分类 / 批量加用途：空串代表「未选择」，不触发
+const batchCategory = ref('')
+const batchPurpose = ref('')
+
 const selectedCount = computed(() => sitesStore.selectedIds.size)
 // 工具栏已上移到 MainToolbar，拖拽开关由 store 承载
 const dragEnabled = computed(() => sitesStore.dragEnabled)
+// 卡片信息密度（简洁 / 标准 / 详细），由「设置 → 显示」决定
+const cardDensity = computed(() => preferencesStore.cardDensity)
+
+// history 的时间戳可能是数字或 ISO 串，统一成毫秒
+function toTs(ts) {
+  return typeof ts === 'number' ? ts : new Date(ts).getTime()
+}
 
 const displaySites = computed(() => {
   switch (sidebarStore.activeNav) {
     case 'favorites':
       return sitesStore.filteredSites.filter(s => favoritesStore.isFav(s.id))
     case 'recent':
-      // 最近添加：按录入时间倒序。这里**不能截断**——侧栏那版只露 24 条是「预览」，
-      // 提成独立范围后截断会让筛选条计数（301）与列表（24）对不上，且用户滚到底也
-      // 翻不到更早的站点，成了死路。排序本身已足够表达「最近」。
+      // 「最近」= 我最近浏览过什么（history store），不再是「最新收录」——
+      // 录入时间已由「最新收录」排序项承担，两者语义必须分开，否则视图与排序在说同一件事。
+      // 只列访问过的：没访问过的站点排在这里没有意义（那不是「最近」）。
       return [...sitesStore.filteredSites]
-        .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+        .filter(s => historyStore.getLastVisitTime(s.id))
+        .sort((a, b) => toTs(historyStore.getLastVisitTime(b.id)) - toTs(historyStore.getLastVisitTime(a.id)))
     default:
       return sitesStore.filteredSites
   }
@@ -186,7 +217,7 @@ const displaySites = computed(() => {
 const emptyMessage = computed(() => {
   switch (sidebarStore.activeNav) {
     case 'favorites': return '还没有收藏的站点'
-    case 'recent': return '还没有收录的站点'
+    case 'recent': return '还没有访问记录'
     default: return '没有找到匹配的站点'
   }
 })
@@ -228,6 +259,38 @@ function doDelete() {
 function doBatchDelete() {
   sitesStore.batchDeleteToTrash()
   showBatchDeleteConfirm.value = false
+}
+
+/* ---------- 批量改分类 / 批量加用途 ---------- */
+
+const categoryOptions = computed(() => categoriesStore.categories)
+const purposeOptions = computed(() => PURPOSE_TAGS)
+
+function applyBatchCategory() {
+  const id = batchCategory.value
+  batchCategory.value = ''
+  if (!id) return
+  const ids = [...sitesStore.selectedIds]
+  const n = sitesStore.batchSetCategory(ids, id)
+  if (n) {
+    toastStore.push({ message: `已把 ${n} 个站点改到「${categoriesStore.getCategoryLabel(id)}」`, tone: 'ok', duration: 4000 })
+    sitesStore.clearSelection()
+  }
+}
+
+function applyBatchPurpose() {
+  const id = batchPurpose.value
+  batchPurpose.value = ''
+  if (!id) return
+  const ids = [...sitesStore.selectedIds]
+  const n = sitesStore.batchAddPurpose(ids, id)
+  const label = PURPOSE_TAGS.find(p => p.id === id)?.label || id
+  if (n) {
+    toastStore.push({ message: `已为 ${n} 个站点加上「${label}」用途`, tone: 'ok', duration: 4000 })
+    sitesStore.clearSelection()
+  } else {
+    toastStore.push({ message: `选中的站点都已有「${label}」用途`, tone: 'info', duration: 3000 })
+  }
 }
 
 function permanentDeleteConfirm(site) {
@@ -280,9 +343,24 @@ function onDragChange() {
   transition: all .15s ease; display: inline-flex; align-items: center; gap: 6px;
 }
 .batch-btn:hover { border-color: var(--accent); color: var(--accent); }
-.batch-btn-danger { color: #ef4444; border-color: #fca5a5; }
-.batch-btn-danger:hover { background: #fef2f2; border-color: #ef4444; }
+.batch-btn-danger { color: var(--color-danger); border-color: #fca5a5; }
+.batch-btn-danger:hover { background: #fef2f2; border-color: var(--color-danger); }
 .batch-btn-danger svg { width: 14px; height: 14px; }
+/* 批量改分类 / 加用途：与按钮同高同圆角，避免浮动栏高低不齐 */
+.batch-select {
+  height: 31px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-family: var(--font);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-white);
+  color: var(--text-primary);
+  cursor: pointer;
+  outline: none;
+  max-width: 150px;
+}
+.batch-select:focus { border-color: var(--accent); }
 
 /* 移动端：批量栏抬到 tab 栏之上，避免遮挡 */
 @media (max-width: 768px) {
@@ -295,6 +373,7 @@ function onDragChange() {
   .batch-count { font-size: 13px; }
   .batch-actions { gap: 6px; }
   .batch-btn { padding: 7px 12px; font-size: 12px; }
+  .batch-select { height: 29px; font-size: 12px; max-width: 104px; }
 }
 
 /* 回收站 */
@@ -321,7 +400,6 @@ function onDragChange() {
 .trash-item:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); }
 .trash-item-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
 .trash-item-info { min-width: 0; }
-.trash-item-info .card-desc { margin-bottom: 0; }
 .trash-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .trash-restore-btn, .trash-delete-btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; font-size: 12px; font-weight: 500;
@@ -332,12 +410,16 @@ function onDragChange() {
 .trash-delete-btn:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
 .trash-restore-btn svg, .trash-delete-btn svg { width: 14px; height: 14px; }
 
-/* 卡片样式复用 */
-.card-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: #fff; position: relative; overflow: hidden; }
-.favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
-.favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: #fff; box-sizing: border-box; }
-.card-title { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
-.card-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* 回收站行自有的图标/标题/描述样式。
+   早先这里直接复用了 SiteCard 的 .card-favicon / .card-title / .card-desc，两处会各自漂移；
+   而这些类名在 7 个组件里被各自 scoped 定义且语义并不相同（AdminSitesPanel 的 .card-title
+   是个 flex 列），因此不做全局收编，改为回收站行自成一套。 */
+.trash-favicon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; color: var(--color-on-solid); position: relative; overflow: hidden; }
+.trash-favicon-text { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.trash-favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: var(--bg-white); box-sizing: border-box; }
+.trash-item-name { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
+.trash-item-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.trash-item-info .trash-item-desc { margin-bottom: 0; }
 
 /* 动画 */
 .slide-up-enter-active, .slide-up-leave-active { transition: all .25s ease; }

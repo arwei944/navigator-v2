@@ -9,7 +9,7 @@
         <option value="name-asc">名称 A-Z</option>
         <option value="name-desc">名称 Z-A</option>
         <option value="clicks">按点击量</option>
-        <option value="newest">最近添加</option>
+        <option value="newest">最新收录</option>
       </select>
 
       <button class="toolbar-btn" :class="{ active: sitesStore.batchMode }"

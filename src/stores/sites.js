@@ -124,7 +124,11 @@ export const useSitesStore = defineStore('sites', () => {
       return rankSites(categorySites.value, q, { tieBreak: SORT_COMPARATORS[sortBy.value] })
     }
 
-    return applySort(categorySites.value, sortBy.value)
+    const list = applySort(categorySites.value, sortBy.value)
+    // 置顶：把「每天都要用」的几个站钉在当前列表最前。
+    // **只在不搜索时生效** —— 搜索是相关性说了算，把钉住的站插到最相关结果之前会骗人。
+    if (!list.some(s => s.pinned)) return list
+    return [...list.filter(s => s.pinned), ...list.filter(s => !s.pinned)]
   })
 
   // ── 覆盖层落盘与视图重建 ──
@@ -202,6 +206,56 @@ export const useSitesStore = defineStore('sites', () => {
   }
 
   /**
+   * 批量改字段：一次遍历写出，最后只 rebuild 一次 —— 逐条调 updateSite 会触发
+   * N 次全量 rebuild + saveOverlay，批量改 50 个站就是 50 次重算。
+   * 返回实际改动的条数（不存在的 id 静默忽略）。
+   */
+  function batchUpdate(ids, patch) {
+    const now = Date.now()
+    const p = { ...patch, updatedAt: now }
+    let touched = 0
+    for (const id of new Set(ids)) {
+      const idx = localAdds.value.findIndex(s => s.id === id)
+      if (idx !== -1) {
+        localAdds.value[idx] = { ...localAdds.value[idx], ...p }
+        touched++
+        continue
+      }
+      if (sites.value.some(s => s.id === id)) {
+        localEdits.value[id] = { ...(localEdits.value[id] || {}), ...p }
+        touched++
+      }
+    }
+    if (touched) { rebuild(); saveOverlay() }
+    return touched
+  }
+
+  /** 批量改分类 */
+  function batchSetCategory(ids, categoryId) {
+    return categoryId ? batchUpdate(ids, { categoryId }) : 0
+  }
+
+  /** 批量加用途：已有该用途的跳过，避免标签重复堆叠 */
+  function batchAddPurpose(ids, purposeId) {
+    if (!purposeId) return 0
+    const now = Date.now()
+    let touched = 0
+    for (const id of new Set(ids)) {
+      const site = sites.value.find(s => s.id === id)
+      if (!site) continue
+      const purposes = Array.isArray(site.purposes) ? site.purposes : []
+      if (purposes.includes(purposeId)) continue
+      const p = { purposes: [...purposes, purposeId], updatedAt: now }
+      const idx = localAdds.value.findIndex(s => s.id === id)
+      if (idx !== -1) localAdds.value[idx] = { ...localAdds.value[idx], ...p }
+      else localEdits.value[id] = { ...(localEdits.value[id] || {}), ...p }
+      touched++
+    }
+    if (touched) { rebuild(); saveOverlay() }
+    return touched
+  }
+
+  /**
    * 撤销一次「自动添加」：只从本地新增层摘掉，不进回收站。
    * 自动添加没有人工确认这一步，撤销就要能彻底当没发生过。
    * 返回是否真的摘掉了一条。
@@ -266,6 +320,15 @@ export const useSitesStore = defineStore('sites', () => {
     localOrder.value = next
     rebuild()
     saveOverlay()
+  }
+
+  /** 置顶 / 取消置顶，返回切换后的状态 */
+  function togglePin(id) {
+    const site = sites.value.find(s => s.id === id)
+    if (!site) return false
+    const next = !site.pinned
+    updateSite(id, { pinned: next })
+    return next
   }
 
   function setSearchQuery(q) { searchQuery.value = q }
@@ -416,6 +479,7 @@ export const useSitesStore = defineStore('sites', () => {
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded,
     addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
+    batchUpdate, batchSetCategory, batchAddPurpose, togglePin,
     setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,

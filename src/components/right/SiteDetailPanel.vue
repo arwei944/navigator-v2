@@ -20,6 +20,15 @@
       </span>
     </div>
 
+    <!-- 别名：人们实际怎么称呼这个站（GPT / 小狐狸 / 抱抱脸）。
+         搜索早就能按别名命中，人也该在详情里看得到它还有什么叫法。 -->
+    <div v-if="aliases.length" class="detail-section">
+      <div class="section-label">别名</div>
+      <div class="alias-list">
+        <span v-for="a in aliases" :key="a" class="alias-chip">{{ a }}</span>
+      </div>
+    </div>
+
     <!-- 用途：与分类正交的第二把尺子 —— 分类说「属于哪」，用途说「拿来干嘛」 -->
     <div v-if="purposeIds.length" class="detail-section">
       <div class="section-label">用途</div>
@@ -124,6 +133,8 @@ const categoryColor = computed(() =>
 )
 // 用途 id 列表（词表外的脏值由 PurposeTags 过滤），空数组时整段不渲染
 const purposeIds = computed(() => (Array.isArray(props.site?.purposes) ? props.site.purposes : []))
+// 别名列表（空串过滤），非空才渲染整段
+const aliases = computed(() => (Array.isArray(props.site?.aliases) ? props.site.aliases.filter(Boolean) : []))
 const isFav = computed(() => (props.site ? favoritesStore.isFavorite(props.site.id) : false))
 // 全网点击量（所有访客累计），与「我的访问次数」不是一回事
 const clickCount = computed(() => (props.site ? clicksStore.countFor(props.site.id) : 0))
@@ -213,6 +224,8 @@ watch(() => props.site, () => {
 .category-tag { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; background: color-mix(in srgb, var(--cat-color, #64748b) 10%, transparent); border: 1px solid color-mix(in srgb, var(--cat-color, #64748b) 20%, transparent); border-radius: 6px; font-size: 11px; font-weight: 500; color: var(--cat-color, #64748b); }
 .category-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .detail-section { padding-top: 4px; }
+.alias-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.alias-chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--border-light); color: var(--text-secondary); }
 .section-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; opacity: 0.7; }
 .detail-desc { font-size: 13px; line-height: 1.6; color: var(--text-primary); margin: 0; opacity: 0.85; }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }

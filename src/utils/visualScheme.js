@@ -155,9 +155,32 @@ function mix(baseHex, targetHex, ratio) {
 const px = n => `${n}px`
 const alpha = n => Math.max(0, Math.min(1, n)).toFixed(3)
 
+/**
+ * 语义色：卡片/控件的**状态色**（在线·限流·失效、收藏、热度分档、禁用灰）。
+ * 刻意不放进 TOKENS —— 它们表达「状态」而非「风格」，不该被方案改来改去；
+ * 但必须**随主题模式取明暗两套值**，否则深色主题下会出现 #fefce8 这种亮黄块。
+ */
+const SEMANTIC = {
+  light: {
+    ok: '#22c55e', warn: '#f59e0b', danger: '#ef4444', muted: '#94a3b8',
+    favorite: '#eab308', favoriteBg: '#fefce8', favoriteBorder: '#eab308',
+    heatWarm: '#b45309', heatWarmBg: 'rgba(245, 158, 11, 0.18)',
+    heatHot: '#dc2626', heatHotBg: 'rgba(239, 68, 68, 0.16)',
+    onSolid: '#ffffff'
+  },
+  dark: {
+    ok: '#4ade80', warn: '#fbbf24', danger: '#f87171', muted: '#64748b',
+    favorite: '#facc15', favoriteBg: 'rgba(234, 179, 8, 0.16)', favoriteBorder: 'rgba(250, 204, 21, 0.45)',
+    heatWarm: '#fbbf24', heatWarmBg: 'rgba(245, 158, 11, 0.22)',
+    heatHot: '#f87171', heatHotBg: 'rgba(239, 68, 68, 0.22)',
+    onSolid: '#ffffff'
+  }
+}
+
 /** 令牌 → 一批 CSS 自定义属性 */
 export function tokensToCssVars(tokens, mode = 'light') {
   const M = MODE_BASE[mode] || MODE_BASE.light
+  const S = SEMANTIC[mode] || SEMANTIC.light
   const s = (tokens.shadowLevel / 100) * M.shadowMul
   const fade = 1 - tokens.borderStrength / 100
   const [gr, gg, gb] = M.glass
@@ -171,6 +194,20 @@ export function tokensToCssVars(tokens, mode = 'light') {
 
     '--border': mix(M.border, M.surface, fade),
     '--border-light': mix(M.borderLight, M.surface, fade),
+
+    // 语义状态色（明暗两套）——卡片与控件只许引用这些，不许再写死颜色
+    '--color-ok': S.ok,
+    '--color-warn': S.warn,
+    '--color-danger': S.danger,
+    '--color-muted': S.muted,
+    '--color-favorite': S.favorite,
+    '--color-favorite-bg': S.favoriteBg,
+    '--color-favorite-border': S.favoriteBorder,
+    '--color-heat-warm': S.heatWarm,
+    '--color-heat-warm-bg': S.heatWarmBg,
+    '--color-heat-hot': S.heatHot,
+    '--color-heat-hot-bg': S.heatHotBg,
+    '--color-on-solid': S.onSolid,
 
     '--shadow': `0 1px 3px rgba(0, 0, 0, ${alpha(0.06 * s)})`,
     '--shadow-hover': `0 4px 16px rgba(0, 0, 0, ${alpha(0.08 * s)})`,

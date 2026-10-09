@@ -84,6 +84,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const wallpaperBlur = ref(true)
   // 网址自动添加：搜索栏粘贴网址时跳过确认弹窗，直接入库并弹预览卡片
   const autoAddOnUrl = ref(true)
+  // 卡片信息密度：compact 只留名称与域名；standard 为既有形态；rich 再补别名与三行描述
+  const cardDensity = ref('standard')
   // 视觉方案：scheme 决定整套令牌，overrides 是用户在其上的逐项微调
   const visualScheme = ref(SCHEMES[0].id)
   const visualOverrides = ref({})
@@ -106,6 +108,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   function setAutoAdd(v) {
     autoAddOnUrl.value = Boolean(v)
+  }
+
+  function setCardDensity(v) {
+    if (['compact', 'standard', 'rich'].includes(v)) cardDensity.value = v
   }
 
   function getCurrentEngine() {
@@ -192,11 +198,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   return {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
+    cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
-    toggleTheme, setSearchEngine, setAutoAdd, getCurrentEngine,
+    toggleTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity,
     setThemePreset, setWallpaper, THEME_PRESETS,
     setVisualScheme, setVisualToken, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'visualScheme', 'visualOverrides'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'visualScheme', 'visualOverrides'])
 })

@@ -57,6 +57,12 @@
 
     <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
     <ToastHost />
+
+    <!-- 全局单例右键菜单：替代每张卡片各自一份（300 卡 = 600 个 document 监听） -->
+    <ContextMenuHost />
+
+    <!-- 移动端站点详情抽屉：≤768px 没有 hover，右侧面板又整体隐藏，详情在这里兜住 -->
+    <MobileDetailDrawer />
   </div>
 </template>
 
@@ -83,6 +89,8 @@ import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
 import AddSiteModal from '@/components/AddSiteModal.vue'
 import ToastHost from '@/components/ToastHost.vue'
+import ContextMenuHost from '@/components/ContextMenuHost.vue'
+import MobileDetailDrawer from '@/components/MobileDetailDrawer.vue'
 import { autoAddSite } from '@/services/autoAdd'
 import { AUTO_ADD_REASON } from '@/utils/siteDraft'
 import { useToastStore } from '@/stores/toast'

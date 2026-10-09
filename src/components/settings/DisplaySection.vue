@@ -19,13 +19,24 @@
       </div>
     </div>
     <div class="setting-row">
+      <div class="setting-label">卡片信息密度</div>
+      <div class="theme-toggle-wrapper">
+        <button class="theme-toggle-btn" :class="{ active: prefs.cardDensity === 'compact' }"
+                title="只留图标、名称与域名" @click="prefs.setCardDensity('compact')">简洁</button>
+        <button class="theme-toggle-btn" :class="{ active: prefs.cardDensity === 'standard' }"
+                title="名称、域名、描述与用途标签" @click="prefs.setCardDensity('standard')">标准</button>
+        <button class="theme-toggle-btn" :class="{ active: prefs.cardDensity === 'rich' }"
+                title="再加别名与三行描述" @click="prefs.setCardDensity('rich')">详细</button>
+      </div>
+    </div>
+    <div class="setting-row">
       <div class="setting-label">默认排序</div>
       <select v-model="sortValue" class="setting-select" @change="sites.setSortBy(sortValue)">
         <option value="default">默认排序</option>
         <option value="name-asc">名称 A-Z</option>
         <option value="name-desc">名称 Z-A</option>
         <option value="clicks">按点击量</option>
-        <option value="newest">最近添加</option>
+        <option value="newest">最新收录</option>
       </select>
     </div>
 

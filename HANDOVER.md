@@ -2930,3 +2930,49 @@ X-Vercel-Error: DEPLOYMENT_DISABLED
 **验证**：`npm run build` 通过；`npm run console:test:all` 全绿；浏览器实测 —— 点击搜索框建议下拉可见、点击外部可关闭、「添加站点」入口回归通过。
 
 **发布**：`nav publish run --gate e2e8014d`（`5c737367`）全流程通过 —— 提交 `3d48492`（43 个文件）→ 推送 `origin/master` → 数据备份 300 条 → schema 校验门禁通过 → 构建 → Vercel 部署（Production `navigator-v2-21qslx59n`，别名 `https://navigator-v2-two.vercel.app`）→ 云端热更新（version 120 → 121，300 站点 / 292 带图标，快照 `000120-2026-10-07T16-29-43-080Z.json`）→ 轮询一次收敛。全程约 93s。
+
+---
+
+## 五十二、卡片体系升级：三处断层修复 + 信息架构（2026-10-09）
+
+方案见 `docs/NAV-v7-card-system-upgrade-plan.md`（用户「全部按建议改」）。本次落地 P0 全部 + P1 全部 + P2 两项。
+
+**P0 三处断层**
+
+| 断层 | 修复 |
+| --- | --- |
+| 卡片主体左键点击**什么都不做**（`.card { cursor: default }`），打开站点只能点右下角 30×30 箭头；移动端 ≤768px 右侧面板整体隐藏、无 hover，主入口只剩那个小箭头 | `SiteCard` 加 `role="button"` / `tabindex="0"` / `@keydown.enter/.space` / `:focus-visible` 焦点环，`cursor` 改 `pointer`；主体点击、回车、空格、箭头按钮统一走 `openSite()`。拖拽手柄与健康角标 `@click.stop` 防误开 |
+| 卡片内 **15 处硬编码色**，6 套视觉方案与深色主题驱动不了（深色下收藏态是 `#fefce8` 亮黄块） | `visualScheme.js` 生成 12 个语义 token（`--color-ok/warn/danger/muted/favorite*/heat-*/on-solid`），**明暗两套值**；`SiteCard` 硬编码色 **15 → 0** |
+| 右键菜单每卡一份：300 卡 = 300 个 `<Teleport>` + **600 个 document 监听**（click + scroll 捕获各一） | 新增 `stores/contextMenu.js` + `components/ContextMenuHost.vue` 全局单例；编辑/删除由卡片以回调注入（`handlers`），菜单不碰业务。**`SiteCard` 的 `addEventListener` 2 → 0** |
+
+**P1 信息架构**
+
+- **卡片信息密度三档**：`preferences.cardDensity`（持久化）+「设置 → 显示 → 卡片信息密度」= 简洁 / 标准 / 详细。默认「标准」即既有形态，**任何原内容都没丢**；「详细」再多给别名与三行描述。
+- **别名浮出**：`aliases` 覆盖 135/300 却一直只服务搜索。详情面板新增「别名」chip 段；卡片 `title` 原生提示带上别名。
+- **访问状态**：「未访问」淡徽章（`history.getLastVisitTime`）；**「最近」视图改为浏览历史倒序**（只列访问过的），原「最近添加」排序更名**「最新收录」**——视图与排序不再说同一件事（此建议见 `NAV-v5-nav-optimization.html` L751，长期未落地）。
+- **移动端详情入口**：新增 `MobileDetailDrawer.vue` 底部抽屉（复用 `SiteDetailPanel`，Esc/遮罩关闭）；右键菜单新增「查看详情」，由 `sidebarStore.showDetail()` 按视口分流（宽屏 → 右侧面板，≤768px → 抽屉）。
+
+**P2 能力**
+
+- **置顶**：`pinned` 字段 + `togglePin`；右键菜单「置顶/取消置顶」；底栏置顶徽章；`filteredSites` 在**不搜索时**把置顶项浮到最前（搜索是相关性说了算，插队会骗人）。
+- **批量操作扩展**：`batchUpdate / batchSetCategory / batchAddPurpose`（一次遍历只 `rebuild` 一次，避免 N 次全量重算）；批量栏新增「改分类」「加用途」下拉 + Toast 反馈。
+
+**P3（部分）**：回收站行不再借用 `SiteCard` 的 `.card-favicon/.card-title/.card-desc`（这组类名在 7 个组件里各自 scoped 且语义不同 —— AdminSitesPanel 的 `.card-title` 是个 flex 列，故不做全局收编），改为自有 `trash-*`。
+
+**未做**（及原因，详见方案 §8）：站点归档（需新查看入口 + 数据门禁 + 后台表单，涉线上契约）、`SiteCard`/`CardsContainer` 深度拆分（本环境无视觉回归手段）、`sortOrder` 去重与 `www.` 前缀（改写线上数据）、折叠过渡性能（无法测帧率）。
+
+| 文件 | 变更 |
+| --- | --- |
+| `src/components/SiteCard.vue` | 可点开/键盘可达、语义色 token、菜单外移、密度档、别名 title、未访问与置顶徽章 |
+| `src/components/ContextMenuHost.vue`（新增）· `src/stores/contextMenu.js`（新增） | 全局单例右键菜单 |
+| `src/components/MobileDetailDrawer.vue`（新增） | 移动端详情抽屉 |
+| `src/utils/visualScheme.js` | 12 个语义色 token（明暗两套） |
+| `src/stores/sites.js` | `batchUpdate/batchSetCategory/batchAddPurpose/togglePin`；`filteredSites` 置顶浮前 |
+| `src/stores/sidebar.js` | `detailSheetSite` / `showDetail` / `closeDetailSheet` |
+| `src/stores/preferences.js` | `cardDensity`（持久化） |
+| `src/components/CardsContainer.vue` | 密度接线、批量改分类/加用途、回收站自有样式、「最近」改浏览历史 |
+| `src/components/right/SiteDetailPanel.vue` | 新增「别名」段 |
+| `src/components/settings/DisplaySection.vue` · `MainToolbar.vue` | 密度选择；「最近添加」→「最新收录」 |
+| `docs/NAV-v7-card-system-upgrade-plan.md`（新增） | 调研 + 分期方案 + 实施结果 |
+
+**验证**：`npm run build` 通过；目标指标用 grep 复核（硬编码色 15→0、卡片 document 监听 2→0）。
