@@ -53,6 +53,7 @@ import { useContextMenuStore } from '@/stores/contextMenu'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useHistoryStore } from '@/stores/history'
+import { openInNewTab } from '@/utils/open'
 
 const menu = useContextMenuStore()
 const favoritesStore = useFavoritesStore()
@@ -72,7 +73,7 @@ function toggleFav() {
 
 function openNewWindow() {
   if (!site.value) return
-  window.open('https://' + site.value.url, '_blank', 'noopener,noreferrer')
+  openInNewTab('https://' + site.value.url)
   sitesStore.recordVisit(site.value.id)
   historyStore.addRecord(site.value.id)
   menu.close()

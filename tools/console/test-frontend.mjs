@@ -143,6 +143,66 @@ try {
   history.addRecord('z')
   ok(Number.isFinite(history.getLastVisitTime('z')), 'getLastVisitTime 返回时间戳')
   eq(history.getLastVisitTime('nope'), null, '未访问过的站点返回 null')
+
+  /* ══════════ [D] 打开外部链接只有一条口径，且必须是「链接导航」而非「弹窗请求」 ══════════ */
+
+  /**
+   * 背景：用户反馈「点击卡片会覆盖当前网址」。在桌面 Chrome 里原实现
+   * （`window.open(url, '_blank', 'noopener')`）实测**是对的** —— 但按规范，传了
+   * windowFeatures 的 window.open 属于**弹窗请求**，在内嵌 WebView / 弹窗拦截下会退化成
+   * 「就地打开」。所以统一改成合成 `<a target="_blank" rel="noopener noreferrer">` 的点击。
+   *
+   * 这里用一个**最小 DOM 桩**验证 openInNewTab 的语义（不引入 jsdom）。
+   */
+  const made = []
+  globalThis.document = {
+    createElement(tag) {
+      const el = { tag, style: {}, clicked: 0, removed: false, appended: false }
+      el.click = () => { el.clicked++ }
+      el.remove = () => { el.removed = true }
+      made.push(el)
+      return el
+    },
+    body: { appendChild(el) { el.appended = true } },
+  }
+
+  const { openInNewTab } = await server.ssrLoadModule('/src/utils/open.js')
+
+  openInNewTab('https://example.com/a?b=1')
+  const el = made.at(-1)
+  eq(made.length, 1, 'openInNewTab 创建了一个元素')
+  eq(el.tag, 'a', '用的是 <a>（链接导航），不是 window.open（弹窗请求）')
+  eq(el.href, 'https://example.com/a?b=1', 'href 就是目标地址')
+  eq(el.target, '_blank', 'target=_blank —— 新标签页')
+  ok(el.rel.includes('noopener') && el.rel.includes('noreferrer'), 'rel 同时含 noopener 与 noreferrer', el.rel)
+  eq(el.clicked, 1, '触发了一次点击')
+  eq(el.appended, true, '先挂到 body 再点（Firefox 的必要条件）')
+  eq(el.removed, true, '点完把临时节点摘掉，不留在 DOM 里')
+
+  const before = made.length
+  openInNewTab('')
+  openInNewTab(null)
+  openInNewTab('   ')
+  eq(made.length, before, '空地址不产生任何节点')
+
+  // 源码级绊线：不允许再出现 window.open( 调用 —— 它正是用户反馈问题的根源。
+  // 扫描前先剥掉注释，否则 utils/open.js 顶部那段「为什么不用 window.open」的说明会被误判。
+  {
+    const { readFileSync, readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const root = new URL('../../src', import.meta.url).pathname.replace(/^\//, '')
+    const stripComments = s => s
+      .replace(/\/\*[\s\S]*?\*\//g, '')   // /* ... */ 与 JSDoc
+      .replace(/^\s*\/\/.*$/gm, '')       // 整行 // 注释
+      .replace(/<!--[\s\S]*?-->/g, '')    // Vue 模板里的 HTML 注释
+    const files = readdirSync(root, { recursive: true })
+      .filter(f => /\.(vue|js)$/.test(String(f)))
+      .map(f => join(root, String(f)))
+    const offenders = files.filter(f => /window\.open\s*\(/.test(stripComments(readFileSync(f, 'utf-8'))))
+    eq(offenders.length, 0, 'src/ 下不再有 window.open( 调用（应统一走 utils/open.js）',
+      offenders.map(f => f.split(/[\\/]/).slice(-2).join('/')).join(', '))
+    ok(files.length > 50, `源码扫描确实扫到了文件（${files.length} 个）`, '防止扫了个空目录还判通过')
+  }
 } finally {
   await server.close()
 }

@@ -54,6 +54,7 @@ import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useOmniBox } from '@/composables/useOmniBox'
+import { openInNewTab } from '@/utils/open'
 import OmniResults from '@/components/OmniResults.vue'
 
 const emit = defineEmits(['open-palette'])
@@ -116,7 +117,7 @@ const currentEngine = computed(() => preferencesStore.getCurrentEngine())
 function externalSearch() {
   const q = trimmed.value
   if (!q) return
-  window.open(`${currentEngine.value.url}?q=${encodeURIComponent(q)}`, '_blank', 'noopener')
+  openInNewTab(`${currentEngine.value.url}?q=${encodeURIComponent(q)}`)
   focused.value = false
 }
 

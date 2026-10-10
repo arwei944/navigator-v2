@@ -22,6 +22,7 @@ import { useOmniStore } from '@/stores/omni'
 import { buildCommands } from '@/utils/commands'
 import { rankSites, matchAny, scoreText, scoreSite } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
+import { openInNewTab } from '@/utils/open'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
 /** 分组顺序：inline 站点优先，palette 命令优先 */
@@ -79,7 +80,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
 
   /** 打开站点的唯一口径：与卡片点击完全一致（新窗口 + 记访问 + 记历史） */
   function openSite(site) {
-    window.open('https://' + site.url, '_blank', 'noopener')
+    openInNewTab('https://' + site.url)
     sites.recordVisit(site.id)
     history.addRecord(site.id)
   }
@@ -228,7 +229,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
       title: `用 ${e.label} 搜索「${q}」`,
       subtitle: '在浏览器新标签页打开',
       icon: 'search',
-      run: () => window.open(`${e.url}?q=${encodeURIComponent(q)}`, '_blank', 'noopener')
+      run: () => openInNewTab(`${e.url}?q=${encodeURIComponent(q)}`)
     }]
   })
 

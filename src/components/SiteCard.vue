@@ -95,6 +95,7 @@ import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { useContextMenuStore } from '@/stores/contextMenu'
 import { usePreferencesStore } from '@/stores/preferences'
+import { openInNewTab } from '@/utils/open'
 import PurposeTags from '@/components/PurposeTags.vue'
 
 const props = defineProps({
@@ -184,7 +185,9 @@ const titleAttr = computed(() => {
 
 /** 打开站点：卡片主体、回车、空格、右下角箭头都走这里，口径一致 */
 function openSite() {
-  window.open('https://' + props.site.url, '_blank', 'noopener')
+  // 走 openInNewTab（锚点导航）而不是 window.open —— 后者带 features 参数时属于弹窗请求，
+  // 在内嵌 WebView / 弹窗拦截下会变成「覆盖当前页」。详见 src/utils/open.js 顶部注释。
+  openInNewTab('https://' + props.site.url)
   sitesStore.recordVisit(props.site.id)
   historyStore.addRecord(props.site.id)
 }
