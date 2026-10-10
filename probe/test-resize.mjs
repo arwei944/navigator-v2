@@ -49,6 +49,9 @@ await sleep(1200)
 await evaluate(`(async () => {
   try { const r = await navigator.serviceWorker.getRegistrations(); await Promise.all(r.map(x => x.unregister())) } catch {}
   try { const k = await caches.keys(); await Promise.all(k.map(x => caches.delete(x))) } catch {}
+  // 侧栏宽度是持久化的（sidebar store 的 width）。不清掉的话反复跑会把宽度一路推到
+  // 上限 400px，之后「再 +80px」无处可增 —— 断言会假装失败。
+  try { localStorage.removeItem('sidebar') } catch {}
   return 1
 })()`).catch(() => {})
 await send('Page.reload', { ignoreCache: true })
@@ -62,7 +65,10 @@ if (!exists) { console.log('\n结果：0/1 通过'); ws.close(); process.exit(1)
 
 const out = await evaluate(`(async () => {
   const handle = document.querySelector('.sidebar-resize-handle')
-  const w = () => document.querySelector('.sidebar').getBoundingClientRect().width
+  // 直接读内联 style 的宽度（store 驱动的真值），而不是 rect ——
+  // rect 含边框 / 滚动条修正，会和 store 值差几个 px，把断言变得不必要地脆
+  const el = document.querySelector('.sidebar')
+  const w = () => parseFloat(el.style.width) || 0
   const w0 = w()
   const r = handle.getBoundingClientRect()
   const x0 = r.left + r.width / 2
@@ -87,7 +93,7 @@ const out = await evaluate(`(async () => {
 const grew = out.wAfterFrame - out.w0
 check(Math.abs(out.wSameFrame - out.w0) < 1, '同一帧内 20 次 mousemove 未逐次写宽度（已合并）',
   `同帧 ${out.wSameFrame.toFixed(0)}px / 起始 ${out.w0.toFixed(0)}px`)
-check(grew > 60 && grew < 100, '下一帧写入最后一个位置（+80px）', `实际 +${grew.toFixed(1)}px`)
+check(Math.abs(grew - 80) <= 1, '下一帧写入最后一个位置（+80px）', `实际 +${grew.toFixed(1)}px`)
 check(Math.abs(out.wAfterUp - out.wAfterFrame) < 1, 'mouseup 时补写最后一次坐标，位移不丢')
 check(out.cursorDuring === 'col-resize', '拖拽期间光标为 col-resize')
 check(out.cursorAfter === '', 'mouseup 后光标复位')
