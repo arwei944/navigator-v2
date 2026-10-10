@@ -23,3 +23,6 @@ probe/_*.txt
 probe/*.png
 # 零依赖 CDP 验证用的临时 Chrome 配置目录（每次测量都该是干净的）
 .chrome-*/
+
+# 项目级 agent 工作区（设计草稿 / 工作日志等本机状态）
+.workbuddy/
