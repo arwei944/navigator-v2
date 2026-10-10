@@ -34,6 +34,10 @@ const START_PORT = Number(args.values.port) || 5175
 const STRICT_PORT = args.values['strict-port'] === true
 const UI_DIR = join(ROOT, 'tools', 'console', 'ui')
 const ICON_DIR = join(ROOT, 'public', 'icons')
+// 浏览器端要复用 shared/ 下的纯模块（目前是 host.mjs 的 hostOf）。
+// 让它直接 import 仓库里的同一份实现，而不是在 UI 里再抄一份 —— 抄出来的第四份
+// 正是审计里那条「三份 hostOf 各自漂移」的来源。
+const SHARED_DIR = join(ROOT, 'shared')
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -115,6 +119,12 @@ const server = createServer(async (req, res) => {
     // 站点图标：直接复用仓库 public/icons，使面板内可预览本地图标
     if (req.method === 'GET' && path.startsWith('/icons/')) {
       await serveFrom(res, ICON_DIR, path.replace(/^\/icons\//, ''))
+      return
+    }
+
+    // shared/ 下的纯模块（浏览器端与 Node 端共用同一份实现）
+    if (req.method === 'GET' && path.startsWith('/shared/')) {
+      await serveFrom(res, SHARED_DIR, path.replace(/^\/shared\//, ''))
       return
     }
 

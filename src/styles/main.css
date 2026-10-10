@@ -126,6 +126,36 @@ button { font-family: inherit; }
   background: rgba(0, 0, 0, 0.6);
 }
 
+/* 云端数据状态条：断网/超时/服务端报错时提示「看到的是本机数据」。
+   底色用主题表面色 + 左侧语义色描边，**不要用亮色底** —— 这里没有 -bg 类语义令牌，
+   写死亮底会在深色主题下变成「浅字浅底」的不可读条。 */
+.cloud-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-white);
+  border-bottom: 1px solid var(--border);
+  border-left: 3px solid var(--color-warn);
+}
+.cloud-notice.bad { border-left-color: var(--color-danger); }
+.cloud-notice-text { flex: 1; min-width: 0; }
+.cloud-notice-btn {
+  flex-shrink: 0;
+  padding: 3px 12px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-white);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.cloud-notice-btn:hover { border-color: var(--accent); color: var(--accent); }
+
 /* 遮罩层 */
 .overlay {
   display: none;

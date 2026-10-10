@@ -14,6 +14,15 @@
 
     <!-- 主内容区 -->
     <main class="main">
+      <!-- 云端数据状态条：断网/超时/服务端报错/响应不合法时，让用户知道
+           「现在看到的可能是本机数据而不是云端最新」。旧实现是 catch 全空，
+           断网与正常在界面上完全一样，用户会以为数据没问题。
+           放在 .main 内部而不是 fixed 定位：避开与移动端头部栏、批量操作栏的层叠打架。 -->
+      <div v-if="cloudNotice" class="cloud-notice" :class="cloudNotice.tone" role="status">
+        <span class="cloud-notice-text">{{ cloudNotice.text }}</span>
+        <button v-if="cloudNotice.retry" class="cloud-notice-btn" @click="sitesStore.retryCloudNow()">重试</button>
+      </div>
+
       <!-- 内容聚合视图 -->
       <template v-if="scope === 'feed'">
         <ContentFeed />
@@ -88,7 +97,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -394,38 +403,71 @@ function updatePageTitle() {
 }
 
 onMounted(() => {
-  // 云端站点热更新：启动拉取 + 30s 轮询
+  // 云端站点热更新：启动拉取 + 轮询（失败会指数退避）
   sitesStore.initCloudSites()
   sitesStore.startPolling(30000)
 
   // 全局点击量（卡片角标 / 排行的权威口径）：启动拉一次，之后按 TTL 自刷新
   clicksStore.load()
 
-  // 标签页重新可见时立即重拉，避免热更新后等待整轮 30s
-  const onVisibility = () => {
-    if (document.visibilityState === 'visible') {
-      sitesStore.pollCloudSites()
-    }
-  }
+  // 标签页重新可见时立即重拉，避免热更新后等待整轮 30s。
+  // 顺带复位退避：用户切回来就是要看最新数据，不该让他等一个断网期间攒出来的窗口。
   document.addEventListener('visibilitychange', onVisibility)
 
-  document.addEventListener('keydown', (e) => {
-    // Ctrl+K 打开全能框（命令面板形态）
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault()
-      commandPaletteRef.value?.open()
-      return
-    }
-    // Ctrl+D 切换主题：快捷键面板里写了这条但一直没实现，这里补上
-    if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-      e.preventDefault()
-      preferencesStore.toggleTheme()
-      return
-    }
-    if (e.key === 'Escape') {
-      sidebarStore.close()
-    }
-  })
+  // 联网恢复/断开：恢复时立刻重拉（不必等退避），断开时把状态写进 cloudError 让界面说出来。
+  // 这两个事件在移动端尤其重要 —— 切 4G/WiFi 时 navigator.onLine 变化是最早的信号。
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
+
+  document.addEventListener('keydown', onKeydown)
 })
+
+onBeforeUnmount(() => {
+  // 这个组件挂在应用根上，正常不会卸载；但把监听与定时器收干净是基本功，
+  // 否则将来一旦有 HMR / 多实例挂载，就会同时跑好几条轮询。
+  document.removeEventListener('visibilitychange', onVisibility)
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
+  document.removeEventListener('keydown', onKeydown)
+  sitesStore.stopPolling()
+})
+
+/**
+ * 云端状态条文案：把 store 里的机器可读短码翻译成人话。
+ * 放在 UI 层而不是 store 里，是为了 store 不带文案、也便于将来换措辞。
+ */
+const cloudNotice = computed(() => {
+  const e = sitesStore.cloudError
+  if (!e) return null
+  if (e === 'offline') return { tone: 'warn', retry: true, text: '已离线，当前展示的是本机数据，联网后会自动更新' }
+  if (e === 'timeout') return { tone: 'warn', retry: true, text: '读取云端数据超时，当前展示的是本机数据' }
+  if (e === 'invalid-payload') return { tone: 'bad', retry: true, text: '云端数据格式异常，已保留上一版本，请联系管理员' }
+  if (String(e).startsWith('http-')) return { tone: 'bad', retry: true, text: `云端数据读取失败（${e.slice(5)}），当前展示的是本机数据` }
+  return { tone: 'warn', retry: true, text: '云端数据暂时不可用，当前展示的是本机数据' }
+})
+
+function onVisibility() {
+  if (document.visibilityState === 'visible') sitesStore.retryCloudNow()
+}
+function onOnline() { sitesStore.retryCloudNow() }
+function onOffline() { sitesStore.pollCloudSites() }
+
+function onKeydown(e) {
+  // Ctrl+K 打开全能框（命令面板形态）
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault()
+    commandPaletteRef.value?.open()
+    return
+  }
+  // Ctrl+D 切换主题：快捷键面板里写了这条但一直没实现，这里补上
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    e.preventDefault()
+    preferencesStore.toggleTheme()
+    return
+  }
+  if (e.key === 'Escape') {
+    sidebarStore.close()
+  }
+}
 </script>
 

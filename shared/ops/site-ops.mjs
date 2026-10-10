@@ -28,15 +28,10 @@ export const EDITABLE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'color', 'i
 
 /* ---------------- URL ---------------- */
 
-/** 取主机名做去重比较：数据里存的是裸域名（无协议），需兼容补全后再解析 */
-export function hostOf(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return ''
-  try {
-    const u = new URL(raw.includes('://') ? raw : 'https://' + raw)
-    return u.hostname.replace(/^www\./, '').toLowerCase()
-  } catch { return '' }
-}
+// 唯一实现在 shared/host.mjs（本文件原来是四份之一）。
+// 既要 re-export（保持既有 import 路径），也要 import（本模块内部有使用）。
+export { hostOf } from '../host.mjs'
+import { hostOf } from '../host.mjs'
 
 /** 落库口径：只保留域名，去协议 / 查询串 / 尾斜杠 */
 export function normalizeUrl(input) {

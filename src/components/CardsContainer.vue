@@ -238,6 +238,18 @@ const batchMode = computed({
 // 自动添加成功后要把新卡片滚到视野中间，否则列表长时「加了但看不见」
 const containerRef = ref(null)
 
+/**
+ * 选择集只该包含「这一刻看得见的站点」。
+ *
+ * displaySites 是最终渲染的那一份（含「收藏 / 最近」这类导航范围内的二次筛选），
+ * 所以以它为准最准：切分类、切范围、改搜索词、切导航都会让它变，选择集随之收敛。
+ * 不做这一步的后果是实打实的误删：在 A 分类选了 3 个站，切到 B 分类点批量删除，
+ * 会把 3 个用户此刻看不见的站一起删掉。
+ */
+watch(displaySites, (list) => {
+  sitesStore.pruneSelection(list.map(s => s.id))
+})
+
 watch(() => sitesStore.highlightSiteId, async (id) => {
   if (!id) return
   await nextTick()

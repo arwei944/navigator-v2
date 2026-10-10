@@ -11,9 +11,6 @@ importers:
       '@vercel/blob':
         specifier: ^2.8.0
         version: 2.8.0
-      '@vueuse/core':
-        specifier: ^10.7.0
-        version: 10.11.1(vue@3.5.42)
       fuse.js:
         specifier: ^7.5.0
         version: 7.5.0
@@ -26,18 +23,12 @@ importers:
       pinyin-pro:
         specifier: ^3.28.2
         version: 3.29.4
-      uuid:
-        specifier: ^14.0.1
-        version: 14.0.2
       vue:
         specifier: ^3.4.0
         version: 3.5.42
       vue-router:
         specifier: ^4.3.0
         version: 4.6.4(vue@3.5.42)
-      vue-virtual-scroller:
-        specifier: ^3.0.4
-        version: 3.0.5(vue@3.5.42)
       vuedraggable:
         specifier: ^4.1.0
         version: 4.1.0(vue@3.5.42)
@@ -966,9 +957,6 @@ packages:
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
-  '@types/web-bluetooth@0.0.20':
-    resolution: {integrity: sha512-g9gZnnXVq7gM7v3tJCWV/qw7w+KeOlSHAhgF9RytFyifW6AF61hdT2ucrYhPq9hLs5JIryeupHV3qGk95dH9ow==}
-
   '@vercel/blob@2.8.0':
     resolution: {integrity: sha512-Nu+HWKpkgovCh/ezlG7wCVwF7RErTzLzZMbGKFBdGBCbTKyK+s5VXPLl+0+TpNEQPH8AVaGzOpIsXUOtkqylCQ==}
     engines: {node: '>=20.0.0'}
@@ -1020,15 +1008,6 @@ packages:
 
   '@vue/shared@3.5.42':
     resolution: {integrity: sha512-2rPxex1jQf4jvl9MOHl6YaXCPcrNqz/FstMOEh3QWY+/OME9nQTvl9WYeCwhW7AFjaR0SnngZGlp/wkR6rkI6g==}
-
-  '@vueuse/core@10.11.1':
-    resolution: {integrity: sha512-guoy26JQktXPcz+0n3GukWIy/JDNKti9v6VEMu6kV2sYBsWuGiTU8OWdg+ADfUbHg3/3DlqySDe7JmdHrktiww==}
-
-  '@vueuse/metadata@10.11.1':
-    resolution: {integrity: sha512-IGa5FXd003Ug1qAZmyE8wF3sJ81xGLSqTqtQ6jaVfkeZ4i5kS2mwQF61yhVqojRnenVew5PldLyRgvdl4YYuSw==}
-
-  '@vueuse/shared@10.11.1':
-    resolution: {integrity: sha512-LHpC8711VFZlDaYUXEBbFBCQ7GS3dVU9mjOhhMhXP6txTV4EhYQg/KGnQuvt/sPAtoUKq7VVUnL6mVtFoL42sA==}
 
   accepts@2.0.0:
     resolution: {integrity: sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng==}
@@ -2174,10 +2153,6 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
-  uuid@14.0.2:
-    resolution: {integrity: sha512-xZe/16rV4aa+HGSOCiY2YeLT1OybRLrrkL/Rqaq7p7GMVXjFh+6wN4oMYgjFmnSnhY8t6Xpdl2l9qmnHYuMHwQ==}
-    hasBin: true
-
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
@@ -2236,11 +2211,6 @@ packages:
     resolution: {integrity: sha512-Hz9q5sa33Yhduglwz6g9skT8OBPii+4bFn88w6J+J4MfEo4KRRpmiNG/hHHkdbRFlLBOqxN8y8gf2Fb0MTUgVg==}
     peerDependencies:
       vue: ^3.5.0
-
-  vue-virtual-scroller@3.0.5:
-    resolution: {integrity: sha512-5YXD+5DiLOGsngaubXmeNKLYsAnokSMKITT8BqlNIGJ7Pggy8udTg00vKVHZDE5ElPXPdxhTXnJBQqpGnzKAgw==}
-    peerDependencies:
-      vue: ^3.3.0
 
   vue@3.5.42:
     resolution: {integrity: sha512-4RyHQTbQvOPs3MfvUO1Sg0YRrKNnA0mAVtvpd12Tg1fKDN7OHBUl1IqSn8zGJjK9nI3NkNp8cgTpVrSZC5TTcA==}
@@ -3288,8 +3258,6 @@ snapshots:
 
   '@types/trusted-types@2.0.7': {}
 
-  '@types/web-bluetooth@0.0.20': {}
-
   '@vercel/blob@2.8.0':
     dependencies:
       '@vercel/oidc': 3.8.7
@@ -3374,25 +3342,6 @@ snapshots:
       '@vue/shared': 3.5.42
 
   '@vue/shared@3.5.42': {}
-
-  '@vueuse/core@10.11.1(vue@3.5.42)':
-    dependencies:
-      '@types/web-bluetooth': 0.0.20
-      '@vueuse/metadata': 10.11.1
-      '@vueuse/shared': 10.11.1(vue@3.5.42)
-      vue-demi: 0.14.10(vue@3.5.42)
-    transitivePeerDependencies:
-      - '@vue/composition-api'
-      - vue
-
-  '@vueuse/metadata@10.11.1': {}
-
-  '@vueuse/shared@10.11.1(vue@3.5.42)':
-    dependencies:
-      vue-demi: 0.14.10(vue@3.5.42)
-    transitivePeerDependencies:
-      - '@vue/composition-api'
-      - vue
 
   accepts@2.0.0:
     dependencies:
@@ -4702,8 +4651,6 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
-  uuid@14.0.2: {}
-
   vary@1.1.2: {}
 
   vite-plugin-pwa@0.17.5(vite@5.4.21(terser@5.51.2))(workbox-build@7.4.1)(workbox-window@7.4.1):
@@ -4733,10 +4680,6 @@ snapshots:
   vue-router@4.6.4(vue@3.5.42):
     dependencies:
       '@vue/devtools-api': 6.6.4
-      vue: 3.5.42
-
-  vue-virtual-scroller@3.0.5(vue@3.5.42):
-    dependencies:
       vue: 3.5.42
 
   vue@3.5.42:

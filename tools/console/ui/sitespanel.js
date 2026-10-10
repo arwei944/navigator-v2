@@ -1,5 +1,6 @@
 /** 站点面板：站点增删改 + 元信息抓取 + 图标下载 + 云端数据实时同步 */
 import { $, api, openStream, appendLocal, isBusy } from './core.js'
+import { hostOf } from '/shared/host.mjs'
 
 const STATUS_LABEL = { pending: '待执行', running: '进行中', success: '完成', failed: '失败', skipped: '跳过' }
 
@@ -204,11 +205,9 @@ function resetTouched() {
   state.touched = { name: false, desc: false, categoryId: false, color: false }
 }
 
-function hostOf(raw) {
-  const s = String(raw || '').trim()
-  if (!s) return ''
-  try { return new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s).hostname.replace(/^www\./, '').toLowerCase() } catch { return '' }
-}
+// hostOf 从 shared/host.mjs 引入（控制台服务器的 /shared/ 静态路由提供），
+// 不在 UI 里再抄一份 —— 抄出来的第四份正是审计里「三份 hostOf 各自漂移」的来源。
+// 注意这里的 import 语句在文件顶部，见下方 import 区。
 
 /** 推断出的分类必须是已登记分类，否则 addSite 会直接拒绝 */
 function knownCategory(id) {

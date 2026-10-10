@@ -55,5 +55,34 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src')
     }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        /**
+         * 依赖分包（序 23）。
+         *
+         * 目标不是「减少总字节」（总字节不变），而是**让首屏关键路径更短、缓存更稳**：
+         *   - `pinyin`：pinyin-pro 是 317 KB raw / ~130 KB gz 的巨型单包，而首屏一次都用不上
+         *     （见 src/utils/search.js 顶部注释）。它被 `import()` 动态引入，本就会成为独立
+         *     chunk；这里只是给它一个稳定名字，便于在构建产物里一眼看出与核对。
+         *   - `vendor-vue`：vue / vue-router / pinia / persistedstate。这三者版本极少变，
+         *     单独成块后改业务代码不会让用户重下这 ~110 KB。
+         *   - 其余依赖（fuse.js、vuedraggable…）留在默认块里，避免过度切碎反而增加请求数。
+         *
+         * 注意：**并不是**把它们变成「按需加载」——vendor-vue 仍随首屏一起下发。真正的
+         * 首屏节省来自 pinyin 的动态 import，这里的分组只解决缓存复用（Cache-Control 层面）。
+         */
+        manualChunks(id) {
+          const p = id.replace(/\\/g, '/')
+          if (!p.includes('/node_modules/')) return
+          if (p.includes('/pinyin-pro/')) return 'pinyin'
+          if (/\/node_modules\/(@vue|vue|vue-router|pinia|pinia-plugin-persistedstate)\//.test(p)) {
+            return 'vendor-vue'
+          }
+          return
+        }
+      }
+    }
   }
 })

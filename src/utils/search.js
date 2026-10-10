@@ -1,12 +1,30 @@
+import { ref } from 'vue'
 import Fuse from 'fuse.js'
-import { pinyin } from 'pinyin-pro'
 import { purposeLabel } from '../../shared/purposes.mjs'
 
 /**
  * 站点检索内核：页面搜索框与命令面板共用同一套评分与排序，
  * 避免「同一关键词两处结果不同」。纯函数，不依赖 Pinia。
  *
- * 评分分档（越高越靠前）：
+ * ## pinyin-pro 为什么是懒加载的（改这块前必读）
+ *
+ * `pinyin-pro` 是整个应用里最大的单个依赖：**317 KB raw**，比 vue + pinia + router
+ * 加起来还大。而它只在「用户输入了搜索词、且中文站名要靠拼音命中」时才用得上 ——
+ * 首屏一次都不用。此前它是静态 import，于是这部分体积压在首屏关键路径上，白下白解析。
+ *
+ * 现在改为动态 import，于是：
+ *   - 构建时 pinyin-pro 被切成独立 chunk，首屏不请求它；
+ *   - `preloadPinyin()` 在启动后空闲时把它取回来（用户真开始打字时通常已就绪）；
+ *   - 引擎没到位时 `keysOf` 把拼音字段算成空串 → **降级为「无拼音命中」**，
+ *     中文名与描述的直接命中、别名、域名、Fuse 模糊兜底全部照常工作；
+ *   - `pinyinReady` 是响应式信号，且**在 keysOf / textKeys 内部被读取** ——
+ *     于是「引擎到位」会自动让依赖检索结果的 computed 重算一次（sitesStore.filteredSites、
+ *     全能框的 siteResults…），不需要每个消费方各自去订阅。
+ *
+ * 降级窗口只有从「首屏」到「空闲时预取完成」这一小段，正常网络下用户还没打完第一个字。
+ *
+ * ## 评分分档（越高越靠前）
+ *
  *   名称精确 > 别名精确 > 名称前缀 > 别名前缀 > 名称包含 > 别名包含
  *   > 域名包含 > 用途命中 > 描述包含 > 拼音首字母前缀 > 别名拼音首字母前缀
  *   > 拼音名包含 > 别名拼音包含 > 拼音描述包含
@@ -15,9 +33,62 @@ import { purposeLabel } from '../../shared/purposes.mjs'
  * 全部未命中时退化为 Fuse 模糊匹配，容忍拼写错误。
  */
 
-const keyCache = new WeakMap()
+/** 拼音引擎是否就绪（响应式：见文件头注释里对消费方的说明） */
+export const pinyinReady = ref(false)
+
+/** 键表要能被整体换掉（见 preloadPinyin 里的说明），所以不能用 const */
+let keyCache = new WeakMap()
+
+let pinyinLib = null
+let pinyinLoading = null
+let pinyinFailedAt = 0
+
+/** 取一次拼音引擎；未就绪返回 null，调用方据此降级 */
+function py(text, opts) {
+  if (!pinyinLib) return ''
+  try {
+    return pinyinLib(text, opts)
+  } catch {
+    // 拼音库对个别符号串会抛 —— 退化为「这条没有拼音键」而不是让整次检索失败
+    return ''
+  }
+}
+
+/**
+ * 预取拼音引擎。幂等、可重入、不阻塞：
+ * 失败后 5s 内不再重试，避免网络不通时每次按键都打一个必然失败的请求。
+ */
+export function preloadPinyin() {
+  // 已就绪：回一个已兑现的 promise，让 `await preloadPinyin()` 永远拿到函数本身。
+  // （早先直接 `return pinyinLoading` 会在加载完成后返回 null —— 调用方 await 到 null，
+  //   虽然当前调用方都忽略返回值，但这是个会咬人的接口。）
+  if (pinyinLib) return Promise.resolve(pinyinLib)
+  if (pinyinLoading) return pinyinLoading
+  if (pinyinFailedAt && Date.now() - pinyinFailedAt < 5000) return null
+  pinyinLoading = import('pinyin-pro')
+    .then(m => {
+      pinyinLib = m.pinyin
+      // 丢弃降级期间算出的键：它们没有拼音字段，留着会让「引擎到位」也搜不出拼音结果。
+      // WeakMap 没有 clear()，整体换一个是等价的（旧表会被 GC 回收）。
+      keyCache = new WeakMap()
+      textKeyCache.clear()
+      pinyinReady.value = true
+      return pinyinLib
+    })
+    .catch(() => {
+      pinyinFailedAt = Date.now()
+      return null
+    })
+    .finally(() => { pinyinLoading = null })
+  return pinyinLoading
+}
 
 function keysOf(site) {
+  // 读一下就绪信号，让调用它的 computed 在引擎到位后自动重算（见文件头）
+  void pinyinReady.value
+  // 引擎没到位就顺手催一次，别让用户第一次搜索走完降级路径
+  if (!pinyinLib) preloadPinyin()
+
   let k = keyCache.get(site)
   if (k) return k
   const name = String(site?.name ?? '')
@@ -32,11 +103,11 @@ function keysOf(site) {
     aliases: aliases.map(a => a.toLowerCase()),
     purposes: purposes.map(p => p.toLowerCase()),
     purposeText: purposes.map(p => purposeLabel(p)).filter(Boolean).join(' ').toLowerCase(),
-    pyName: pinyin(name, { toneType: 'none', separator: '' }).toLowerCase(),
-    pyInitial: pinyin(name, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase(),
-    pyDesc: pinyin(desc, { toneType: 'none', separator: '' }).toLowerCase(),
-    pyAliases: aliases.map(a => pinyin(a, { toneType: 'none', separator: '' }).toLowerCase()),
-    pyAliasInitial: aliases.map(a => pinyin(a, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase())
+    pyName: py(name, { toneType: 'none', separator: '' }).toLowerCase(),
+    pyInitial: py(name, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase(),
+    pyDesc: py(desc, { toneType: 'none', separator: '' }).toLowerCase(),
+    pyAliases: aliases.map(a => py(a, { toneType: 'none', separator: '' }).toLowerCase()),
+    pyAliasInitial: aliases.map(a => py(a, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase())
   }
   keyCache.set(site, k)
   return k
@@ -153,8 +224,9 @@ export function matchedAlias(site, query) {
   let i = lower.indexOf(q)
   if (i === -1) i = lower.findIndex(a => a && a.startsWith(q))
   if (i === -1) i = lower.findIndex(a => a && a.includes(q))
-  if (i === -1) i = lower.findIndex(a => a && pinyin(a, { toneType: 'none', separator: '' }).toLowerCase().includes(q))
-  if (i === -1) i = lower.findIndex(a => a && pinyin(a, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase().startsWith(q))
+  // 拼音两档只在引擎就绪时可能命中；py() 未就绪返回 ''，下面的 includes/startsWith 自然为假
+  if (i === -1) i = lower.findIndex(a => a && py(a, { toneType: 'none', separator: '' }).toLowerCase().includes(q))
+  if (i === -1) i = lower.findIndex(a => a && py(a, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase().startsWith(q))
   return i === -1 ? '' : aliases[i]
 }
 
@@ -178,18 +250,16 @@ const TEXT_SCORE = {
 const textKeyCache = new Map()
 
 function textKeys(text) {
+  // 与 keysOf 同理：读一下就绪信号，让依赖命中的 computed 在引擎到位后重算
+  void pinyinReady.value
+  if (!pinyinLib) preloadPinyin()
   const src = String(text ?? '')
   let k = textKeyCache.get(src)
   if (k) return k
-  let py = ''
-  let pyInitial = ''
-  try {
-    py = pinyin(src, { toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
-    pyInitial = pinyin(src, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
-  } catch {
-    // 拼音库对个别符号串会抛，退化为「无拼音命中」而不是让整次检索失败
-  }
-  k = { lower: src.toLowerCase(), py, pyInitial }
+  // 引擎未就绪时 py() 返回 ''，等价于「这条没有拼音键」，中文/英文的直接命中不受影响
+  const pyFull = py(text, { toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
+  const pyInitial = py(text, { pattern: 'first', toneType: 'none', separator: '' }).toLowerCase().replace(/\s+/g, '')
+  k = { lower: src.toLowerCase(), py: pyFull, pyInitial }
   textKeyCache.set(src, k)
   return k
 }

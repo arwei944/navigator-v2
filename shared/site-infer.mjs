@@ -95,14 +95,10 @@ export function decodeHtmlBytes(bytes) {
 
 /* ---------------- 地址 ---------------- */
 
-export function hostOf(url) {
-  const raw = String(url || '').trim()
-  if (!raw) return ''
-  try {
-    const u = new URL(raw.includes('://') ? raw : 'https://' + raw)
-    return u.hostname.replace(/^www\./, '').toLowerCase()
-  } catch { return '' }
-}
+// 唯一实现在 shared/host.mjs（本文件原来是四份之一）。
+// 既要 re-export（保持既有 import 路径），也要 import（本模块内部有使用）。
+export { hostOf } from './host.mjs'
+import { hostOf } from './host.mjs'
 
 const MULTI_TLD = new Set(['co.uk', 'com.cn', 'com.hk', 'com.tw', 'com.au', 'co.jp', 'co.kr', 'com.sg', 'org.cn', 'net.cn', 'gov.cn'])
 const TOKEN_STOP = new Set([

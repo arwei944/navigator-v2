@@ -1,24 +1,20 @@
 /**
  * 网址归一与识别：搜索框的「添加站点」入口与「添加站点」弹窗共用。
  *
- * 两边必须用同一把尺子判断「这个域名是否已收录」——否则会出现
- * 搜索框说没收录、弹窗却拦下来说重复的死路。
+ * `hostOf` 已收敛到 `shared/host.mjs` 的唯一实现（原来这里有第二份，加上
+ * site-infer / site-ops / 控制台 UI 各一份，一共四份）。四份实现只要有一份在
+ * 裸域名、大小写、www 前缀上略有出入，就会出现「搜索框说没收录、弹窗却拦下来说重复」
+ * 的死路 —— 那正是这里原本注释警告的事。
  */
+import { hostOf } from '../../shared/host.mjs'
+
+export { hostOf }
 
 /** 补全协议；空值原样返回空串 */
 export function normalizeUrl(raw) {
   const s = String(raw ?? '').trim()
   if (!s) return ''
   return /^https?:\/\//i.test(s) ? s : 'https://' + s
-}
-
-/** 取主域名：小写、去 www；无法解析返回 '' */
-export function hostOf(raw) {
-  try {
-    return new URL(normalizeUrl(raw)).hostname.replace(/^www\./, '').toLowerCase()
-  } catch {
-    return ''
-  }
 }
 
 /**

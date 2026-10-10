@@ -11,7 +11,22 @@ import { normalizeUrl, hostOf } from '@/utils/url'
 import {
   AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft,
 } from '@/utils/siteDraft'
-import { suggestCategory } from '../../shared/auto-category.mjs'
+
+/**
+ * `suggestCategory` 走**动态 import**（不是顶部的静态 import）。
+ *
+ * 原因：它所在的 `shared/auto-category.mjs` 顶层静态 import 了 `pinyin-pro`（317 KB raw）。
+ * 只要这个 import 是静态的，pinyin-pro 就会经由「autoAdd → auto-category」进入**首屏静态图**，
+ * 于是无论 `src/utils/search.js` 那边怎么改成动态 import，构建产物里入口 chunk 仍会有一条
+ * `import{pinyin}from"./pinyin-xxx.js"`，浏览器照样在首屏把它拉下来 —— 分包白做。
+ *
+ * 而这个函数（自动添加站点）只在用户粘网址时才会走到，首屏一次都不用，所以推迟到调用点是
+ * 零成本的：`runAutoAdd` 本来就是 async。
+ */
+export async function loadSuggestCategory() {
+  const m = await import('../../shared/auto-category.mjs')
+  return m.suggestCategory
+}
 
 const META_TIMEOUT_MS = 8000
 
@@ -81,9 +96,13 @@ async function runAutoAdd(normalized) {
   const raced = findDuplicate(sitesStore.sites, normalized)
   if (raced) return duplicateResult(raced)
 
+  // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」。
+  // 引擎（auto-category → pinyin-pro）是**按需加载**的（见文件顶部 loadSuggestCategory 的注释）。
+  // 加载失败不阻断添加：退化为「未分类入库」，与「新建分类失败」的处理口径一致。
+  let plan = null
   try {
-    // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」
-    const plan = suggestCategory({
+    const suggestCategory = await loadSuggestCategory()
+    plan = suggestCategory({
       categoryId: meta?.categoryId || '',
       categoryConfidence: meta?.confidence?.category || '',
       name: meta?.name || '',
@@ -97,12 +116,16 @@ async function runAutoAdd(normalized) {
       })),
       domainIds: categoriesStore.domains.map(d => d.id),
     })
+  } catch {
+    plan = null
+  }
 
+  try {
     let categoryId = ''
     let categoryLabel = ''
     let createdCategory = false
 
-    if (plan.kind === 'create') {
+    if (plan && plan.kind === 'create') {
       // 新建分类失败（id 撞车 / 域不存在）不阻断添加：站点按未分类入库，Toast 照常出
       const r = categoriesStore.addCategory(plan.groupId, {
         id: plan.id, label: plan.label, dotColor: plan.dotColor,
@@ -112,7 +135,7 @@ async function runAutoAdd(normalized) {
         categoryLabel = plan.label
         createdCategory = true
       }
-    } else {
+    } else if (plan) {
       categoryId = plan.categoryId
       categoryLabel = plan.label
     }

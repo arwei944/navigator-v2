@@ -257,7 +257,8 @@ async function loadUnread() {
 
 function onLogin({ token, username, via, expiresAt }) {
   adminKey.value = token
-  setAdminKey(token)
+  // expiresAt 一并存下：前端据此在过期时就地清掉凭据，不必等一次 401 往返
+  setAdminKey(token, expiresAt)
   authUser.value = username || 'admin'
   authVia.value = via || 'session'
   authExpiresAt.value = expiresAt || 0

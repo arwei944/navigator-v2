@@ -3,23 +3,58 @@
  *
  * 与数据面（`/api/sites` 的站点读写）分开，是因为两者鉴权与语义不同：
  * 数据面是「把站点数据推上去」，运维面是「看这次推上去之后发生了什么」。
- * 所有调用都带 Bearer 密钥；密钥不存在时由调用方先行拦截，避免打出必失败的请求。
+ * 所有调用都带 Bearer 凭据；凭据不存在时由调用方先行拦截，避免打出必失败的请求。
+ *
+ * ## 凭据存哪里（改这块前必读）
+ *
+ * 用 **sessionStorage**，不用 localStorage，也不再接受共享密钥：
+ *
+ *   - 共享密钥（`SITES_ADMIN_KEY`）是**永久**凭据，一旦落在浏览器里就等于长期泄露；
+ *     XSS 或恶意扩展拿到之后只能靠轮换密钥 + 重新部署才能止损。所以它不再进浏览器，
+ *     登录改为「用户名 + 口令 → 有期限的会话 token」（`api/auth.js`）。
+ *   - 会话 token 用 sessionStorage 而不是 localStorage：**关掉标签页即失效**。
+ *     浏览器里没有能挡住 XSS 的加密（密钥本身也在 XSS 可达范围内），
+ *     真正有效的只有「缩短有效期 + 缩短暴露窗口」，而这两条 sessionStorage 天然满足后者。
+ *   - 旧版存在 localStorage 的 `nav_admin_key`（共享密钥明文）在这里**主动清除**，
+ *     不做迁移 —— 把它搬进 sessionStorage 只是把同一个问题换个位置。
  */
 
-const KEY_STORE = 'nav_admin_key'
+const TOKEN_STORE = 'nav_admin_token'
+const EXPIRES_STORE = 'nav_admin_token_exp'
+/** 旧版遗留：localStorage 里的共享密钥明文，读到就删 */
+const LEGACY_KEY_STORE = 'nav_admin_key'
 
+/** 取当前会话凭据；已过期则就地清掉并返回空串 */
 export function getAdminKey() {
-  return localStorage.getItem(KEY_STORE) || ''
+  try {
+    if (localStorage.getItem(LEGACY_KEY_STORE) !== null) {
+      localStorage.removeItem(LEGACY_KEY_STORE)
+    }
+  } catch { /* 无痕模式下 localStorage 可能抛，忽略 */ }
+  let token = ''
+  try { token = sessionStorage.getItem(TOKEN_STORE) || '' } catch { return '' }
+  if (!token) return ''
+  const exp = Number(sessionStorage.getItem(EXPIRES_STORE) || 0)
+  // exp 为 0 表示服务端没给有效期（如密钥直连的兜底路径），交给服务端判
+  if (exp && Date.now() > exp) { clearAdminKey(); return '' }
+  return token
 }
 
-/** 写入凭据（登录签发的会话 token，或直接粘贴的共享密钥） */
-export function setAdminKey(key) {
-  if (key) localStorage.setItem(KEY_STORE, key)
-  else localStorage.removeItem(KEY_STORE)
+/** 写入凭据（登录签发的会话 token，或未配置口令登录时的密钥兜底） */
+export function setAdminKey(key, expiresAt) {
+  try {
+    if (key) sessionStorage.setItem(TOKEN_STORE, key)
+    else sessionStorage.removeItem(TOKEN_STORE)
+    if (key && expiresAt) sessionStorage.setItem(EXPIRES_STORE, String(expiresAt))
+    else sessionStorage.removeItem(EXPIRES_STORE)
+  } catch { /* 存储不可用时退化为「本页内存中的 ref」，不阻断后台使用 */ }
 }
 
 export function clearAdminKey() {
-  localStorage.removeItem(KEY_STORE)
+  try {
+    sessionStorage.removeItem(TOKEN_STORE)
+    sessionStorage.removeItem(EXPIRES_STORE)
+  } catch { /* 同上 */ }
 }
 
 function qs(params = {}) {

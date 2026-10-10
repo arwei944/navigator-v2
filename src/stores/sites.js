@@ -4,6 +4,7 @@ import SEED_SITES from '../../api/sites-data.json'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
 import { rankSites } from '@/utils/search'
 import { safeSetItem } from '@/utils/safeStorage'
+import { sanitizeSites } from '../../shared/sanitize.mjs'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
 
@@ -20,12 +21,20 @@ const TRASH_KEY = 'nav-sites-trash'
 function loadOverlay() {
   const d = decodeStored(OVERLAY_KEY, localStorage.getItem(OVERLAY_KEY), null)
   return {
-    adds: Array.isArray(d?.adds) ? d.adds : [],
+    // adds 逐条过滤（不是只判顶层是不是数组）：存储被外部改坏时，一条 null 就足以让
+    // rebuild 在 materialize 里读 src.id 抛错，而那是首屏路径 —— 结果是永久白屏。
+    // 过滤掉坏条目、保住其余数据，比整体丢弃或崩溃都好。
+    adds: Array.isArray(d?.adds) ? d.adds.filter(isOverlaySite) : [],
     edits: d?.edits && typeof d.edits === 'object' ? d.edits : {},
-    deletes: Array.isArray(d?.deletes) ? d.deletes : [],
-    order: Array.isArray(d?.order) ? d.order : [],
+    deletes: Array.isArray(d?.deletes) ? d.deletes.filter(x => typeof x === 'string' && x) : [],
+    order: Array.isArray(d?.order) ? d.order.filter(x => typeof x === 'string' && x) : [],
     visits: d?.visits && typeof d.visits === 'object' ? d.visits : {},
   }
+}
+
+/** 覆盖层里一条「足够像站点」的记录：有非空字符串 id 是重建列表的最低要求 */
+function isOverlaySite(x) {
+  return Boolean(x) && typeof x === 'object' && !Array.isArray(x) && typeof x.id === 'string' && x.id
 }
 
 export const useSitesStore = defineStore('sites', () => {
@@ -49,7 +58,6 @@ export const useSitesStore = defineStore('sites', () => {
 
   const cloudVersion = ref(0)
   const cloudLoaded = ref(false)
-  let pollTimer = null
   const searchQuery = ref('')
   const currentCategory = ref('all')
   // 用途筛选（Axis 4）：与分类正交，可跨分类聚合「所有查资料站」
@@ -343,6 +351,13 @@ function rebuild() {
     const site = sites.value.find(s => s.id === id)
     if (site) trash.value.push({ ...site, deletedAt: Date.now() })
     removeLocally(id)
+    // 顺手把这条从批量选择里摘掉：否则「已选 3 个」的计数会含一条不存在的站，
+    // 后续批量操作会拿它去匹配，结果既删不动也清不掉。
+    if (selectedIds.value.has(id)) {
+      const next = new Set(selectedIds.value)
+      next.delete(id)
+      selectedIds.value = next
+    }
     rebuild()
     // 先落回收站再落覆盖层：回收站是「删过什么」的唯一证据，
     // 万一配额溢出只能写入一处，宁可丢墓碑也不能让这条记录凭空消失。
@@ -382,21 +397,25 @@ function rebuild() {
     saveOverlay()
   }
 
-  /** 置顶 / 取消置顶，返回切换后的状态 */
+  /**
+   * 置顶 / 取消置顶，返回切换后的状态。
+   * 与归档**互斥**：归档是「我不再日常用」，置顶是「我要一直看到」—— 两者同时为真时，
+   * 取消归档会让这条站突然弹到列表最前，看起来像凭空冒出来的，所以置顶即取消归档。
+   */
   function togglePin(id) {
     const site = sites.value.find(s => s.id === id)
     if (!site) return false
     const next = !site.pinned
-    updateSite(id, { pinned: next })
+    updateSite(id, next ? { pinned: true, archived: false } : { pinned: false })
     return next
   }
 
-  /** 归档 / 取消归档，返回切换后的状态 */
+  /** 归档 / 取消归档，返回切换后的状态。归档即取消置顶（同上，保持两者互斥） */
   function toggleArchive(id) {
     const site = sites.value.find(s => s.id === id)
     if (!site) return false
     const next = !site.archived
-    updateSite(id, { archived: next })
+    updateSite(id, next ? { archived: true, pinned: false } : { archived: false })
     return next
   }
 
@@ -447,6 +466,28 @@ function rebuild() {
     selectedIds.value = new Set()
   }
 
+  /**
+   * 把选择集收敛到「当前看得见的站点」。
+   *
+   * 为什么必须有：选择集是跨分类存活的。在 A 分类选了 3 个站，再切到 B 分类点「批量删除」，
+   * 会删掉 3 个用户此刻根本看不见的站 —— 这是这套交互里最伤人的一种误操作，
+   * 而且删完还能在回收站里看到，用户会一头雾水。
+   *
+   * 选择集为空时直接返回：这是绝大多数时刻的状态，不该为它做任何遍历。
+   * @param {string[]} [visibleIds] 以调用方给出的可见集为准；缺省用当前过滤结果
+   */
+  function pruneSelection(visibleIds) {
+    if (!selectedIds.value.size) return
+    const visible = visibleIds ? new Set(visibleIds) : new Set(filteredSites.value.map(s => s.id))
+    let dropped = false
+    const next = new Set()
+    for (const id of selectedIds.value) {
+      if (visible.has(id)) next.add(id)
+      else dropped = true
+    }
+    if (dropped) selectedIds.value = next
+  }
+
   function batchDeleteToTrash(targetIds) {
     const ids = targetIds || [...selectedIds.value]
     for (const id of ids) {
@@ -467,9 +508,13 @@ function rebuild() {
     const [site] = trash.value.splice(idx, 1)
     delete site.deletedAt
     const dIdx = localDeletes.value.indexOf(id)
-    // 墓碑里有 → 原本是云端站点，撤掉墓碑即可；否则是本地新增，放回本地新增层
+    // 墓碑里有 → 原本是云端站点，撤掉墓碑即可；否则是本地新增，放回本地新增层。
+    // **但先要确认它现在不在列表里** —— 若站点已经在（例如回滚时墓碑被清掉、云端又把
+    // 它带了回来），再往新增层压一条就会造出两条同 id 的记录：item-key 重复，
+    // 后续删除/编辑只命中一条，另一条变成删不掉的幽灵卡片。
+    const exists = sites.value.some(s => s.id === id)
     if (dIdx !== -1) localDeletes.value.splice(dIdx, 1)
-    else localAdds.value.push(site)
+    else if (!exists) localAdds.value.push(site)
     rebuild()
     saveOverlay()
     saveTrash()
@@ -485,11 +530,18 @@ function rebuild() {
     saveTrash()
   }
 
-  /** 管理端发布成功后调用：覆盖层内容已进入云端，清掉以免长期遮蔽后续云端变更 */
+  /**
+   * 管理端发布 / 回滚成功后调用：覆盖层内容已进入云端，清掉以免长期遮蔽后续云端变更。
+   *
+   * **刻意不清 `deletes` 墓碑**。墓碑表达的是用户本机的意图（「这条我不看」），
+   * 而云端的发布/回滚是另一回事 —— 顺手清掉会让用户已经删掉的站点复活，这是实打实的数据
+   * 语义错误（审计里那条「回滚后已删站点复活」）。留着也不会有副作用：
+   *   - 发布路径：被删的站已经不在云端基底里了，墓碑过滤的是一个不存在的 id，等于空操作；
+   *   - 回滚路径：墓碑继续生效，用户的删除意图被保住。
+   */
   function clearLocalOverlay() {
     localAdds.value = []
     localEdits.value = {}
-    localDeletes.value = []
     localOrder.value = []
     rebuild()
     saveOverlay()
@@ -497,11 +549,21 @@ function rebuild() {
 
   // ── 云端热更新 ──
   function applyCloudData(data) {
-    if (!data || !Array.isArray(data.sites)) return false
-    cloudSites.value = data.sites
-    cloudVersion.value = data.version || 0
+    if (!data) return false
+    // 元素级校验（与 api/sites.js 用同一个 shared/sanitize.mjs）：空数组、元素缺 id/name/url、
+    // id 重复，任何一种都不该落地 —— 落地就是全站白屏，而且没有回退路径。
+    // 不合法时**保留上一版**，并把原因记到 cloudError 上让界面能说出来。
+    const clean = sanitizeSites(data.sites)
+    if (!clean) {
+      console.warn('[sites] 云端站点表结构不合法，已保留上一版')
+      cloudError.value = 'invalid-payload'
+      return false
+    }
+    cloudSites.value = clean
+    cloudVersion.value = Number(data.version) || 0
     // 分类表与站点同批下发：缺省时 applyCloudGroups 返回 false，保留当前表不动
     if (data.categories) categoriesStore.applyCloudGroups(data.categories)
+    cloudError.value = ''
     rebuild()
     return true
   }
@@ -527,6 +589,15 @@ const CLOUD_TIMEOUT = 10000
  */
 let cloudEtag = ''
 
+/**
+ * 拉取失败的原因，用**机器可读的短码**表示，文案交给 UI 决定。
+ *   '' 正常 / 'offline' 网络不可达 / 'timeout' 超时 / 'http-<status>' 服务端错误
+ *   / 'invalid-payload' 响应结构不合法
+ * 这一项存在的意义是「断网时用户看到的到底是真实数据还是构建期种子，界面要说得出来」——
+ * 旧实现是 `catch {}` 全空，断网与正常在界面上完全一样。
+ */
+const cloudError = ref('')
+
 function fetchCloud() {
   if (cloudInflight) return cloudInflight
   const ctrl = new AbortController()
@@ -538,15 +609,19 @@ function fetchCloud() {
         headers: cloudEtag ? { 'If-None-Match': cloudEtag } : undefined
       })
       // 304：内容与上次一致。既不用解析 JSON，也不用 rebuild
-      if (res.status === 304) return null
-      if (!res.ok) return null
+      if (res.status === 304) { cloudError.value = ''; return null }
+      if (!res.ok) {
+        cloudError.value = `http-${res.status}`
+        return null
+      }
       const data = await res.json()
       // 只在拿到合法版本号时才记住 ETag。否则一旦第一次响应体不合法，
       // 下次的 304 会把「这份数据没被应用过」这个状态永久钉住，热更新再也进不来。
       const v = Number(data?.version)
       if (Number.isFinite(v)) cloudEtag = res.headers.get('ETag') || cloudEtag
       return data
-    } catch {
+    } catch (e) {
+      cloudError.value = e && e.name === 'AbortError' ? 'timeout' : 'offline'
       return null
     } finally {
       clearTimeout(timer)
@@ -562,10 +637,11 @@ function fetchCloud() {
    * 成了数据回滚的通道。
    */
   function applyIfNewer(data) {
-    if (!data || !Array.isArray(data.sites)) return false
+    if (!data) return false
     const v = Number(data.version)
     if (!Number.isFinite(v)) {
       console.warn('[sites] 云端响应缺少合法的 version，已忽略本次更新')
+      cloudError.value = 'invalid-payload'
       return false
     }
     if (v <= cloudVersion.value) return false
@@ -580,18 +656,54 @@ function fetchCloud() {
     }
   }
 
+  /* ── 轮询节奏：成功间隔恒定，失败指数退避 ──
+   * 为什么必须退避：断网时 30s 一轮会一直打一个必然失败的请求，移动端上每次都要等
+   * 到超时（10s），叠加起来就是「后台一直在耗电、前台一直没有新数据」。
+   * 退避到 5 分钟封顶，并在 `online` 事件与标签页重新可见时立刻重试 ——
+   * 恢复联网那一瞬间用户就能拿到数据，不用等退避窗口走完。 */
+  const POLL_BASE_MS = 30000
+  const POLL_MAX_MS = 300000
+  let pollTimer = null
+  let pollDelay = POLL_BASE_MS
+  let pollFails = 0
+  let polling = false
+
   async function pollCloudSites() {
-    applyIfNewer(await fetchCloud())
+    const applied = applyIfNewer(await fetchCloud())
+    if (cloudError.value) {
+      pollFails += 1
+      pollDelay = Math.min(POLL_MAX_MS, POLL_BASE_MS * 2 ** Math.min(pollFails, 4))
+    } else {
+      pollFails = 0
+      pollDelay = POLL_BASE_MS
+    }
+    return applied
   }
 
-  function startPolling(interval = 30000) {
+  /** 立刻重试并复位退避：联网恢复 / 标签页回来时用，别让用户干等退避窗口 */
+  function retryCloudNow() {
+    pollFails = 0
+    pollDelay = POLL_BASE_MS
+    return pollCloudSites()
+  }
+
+  function startPolling(interval = POLL_BASE_MS) {
     stopPolling()
-    pollTimer = setInterval(pollCloudSites, interval)
+    polling = true
+    pollDelay = interval
+    const tick = async () => {
+      if (!polling) return
+      await pollCloudSites()
+      if (!polling) return
+      pollTimer = setTimeout(tick, pollDelay)
+    }
+    pollTimer = setTimeout(tick, interval)
   }
 
   function stopPolling() {
+    polling = false
     if (pollTimer) {
-      clearInterval(pollTimer)
+      clearTimeout(pollTimer)
       pollTimer = null
     }
   }
@@ -603,14 +715,15 @@ function fetchCloud() {
     sites, cloudSites, searchQuery, currentCategory, currentPurpose, sortBy, viewMode,
     highlightSiteId, highlightSite, clearHighlight,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
-    cloudVersion, cloudLoaded,
+    cloudVersion, cloudLoaded, cloudError,
     addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
     batchUpdate, batchSetCategory, batchAddPurpose, togglePin, toggleArchive, setArchivedScope,
     archivedCount, archivedScope,
     setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
-    toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, batchDeleteToTrash,
+    toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, pruneSelection,
+    batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,
-    initCloudSites, pollCloudSites, startPolling, stopPolling
+    initCloudSites, pollCloudSites, startPolling, stopPolling, retryCloudNow
   }
 })
 

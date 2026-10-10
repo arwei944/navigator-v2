@@ -3,7 +3,8 @@
     <div class="ops-card login-card">
       <h3>管理后台登录</h3>
       <p class="login-sub">
-        登录后凭据有效期 7 天，过期或轮换密钥后会自动退回此页。
+        登录后签发有效期为 7 天（勾选记住此设备为 90 天）的会话 token，仅存于本标签页，
+        关闭标签页即失效；过期或轮换后会自动退回此页。
       </p>
 
       <div v-if="notice" class="ops-msg warn">{{ notice }}</div>
@@ -38,12 +39,16 @@
           {{ loading ? '登录中…' : '登录' }}
         </button>
 
-        <button v-if="keyReady" type="button" class="link-btn" @click="switchMode('key')">
-          改用管理密钥直连
+        <button v-if="keyModeAvailable" type="button" class="link-btn" @click="switchMode('key')">
+          {{ loginReady ? '密钥直连' : '改用管理密钥直连' }}
         </button>
       </form>
 
       <form v-else @submit.prevent="submitKey" class="login-form">
+        <div class="ops-msg warn">
+          管理密钥是<strong>永久</strong>凭据，粘贴到浏览器等于把它长期留在这里，只应在服务端没有配置
+          口令登录（<code>ADMIN_PASSWORD_HASH</code>）时才使用。本次会话结束后即失效。
+        </div>
         <label class="login-field">
           <span>管理密钥</span>
           <input v-model="keyInput" type="password" class="mini-input" placeholder="SITES_ADMIN_KEY" :disabled="loading">
@@ -64,7 +69,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { authApi } from '@/services/authApi'
 
 const emit = defineEmits(['success'])
@@ -74,6 +79,8 @@ defineProps({ notice: { type: String, default: '' } })
 const statusLoading = ref(true)
 const loginReady = ref(false)
 const keyReady = ref(false)
+/** 状态接口读失败：此时无法判断服务端配了哪种鉴权，必须保留密钥兜底，否则管理员可能进不来 */
+const statusFailed = ref(false)
 const mode = ref('login')
 const username = ref('')
 const password = ref('')
@@ -81,6 +88,15 @@ const keyInput = ref('')
 const loading = ref(false)
 const error = ref('')
 const remember = ref(true)
+
+/**
+ * 密钥直连只在两种情况下出现：
+ *   - 服务端确实没配口令登录（`loginReady === false`）→ 不提供就没人能进；
+ *   - 状态接口读失败（无法判断）→ 保留兜底。
+ * 正常情况下**不提供**这个入口：共享密钥是永久凭据，粘进浏览器就等于长期泄露，
+ * 而账号登录签发的是有期限、可轮换的会话 token。
+ */
+const keyModeAvailable = computed(() => keyReady.value && (!loginReady.value || statusFailed.value))
 
 function switchMode(next) {
   mode.value = next
@@ -164,13 +180,14 @@ onMounted(async () => {
     username.value = s.loginReady ? s.username : ''
     mode.value = s.loginReady ? 'login' : 'key'
   } catch {
-    // 读不到配置时**必须回退到密钥直连**，不能显示「未配置任何鉴权方式」的死胡同：
-    // 网络抖动 / 新接口尚未生效都会走到这里，若不给密钥输入框，管理员就再也进不来了。
-    // 真正的「服务端确实没配」由 submitKey 的校验结果来暴露。
-    loginReady.value = false
+    // 读不到配置时无法判断服务端配了哪种鉴权。这里**不**直接把界面切成密钥直连
+    // （那会把「永久凭据」推成默认路径），而是保留登录表单、并靠 keyModeAvailable
+    // 把密钥入口作为兜底露出来，同时提示用户重试。
+    statusFailed.value = true
     keyReady.value = true
-    mode.value = 'key'
-    error.value = '无法读取认证配置，已回退到管理密钥直连'
+    loginReady.value = false
+    mode.value = 'login'
+    error.value = '无法读取认证配置，可重试；若仍失败，请改用管理密钥直连'
   } finally {
     statusLoading.value = false
   }

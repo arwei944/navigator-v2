@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { get, put, list, del } from '@vercel/blob'
+import { get, put, list, del, BlobPreconditionFailedError } from '@vercel/blob'
 import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, snapshotPathname, parseSnapshotName, prunableSnapshots, isSnapshotPathname } from '../shared/snapshots.mjs'
 import { sanitizeGroups } from '../shared/categories.mjs'
+import { sanitizeSites } from '../shared/sanitize.mjs'
 import { checkAuthHeader } from '../shared/auth.mjs'
 
 // 数据真相源：Vercel Blob 上的 sites.json（运行时权威数据）。
@@ -14,13 +15,40 @@ const SEED_SITES = JSON.parse(
 
 const PATHNAME = 'sites.json'
 
-async function readStored() {
+/**
+ * 读取主数据，**连同 ETag** —— ETag 是写入时条件写（`ifMatch`）的前提。
+ *
+ * 为什么要带上它：Blob 上的 sites.json 是 read-modify-write 模式（读 version → +1 → 写回），
+ * 而 Blob 没有事务。两个并发 POST 各自读到同一份 version、各自写 +1，后写的把先写的整份
+ * 内容覆盖掉 —— 一次静默的丢更新。带上 `ifMatch` 之后，后写的那次会因为 ETag 已变而被拒
+ * （`BlobPreconditionFailedError`），调用方拿到 409 去重试，丢更新变成可观察的冲突。
+ */
+async function readStoredWithEtag() {
   // useCache:false 绕过 Blob CDN 缓存：发布后首次读取即拿到最新版本，
   // 否则 publish.mjs 的一致性轮询要 1~4 次才收敛
   const blob = await get(PATHNAME, { access: 'private', useCache: false })
-  if (!blob || !blob.stream) return null
+  if (!blob || !blob.stream) return { data: null, etag: null }
   const text = await new Response(blob.stream).text()
-  return JSON.parse(text)
+  return { data: JSON.parse(text), etag: (blob.blob && blob.blob.etag) || blob.etag || null }
+}
+
+async function readStored() {
+  return (await readStoredWithEtag()).data
+}
+
+/**
+ * 带条件写的 put：ETag 已知时必须走 ifMatch；不知道 ETag（对象本来就不存在）时
+ * 用 `allowOverwrite: false` 拿「只在不存在时创建」的语义。
+ * 两条路径都是**失败宁可报错也不覆盖**，与 P0-1 定下的口径一致。
+ */
+async function putGuarded(data, etag) {
+  const opts = {
+    access: 'private',
+    addRandomSuffix: false,
+    contentType: 'application/json',
+    ...(etag ? { ifMatch: etag, allowOverwrite: true } : { allowOverwrite: false }),
+  }
+  return put(PATHNAME, JSON.stringify(data), opts)
 }
 
 /** 读取任意 pathname 的 JSON 对象（快照读取用） */
@@ -42,7 +70,9 @@ async function writeSnapshot(data) {
     await put(pathname, JSON.stringify(data), {
       access: 'private',
       addRandomSuffix: false,
-      allowOverwrite: true,
+      // 名字里已带随机后缀（见 shared/snapshots.mjs），这里**不该**再允许覆盖：
+      // 万一真撞名，报错比「悄无声息地盖掉一份用于回滚的快照」安全得多。
+      allowOverwrite: false,
       contentType: 'application/json',
     })
     return { ok: true, pathname }
@@ -162,8 +192,10 @@ export default async function handler(req, res) {
       return
     }
 
-    // 存了但结构不对：多半是被脏写污染过，覆盖它只会把证据也毁掉 —— 交给运维用快照回滚
-    if (stored && (!Array.isArray(stored.sites) || stored.sites.length === 0)) {
+    // 存了但结构不对：多半是被脏写污染过，覆盖它只会把证据也毁掉 —— 交给运维用快照回滚。
+    // 判据与写入侧共用 shared/sanitize.mjs（元素级：id/name/url 非空且 id 唯一），
+    // 于是「能写进去的一定能读出来」是一条可以依赖的不变量。
+    if (stored && !sanitizeSites(stored.sites)) {
       console.error('[sites] stored data invalid, refusing to overwrite')
       res.status(503).json({ error: '已存储的数据不合法', degraded: true })
       return
@@ -207,8 +239,22 @@ export default async function handler(req, res) {
       return
     }
 
+    /**
+     * 读前值 + 它的 ETag。**读失败一律 503，绝不继续写**：
+     * 与 GET 同一条口径 —— 「读不出来」和「没有数据」是两回事，把一个读故障
+     * 当成「没存过」去覆盖写，就是丢数据的经典路径。
+     */
     let prev = null
-    try { prev = await readStored() } catch { /* 首次写入，无前值 */ }
+    let prevEtag = null
+    try {
+      const r = await readStoredWithEtag()
+      prev = r.data
+      prevEtag = r.etag
+    } catch (e) {
+      console.error('[sites] pre-write read failed:', String(e?.message || e))
+      res.status(503).json({ error: 'Blob 读取失败，已拒绝写入以免覆盖数据', degraded: true })
+      return
+    }
     const prevVersion = prev && prev.version ? Number(prev.version) : 0
 
     /* ---- 回滚：把指定快照写回主 pathname，version 继续递增（不回退计数） ---- */
@@ -222,8 +268,10 @@ export default async function handler(req, res) {
         res.status(404).json({ error: `读取快照失败：${String(e?.message || e)}` })
         return
       }
-      if (!snapshot || !Array.isArray(snapshot.sites) || snapshot.sites.length === 0) {
-        res.status(400).json({ error: '快照内容无效或为空' })
+      // 快照内容同样要过元素级校验：回滚是「把一个历史版本变成当前版本」，
+      // 把一个坏快照写回去，等于用旧数据把站点表打崩，且这次没有比它更新的兜底。
+      if (!snapshot || !sanitizeSites(snapshot.sites)) {
+        res.status(400).json({ error: '快照内容无效或为空（站点表结构不合法）' })
         return
       }
       // 回滚本身也要可撤销：先把「回滚前的当前数据」存一份
@@ -241,12 +289,15 @@ export default async function handler(req, res) {
         ? snapshot.categories
         : (prev && Array.isArray(prev.categories) ? prev.categories : null)
       if (rollbackCats) data.categories = rollbackCats
-      await put(PATHNAME, JSON.stringify(data), {
-        access: 'private',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        contentType: 'application/json',
-      })
+      try {
+        await putGuarded(data, prevEtag)
+      } catch (e) {
+        if (e instanceof BlobPreconditionFailedError) {
+          res.status(409).json({ error: '数据已被其他写入更新，请刷新后重试回滚', reason: 'precondition-failed' })
+          return
+        }
+        throw e
+      }
       const pruned = await pruneSnapshots()
       res.status(200).json({
         ...data,
@@ -259,8 +310,12 @@ export default async function handler(req, res) {
 
     /* ---- 常规热更新：写入前先给当前数据落快照 ---- */
     const { sites, categories } = body
-    if (!Array.isArray(sites) || sites.length === 0) {
-      res.status(400).json({ error: 'Invalid sites payload' })
+    // 元素级门禁：脏数据一旦落盘，全站前端就白屏，而且只能靠快照回滚救 ——
+    // 那次发布本该被拒。判据与前端 applyCloudData 共用同一份 shared/sanitize.mjs。
+    if (!sanitizeSites(sites)) {
+      res.status(400).json({
+        error: '站点表结构非法：需为非空数组，每条含非空 id / name / url 且 id 不重复',
+      })
       return
     }
 
@@ -286,12 +341,17 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString()
     }
     if (nextCategories) data.categories = nextCategories
-    await put(PATHNAME, JSON.stringify(data), {
-      access: 'private',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      contentType: 'application/json',
-    })
+    try {
+      await putGuarded(data, prevEtag)
+    } catch (e) {
+      if (e instanceof BlobPreconditionFailedError) {
+        // 条件写失败 = 在我们读与写之间有另一次写入。这不是错误，是并发被正确拦下了 ——
+        // 旧行为是两边都写、后到的把先到的整份内容覆盖掉，属于静默丢更新。
+        res.status(409).json({ error: '数据已被其他写入更新，请刷新后重试', reason: 'precondition-failed' })
+        return
+      }
+      throw e
+    }
     const pruned = await pruneSnapshots()
     res.status(200).json({ ...data, snapshot, pruned })
     return

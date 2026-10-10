@@ -2,6 +2,9 @@
  * 会话数据同步服务（替代失效的 KV 云同步）
  * 基于 /api/session + Blob 存储，用 session key 作为多设备隔离与同步标识。
  * key 仅存于浏览器的 localStorage（nav-session-key），不上传服务器明文校验密钥之外。
+ *
+ * key 一律走 `Authorization: Bearer`，不走 query string —— query 会进 Vercel 函数日志、
+ * CDN 日志、浏览器历史与 Referer，而它是这份数据的唯一凭证。服务端已停用旧的 `?key=`。
  */
 const API = '/api/session'
 const KEY_KEY = 'nav-session-key'
@@ -12,6 +15,10 @@ export function getStoredKey() {
 export function storeKey(k) {
   if (k) localStorage.setItem(KEY_KEY, k)
   else localStorage.removeItem(KEY_KEY)
+}
+
+function authHeaders(key, extra) {
+  return { Authorization: `Bearer ${key || ''}`, ...(extra || {}) }
 }
 
 /** 从活跃 store 收集本机快照 */
@@ -52,8 +59,7 @@ export function applySnapshotToStores(data, { favorites, todos, history, prefere
 }
 
 export async function fetchSession(key) {
-  const q = encodeURIComponent(key)
-  const r = await fetch(`${API}?key=${q}`, { cache: 'no-store' })
+  const r = await fetch(API, { cache: 'no-store', headers: authHeaders(key) })
   if (!r.ok) throw new Error('读取会话失败 (' + r.status + ')')
   return r.json()
 }
@@ -61,8 +67,8 @@ export async function fetchSession(key) {
 export async function pushSession(key, data) {
   const r = await fetch(API, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, data })
+    headers: authHeaders(key, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ data })
   })
   if (!r.ok) throw new Error('写入会话失败 (' + r.status + ')')
   return r.json()
