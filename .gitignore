@@ -21,6 +21,8 @@ _chrome-report.json
 probe/_*.json
 probe/_*.txt
 probe/*.png
+# 线上验收脚本的中间产物目录（响应体 / 响应头 / 构造出来的大体积请求体）
+probe/_*/
 # 零依赖 CDP 验证用的临时 Chrome 配置目录（每次测量都该是干净的）
 .chrome-*/
 
