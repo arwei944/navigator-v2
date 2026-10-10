@@ -189,13 +189,14 @@ function openSite() {
   historyStore.addRecord(props.site.id)
 }
 
+/** 批量选择：把这条站点交给父级（父级据此 toggleSelect，无需在模板里写内联闭包） */
 function onCardClick() {
-  if (props.batchMode) emit('select')
+  if (props.batchMode) emit('select', props.site)
   else openSite()
 }
 
 function onActivate() {
-  if (props.batchMode) emit('select')
+  if (props.batchMode) emit('select', props.site)
   else openSite()
 }
 

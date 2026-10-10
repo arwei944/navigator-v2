@@ -83,19 +83,34 @@ export function scoreSite(site, q) {
   return 0
 }
 
+/**
+ * Fuse 实例按「站点数组引用」缓存。
+ *
+ * 建索引是 O(n)，而输入时前几个字符往往零命中，每敲一键就要走这条兜底路径。
+ * 数组引用在列表内容没变时是稳定的（见 sites.js 的 rebuild：未变的站点沿用旧对象，
+ * 全表恒等时连数组引用都不换），所以同一批数据只会建一次索引；数据一变引用就变，
+ * 缓存自然失效，不会读到陈旧索引。
+ */
+let fuseCache = { sites: null, fuse: null }
+
 function fuzzySites(sites, q) {
   try {
-    const fuse = new Fuse(sites, {
-      keys: [
-        { name: 'name', weight: 2 },
-        { name: 'aliases', weight: 1.6 },
-        { name: 'desc', weight: 1 },
-        { name: 'url', weight: 1 }
-      ],
-      threshold: 0.4,
-      includeScore: true
-    })
-    return fuse.search(q).map(r => r.item)
+    if (fuseCache.sites !== sites) {
+      fuseCache = {
+        sites,
+        fuse: new Fuse(sites, {
+          keys: [
+            { name: 'name', weight: 2 },
+            { name: 'aliases', weight: 1.6 },
+            { name: 'desc', weight: 1 },
+            { name: 'url', weight: 1 }
+          ],
+          threshold: 0.4,
+          includeScore: true
+        })
+      }
+    }
+    return fuseCache.fuse.search(q).map(r => r.item)
   } catch {
     return []
   }

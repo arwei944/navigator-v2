@@ -20,4 +20,6 @@ _probe-report*.json
 _chrome-report.json
 probe/_*.json
 probe/_*.txt
-probe/_*.png
+probe/*.png
+# 零依赖 CDP 验证用的临时 Chrome 配置目录（每次测量都该是干净的）
+.chrome-*/

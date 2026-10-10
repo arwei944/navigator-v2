@@ -8,7 +8,15 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Inter 只被「视觉方案 → sans」这一个方案栈引用，基础 --font 是系统字体栈，
+       所以它不该压在首屏渲染的关键路径上（该域名在国内网络下还不可达，最长会把首帧
+       拖到浏览器放弃请求为止）。media="print" + onload 是标准的非阻塞写法：样式表
+       照常下载并在到达后生效，只是不再阻塞渲染；noscript 兜底保证禁用 JS 时仍能拿到。 -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+        media="print" onload="this.media='all'">
+  <noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  </noscript>
   <title>Navigator - 网站导航中心</title>
 </head>
 <body>

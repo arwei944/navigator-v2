@@ -152,34 +152,86 @@ export const useSitesStore = defineStore('sites', () => {
     safeSetItem(TRASH_KEY, encodeStored(trash.value))
   }
 
-  /** 用「云端基底 + 本地覆盖层」重新拼出渲染用的列表 */
-  function rebuild() {
-    const deleted = new Set(localDeletes.value)
-    const visits = visitCounts.value
-    const withVisit = s => ({ ...s, visitCount: visits[s.id] ?? s.visitCount ?? 0 })
+/**
+ * rebuild 产出的记忆表：id → { src, edit, visits, out }。
+ *
+ * 为什么需要它：渲染层是按 prop 的**对象身份**决定要不要跳过子组件更新的。
+ * 早期版本对每条站点都 `{ ...s, visitCount }` 展开出新对象，于是「改 1 个站点」
+ * （置顶 / 归档 / 编辑 / 记一次访问）或一次 30s 云端轮询，都会让 300 张卡片的
+ * `site` prop 全部换新 —— 300 个组件全部重渲染，而其中 299 个的内容一字未改。
+ *
+ * 现在的判据是三个来源标记的**身份**而非内容比对（O(1)，不做字符串拼接）：
+ *   - src    云端数组里的那个对象 / 本地新增层里的那个对象
+ *   - edit   该 id 的编辑补丁对象（updateSite 会整体换掉它）
+ *   - visits 该 id 的本地访问计数（数字）
+ * 三者都没变就沿用上次那个对象，未变的卡片因 prop 恒等被 Vue 跳过。
+ *
+ * ⚠️ 这套判据依赖一条不变量：**来源对象一律整体替换，绝不就地改字段**。
+ *    - 云端 src 来自 `res.json()`，每次轮询都是新解析出来的新对象；
+ *    - 本地新增层在 updateSite / batchUpdate 里是 `localAdds[i] = { ...old, ...patch }`；
+ *    - 本地编辑层同理整体替换 `localEdits[id]`。
+ * 若将来有人写下 `cloudSites.value[i].name = x` 这样的就地改，视图不会跟着变 ——
+ * 因为 src 身份没变、memo 会照旧返回上一个对象。要改数据请走 updateSite /
+ * applyCloudData 这条路，不要碰数组元素。
+ *
+ * 注意与 recordVisit 的配合：那里会直接改 `site.visitCount`（为了让卡片角标立刻 +1），
+ * 于是 out 被就地改过、下一次 rebuild 的 visits 与记忆不符 → 那一条必然重建。
+ * 这是刻意接受的：只重建被点的那一张，且顺带把记忆同步回真实值（改的是 out，
+ * 不是 src，所以不违反上面那条不变量）。
+ */
+let rebuildMemo = new Map()
 
-    const base = cloudSites.value
-      .filter(s => !deleted.has(s.id))
-      .map(s => withVisit(localEdits.value[s.id] ? { ...s, ...localEdits.value[s.id] } : s))
-    const adds = localAdds.value.filter(s => !deleted.has(s.id)).map(withVisit)
+/** 用「云端基底 + 本地覆盖层」重新拼出渲染用的列表 */
+function rebuild() {
+  const deleted = new Set(localDeletes.value)
+  const edits = localEdits.value
+  const visits = visitCounts.value
+  const next = new Map()
 
-    let list = [...base, ...adds]
-
-    // localOrder 只描述这批 id 的相对顺序，未登记的站点（如云端新收录的）保持原有位置
-    if (localOrder.value.length) {
-      const pos = new Map(localOrder.value.map((id, i) => [id, i]))
-      list = list
-        .map((site, i) => ({ site, i }))
-        .sort((a, b) => {
-          const pa = pos.has(a.site.id) ? pos.get(a.site.id) : Infinity
-          const pb = pos.has(b.site.id) ? pos.get(b.site.id) : Infinity
-          return pa === pb ? a.i - b.i : pa - pb
-        })
-        .map(x => x.site)
+  /** 把一条来源对象物化成渲染用对象，能复用则复用 */
+  function materialize(src, edit) {
+    const id = src.id
+    const v = visits[id] ?? src.visitCount ?? 0
+    const prev = rebuildMemo.get(id)
+    if (prev && prev.src === src && prev.edit === edit && prev.visits === v) {
+      next.set(id, prev)
+      return prev.out
     }
-
-    sites.value = list
+    const out = edit ? { ...src, ...edit, visitCount: v } : { ...src, visitCount: v }
+    next.set(id, { src, edit, visits: v, out })
+    return out
   }
+
+  const base = cloudSites.value
+    .filter(s => !deleted.has(s.id))
+    .map(s => materialize(s, edits[s.id] || null))
+  const adds = localAdds.value
+    .filter(s => !deleted.has(s.id))
+    .map(s => materialize(s, null))
+
+  let list = [...base, ...adds]
+
+  // localOrder 只描述这批 id 的相对顺序，未登记的站点（如云端新收录的）保持原有位置
+  if (localOrder.value.length) {
+    const pos = new Map(localOrder.value.map((id, i) => [id, i]))
+    list = list
+      .map((site, i) => ({ site, i }))
+      .sort((a, b) => {
+        const pa = pos.has(a.site.id) ? pos.get(a.site.id) : Infinity
+        const pb = pos.has(b.site.id) ? pos.get(b.site.id) : Infinity
+        return pa === pb ? a.i - b.i : pa - pb
+      })
+      .map(x => x.site)
+  }
+
+  rebuildMemo = next
+
+  // 顺序与内容都逐项恒等时，连数组引用都不换：ref 赋值同一个数组不会触发任何
+  // 依赖它的 computed / 渲染，省下一整趟 300 张卡的 diff。
+  const prevList = sites.value
+  const identical = prevList.length === list.length && list.every((s, i) => s === prevList[i])
+  sites.value = identical ? prevList : list
+}
 
   function addSite(site) {
     const now = Date.now()
@@ -454,34 +506,55 @@ export const useSitesStore = defineStore('sites', () => {
     return true
   }
 
-  /**
-   * 云端请求收口：同一时刻只保留一个在途请求，并给 10s 超时。
-   *
-   * 不做这两件事会发生什么：`visibilitychange` 的立即重拉会与 30s 定时轮询并发，
-   * 弱网下连接一直挂着、请求越堆越多；两个响应乱序回来时，先发的慢响应会把
-   * 整站数据覆盖回旧版本（分类表一起回退），最长持续一个轮询周期才自愈。
-   */
-  let cloudInflight = null
-  const CLOUD_TIMEOUT = 10000
+/**
+ * 云端请求收口：同一时刻只保留一个在途请求，并给 10s 超时。
+ *
+ * 不做这两件事会发生什么：`visibilitychange` 的立即重拉会与 30s 定时轮询并发，
+ * 弱网下连接一直挂着、请求越堆越多；两个响应乱序回来时，先发的慢响应会把
+ * 整站数据覆盖回旧版本（分类表一起回退），最长持续一个轮询周期才自愈。
+ */
+let cloudInflight = null
+const CLOUD_TIMEOUT = 10000
 
-  function fetchCloud() {
-    if (cloudInflight) return cloudInflight
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), CLOUD_TIMEOUT)
-    cloudInflight = (async () => {
-      try {
-        const res = await fetch('/api/sites', { signal: ctrl.signal })
-        if (!res.ok) return null
-        return await res.json()
-      } catch {
-        return null
-      } finally {
-        clearTimeout(timer)
-        cloudInflight = null
-      }
-    })()
-    return cloudInflight
-  }
+/**
+ * 上一次成功应用的响应的 ETag，用于发条件请求。
+ *
+ * 轮询的内容绝大多数时候和上一轮一模一样，而 Vercel 会依据响应体自动生成弱 ETag，
+ * 带上 If-None-Match 就能换回一个 304 —— **0 字节**（线上实测；不带是 34,180 字节）。
+ * 每 30s 一轮、一天挂机约 4 MB，这一条把它压到几十 KB。
+ *
+ * 刻意存成普通变量而不是 ref：它只是请求头的一个附属状态，不该驱动任何渲染。
+ */
+let cloudEtag = ''
+
+function fetchCloud() {
+  if (cloudInflight) return cloudInflight
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), CLOUD_TIMEOUT)
+  cloudInflight = (async () => {
+    try {
+      const res = await fetch('/api/sites', {
+        signal: ctrl.signal,
+        headers: cloudEtag ? { 'If-None-Match': cloudEtag } : undefined
+      })
+      // 304：内容与上次一致。既不用解析 JSON，也不用 rebuild
+      if (res.status === 304) return null
+      if (!res.ok) return null
+      const data = await res.json()
+      // 只在拿到合法版本号时才记住 ETag。否则一旦第一次响应体不合法，
+      // 下次的 304 会把「这份数据没被应用过」这个状态永久钉住，热更新再也进不来。
+      const v = Number(data?.version)
+      if (Number.isFinite(v)) cloudEtag = res.headers.get('ETag') || cloudEtag
+      return data
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timer)
+      cloudInflight = null
+    }
+  })()
+  return cloudInflight
+}
 
   /**
    * version 必须**单调递增**才应用。

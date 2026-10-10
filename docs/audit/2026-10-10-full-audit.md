@@ -167,19 +167,25 @@
 
 > 第 1、2、3 条做完需要重新部署才能验证；第 2 条不修，第 1 条的价值也会打折（SW 挂了，用户拿到的还是缓存旧包）。
 
-### 第二批：性能与流量（本周）
+### 第二批：性能与流量
 
-| 序 | 修复 | 位置 | 预期收益 |
-|---|---|---|---|
-| 8 | **`rebuild()` 按 id 复用对象引用**：`Map<id, site>` 对比字段，未变的沿用旧对象；集合不变则不换数组引用 | `sites.js:155-181` | 改 1 个站的代价从 300 卡降到 1 张。**全清单 ROI 最高的一处** |
-| 9 | **`keyCache` 改按 id + 内容指纹**：`id + name|desc|url|aliases|purposes`；rebuild 时只失效变更项 | `search.js:18-43` | 消灭每次 rebuild 后 40–150 ms 的拼音重算 |
-| 10 | **Fuse 实例按 `sites` 引用缓存**；omni 输入加 150–200ms 防抖 | `search.js:86-102`、`useOmniBox.js:147` | 消灭拼音输入时 100–280 ms 的阻塞 |
-| 11 | **`@select` 改稳定方法引用** + `SiteCard` 加 `v-memo="[site.id, selected, isHighlighted, clickCount, isFav, visited]"` | `CardsContainer.vue:64/86`、`SiteCard.vue` | 掐断"数组新引用 → 300 插槽 → 300 闭包 → 300 重渲染"链条 |
-| 12 | **分类表建 Map 索引**；`visited/isFav/clickCount/healthState` 提到 store 做一次建表 | `categories.js:74-90`、`SiteCard.vue:124-181` | 去掉 ~25,000 次/轮字符串比较 + 1200 次逐卡重算 |
-| 13 | **ETag / If-None-Match**：服务端返回 `ETag: "v<version>"`，客户端带 `If-None-Match`，命中 304 空体 | `api/sites.js:80-85`、`sites.js:469-474` | 轮询流量与 Blob 读次数**降约 95%** |
-| 14 | **mousemove 用 rAF 合并**，mouseup 再写回 store | `Sidebar.vue:114`、`RightSidebar.vue:64` | 调宽从 60–120 次/秒重排降到 60 次/秒以内且合并 |
-| 15 | **移动端固定栏纳入 `no-blur`**；`markAnimating(140)` → `300`；`toggle()` 补 `markAnimating` | `main.css:195-200`、`sidebar.js:30/38-39` | 消掉移动端滚动与拖拽收尾的毛玻璃重算 |
-| 16 | **SW 预缓存去掉图标**：globPatterns 只留 `assets/**` + `index.html`，图标改运行时缓存；补 `jpg,webp` | `vite.config.js:26` | 6.25 MB → 几十 KB |
+> **已完成**（2026-10-10）。实施前先做了实测基线，结果**推翻了几条估算**（`pinyin-pro` 的拼音重算实测是 0.7 ms，不是 40–150 ms），因此本表已按下表的「处置」重排。
+> 基线与对照数据、复现命令见 [`2026-10-10-batch2-baseline.md`](./2026-10-10-batch2-baseline.md)。
+
+| 序 | 修复 | 位置 | 处置 | 实测结果 |
+|---|---|---|---|---|
+| 8 | `rebuild()` 按来源对象身份复用渲染对象；全表恒等时不换数组引用 | `sites.js` | ✅ 已做 | 单站改动脚本耗时 **7.31 → 1.88 ms** |
+| 9 | `keyCache` 改按 id + 内容指纹 | `search.js` | ⛔ **不做** | 被序 8 覆盖（引用稳定后 WeakMap 不再失效）；改全局 Map 反而会为已删站点永久留条目 |
+| 10 | Fuse 实例按 `sites` 引用缓存 **／** omni 输入加 150–200ms 防抖 | `search.js`、`useOmniBox.js` | ✅ 前半已做<br>⛔ 后半不做 | 缓存：零风险消除每键 O(n) 建索引<br>防抖：实测每键仅 0.13 ms，加防抖是**负优化** |
+| 11 | `@select` 改稳定方法引用 **／** `SiteCard` 加 `v-memo` | `CardsContainer.vue`、`SiteCard.vue` | ✅ 前半已做<br>⛔ 后半不做 | v-memo 依赖数组漏项会**静默渲染陈旧内容**，而单卡改动全量重渲染实测仅 1.88 ms，风险 > 收益 |
+| 12 | 分类表建 Map 索引；`visited/isFav/clickCount` 提到 store 建表 | `categories.js`、`SiteCard.vue` | ⛔ **不做** | 切分类脚本成本实测 0.31 ms，其余 5–14 ms 全是**布局**成本，建索引解决不了 |
+| 13 | ETag / If-None-Match，命中 304 空体 | `api/sites.js`、`sites.js` | ✅ 已做 | 轮询传输 **34,180 B → 0 B**（线上下断实测） |
+| 14 | mousemove 用 rAF 合并，mouseup 再写回 | `Sidebar.vue`、`RightSidebar.vue` | ✅ 已做 | 同一帧内 20 次 mousemove 只写 1 次（`test-resize.mjs` 6/6） |
+| 15 | `markAnimating(140)` → 300；`toggle()` 补 `markAnimating` | `sidebar.js` | ✅ 已做 | `toggleCollapse`/`toggleRightCollapse` **原本就有**，无需补<br>「移动端固定栏纳入 no-blur」**不做**：固定栏尺寸不变，不产生模糊重算，关掉只会白白改掉它的玻璃观感 |
+| 16 | SW 预缓存只留应用外壳，图标改运行时缓存，补 `jpg,webp` | `vite.config.js` | ✅ 已做 | **294 条 / 7.17 MB → 16 条 / 1.07 MB** |
+| — | （基线上新增）Google Fonts 样式表改非阻塞 | `index.html` | ✅ 已做 | 首卡出现 **573 → 478 ms**；该域名在国内网络下不可达，却是渲染阻塞项 |
+
+**顺带记录两条「体检报告估错了」的结论**，避免以后照旧数字做决策：`pinyin-pro` 的实际吞吐比预估高约两个数量级；Vue 的响应式是微任务批处理，用 `dispatchEvent` 的同步栈去测检索耗时会得到 0.1 ms 的假象（真正的计算在 flush 里）。
 
 ### 第三批：安全加固与架构（排期）
 

@@ -84,6 +84,27 @@ function noStore(res) {
   res.setHeader('Expires', '0')
 }
 
+/**
+ * 站点表的 GET 响应改用「可重验证」策略，而不是 noStore。
+ *
+ * 为什么不能再 no-store：`no-store` 让浏览器既不保留副本、也不发条件请求，于是
+ * 客户端每 30s 的轮询都会完整下载 34,180 字节（Brotli）并解析 118 KB JSON —— 
+ * 实测 4.1 MB/小时/标签页，而绝大多数轮询的内容与上一次完全相同。
+ *
+ * `private, max-age=0, must-revalidate`：
+ *   - `max-age=0` + `must-revalidate` 保留了「每次都必须回源校验」的原语义，
+ *     不会读到陈旧数据（数据一变 Vercel 依据响应体算出的 ETag 就变）；
+ *   - 校验命中时服务端回 304，**0 字节**（线上实测），浏览器用本地副本继续；
+ *   - `private` 只是不让共享缓存（CDN）存这份数据，浏览器私有缓存不受影响。
+ *
+ * 站点表是公开可读的访客数据，但「每次回源」这个语义要保住，故用 private 而非 public。
+ */
+function revalidatable(res) {
+  res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate')
+  res.removeHeader('Pragma')
+  res.removeHeader('Expires')
+}
+
 export default async function handler(req, res) {
   if (req.method === 'GET') {
     const snapshotsQuery = req.query && req.query.snapshots
@@ -118,7 +139,8 @@ export default async function handler(req, res) {
       return
     }
 
-    noStore(res)
+    // 站点表主读取路径：走可重验证缓存，让 30s 轮询在内容未变时命中 304（0 字节）
+    revalidatable(res)
 
     /**
      * 「Blob 里没有数据」与「读取失败 / 数据损坏」必须分开处理。

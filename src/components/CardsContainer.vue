@@ -61,8 +61,7 @@
                     :batch-mode="batchMode"
                     :selected="sitesStore.selectedIds.has(site.id)"
                     :is-read-only="batchMode"
-                    @select="sitesStore.toggleSelect(site.id)"
-                    @edit="openEdit" @delete="confirmDelete" />
+                    @select="onSelect" @edit="openEdit" @delete="confirmDelete" />
         </template>
       </Draggable>
 
@@ -83,8 +82,7 @@
                     :batch-mode="batchMode"
                     :selected="sitesStore.selectedIds.has(site.id)"
                     :is-read-only="batchMode"
-                    @select="sitesStore.toggleSelect(site.id)"
-                    @edit="openEdit" @delete="confirmDelete" />
+                    @select="onSelect" @edit="openEdit" @delete="confirmDelete" />
         </template>
       </Draggable>
 
@@ -249,6 +247,15 @@ watch(() => sitesStore.highlightSiteId, async (id) => {
 
 function openEdit(site) {
   editingSite.value = { ...site }
+}
+
+/**
+ * 批量选择：模板里写成 `@select="sitesStore.toggleSelect(site.id)"` 会在每次渲染时
+ * 为 300 张卡各生成一个闭包，并且让这个监听器每次都是新函数 —— 卡片无法被跳过更新。
+ * 收敛成一个稳定引用，代价由卡片把 site 作为事件载荷带出来。
+ */
+function onSelect(site) {
+  sitesStore.toggleSelect(site.id)
 }
 
 function confirmDelete(site) {

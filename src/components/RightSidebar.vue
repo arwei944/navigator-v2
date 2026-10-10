@@ -61,13 +61,23 @@ function startResize(e) {
   const startX = e.clientX
   const startWidth = sidebarStore.rightWidth
 
+  // 同 Sidebar：mousemove 逐次写 store 会让 300 项网格反复重排，合并到一帧一次
+  let pendingX = startX
+  let raf = 0
+  function flush() {
+    raf = 0
+    sidebarStore.setRightWidth(startWidth + (startX - pendingX))
+  }
   function onMove(ev) {
-    sidebarStore.setRightWidth(startWidth + (startX - ev.clientX))
+    pendingX = ev.clientX
+    if (!raf) raf = requestAnimationFrame(flush)
   }
 
   function onUp() {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    sidebarStore.setRightWidth(startWidth + (startX - pendingX))
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
   }

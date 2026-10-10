@@ -111,14 +111,26 @@ function startResize(e) {
   const startX = e.clientX
   const startWidth = sidebarStore.width
 
+  // mousemove 的频率（60–120 Hz）高于渲染帧率，而每次 setWidth 都会让 store 变更 →
+  // 内联 style 改写 → 300 项网格重排（实测布局成本约 9.7 ms）。合并到一帧一次：
+  // 事件里只记最新坐标，真正的写入交给 rAF。
+  let pendingX = startX
+  let raf = 0
+  function flush() {
+    raf = 0
+    sidebarStore.setWidth(startWidth + (pendingX - startX))
+  }
   function onMove(ev) {
-    const delta = ev.clientX - startX
-    sidebarStore.setWidth(startWidth + delta)
+    pendingX = ev.clientX
+    if (!raf) raf = requestAnimationFrame(flush)
   }
 
   function onUp() {
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
+    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    // 收尾补写最后一次坐标，否则松手前那一小段位移会丢
+    sidebarStore.setWidth(startWidth + (pendingX - startX))
     document.body.style.cursor = ''
     document.body.style.userSelect = ''
   }

@@ -27,7 +27,12 @@ export const useSidebarStore = defineStore('sidebar', () => {
     animTimer = setTimeout(() => { animating.value = false }, ms)
   }
 
-  function toggle() { open.value = !open.value }
+  function toggle() {
+    open.value = !open.value
+    // 窄屏抽屉是覆盖在网格之上的浮层，滑入/滑出期间它自己的毛玻璃每帧都要在
+    // 300 张卡之上重算一次模糊。与折叠、拖拽同源，一并临时摘掉。
+    markAnimating()
+  }
   function close() { open.value = false }
   function openSidebar() { open.value = true }
   function setActiveNav(nav) { activeNav.value = nav }
@@ -35,8 +40,12 @@ export const useSidebarStore = defineStore('sidebar', () => {
   function toggleRightCollapse() { rightCollapsed.value = !rightCollapsed.value; markAnimating() }
   // 两侧宽度下限都是 60px：左侧图标的物理下限（nav 项 44px + 两侧各 8px 内边距），
   // 拖到这个宽度以下就只剩图标了，再窄连图标都放不下。上限 400px。
-  function setWidth(val) { width.value = Math.max(60, Math.min(400, val)); markAnimating(140) }
-  function setRightWidth(val) { rightWidth.value = Math.max(60, Math.min(400, val)); markAnimating(140) }
+  //
+  // 计时取 300ms 而不是更短的 140ms：拖拽期间 mousemove 是连续来的，但用户随时可能
+  // 停顿一下再继续。计时若短于停顿，模糊会在拖拽中途重新弹回来，正好卡在最需要流畅的
+  // 那一刻重算。松手后多留 300ms 再恢复，用户看不到差别（面板本来就在动）。
+  function setWidth(val) { width.value = Math.max(60, Math.min(400, val)); markAnimating(300) }
+  function setRightWidth(val) { rightWidth.value = Math.max(60, Math.min(400, val)); markAnimating(300) }
   function setHoveredSite(site) { hoveredSite.value = site }  function clearHoveredSite() { hoveredSite.value = null }
 
   /**
