@@ -31,7 +31,9 @@ const visible = ref(false)
 const shortcuts = [
   { id: 'omni', label: '打开全能框（命令）', key: 'Ctrl+K' },
   { id: 'search', label: '聚焦顶部搜索框', key: 'Ctrl+F' },
-  { id: 'theme', label: '切换主题', key: 'Ctrl+D' },
+  { id: 'theme', label: '切换明暗', key: 'Ctrl+D' },
+  { id: 'noteNew', label: '新建便利贴', key: 'Ctrl+Alt+N' },
+  { id: 'noteBoard', label: '打开便签墙', key: 'Ctrl+Shift+N' },
   { id: 'shortcuts', label: '查看快捷键', key: '?' },
   { id: 'close', label: '关闭面板/弹窗', key: 'Escape' },
 ]

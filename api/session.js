@@ -19,8 +19,15 @@
  */
 import { get, put } from '@vercel/blob'
 
-/** 单次写入的体量上限：会话数据只该是收藏/待办/历史/偏好，256KB 足够宽松 */
-const MAX_BODY_BYTES = 256 * 1024
+/**
+ * 单次写入的体量上限。
+ *
+ * 256KB 是「只有收藏/待办/历史/偏好」时期定的；v8 起会话里多了站点备注与便利贴
+ * （各限 80KB，见 utils/noteSync.js#LIMITS），再加上历史与偏好就顶到边了，故放宽到 512KB。
+ * 客户端在推送前会先自检（见 SessionSyncSection 的配额检查），
+ * 这里的门禁是最后一道：任何人可无限次 POST，限流只能 best-effort，体积上限才是硬的。
+ */
+const MAX_BODY_BYTES = 512 * 1024
 const MAX_KEY_LEN = 64
 
 /* 写入限流：per-instance，best-effort。诚实说明边界 —— serverless 是多实例的，

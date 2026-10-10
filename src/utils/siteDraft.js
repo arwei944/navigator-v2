@@ -10,7 +10,9 @@
 
 import { hostOf, looksLikeUrl } from './url.js'
 import { normalizePurposes } from '../../shared/purposes.mjs'
-import { hashColor } from '../../shared/site-infer.mjs'
+// hashColor 单独从拆出来的小模块拿：从 site-infer 引会把整个 700 行推断引擎拖进首屏
+// （它虽被 tree-shaking，但只要 site-infer 同时被别处动态 import，rollup 就会整模块提升）
+import { hashColor } from '../../shared/hash-color.mjs'
 
 /** 自动添加被拦下的原因码。抓取失败与站名低置信已改为域名兜底照常入库，故退役。 */
 export const AUTO_ADD_REASON = {

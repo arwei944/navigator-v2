@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { setVisibleInterval } from '@/utils/visibility'
 
 /**
  * 站点在线状态 store —— **只读云端判定**，前端不做任何探测。
@@ -81,9 +82,10 @@ export const useHealthStore = defineStore('health', () => {
     return { ok: 'green', limited: 'amber', down: 'red' }[status] || 'gray'
   }
 
-  // 判定是云端快照，页面长开时不轮询就会一直显示开局那一份；已加载过才轮询
+  // 判定是云端快照，页面长开时不轮询就会一直显示开局那一份；已加载过才轮询。
+  // 后台标签页不轮询（理由同 clicks.js：会白烧云端额度，额度打满会被平台暂停部署）
   if (typeof window !== 'undefined') {
-    setInterval(() => { if (loadedAt.value) load({ force: true }) }, CLOUD_TTL)
+    setVisibleInterval(CLOUD_TTL, () => { if (loadedAt.value) load({ force: true }) })
   }
 
   return { statusMap, counts, updatedAt, actor, proxy, loading, getStatus, probeSites, refresh, nodeFor }

@@ -16,7 +16,7 @@
  *
  * 依赖 `dist/`，所以先 `npm run build`。运行：node tools/console/test-bundle.mjs
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gzipSync } from 'node:zlib'
@@ -129,6 +129,45 @@ for (const f of initialJs) console.log(`  ${(sizeOf(f) / 1024).toFixed(1).padSta
 console.log(`  合计 ${(initRaw / 1024).toFixed(1)} KiB raw / ${(initGz / 1024).toFixed(1)} KiB gz`)
 console.log(`懒加载 chunk：${pinyinChunk} — ${(sizeOf(pinyinChunk) / 1024).toFixed(1)} KiB raw / ${(gzOf(pinyinChunk) / 1024).toFixed(1)} KiB gz`)
 console.log(`全部 JS 合计 ${(totalRaw / 1024).toFixed(1)} KiB raw（分包不减少总量，只挪动「什么时候下载」）`)
+
+/* ══════════ 7. 「点开才用」的重组件不许回到首屏 ══════════
+   预算那条线是总量绊线，管不住「谁的代码」。这里按内容标记点名：
+   便签卡片、主题编辑器都是 `v-if` 控制、用户点一下才出现的界面，
+   它们的渲染代码一旦被某个静态 import 拉回入口图，首屏就会悄悄胖一圈 —— 而预算还有余量时不会报警。
+   标记取的是组件里独有的一句 UI 文案（改名即失败，提醒同步改这里）。 */
+
+const LAZY_PARTS = [
+  ['主题编辑器', 'ThemeEditor'],
+  ['钉在桌面上', 'StickyNote'],
+  // 本地推断引擎：`/api/metadata` 不可用时的自动补全兜底（services/localMeta.js 动态 import）。
+  // 它有 700+ 行，而 siteDraft.js 只用它的 hashColor —— 标记串必须取 site-infer **独有**的
+  // 一句（「地址无法解析」在 shared/ops/site-ops.mjs 里也出现，会把判定带偏）。
+  // AddSiteModal 改成异步组件后整条链路才真正离开首屏（591.6 → 608.4 → 回落，实测踩过）。
+  ['正在抓取站点信息', '添加站点弹窗'],
+  ['反爬挑战页', 'site-infer 推断引擎'],
+]
+for (const [mark, name] of LAZY_PARTS) {
+  const owners = allJs.filter(f => readAsset(f).includes(mark))
+  ok(owners.length > 0, `${name} 的产物存在（可按「${mark}」定位）`)
+  ok(!initialJs.some(f => readAsset(f).includes(mark)), `${name} 不在首屏下载清单里`)
+}
+
+/* ══════════ 8. 静态路由入口必须生成 ══════════
+   WorkBuddy 云端（以及任何 Python `http.server` 这类静态宿主）**没有 SPA 兜底**：
+   请求 `/archived` 直接回它自己的 404 页。构建后置脚本会为每条静态路由生成
+   `<route>/index.html`，让「在子页面按刷新」不至于 404。
+   丢了这一步的表现很隐蔽 —— 应用内点击跳转一切正常，只有刷新才出事，
+   所以必须在产物层面点名。 */
+
+const ROUTER_SRC = readFileSync(join(ROOT, 'src', 'router', 'index.js'), 'utf-8')
+const staticRoutes = [...ROUTER_SRC.matchAll(/\{\s*path:\s*'([^']+)'/g)]
+  .map(m => m[1])
+  .filter(p => p !== '/' && !p.includes(':') && /^\/[a-z0-9-]+$/i.test(p))
+const missingRoutes = staticRoutes.filter(p => !existsSync(join(DIST, p.slice(1), 'index.html')))
+ok(staticRoutes.length > 0, '从路由表里能提取到静态路由', `${staticRoutes.length} 条`)
+ok(missingRoutes.length === 0,
+  `${staticRoutes.length} 条静态路由都有目录入口（刷新子页面不 404）`,
+  `缺 ${missingRoutes.join(' ')}（检查 package.json 的 build 是否带上 postbuild-spa-fallbacks）`)
 
 /* ---------------- 结果 ---------------- */
 

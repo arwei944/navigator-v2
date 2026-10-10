@@ -45,6 +45,12 @@
     <div v-if="!isList && showAliases" class="card-aliases">
       别名 · {{ aliases.join(' / ') }}
     </div>
+    <!-- 钉住的备注：只有钉住才露摘要，没钉的只留角标 —— 否则 300 张卡上会铺满私人批注。
+         紧凑档连摘要都不给（那里只保留「名称 + 域名 + 底栏」的信息量）。 -->
+    <div v-if="!isList && noteSummary" class="card-note-line" @click.stop="openNote">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      <span>{{ noteSummary }}</span>
+    </div>
     <!-- 用途标签：与分类是两把正交的尺子，分类说「属于哪」，用途说「拿来干嘛」 -->
     <div v-if="!isList && showPurposesByDensity && display.purposes && purposeIds.length" class="card-purposes">
       <PurposeTags :ids="purposeIds" />
@@ -60,6 +66,11 @@
         </span>
         <span v-if="site.archived" class="card-archived-tag" title="已归档：不参与日常浏览">已归档</span>
         <span v-if="display.badges && showUnvisited && !visited" class="card-unvisited" title="还没访问过">未访问</span>
+        <!-- 备注角标：有批注就说得出来，点了直接跳详情面板的备注区。
+             尺寸刻意做小 —— 300 张卡里它只是「这条有我的批注」的一个记号。 -->
+        <span v-if="hasNote" class="card-note" :title="noteTitle" @click.stop="openNote">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </span>
         <span v-if="display.heat && clickCount > 0" class="card-clicks" :class="heatClass" :title="'全网累计点击 ' + clickCount + ' 次（所有访客）'">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
           {{ clickCount }}
@@ -95,6 +106,7 @@ import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { useContextMenuStore } from '@/stores/contextMenu'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useSiteNotesStore } from '@/stores/siteNotes'
 import { openInNewTab } from '@/utils/open'
 import PurposeTags from '@/components/PurposeTags.vue'
 
@@ -120,9 +132,29 @@ const healthStore = useHealthStore()
 const clicksStore = useClicksStore()
 const contextMenuStore = useContextMenuStore()
 const preferencesStore = usePreferencesStore()
+const siteNotesStore = useSiteNotesStore()
 
 /** 卡片元素显隐（在线角标 / 热度 / 分类标签 / 用途标签 / 徽章），由「卡片设置」控制 */
 const display = computed(() => preferencesStore.cardDisplay)
+
+/* ---------- 备注 ----------
+   只读 marks（一个 Set）与 pinnedSummaries（一个 Map），不去读 entries[site.id] ——
+   后者会给 300 张卡各建一条深层依赖，备注一改要重算 300 次。 */
+
+const hasNote = computed(() => siteNotesStore.marks.has(props.site.id))
+// 紧凑档不给摘要：那里只留「名称 + 域名 + 底栏」，多一行会破坏它的信息密度
+const noteSummary = computed(() =>
+  props.density === 'compact' ? '' : (siteNotesStore.pinnedSummaries.get(props.site.id) || '')
+)
+const noteTitle = computed(() => {
+  const t = siteNotesStore.textOf(props.site.id)
+  return t ? `备注：${t}` : '有备注'
+})
+
+/** 角标与摘要都指向同一个落点：详情面板的备注区 */
+function openNote() {
+  sidebarStore.showDetail(props.site)
+}
 
 /* ---------- 信息密度分层 ---------- */
 
@@ -355,6 +387,44 @@ function onHoverLeave() {
 @keyframes flamePulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.18); opacity: .8; }
+}
+/* 备注角标：与热度徽章同规格，只是颜色走 --color-note（明暗两套由令牌给） */
+.card-note {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-note);
+  background: var(--color-note-bg);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.card-note svg { width: 12px; height: 12px; }
+.card-note:hover { filter: brightness(0.95); }
+/* 钉住备注的摘要行：一行截断，不抢卡片主信息的视觉重量 */
+.card-note-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border-left: 2px solid var(--color-note);
+  background: var(--color-note-bg);
+  font-size: calc(12px * var(--cs, 1));
+  line-height: 1.45;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.card-note-line svg { width: 13px; height: 13px; color: var(--color-note); flex-shrink: 0; margin-top: 1px; }
+.card-note-line span {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 .card-tag { font-size: calc(11px * var(--cs, 1)); font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--border-light); color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
 .card-tag-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }

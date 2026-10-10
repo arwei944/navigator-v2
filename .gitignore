@@ -25,6 +25,8 @@ probe/*.png
 probe/_*/
 # 零依赖 CDP 验证用的临时 Chrome 配置目录（每次测量都该是干净的）
 .chrome-*/
+# WorkBuddy「发布应用」在本机写的应用追踪标记（对应哪个分享链接，属本机状态）
+.wbapp_*.genie
 
 # 项目级 agent 工作区（设计草稿 / 工作日志等本机状态）
 .workbuddy/

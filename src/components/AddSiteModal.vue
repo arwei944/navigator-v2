@@ -124,6 +124,8 @@ import PurposePicker from '@/components/PurposePicker.vue'
 import { normalizeUrl, hostOf } from '@/utils/url'
 import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
 import { findDuplicate, buildSiteFromDraft } from '@/utils/siteDraft'
+import { fetchSiteMeta, metaFailureText } from '@/services/meta'
+import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
@@ -203,6 +205,15 @@ function hasCategory(id) {
   return Boolean(id) && categoriesStore.categories.some(c => c.id === id)
 }
 
+/** 当前生效的分类表（含用户新建的）→ 推断引擎要的 {label,color} 形状，保证推出来的分类真的在下拉框里 */
+function categoryMetaFromStore() {
+  const map = {}
+  for (const g of categoriesStore.groups) {
+    for (const c of g.categories) map[c.id] = { label: c.label, color: c.dotColor, group: g.label }
+  }
+  return map
+}
+
 /** 只覆盖「用户没改过」的字段；用户改过的保留，避免自动补全把人的输入冲掉 */
 function applyMeta(data) {
   if (!touched.name && data.name) form.name = data.name
@@ -271,28 +282,48 @@ async function fetchMeta() {
   fetching.value = true
   status.value = '正在抓取站点信息…'
   statusKind.value = 'loading'
-  try {
-    const res = await fetch('/api/metadata?url=' + encodeURIComponent(url))
-    const data = await res.json()
+  // 抓取一律走 services/meta.js：非 JSON 的响应（平台暂停部署的 402 纯文本、
+  // 网关的 5xx HTML、SPA 兜底的 index.html）在那里被翻成人话，不会露出 JSON 解析错误
+  const r = await fetchSiteMeta(url)
+  if (seq !== reqSeq) return
+  if (!r.ok) {
+    // 服务端抓取不可用（纯静态托管没有 /api/metadata，或后端临时故障）时退回本地推断：
+    // 跑的是与服务端同一个 inferSite 引擎，只是手上没有 HTML ——
+    // 名称/分类/配色来自域名（同域已收录则沿用真名），描述与图标是推断值。
+    // 这比直接报错强得多：用户拿到的是一份可复核的草稿，而不是从零手填。
+    const local = await localSiteMeta(url, {
+      existingSites: sitesStore.sites,
+      categoryMeta: categoryMetaFromStore(),
+    })
     if (seq !== reqSeq) return
-    if (!res.ok) {
-      meta.value = null
-      faviconUrl.value = ''
-      faviconHost.value = ''
-      status.value = data.error || '抓取失败，请手动填写'
-      statusKind.value = 'err'
+    if (local.ok) {
+      meta.value = local.data
+      applyMeta(local.data)
+      status.value = localMetaNotice(local.data)
+      statusKind.value = 'warn'
+      fetching.value = false
       return
     }
+    meta.value = null
+    faviconUrl.value = ''
+    faviconHost.value = ''
+    status.value = metaFailureText(r)
+    statusKind.value = 'err'
+    fetching.value = false
+    return
+  }
+  try {
+    const data = r.data
     meta.value = data
     applyMeta(data)
     status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
     statusKind.value = data.warning ? 'warn' : 'ok'
   } catch (e) {
-    if (seq !== reqSeq) return
+    // 抓取成功但回填失败（字段结构意外）—— 仍然是「可手动填写」，不能把弹窗卡在 loading
     meta.value = null
     faviconUrl.value = ''
     faviconHost.value = ''
-    status.value = '抓取失败：' + e.message + '（可手动填写）'
+    status.value = '抓取结果无法解析：' + e.message + '（可手动填写）'
     statusKind.value = 'err'
   } finally {
     if (seq === reqSeq) fetching.value = false

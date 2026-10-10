@@ -7,7 +7,7 @@
  */
 import {
   FONT_STACKS, FONT_LABELS, DIMENSIONS, TOKENS, DEFAULT_TOKENS,
-  ACCENT_PRESETS, SCHEMES, getScheme, resolveTokens, tokensToCssVars,
+  ACCENT_PRESETS, SCHEMES, getScheme, resolveTokens, tokensToCssVars, NOTE_COLOR_KEYS,
 } from '../../src/utils/visualScheme.js'
 
 let pass = 0
@@ -160,6 +160,15 @@ const expectKeys = [
   '--color-favorite', '--color-favorite-bg', '--color-favorite-border',
   '--color-heat-warm', '--color-heat-warm-bg', '--color-heat-hot', '--color-heat-hot-bg',
   '--color-on-solid',
+  // 站点备注色（卡片角标 / 详情备注区）
+  '--color-note', '--color-note-bg',
+  // 便利贴六色：底色 + 描边，同样随主题模式取明暗两套值
+  '--note-yellow-bg', '--note-yellow-edge',
+  '--note-pink-bg', '--note-pink-edge',
+  '--note-blue-bg', '--note-blue-edge',
+  '--note-green-bg', '--note-green-edge',
+  '--note-purple-bg', '--note-purple-edge',
+  '--note-gray-bg', '--note-gray-edge',
 ]
 deepEq(Object.keys(vars).sort(), expectKeys.slice().sort(), 'CSS 变量键集完整')
 ok(Object.values(vars).every(v => typeof v === 'string'), '所有 CSS 变量值都是字符串（setProperty 只吃字符串）')
@@ -170,6 +179,11 @@ const darkSemantic = tokensToCssVars(apple, 'dark')
 ok(darkSemantic['--color-favorite-bg'] !== vars['--color-favorite-bg'], '收藏底色随主题模式取不同值')
 ok(darkSemantic['--color-ok'] !== vars['--color-ok'], '在线状态色随主题模式取不同值')
 ok(darkSemantic['--color-danger'] !== vars['--color-danger'], '失效状态色随主题模式取不同值')
+// 便签底色是最容易漏的一处：浅色下是淡黄纸面，深色下必须变成暗底，否则便签墙在夜间是一片发光方块
+ok(darkSemantic['--note-yellow-bg'] !== vars['--note-yellow-bg'], '便签底色随主题模式取不同值')
+ok(darkSemantic['--color-note-bg'] !== vars['--color-note-bg'], '备注底色随主题模式取不同值')
+ok(NOTE_COLOR_KEYS.every(c => darkSemantic[`--note-${c}-bg`] !== vars[`--note-${c}-bg`]),
+  '六色便签底色全部随主题模式切换')
 
 eq(vars['--radius'], '12px', '卡片圆角落成 px')
 eq(vars['--radius-sm'], '8px', '控件圆角落成 px')

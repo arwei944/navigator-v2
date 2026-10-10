@@ -8,6 +8,7 @@
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { normalizeUrl, hostOf } from '@/utils/url'
+import { fetchSiteMeta } from '@/services/meta'
 import {
   AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft,
 } from '@/utils/siteDraft'
@@ -37,19 +38,10 @@ const META_TIMEOUT_MS = 8000
  */
 const inFlight = new Map()
 
-/** 抓元数据：超时 / 非 2xx / 网络异常都返回 null，由后续「域名兜底」接手，不再拦人 */
+/** 抓元数据：超时 / 非 2xx / 非 JSON / 网络异常都返回 null，由后续「域名兜底」接手，不再拦人 */
 async function fetchMeta(url) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), META_TIMEOUT_MS)
-  try {
-    const res = await fetch('/api/metadata?url=' + encodeURIComponent(url), { signal: ctrl.signal })
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
-  }
+  const r = await fetchSiteMeta(url, { timeoutMs: META_TIMEOUT_MS })
+  return r.ok ? r.data : null
 }
 
 function duplicateResult(duplicate) {

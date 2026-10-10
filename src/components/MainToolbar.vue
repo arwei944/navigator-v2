@@ -10,6 +10,7 @@
         <option value="name-desc">名称 Z-A</option>
         <option value="clicks">按点击量</option>
         <option value="newest">最新收录</option>
+        <option value="smart">智能排序</option>
       </select>
 
       <button class="toolbar-btn" :class="{ active: sitesStore.batchMode }"
@@ -37,6 +38,11 @@
         <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
       </button>
 
+      <button class="view-toggle" @click="$emit('open-notes')" :aria-label="'便利贴' + (pinnedCount ? '（' + pinnedCount + '）' : '')"
+              :title="'便利贴（Ctrl+Alt+N）'">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11l5 5v11H4z"/><polyline points="15 4 15 9 20 9"/></svg>
+      </button>
+
       <button class="view-toggle" @click="$emit('open-todo')" aria-label="待办事项" title="待办事项">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
       </button>
@@ -62,12 +68,17 @@
 import { ref, computed, watch } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useNotesStore } from '@/stores/notes'
 import UnifiedSearchBox from '@/components/UnifiedSearchBox.vue'
 
-defineEmits(['open-settings', 'open-todo', 'open-add', 'open-card-settings', 'open-palette'])
+defineEmits(['open-settings', 'open-todo', 'open-add', 'open-card-settings', 'open-palette', 'open-notes'])
 
 const sitesStore = useSitesStore()
 const preferencesStore = usePreferencesStore()
+const notesStore = useNotesStore()
+
+/** 钉住的数量：移动端没有右下角浮标，这个按钮是唯一入口，得把数量带出来 */
+const pinnedCount = computed(() => notesStore.pinned.length)
 
 const sortValue = ref(sitesStore.sortBy)
 watch(sortValue, (val) => sitesStore.setSortBy(val))

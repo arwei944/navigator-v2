@@ -34,7 +34,12 @@
         <MainToolbar v-if="scope !== 'trash'"
                      @open-settings="showSettings = true" @open-todo="showTodo = true"
                      @open-add="openAddSite" @open-card-settings="showCardSettings = true"
+                     @open-notes="openNotes"
                      @open-palette="commandPaletteRef?.open()" />
+        <!-- 此刻推荐：只在首页「没在搜索」时出现 —— 搜索时结果已经由相关性决定，
+             再插一排推荐等于和用户输入的词抢注意力 -->
+        <SmartBar v-if="scope === 'discover' && !sitesStore.searchQuery && preferencesStore.smartBar" />
+
         <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示；归档同理（筛选条的计数
              基于在册站点，在归档范围内会虚高） -->
         <FilterBar v-if="scope !== 'trash' && scope !== 'archived'" />
@@ -58,13 +63,22 @@
   <CommandPalette ref="commandPaletteRef" />
 
   <!-- 设置面板 -->
-  <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin" />
+  <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin"
+                 @open-theme-editor="showThemeEditor = true" />
+
+  <!-- 主题编辑器：右侧抽屉，与卡片设置同形态 —— 改动即时可见 -->
+  <ThemeEditor v-if="showThemeEditor" @close="showThemeEditor = false" />
 
   <!-- 卡片设置：右侧抽屉，改动在左侧网格即时可见 -->
   <CardSettingsPanel v-if="showCardSettings" @close="showCardSettings = false" />
 
   <!-- 待办面板：入口在中间栏工具栏 -->
   <TodoPanel v-if="showTodo" @close="showTodo = false" />
+
+  <!-- 便利贴：停靠形态常驻桌面右下角（移动端由 CSS 隐藏，改走便签墙）；
+       便签墙是按需打开的全屏浮层。两者都在路由壳之外，/admin 下同样可用。 -->
+  <StickyDock ref="dockRef" @open-board="showStickyBoard = true" />
+  <StickyBoard v-if="showStickyBoard" @close="showStickyBoard = false" />
 
   <!-- 导入导出面板 -->
   <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
@@ -97,7 +111,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -114,20 +128,40 @@ import CardsContainer from '@/components/CardsContainer.vue'
 import ShortcutsPanel from '@/components/ShortcutsPanel.vue'
 import ContentFeed from '@/components/ContentFeed.vue'
 import CommandPalette from '@/components/CommandPalette.vue'
-import SettingsPanel from '@/components/SettingsPanel.vue'
 import CardSettingsPanel from '@/components/CardSettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
-import AddSiteModal from '@/components/AddSiteModal.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import ContextMenuHost from '@/components/ContextMenuHost.vue'
 import MobileDetailDrawer from '@/components/MobileDetailDrawer.vue'
+import StickyDock from '@/components/StickyDock.vue'
+import SmartBar from '@/components/SmartBar.vue'
 import { autoAddSite } from '@/services/autoAdd'
 import { AUTO_ADD_REASON } from '@/utils/siteDraft'
 import { useToastStore } from '@/stores/toast'
 import { useOmniStore } from '@/stores/omni'
+import { useNotesStore } from '@/stores/notes'
+import { useSiteNotesStore } from '@/stores/siteNotes'
+import { useThemeStore } from '@/stores/theme'
+import { startLiveSync } from '@/services/liveSync'
+
+/**
+ * 「点开才用」的重组件一律走异步：它们都由用户点击打开、`v-if` 控制，没有任何理由把代码压在首屏。
+ * v8 上线时这几块（含新增的主题编辑器与便签墙）把首屏顶出了 600 KiB 预算，故在此收口。
+ * 注意 `StickyDock` 仍是同步的 —— 它是常驻的右下角浮标，异步会让它晚一拍才出现。
+ */
+const SettingsPanel = defineAsyncComponent(() => import('@/components/SettingsPanel.vue'))
+const StickyBoard = defineAsyncComponent(() => import('@/components/StickyBoard.vue'))
+const ThemeEditor = defineAsyncComponent(() => import('@/components/ThemeEditor.vue'))
+/**
+ * 添加站点弹窗也是「点开才用」—— 与上面三个同类。它拖着的推断引擎
+ * （shared/site-infer.mjs，services/localMeta.js 动态引用）有 700+ 行，
+ * 只要它在首屏静态图里，引擎就会被一起提进入口 chunk（实测 591.6 → 608.4 KiB，
+ * 越过 600 KiB 预算）。改成异步后整条链路落到异步 chunk，首屏反而省下一截。
+ */
+const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModal.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -138,12 +172,24 @@ const categoriesStore = useCategoriesStore()
 const clicksStore = useClicksStore()
 const toastStore = useToastStore()
 const omniStore = useOmniStore()
+const notesStore = useNotesStore()
+const siteNotesStore = useSiteNotesStore()
+/**
+ * 主题 store 必须在启动时就实例化，**不能**只靠主题设置面板去创建它：
+ * 「跟随系统」「日落自动换深色」「自建主题刷新后补应用」都挂在它的初始化里，
+ * 而 `ThemeSection` / `ThemeEditor` 现在都是按需加载的 —— 等用户点开设置才建 store，
+ * 这些行为在刷新后一次都不会发生。
+ */
+useThemeStore()
 const commandPaletteRef = ref(null)
 const shortcutsRef = ref(null)
+const dockRef = ref(null)
 const showSettings = ref(false)
 // 卡片设置面板：右侧抽屉，与「设置」一样由工具栏触发
 const showCardSettings = ref(false)
 const showTodo = ref(false)
+const showStickyBoard = ref(false)
+const showThemeEditor = ref(false)
 const showBookmarkImport = ref(false)
 const showAddModal = ref(false)
 // 全能框「编辑 / 删除」命令的宿主状态：命令只发请求，弹窗由这里渲染
@@ -156,6 +202,9 @@ const addNotice = ref('')
 
 // 连续触发时丢弃过期结果，避免旧请求把新卡片覆盖回去
 let autoAddSeq = 0
+
+// 备注 / 便利贴的自动上行句柄（onMounted 里启动，卸载时停掉）
+let stopLiveSync = null
 
 function openAddSite(payload) {
   const url = payload?.url || ''
@@ -248,6 +297,29 @@ function openBookmarkImport() {
   showBookmarkImport.value = true
 }
 
+/* ---- 便利贴 ----
+   默认形态是停靠（右下角浮标），便签墙按需打开。
+   窄屏没有浮标（会被底部 tab 栏压住），一律走便签墙。 */
+
+function isNarrow() {
+  return typeof window !== 'undefined' && window.innerWidth <= 768
+}
+
+function openNotes() {
+  if (isNarrow()) { showStickyBoard.value = true; return }
+  dockRef.value?.open()
+}
+
+/** 新建一枚并打开。钉住是为了让它直接出现在停靠区 —— 「新建后看不见」最让人困惑 */
+function createNote() {
+  if (isNarrow()) {
+    showStickyBoard.value = true
+    notesStore.create('', { pinned: true })
+    return
+  }
+  dockRef.value?.createAndOpen()
+}
+
 // 管理后台入口收敛进设置面板：先关面板再跳转，避免返回时面板还盖在上面
 function openAdmin() {
   showSettings.value = false
@@ -274,6 +346,8 @@ watch(() => omniStore.panel, (name) => {
   if (name === 'settings') showSettings.value = true
   else if (name === 'cardSettings') showCardSettings.value = true
   else if (name === 'todo') showTodo.value = true
+  else if (name === 'stickyBoard') showStickyBoard.value = true
+  else if (name === 'noteNew') createNote()
   else if (name === 'bookmarkImport') { showSettings.value = false; showBookmarkImport.value = true }
   else if (name === 'shortcuts') nextTick(() => shortcutsRef.value?.open())
   // 一次性请求：消费后立即清空，不带到下一次
@@ -420,9 +494,13 @@ onMounted(() => {
   window.addEventListener('offline', onOffline)
 
   document.addEventListener('keydown', onKeydown)
+
+  // 备注 / 便利贴的自动上行：改完 5s 后推一次云端（没填会话密钥则完全不推）
+  stopLiveSync = startLiveSync({ siteNotes: siteNotesStore, notes: notesStore })
 })
 
 onBeforeUnmount(() => {
+  stopLiveSync?.()
   // 这个组件挂在应用根上，正常不会卸载；但把监听与定时器收干净是基本功，
   // 否则将来一旦有 HMR / 多实例挂载，就会同时跑好几条轮询。
   document.removeEventListener('visibilitychange', onVisibility)
@@ -441,7 +519,24 @@ const cloudNotice = computed(() => {
   if (!e) return null
   if (e === 'offline') return { tone: 'warn', retry: true, text: '已离线，当前展示的是本机数据，联网后会自动更新' }
   if (e === 'timeout') return { tone: 'warn', retry: true, text: '读取云端数据超时，当前展示的是本机数据' }
-  if (e === 'invalid-payload') return { tone: 'bad', retry: true, text: '云端数据格式异常，已保留上一版本，请联系管理员' }
+  /**
+   * 「这个部署没有后端接口」的两种表现，文案一致。
+   *   404：纯静态托管下 `/api/sites` 根本不存在；
+   *   非 JSON：SPA 兜底页 / 登录页 / 代理拦截页。
+   * 它们跟「离线」是两件事 —— 用户网络好得很，是这个部署环境没接后端。
+   * 说成「已离线」会让人去重启路由器，找错方向。
+   */
+  if (e === 'http-404' || e === 'invalid-payload') {
+    return { tone: 'warn', retry: true, text: '本站未接入云端同步，展示的是本机数据（本地增删改照常可用）' }
+  }
+  /**
+   * 402 单独说清楚：它不是「网络抖了一下」，而是部署被平台停了
+   * （Vercel Hobby 额度打满后会暂停整个部署，全站返回 402 DEPLOYMENT_DISABLED）。
+   * 这种状态重试不会好，所以要直接告诉用户去哪儿处理，否则只会一直点「重试」。
+   */
+  if (e === 'http-402') {
+    return { tone: 'bad', retry: true, text: '云端部署已被平台暂停（402 · 多为用量超限），展示的是本机数据；请到 Vercel 面板查看用量' }
+  }
   if (String(e).startsWith('http-')) return { tone: 'bad', retry: true, text: `云端数据读取失败（${e.slice(5)}），当前展示的是本机数据` }
   return { tone: 'warn', retry: true, text: '云端数据暂时不可用，当前展示的是本机数据' }
 })
@@ -463,6 +558,17 @@ function onKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
     e.preventDefault()
     preferencesStore.toggleTheme()
+    return
+  }
+  // Ctrl+Alt+N 新建便利贴；Ctrl+Shift+N 打开便签墙
+  if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
+    e.preventDefault()
+    createNote()
+    return
+  }
+  if (e.shiftKey && (e.ctrlKey || e.metaKey) && (e.key === 'N')) {
+    e.preventDefault()
+    showStickyBoard.value = true
     return
   }
   if (e.key === 'Escape') {

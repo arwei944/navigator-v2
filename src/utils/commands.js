@@ -27,7 +27,8 @@ const SORTS = [
   { id: 'name-asc', label: '名称 A-Z', keywords: ['mingcheng', 'mc', 'az', 'name'] },
   { id: 'name-desc', label: '名称 Z-A', keywords: ['mingcheng', 'mc', 'za', 'daoxu', 'dx'] },
   { id: 'clicks', label: '按点击量', keywords: ['dianjiliang', 'djl', 'remai', 'hot', 'clicks'] },
-  { id: 'newest', label: '最新收录', keywords: ['zuixin', 'zx', 'shoulu', 'newest'] }
+  { id: 'newest', label: '最新收录', keywords: ['zuixin', 'zx', 'shoulu', 'newest'] },
+  { id: 'smart', label: '智能排序', keywords: ['zhineng', 'zn', 'smart', 'tuijian', 'tj', 'gerehua'] }
 ]
 
 const DENSITIES = [
@@ -37,9 +38,10 @@ const DENSITIES = [
 ]
 
 export function buildCommands(ctx) {
-  const { router, sites, categories, preferences, sidebar, omni, toast, favorites } = ctx
+  const { router, sites, categories, preferences, sidebar, omni, toast, favorites, notes } = ctx
 
   const cmds = []
+  const notesCount = notes?.count ?? 0
 
   /* ── page：跳转页面 ── */
   const pages = [
@@ -186,6 +188,49 @@ export function buildCommands(ctx) {
   })
 
   cmds.push({
+    id: 'action.noteNew',
+    title: '新建便利贴',
+    subtitle: 'Ctrl+Alt+N · 钉住的便签会常驻桌面',
+    section: 'action',
+    icon: 'note',
+    keywords: ['bianliqian', 'blq', 'bianqian', 'bq', 'xieyixia', 'note', 'sticky', 'noteNew'],
+    run: () => omni.requestPanel('noteNew')
+  })
+
+  cmds.push({
+    id: 'action.stickyBoard',
+    title: '打开便签墙',
+    subtitle: notesCount ? `已有 ${notesCount} 枚便签` : '还没有便签，新建一枚看看',
+    section: 'action',
+    icon: 'note',
+    keywords: ['bianqianqiang', 'bqq', 'qiang', 'board', 'sticky', 'bianliqian'],
+    run: () => omni.requestPanel('stickyBoard')
+  })
+
+  cmds.push({
+    id: 'action.themeMarket',
+    title: '主题与外观',
+    subtitle: `当前：${preferences.THEME_PRESETS[preferences.themePreset]?.name || '默认'}`,
+    section: 'action',
+    icon: 'palette',
+    keywords: ['zhuti', 'zt', 'theme', 'zhutishichang', 'waiguan', 'wg', 'peise', 'ps'],
+    run: () => omni.requestPanel('settings')
+  })
+
+  cmds.push({
+    id: 'action.smartBar',
+    title: preferences.smartBar ? '关闭此刻推荐' : '开启此刻推荐',
+    subtitle: '首页顶部那排按当前时段与你的习惯算出来的站',
+    section: 'action',
+    icon: 'sparkle',
+    keywords: ['ciketuijian', 'ck tj', 'tuijian', 'tj', 'zhineng', 'smart', 'recommend'],
+    run: () => {
+      preferences.setSmartBar(!preferences.smartBar)
+      toast.push({ message: preferences.smartBar ? '已开启此刻推荐' : '已关闭此刻推荐', tone: 'ok', duration: 2000 })
+    }
+  })
+
+  cmds.push({
     id: 'action.card',
     title: '卡片设置',
     subtitle: '排列方式、卡片大小与显示元素',
@@ -272,7 +317,7 @@ export function buildCommands(ctx) {
  * 比 `>命令 <站点名>` 少一次心智切换，也不会在命令和站点名之间产生歧义。
  */
 export function buildSiteActions(ctx) {
-  const { sites, favorites, sidebar, omni, toast, openSite } = ctx
+  const { sites, favorites, sidebar, omni, toast, openSite, siteNotes } = ctx
 
   return function actionsFor(site) {
     if (!site) return []
@@ -341,6 +386,16 @@ export function buildSiteActions(ctx) {
           const next = sites.toggleArchive(site.id)
           toast.push({ message: next ? '已归档' : '已取消归档', tone: 'ok', duration: 2000 })
         }
+      },
+      {
+        id: 'site.note',
+        title: siteNotes?.has(site.id) ? '编辑备注' : '添加备注',
+        subtitle: siteNotes?.has(site.id)
+          ? siteNotes.textOf(site.id)
+          : '记下额度、注意事项 —— 备注只存在你自己的设备上',
+        icon: 'comment',
+        keywords: ['beizhu', 'bz', 'note', 'pizhu', 'pz', 'jilu', 'jl'],
+        run: () => sidebar.showDetail(site)
       },
       {
         id: 'site.edit',

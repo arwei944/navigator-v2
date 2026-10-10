@@ -3,10 +3,13 @@ import { ref, computed } from 'vue'
 import SEED_SITES from '../../api/sites-data.json'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
 import { rankSites } from '@/utils/search'
+import { watchVisibility } from '@/utils/visibility'
 import { safeSetItem } from '@/utils/safeStorage'
 import { sanitizeSites } from '../../shared/sanitize.mjs'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
+import { useHistoryStore } from '@/stores/history'
+import { buildSignals, hasSignal, rankSites as rankSmart } from '@/utils/smartRank'
 
 const OVERLAY_KEY = 'nav-sites-overlay'
 const TRASH_KEY = 'nav-sites-trash'
@@ -43,6 +46,8 @@ export const useSitesStore = defineStore('sites', () => {
   const categoriesStore = useCategoriesStore()
   // 点击量是**云端全局口径**（所有访客的总和），与本地 visitCounts 是两回事
   const clicksStore = useClicksStore()
+  // 智能排序要用访问记录（时段偏好与共现）—— 这是本地信号，不上云
+  const historyStore = useHistoryStore()
 
   // 云端基底（种子数据只是首屏兜底，拉到云端后即被替换）
   const cloudSites = ref([...SEED_SITES])
@@ -124,7 +129,28 @@ export const useSitesStore = defineStore('sites', () => {
     'newest': (a, b) => b.createdAt - a.createdAt
   }
 
+  /**
+   * 智能排序：按「此刻最可能要用」的顺序排。
+   *
+   * 信号来自本机访问记录与本地访问次数，冷启动（没有任何记录）时**降级为点击量** ——
+   * 没有数据却硬要个性化，结果只会是随机顺序冒充智能。
+   */
+  function applySmart(list) {
+    const signals = buildSignals(historyStore.records, list)
+    if (!hasSignal(signals)) {
+      return [...list].sort((a, b) => clicksStore.countFor(b.id) - clicksStore.countFor(a.id))
+    }
+    const ranked = rankSmart(list, signals, {
+      clicks: clicksStore.mergedCounts || {},
+      recentId: historyStore.records[0]?.siteId
+    })
+    const order = new Map(ranked.map((x, i) => [x.site.id, i]))
+    // 没进榜的排在后面，且保持原有相对顺序（稳定）
+    return [...list].sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER))
+  }
+
   function applySort(list, mode) {
+    if (mode === 'smart') return applySmart(list)
     const cmp = SORT_COMPARATORS[mode]
     return cmp ? [...list].sort(cmp) : [...list]
   }
@@ -614,7 +640,27 @@ function fetchCloud() {
         cloudError.value = `http-${res.status}`
         return null
       }
-      const data = await res.json()
+      /**
+       * 不能直接 `res.json()`：静态托管（或任何 SPA 兜底 / 代理）会把未知路径
+       * 也返回 200 + `index.html`，于是 `res.ok` 为真，`res.json()` 抛
+       * 「Unexpected token '<'」并被下面 catch 误判成「离线」——用户明明在线，
+       * 界面却说「已离线，联网后会自动更新」，而那个自动恢复永远不会发生。
+       *
+       * 先看 Content-Type，再尽力解析：拿不到合法对象就归入 `invalid-payload`
+       * （与「网络不可达」分开），界面据此说真话。
+       */
+      const ctype = res.headers.get('Content-Type') || ''
+      if (!ctype.includes('json')) {
+        cloudError.value = 'invalid-payload'
+        return null
+      }
+      let data = null
+      try {
+        data = await res.json()
+      } catch {
+        cloudError.value = 'invalid-payload'
+        return null
+      }
       // 只在拿到合法版本号时才记住 ETag。否则一旦第一次响应体不合法，
       // 下次的 304 会把「这份数据没被应用过」这个状态永久钉住，热更新再也进不来。
       const v = Number(data?.version)
@@ -663,13 +709,52 @@ function fetchCloud() {
    * 恢复联网那一瞬间用户就能拿到数据，不用等退避窗口走完。 */
   const POLL_BASE_MS = 30000
   const POLL_MAX_MS = 300000
+
+  /**
+   * 「再轮询一万次也不可能成功」的服务端状态 → 停掉排期。
+   *
+   * 目前三项：
+   *   - `http-402`：Vercel 在 Hobby 额度（边缘请求 / 函数调用 100 万每月）打满后会暂停整个部署，
+   *     全站返回 `402 DEPLOYMENT_DISABLED`。这种状态不会因为重试而改变，
+   *     按退避节奏每 5 分钟继续打只是白白消耗额度 —— 而额度正是被耗光的那个东西。
+   *   - `http-404`：这个部署根本没有 `/api/sites`（纯静态托管就是这样）。接口不存在，
+   *     重试一万次也还是 404。
+   *   - `invalid-payload`：`/api/sites` 回了 200 但不是 JSON（SPA 兜底页、登录页、
+   *     代理拦截页）。同上，接口不存在。
+   * 停掉之后由**用户手动重试**、`online` 事件、标签页回到前台这三条路径重新探一次；
+   * 探通了（`cloudError` 清空）就自动恢复常规节奏。
+   */
+  const CLOUD_FATAL = new Set(['http-402', 'http-404', 'invalid-payload'])
+
   let pollTimer = null
   let pollDelay = POLL_BASE_MS
   let pollFails = 0
   let polling = false
+  /** 标签页是否在后台：在后台不排期（见 utils/visibility.js 的说明） */
+  let pageHidden = false
+
+  function scheduleNext(delay = pollDelay) {
+    if (!polling || pageHidden) return
+    if (pollTimer) clearTimeout(pollTimer)
+    pollTimer = setTimeout(tick, delay)
+  }
+
+  async function tick() {
+    pollTimer = null
+    if (!polling || pageHidden) return
+    await pollCloudSites()
+    if (!polling || pageHidden) return
+    // 平台暂停（CLOUD_FATAL）时 pollCloudSites 已经决定不再排期，这里不续期
+    if (CLOUD_FATAL.has(cloudError.value)) return
+    scheduleNext()
+  }
 
   async function pollCloudSites() {
     const applied = applyIfNewer(await fetchCloud())
+    if (CLOUD_FATAL.has(cloudError.value)) {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+      return applied
+    }
     if (cloudError.value) {
       pollFails += 1
       pollDelay = Math.min(POLL_MAX_MS, POLL_BASE_MS * 2 ** Math.min(pollFails, 4))
@@ -680,24 +765,22 @@ function fetchCloud() {
     return applied
   }
 
-  /** 立刻重试并复位退避：联网恢复 / 标签页回来时用，别让用户干等退避窗口 */
+  /** 立刻重试并复位退避：联网恢复 / 标签页回来 / 用户点「重试」时用，别让人干等退避窗口 */
   function retryCloudNow() {
     pollFails = 0
     pollDelay = POLL_BASE_MS
-    return pollCloudSites()
+    return pollCloudSites().then((applied) => {
+      // 之前可能因为平台暂停或进后台停掉了排期，这次探通了就把节奏接回去
+      if (polling && !pollTimer && !pageHidden && !CLOUD_FATAL.has(cloudError.value)) scheduleNext()
+      return applied
+    })
   }
 
   function startPolling(interval = POLL_BASE_MS) {
     stopPolling()
     polling = true
     pollDelay = interval
-    const tick = async () => {
-      if (!polling) return
-      await pollCloudSites()
-      if (!polling) return
-      pollTimer = setTimeout(tick, pollDelay)
-    }
-    pollTimer = setTimeout(tick, interval)
+    scheduleNext(interval)
   }
 
   function stopPolling() {
@@ -707,6 +790,18 @@ function fetchCloud() {
       pollTimer = null
     }
   }
+
+  // 进后台停排期、回前台立刻补一次并接回节奏 —— 后台标签页不该消耗云端额度（见 utils/visibility.js）
+  watchVisibility((visible) => {
+    pageHidden = !visible
+    if (!visible) {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+      return
+    }
+    if (polling && !CLOUD_FATAL.has(cloudError.value)) {
+      if (!pollTimer) retryCloudNow()
+    }
+  })
 
   // 首屏先用种子数据渲染，云端拉到后由 applyCloudData 重建
   rebuild()

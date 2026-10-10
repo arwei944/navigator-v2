@@ -9,6 +9,9 @@
           </button>
         </div>
         <div class="settings-body">
+          <!-- 主题是「配色 + 形状 + 明暗」的统一入口，放在最上面；
+               下面两个分区是它的原料（配色预设与令牌微调），保留给要细调的人。 -->
+          <ThemeSection @open-editor="$emit('open-theme-editor')" />
           <VisualSchemeSection />
           <DisplaySection />
           <SessionSyncSection @open-import="$emit('open-import')" />
@@ -20,12 +23,13 @@
 </template>
 
 <script setup>
+import ThemeSection from '@/components/settings/ThemeSection.vue'
 import VisualSchemeSection from '@/components/settings/VisualSchemeSection.vue'
 import DisplaySection from '@/components/settings/DisplaySection.vue'
 import SessionSyncSection from '@/components/settings/SessionSyncSection.vue'
 import AdminSection from '@/components/settings/AdminSection.vue'
 
-const emit = defineEmits(['close', 'open-import', 'open-admin'])
+const emit = defineEmits(['close', 'open-import', 'open-admin', 'open-theme-editor'])
 
 function close() {
   // emit('close') 由父组传入的 handler；这里通过 emits 声明触发

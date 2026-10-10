@@ -4,77 +4,7 @@ import { versionedPersist } from '@/utils/storeVersioning'
 import {
   SCHEMES, TOKENS, getScheme, resolveTokens, tokensToCssVars
 } from '@/utils/visualScheme'
-
-const THEME_PRESETS = {
-  'default': {
-    id: 'default',
-    name: '默认蓝',
-    primary: '#2563eb',
-    bg: '#f1f5f9',
-    bgWhite: '#ffffff',
-    sidebarBg: '#0f172a',
-    accent: '#2563eb',
-    accentLight: '#dbeafe',
-    dark: {
-      bg: '#0f172a',
-      bgWhite: '#1e293b',
-      sidebarBg: '#020617',
-      accent: '#3b82f6',
-      accentLight: '#1e3a5f'
-    }
-  },
-  'green': {
-    id: 'green',
-    name: '极客绿',
-    primary: '#10b981',
-    bg: '#ecfdf5',
-    bgWhite: '#ffffff',
-    sidebarBg: '#064e3b',
-    accent: '#10b981',
-    accentLight: '#d1fae5',
-    dark: {
-      bg: '#022c22',
-      bgWhite: '#064e3b',
-      sidebarBg: '#020617',
-      accent: '#34d399',
-      accentLight: '#064e3b'
-    }
-  },
-  'purple': {
-    id: 'purple',
-    name: '赛博紫',
-    primary: '#8b5cf6',
-    bg: '#f5f3ff',
-    bgWhite: '#ffffff',
-    sidebarBg: '#2e1065',
-    accent: '#8b5cf6',
-    accentLight: '#ede9fe',
-    dark: {
-      bg: '#1e1b4b',
-      bgWhite: '#2e1065',
-      sidebarBg: '#020617',
-      accent: '#a78bfa',
-      accentLight: '#2e1065'
-    }
-  },
-  'orange': {
-    id: 'orange',
-    name: '日落橙',
-    primary: '#f59e0b',
-    bg: '#fff7ed',
-    bgWhite: '#ffffff',
-    sidebarBg: '#431407',
-    accent: '#f59e0b',
-    accentLight: '#fef3c7',
-    dark: {
-      bg: '#1c1917',
-      bgWhite: '#292524',
-      sidebarBg: '#020617',
-      accent: '#fbbf24',
-      accentLight: '#431407'
-    }
-  }
-}
+import { THEME_PRESETS } from '@/utils/themeSchema'
 
 export const usePreferencesStore = defineStore('preferences', () => {
   const theme = ref('light')
@@ -89,6 +19,18 @@ export const usePreferencesStore = defineStore('preferences', () => {
   // 视觉方案：scheme 决定整套令牌，overrides 是用户在其上的逐项微调
   const visualScheme = ref(SCHEMES[0].id)
   const visualOverrides = ref({})
+  // 首页「此刻推荐」横条：个性化推荐是打扰还是帮助，取决于用户，所以必须能关
+  const smartBar = ref(true)
+
+  /**
+   * 配色「归谁管」：'preset' = 由内置预设落色，'custom' = 由自定义主题落色。
+   *
+   * 为什么需要这个标记：预设的落色有两条**延迟**路径 —— `themePreset` 的 watcher
+   * 与明暗切换后 `setTimeout(…, 10)` 的重放。自定义主题是在 `apply()` 里同步写好配色的，
+   * 上面那两条会在下一个微任务/10ms 后把用户的 accent 又盖回预设值。
+   * 这个标记就是让那两条路径认出「配色已被接管」。
+   */
+  let colorsOwner = 'preset'
 
   const engines = [
     { id: 'google', label: 'Google', url: 'https://www.google.com/search' },
@@ -114,6 +56,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
     if (['compact', 'standard', 'rich'].includes(v)) cardDensity.value = v
   }
 
+  function setSmartBar(v) {
+    smartBar.value = Boolean(v)
+  }
+
   function getCurrentEngine() {
     return engines.find(e => e.id === searchEngine.value) || engines[0]
   }
@@ -123,9 +69,40 @@ export const usePreferencesStore = defineStore('preferences', () => {
     applyPreset(id)
   }
 
+  /** 直接指定明暗（跟随系统 / 定时切换用），与 toggleTheme 的区别只是不取反 */
+  function setTheme(mode) {
+    if (mode === 'light' || mode === 'dark') theme.value = mode
+  }
+
+  /**
+   * 自定义主题用：直接落一组颜色变量。
+   * 与 applyPreset 写的是**同一批**变量、同一套键名 —— 这样「内置配色」与
+   * 「用户调出来的配色」在组件眼里没有区别，不需要组件去分辨当前是哪种。
+   */
+  const CSS_VAR_OF = {
+    bg: '--bg', bgWhite: '--bg-white', sidebarBg: '--sidebar-bg',
+    accent: '--accent', accentLight: '--accent-light'
+  }
+  function applyColors(colors) {
+    if (!colors || typeof colors !== 'object') return
+    colorsOwner = 'custom'
+    const root = document.documentElement
+    for (const [k, cssVar] of Object.entries(CSS_VAR_OF)) {
+      const v = colors[k]
+      if (typeof v === 'string' && v) root.style.setProperty(cssVar, v)
+    }
+  }
+
+  /** 批量写令牌微调（不清空其余项）—— 应用自定义主题时要一次落一组，而不是逐项触发重算 */
+  function setVisualTokens(patch) {
+    if (!patch || typeof patch !== 'object') return
+    visualOverrides.value = { ...visualOverrides.value, ...patch }
+  }
+
   function applyPreset(id) {
     const preset = THEME_PRESETS[id]
     if (!preset) return
+    colorsOwner = 'preset'
 
     const isDark = theme.value === 'dark'
     const colors = isDark ? preset.dark : preset
@@ -185,6 +162,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
     const s = getScheme(id)
     visualScheme.value = s.id
     visualOverrides.value = {}
+    // 选方案 = 回到「预设配色」，之后若还有自定义主题落色，会由 applyColors 再接管
+    colorsOwner = 'preset'
     if (s.accent && s.accent !== themePreset.value) setThemePreset(s.accent)
     if (s.mode && s.mode !== theme.value) theme.value = s.mode
   }
@@ -206,12 +185,15 @@ export const usePreferencesStore = defineStore('preferences', () => {
   // 监听主题变化，同步当前预设
   watch(theme, (val) => {
     document.documentElement.setAttribute('data-theme', val)
-    // 重新应用当前预设
-    setTimeout(() => applyPreset(themePreset.value), 10)
+    // 重新应用当前预设（延后一拍是为了让 CSS 变量与 data-theme 同帧生效）。
+    // 但自定义主题的配色是逐模式指定的，这条重放会把它盖掉 —— 那种情况交给 theme store 重落色。
+    setTimeout(() => { if (colorsOwner !== 'custom') applyPreset(themePreset.value) }, 10)
   }, { immediate: true })
 
   // 初始化时应用预设
   watch(themePreset, (val) => {
+    // 同上：自定义主题落色后，排队的预设重放不得覆盖它
+    if (colorsOwner === 'custom') return
     applyPreset(val)
   }, { immediate: true })
 
@@ -219,11 +201,11 @@ export const usePreferencesStore = defineStore('preferences', () => {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
-    cardLayoutMode, cardDisplay,
-    toggleTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity,
-    setThemePreset, setWallpaper, THEME_PRESETS,
-    setVisualScheme, setVisualToken, resetVisualTokens
+    cardLayoutMode, cardDisplay, smartBar,
+    toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar,
+    setThemePreset, setWallpaper, applyColors, THEME_PRESETS,
+    setVisualScheme, setVisualToken, setVisualTokens, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'visualScheme', 'visualOverrides'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'visualScheme', 'visualOverrides'])
 })

@@ -26,7 +26,7 @@ import { purposeLabel } from '../../shared/purposes.mjs'
  * ## 评分分档（越高越靠前）
  *
  *   名称精确 > 别名精确 > 名称前缀 > 别名前缀 > 名称包含 > 别名包含
- *   > 域名包含 > 用途命中 > 描述包含 > 拼音首字母前缀 > 别名拼音首字母前缀
+ *   > 域名包含 > 用途命中 > 备注命中 > 描述包含 > 拼音首字母前缀 > 别名拼音首字母前缀
  *   > 拼音名包含 > 别名拼音包含 > 拼音描述包含
  * 别名是站点的「另一个叫法」（币安 / 小狐狸 / 抱抱脸），因此排在主名称
  * 同名档位之后、域名与描述之前——既让俗称找得到，又不喧宾夺主。
@@ -113,6 +113,31 @@ function keysOf(site) {
   return k
 }
 
+/**
+ * 备注文本提供者（可选）。
+ *
+ * 备注不在站点对象里（它属于个人数据，见 stores/siteNotes.js），所以检索时得由外部喂进来。
+ * 这里只留一个惰性取值函数：search.js 保持纯函数、不 import store，
+ * 而传入的若是 computed，读取它就建立了响应式依赖 —— 备注一改，检索结果自动重算。
+ */
+let noteProvider = null
+
+export function setNoteProvider(fn) {
+  noteProvider = typeof fn === 'function' ? fn : null
+}
+
+function noteTextOf(site) {
+  if (!noteProvider) return ''
+  try {
+    const m = noteProvider()
+    if (!m || typeof m.get !== 'function') return ''
+    return m.get(site?.id) || ''
+  } catch {
+    // store 尚未激活（pinia 未 install）时不要拖垮整次检索
+    return ''
+  }
+}
+
 export const SCORE = {
   NAME_EXACT: 1000,
   ALIAS_EXACT: 940,
@@ -122,6 +147,8 @@ export const SCORE = {
   ALIAS_INCLUDES: 580,
   URL_INCLUDES: 520,
   PURPOSE_INCLUDES: 500,
+  // 备注：比描述可信（是你自己写的），但覆盖的站点少，故压在用途之后、描述之前
+  NOTE_INCLUDES: 480,
   DESC_INCLUDES: 440,
   PY_INITIAL_PREFIX: 400,
   PY_ALIAS_INITIAL_PREFIX: 380,
@@ -145,6 +172,9 @@ export function scoreSite(site, q) {
   if (k.url.includes(q)) return SCORE.URL_INCLUDES
   // 用途是受控词表，命中即「这条站就是干这个的」，比描述里的顺带提及更可信，故排在描述之前
   if (anyIncludes(k.purposes, q) || k.purposeText.includes(q)) return SCORE.PURPOSE_INCLUDES
+  // 备注不进 keysOf 的缓存：它不属于站点对象，缓存下来会在备注改动后读不到新值
+  const note = noteTextOf(site)
+  if (note && note.includes(q)) return SCORE.NOTE_INCLUDES
   if (k.desc.includes(q)) return SCORE.DESC_INCLUDES
   if (k.pyInitial.startsWith(q)) return SCORE.PY_INITIAL_PREFIX
   if (anyStarts(k.pyAliasInitial, q)) return SCORE.PY_ALIAS_INITIAL_PREFIX

@@ -37,7 +37,15 @@
         <option value="name-desc">名称 Z-A</option>
         <option value="clicks">按点击量</option>
         <option value="newest">最新收录</option>
+        <option value="smart">智能排序</option>
       </select>
+    </div>
+    <div class="setting-row">
+      <label class="setting-toggle">
+        <span class="setting-label">首页「此刻推荐」</span>
+        <input type="checkbox" :checked="prefs.smartBar" @change="prefs.setSmartBar($event.target.checked)" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
     </div>
 
     <!-- 搜索 -->

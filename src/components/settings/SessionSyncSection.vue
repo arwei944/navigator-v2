@@ -19,7 +19,13 @@
     <div class="setting-row">
       <div class="data-info">
         <span class="data-info-label">云端会话同步</span>
-        <span class="data-info-value">用同一串密钥在不同的浏览器/设备间同步收藏、待办、访问记录与偏好。</span>
+        <span class="data-info-value">用同一串密钥在不同的浏览器/设备间同步收藏、待办、访问记录、偏好、站点备注与便利贴。</span>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="data-info">
+        <span class="data-info-label">个人批注</span>
+        <span class="data-info-value">{{ siteNotesStore.marks.size }} 条站点备注 · {{ notesStore.count }} 枚便利贴 · 约 {{ personalSize }} KB</span>
       </div>
     </div>
     <div class="sync-panel">
@@ -45,13 +51,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useTodosStore } from '@/stores/todos'
 import { useHistoryStore } from '@/stores/history'
 import { usePreferencesStore } from '@/stores/preferences'
+import { useSiteNotesStore } from '@/stores/siteNotes'
+import { useNotesStore } from '@/stores/notes'
 import { getStoredKey, storeKey, fetchSession, pushSession, snapshotFromStores, applySnapshotToStores } from '@/services/session'
 
 defineEmits(['open-import'])
@@ -62,12 +70,19 @@ const favoritesStore = useFavoritesStore()
 const todosStore = useTodosStore()
 const historyStore = useHistoryStore()
 const preferencesStore = usePreferencesStore()
+const siteNotesStore = useSiteNotesStore()
+const notesStore = useNotesStore()
 
 const sessionKey = ref(getStoredKey())
 const syncing = ref('')
 const syncMsg = ref('')
 const syncError = ref(false)
 const lastSyncInfo = ref('')
+
+/** 个人批注占的体积：接近上限时用户得有途径知道该清理了（服务端 413 之外的第一道提示） */
+const personalSize = computed(() =>
+  Math.round((siteNotesStore.usedBytes + notesStore.usedBytes) / 1024)
+)
 
 onMounted(() => { sessionKey.value = getStoredKey() })
 
@@ -86,7 +101,9 @@ function snapshot() {
     favorites: favoritesStore,
     todos: todosStore,
     history: historyStore,
-    preferences: preferencesStore
+    preferences: preferencesStore,
+    siteNotes: siteNotesStore,
+    notes: notesStore
   })
 }
 
@@ -95,7 +112,9 @@ function applyLocal(data) {
     favorites: favoritesStore,
     todos: todosStore,
     history: historyStore,
-    preferences: preferencesStore
+    preferences: preferencesStore,
+    siteNotes: siteNotesStore,
+    notes: notesStore
   })
 }
 

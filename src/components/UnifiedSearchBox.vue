@@ -32,6 +32,16 @@
 
     <!-- 全能下拉：命令 / 页面 / 方向 / 分类 / 用途 / 站点 / 站外，一套结果 -->
     <div v-if="open" class="search-suggestions">
+      <!-- 意图提示：一句话被理解成了分类 / 用途 / 排序的组合。
+           永远可清除 —— 理解错了要能一键回到普通搜索，不能把用户锁在猜测里。 -->
+      <div v-if="intent.hit" class="intent-chip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+        <span class="intent-text">已理解：{{ intentText }}</span>
+        <button class="intent-apply" @click="applyIntent">应用筛选</button>
+        <button class="intent-clear" @click="clearIntent" aria-label="清除意图筛选">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
       <OmniResults
         :groups="groups"
         :selected-index="selectedIndex"
@@ -51,14 +61,18 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useOmniBox } from '@/composables/useOmniBox'
 import { openInNewTab } from '@/utils/open'
 import OmniResults from '@/components/OmniResults.vue'
+import { describeIntent, intentToQuery, parseIntent } from '@/utils/intent'
 
 const emit = defineEmits(['open-palette'])
 
+const route = useRoute()
+const router = useRouter()
 const sitesStore = useSitesStore()
 const preferencesStore = usePreferencesStore()
 
@@ -73,6 +87,32 @@ const {
 } = omni
 
 const filteredCount = computed(() => sitesStore.filteredSites.length)
+
+/* ---- 意图识别 ----
+   把「免费的 AI 画图工具」这类输入解析成 分类 × 用途 × 排序 的组合，给一条可应用的提示。
+   识别错了要能一键关掉，且关掉后不再对着同一个词反复提示（改词即复位）。 */
+
+const intentSuppressed = ref(false)
+
+const intent = computed(() => {
+  if (intentSuppressed.value || page.value) return { hit: false, matched: [] }
+  return parseIntent(trimmed.value)
+})
+const intentText = computed(() => describeIntent(intent.value))
+
+function applyIntent() {
+  if (!intent.value.hit) return
+  const query = intentToQuery(intent.value)
+  const keep = trimmed.value ? { q: trimmed.value } : {}
+  router.push({ name: 'Home', query: { ...query, ...keep } })
+}
+
+function clearIntent() {
+  intentSuppressed.value = true
+}
+
+// 改词即复位：用户换个说法时，上一次的「不要」不该继续生效
+watch(trimmed, () => { intentSuppressed.value = false })
 
 /**
  * 输入即过滤网格（沿用既有行为）。两个例外：
@@ -395,6 +435,15 @@ onUnmounted(() => {
   from { transform: translateX(-50%) translateY(-5px); }
 }
 
+/* 意图条：与结果区同一层，但视觉上更轻 —— 它是解释，不是结果 */
+.intent-chip { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--border-light); background: var(--color-note-bg); flex-shrink: 0; }
+.intent-chip > svg { width: 14px; height: 14px; color: var(--color-note); flex-shrink: 0; }
+.intent-text { flex: 1; min-width: 0; font-size: 12px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.intent-apply { border: 1px solid var(--color-note); background: transparent; color: var(--color-note); font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; cursor: pointer; font-family: var(--font); flex-shrink: 0; }
+.intent-apply:hover { background: var(--color-note); color: var(--color-on-solid); }
+.intent-clear { width: 20px; height: 20px; border: none; border-radius: 50%; background: transparent; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+.intent-clear:hover { background: var(--border-light); }
+.intent-clear svg { width: 12px; height: 12px; }
 .omni-hints {
   padding: 8px 14px;
   border-top: 1px solid var(--border);

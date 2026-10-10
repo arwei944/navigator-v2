@@ -41,6 +41,26 @@
       <p class="detail-desc">{{ site.desc || '暂无描述' }}</p>
     </div>
 
+    <!-- 备注：个人批注，不进站点表 —— 一次发布也不会把它冲掉。
+         输入即存（300ms 防抖），同浏览器的其他标签页秒级可见。 -->
+    <div class="detail-section">
+      <div class="section-label note-label">
+        备注
+        <button class="note-pin" :class="{ on: notePinned }" :title="notePinned ? '取消钉在卡片上' : '钉在卡片上'"
+                :disabled="!noteText.trim()" @click="toggleNotePin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+          {{ notePinned ? '已钉住' : '钉住' }}
+        </button>
+      </div>
+      <textarea v-model="noteText" class="note-input" rows="3" maxlength="1000"
+                placeholder="记点什么：免费额度、使用注意、要不要挂代理…"
+                @input="onNoteInput" @blur="flushNote"></textarea>
+      <div class="note-meta">
+        <span class="note-status" :class="{ saving: noteSaving }">{{ noteStatusText }}</span>
+        <button v-if="noteText.trim()" class="note-clear" @click="clearNote">清除</button>
+      </div>
+    </div>
+
     <!-- 统计信息 -->
     <div class="detail-section">
       <div class="section-label">使用统计</div>
@@ -104,12 +124,13 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useHistoryStore } from '@/stores/history'
 import { useClicksStore } from '@/stores/clicks'
+import { useSiteNotesStore } from '@/stores/siteNotes'
 import PurposeTags from '@/components/PurposeTags.vue'
 
 const props = defineProps({
@@ -121,9 +142,79 @@ const favoritesStore = useFavoritesStore()
 const sitesStore = useSitesStore()
 const historyStore = useHistoryStore()
 const clicksStore = useClicksStore()
+const siteNotesStore = useSiteNotesStore()
 
 const copied = ref(false)
 let copyTimer = null
+
+/* ---------- 备注：输入即存 ----------
+   防抖 300ms 是「实时」的手感与写入频率之间的平衡点：再快就会每个按键都写一次
+   localStorage 并广播一条消息；再慢就不是「实时备注」了。
+   切换站点 / 关闭面板前必须 flush，否则最后一次输入会丢。 */
+
+const SAVE_DEBOUNCE = 300
+const noteText = ref('')
+const noteSaving = ref(false)
+const noteQuota = ref(false)
+let noteTimer = null
+let currentId = null
+
+const notePinned = computed(() => (currentId ? siteNotesStore.isPinned(currentId) : false))
+const noteStatusText = computed(() => {
+  if (noteQuota.value) return '备注空间已满，请先清理其他备注'
+  if (noteSaving.value) return '保存中…'
+  if (!noteText.value.trim()) return '还没写备注'
+  return '已保存'
+})
+
+function flushNote(id = currentId) {
+  clearTimeout(noteTimer)
+  if (!id) return
+  const draft = noteText.value
+  if (draft === siteNotesStore.textOf(id)) return
+  const res = siteNotesStore.setText(id, draft)
+  noteQuota.value = res.ok === false && res.reason === 'quota'
+  noteSaving.value = false
+}
+
+function onNoteInput() {
+  noteSaving.value = true
+  clearTimeout(noteTimer)
+  noteTimer = setTimeout(() => flushNote(), SAVE_DEBOUNCE)
+}
+
+function clearNote() {
+  if (!currentId) return
+  flushNote()
+  siteNotesStore.remove(currentId)
+  noteText.value = ''
+  noteQuota.value = false
+}
+
+function toggleNotePin() {
+  if (!currentId || !noteText.value.trim()) return
+  siteNotesStore.togglePin(currentId)
+}
+
+// 站点切换：先把上一条的草稿落盘，再载入新站点的备注
+watch(() => props.site?.id, (id, old) => {
+  if (old && currentId === old) flushNote(old)
+  currentId = id || null
+  noteText.value = id ? siteNotesStore.textOf(id) : ''
+  noteSaving.value = false
+  noteQuota.value = false
+}, { immediate: true })
+
+// 别处的改动（另一个标签页、云端同步）要回流到输入框，但**不能**覆盖正在编辑的内容
+watch(() => (currentId ? siteNotesStore.textOf(currentId) : ''), (v) => {
+  if (noteSaving.value) return
+  if (v !== noteText.value) noteText.value = v
+})
+
+onBeforeUnmount(() => {
+  flushNote()
+  clearTimeout(noteTimer)
+})
 
 const categoryLabel = computed(() =>
   props.site ? categoriesStore.getCategoryLabel(props.site.categoryId) : ''
@@ -228,6 +319,20 @@ watch(() => props.site, () => {
 .alias-chip { font-size: 11px; padding: 3px 9px; border-radius: 999px; background: var(--border-light); color: var(--text-secondary); }
 .section-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; opacity: 0.7; }
 .detail-desc { font-size: 13px; line-height: 1.6; color: var(--text-primary); margin: 0; opacity: 0.85; }
+.note-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.note-pin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; opacity: 1; margin: 0; transition: all 0.15s ease; }
+.note-pin svg { width: 11px; height: 11px; }
+.note-pin:hover:not(:disabled) { border-color: var(--color-note); color: var(--color-note); }
+.note-pin.on { border-color: var(--color-note); color: var(--color-note); background: var(--color-note-bg); }
+.note-pin:disabled { opacity: 0.4; cursor: not-allowed; }
+.note-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; line-height: 1.6; resize: vertical; outline: none; transition: border-color 0.15s ease; }
+.note-input:focus { border-color: var(--color-note); }
+.note-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
+.note-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.note-status { font-size: 11px; color: var(--text-secondary); opacity: 0.75; }
+.note-status.saving { color: var(--color-note); opacity: 1; }
+.note-clear { border: none; background: transparent; color: var(--text-secondary); font-size: 11px; cursor: pointer; padding: 2px 4px; font-family: var(--font); }
+.note-clear:hover { color: var(--color-danger); }
 .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .stat-item { background: var(--border-light); border-radius: 8px; padding: 10px 8px; text-align: center; }
 .stat-value { font-size: 18px; font-weight: 700; color: var(--text-primary); line-height: 1.2; }

@@ -22,6 +22,11 @@
         查看详情
       </button>
 
+      <button type="button" class="context-menu-item" role="menuitem" @click="openNote">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        {{ hasNote ? '编辑备注' : '添加备注' }}
+      </button>
+
       <button type="button" class="context-menu-item" role="menuitem" @click="togglePin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 4 19 4"/><line x1="12" y1="8" x2="12" y2="20"/><polyline points="8 12 12 8 16 12"/></svg>
         {{ site.pinned ? '取消置顶' : '置顶' }}
@@ -53,18 +58,23 @@ import { useContextMenuStore } from '@/stores/contextMenu'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useHistoryStore } from '@/stores/history'
+import { useSiteNotesStore } from '@/stores/siteNotes'
+import { useSidebarStore } from '@/stores/sidebar'
 import { openInNewTab } from '@/utils/open'
 
 const menu = useContextMenuStore()
 const favoritesStore = useFavoritesStore()
 const sitesStore = useSitesStore()
 const historyStore = useHistoryStore()
+const siteNotesStore = useSiteNotesStore()
+const sidebarStore = useSidebarStore()
 
 const copied = ref(false)
 let copyTimer = null
 
 const site = computed(() => menu.site)
 const isFav = computed(() => (site.value ? favoritesStore.isFav(site.value.id) : false))
+const hasNote = computed(() => (site.value ? siteNotesStore.has(site.value.id) : false))
 
 function toggleFav() {
   if (site.value) favoritesStore.toggle(site.value.id)
@@ -85,6 +95,12 @@ function copyLink() {
   copied.value = true
   clearTimeout(copyTimer)
   copyTimer = setTimeout(() => { copied.value = false }, 2000)
+  menu.close()
+}
+
+/** 备注的落点是详情面板的备注区：那里才是能打字的地方，菜单只负责把人送过去 */
+function openNote() {
+  if (site.value) sidebarStore.showDetail(site.value)
   menu.close()
 }
 

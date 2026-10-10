@@ -61,7 +61,9 @@ async function call(req) {
 }
 
 const auth = () => ({ authorization: `Bearer ${KEY}` })
-const MAX = 256 * 1024
+// 必须与 api/session.js 的 MAX_BODY_BYTES 保持一致（v8 因个人批注放宽到 512KB）。
+// 改服务端上限时同步改这里，否则这几条用例会静默变成「测不到门禁」。
+const MAX = 512 * 1024
 
 /* ══════════ 序 18：凭据只走 Authorization 头 ══════════ */
 
@@ -128,7 +130,8 @@ test('POST：字符串 body 超限 → 413', async () => {
 
 test('POST：**合并后**的实际大小超限 → 413（防「多次小写入把快照喂大」）', async () => {
   store.clear()
-  const chunk = 'y'.repeat(180 * 1024)
+  // 单块取 3/5 上限：一次写入合法，两块合并（≈1.2×上限）必然越界
+  const chunk = 'y'.repeat(Math.round(MAX * 0.6))
   const first = await call(makeReq({ method: 'POST', headers: auth(), body: { data: { a: chunk } } }))
   assert.equal(first.statusCode, 200, '单次写入本身合法')
   // 第二次写入很小，但合并结果越界 —— 只check content-length 是挡不住这条的

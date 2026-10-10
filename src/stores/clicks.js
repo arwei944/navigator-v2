@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { countOf } from '../../shared/clicks-core.mjs'
 import { decodeStored, encodeStored } from '@/utils/storeVersioning'
 import { safeSetItem } from '@/utils/safeStorage'
+import { setVisibleInterval } from '@/utils/visibility'
 
 /**
  * 点击统计 store —— **全局口径**，与「我的访问次数」区分开。
@@ -180,8 +181,10 @@ export const useClicksStore = defineStore('clicks', () => {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') onHide()
     })
-    // 云端统计是快照，页面长开时不轮询就会一直显示开局那一份
-    setInterval(() => { if (loadedAt.value) load({ force: true }) }, CLOUD_TTL)
+    // 云端统计是快照，页面长开时不轮询就会一直显示开局那一份。
+    // 但**后台标签页不轮询**：浏览器只把后台定时器压到 1 次/分钟、不会停掉它，
+    // 挂后台一整天就是白烧云端额度（额度打满会被平台暂停整个部署，见 utils/visibility.js）
+    setVisibleInterval(CLOUD_TTL, () => { if (loadedAt.value) load({ force: true }) })
   }
 
   return {

@@ -100,7 +100,9 @@ export const ACCENT_PRESETS = [
   { id: 'default', name: '默认蓝' },
   { id: 'green', name: '极客绿' },
   { id: 'purple', name: '赛博紫' },
-  { id: 'orange', name: '日落橙' }
+  { id: 'orange', name: '日落橙' },
+  { id: 'paper', name: '宣纸青' },
+  { id: 'night', name: '夜航蓝' }
 ]
 
 /** 全部令牌的默认值 */
@@ -150,6 +152,14 @@ export const SCHEMES = [
   {
     id: 'contrast', name: '高对比硬朗', desc: '直角、重阴影、深色底', accent: 'default', mode: 'dark',
     tokens: { radiusCard: 2, radiusControl: 2, borderStrength: 100, shadowLevel: 140, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 42, glassBlur: 0, glassAlpha: 100, fontFamily: 'sans', fontSizeBase: 15, titleWeight: 700, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT }
+  },
+  {
+    id: 'paper', name: '宣纸', desc: '暖白纸感、松石绿点缀、克制的阴影', accent: 'paper', mode: 'light',
+    tokens: { radiusCard: 14, radiusControl: 10, borderStrength: 85, shadowLevel: 70, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 8, glassAlpha: 90, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 180, cardAnim: true, ...NEUTRAL_LAYOUT }
+  },
+  {
+    id: 'night', name: '夜航', desc: '深墨蓝底、低饱和青、关掉毛玻璃', accent: 'night', mode: 'dark',
+    tokens: { radiusCard: 10, radiusControl: 8, borderStrength: 90, shadowLevel: 90, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 0, glassAlpha: 95, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: false, ...NEUTRAL_LAYOUT }
   }
 ]
 
@@ -213,16 +223,35 @@ const SEMANTIC = {
     favorite: '#eab308', favoriteBg: '#fefce8', favoriteBorder: '#eab308',
     heatWarm: '#b45309', heatWarmBg: 'rgba(245, 158, 11, 0.18)',
     heatHot: '#dc2626', heatHotBg: 'rgba(239, 68, 68, 0.16)',
-    onSolid: '#ffffff'
+    onSolid: '#ffffff',
+    // 备注与便利贴。六色便签刻意只给「底 + 边」两个色，文字一律走 --text-primary：
+    // 深色主题下底色变深、文字变浅，一对变量就能同时满足两套主题，不必为每个色再配字色。
+    note: '#8b5cf6', noteBg: 'rgba(139, 92, 246, 0.14)',
+    noteYellowBg: '#fef9c3', noteYellowEdge: '#eab308',
+    notePinkBg: '#fce7f3', notePinkEdge: '#ec4899',
+    noteBlueBg: '#dbeafe', noteBlueEdge: '#3b82f6',
+    noteGreenBg: '#dcfce7', noteGreenEdge: '#22c55e',
+    notePurpleBg: '#ede9fe', notePurpleEdge: '#8b5cf6',
+    noteGrayBg: '#f1f5f9', noteGrayEdge: '#94a3b8'
   },
   dark: {
     ok: '#4ade80', warn: '#fbbf24', danger: '#f87171', muted: '#64748b',
     favorite: '#facc15', favoriteBg: 'rgba(234, 179, 8, 0.16)', favoriteBorder: 'rgba(250, 204, 21, 0.45)',
     heatWarm: '#fbbf24', heatWarmBg: 'rgba(245, 158, 11, 0.22)',
     heatHot: '#f87171', heatHotBg: 'rgba(239, 68, 68, 0.22)',
-    onSolid: '#ffffff'
+    onSolid: '#ffffff',
+    note: '#a78bfa', noteBg: 'rgba(167, 139, 250, 0.18)',
+    noteYellowBg: '#453714', noteYellowEdge: '#a16207',
+    notePinkBg: '#4a1f33', notePinkEdge: '#be185d',
+    noteBlueBg: '#122f56', noteBlueEdge: '#2563eb',
+    noteGreenBg: '#123c28', noteGreenEdge: '#15803d',
+    notePurpleBg: '#2d2160', notePurpleEdge: '#7c3aed',
+    noteGrayBg: '#33383f', noteGrayEdge: '#64748b'
   }
 }
+
+/** 便利贴六色板：只登记色名，具体色号由 SEMANTIC 按明暗给出 */
+export const NOTE_COLOR_KEYS = ['yellow', 'pink', 'blue', 'green', 'purple', 'gray']
 
 /** 令牌 → 一批 CSS 自定义属性 */
 export function tokensToCssVars(tokens, mode = 'light') {
@@ -255,6 +284,15 @@ export function tokensToCssVars(tokens, mode = 'light') {
     '--color-heat-hot': S.heatHot,
     '--color-heat-hot-bg': S.heatHotBg,
     '--color-on-solid': S.onSolid,
+
+    '--color-note': S.note,
+    '--color-note-bg': S.noteBg,
+    '--note-yellow-bg': S.noteYellowBg, '--note-yellow-edge': S.noteYellowEdge,
+    '--note-pink-bg': S.notePinkBg, '--note-pink-edge': S.notePinkEdge,
+    '--note-blue-bg': S.noteBlueBg, '--note-blue-edge': S.noteBlueEdge,
+    '--note-green-bg': S.noteGreenBg, '--note-green-edge': S.noteGreenEdge,
+    '--note-purple-bg': S.notePurpleBg, '--note-purple-edge': S.notePurpleEdge,
+    '--note-gray-bg': S.noteGrayBg, '--note-gray-edge': S.noteGrayEdge,
 
     '--shadow': `0 1px 3px rgba(0, 0, 0, ${alpha(0.06 * s)})`,
     '--shadow-hover': `0 4px 16px rgba(0, 0, 0, ${alpha(0.08 * s)})`,

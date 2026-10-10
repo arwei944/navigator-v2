@@ -23,6 +23,8 @@ import { buildCommands } from '@/utils/commands'
 import { rankSites, matchAny, scoreText, scoreSite } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
 import { openInNewTab } from '@/utils/open'
+import { useNotesStore } from '@/stores/notes'
+import { useSiteNotesStore } from '@/stores/siteNotes'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
 /** 分组顺序：inline 站点优先，palette 命令优先 */
@@ -72,6 +74,8 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const sidebar = useSidebarStore()
   const toast = useToastStore()
   const omni = useOmniStore()
+  const notes = useNotesStore()
+  const siteNotes = useSiteNotesStore()
 
   const raw = ref('')
   const selectedIndex = ref(0)
@@ -86,7 +90,8 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   }
 
   const ctx = {
-    router, sites, categories, preferences, favorites, history, sidebar, omni, toast, openSite
+    router, sites, categories, preferences, favorites, history, sidebar, omni, toast, openSite,
+    notes, siteNotes
   }
 
   const commands = computed(() => buildCommands(ctx))
