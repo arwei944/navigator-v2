@@ -58,7 +58,8 @@
     "nav": "node tools/cli/nav.mjs",
     "mcp": "node tools/mcp/server.mjs",
     "mcp:test": "node tools/mcp/test-mcp.mjs",
-    "console:test:store": "node tools/console/test-store.mjs"
+    "console:test:store": "node tools/console/test-store.mjs",
+    "console:test:health": "node tools/console/test-health.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

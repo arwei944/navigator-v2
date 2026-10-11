@@ -9,7 +9,7 @@
  * 记录结构来自 shared/ops/*（与本地控制台同源），因此两端能在同一套语义下对比。
  * 鉴权：全部要求 Bearer 凭据（登录会话 token 或 SITES_ADMIN_KEY）—— 运维面信息不对匿名访客开放。
  */
-import { get, put } from '@vercel/blob'
+import { get, put } from '#store'
 import { checkAuthHeader } from '../shared/auth.mjs'
 import {
   HISTORY_KEEP, TRIGGERS, normalizeRecord, sortRecords, filterRecords,

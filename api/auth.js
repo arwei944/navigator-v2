@@ -10,7 +10,7 @@
  * 不能因为限流组件故障就把管理员挡在门外。scrypt 本身约 100ms 的计算开销
  * 也构成一道天然的暴力破解成本。
  */
-import { get, put } from '@vercel/blob'
+import { get, put } from '#store'
 import {
   authConfig, verifyPassword, issueSession, verifySession,
   bearerOf, safeEqual, loginLockState, registerFail, SESSION_TTL_MS, SESSION_TTL_LONG_MS,

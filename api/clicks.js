@@ -13,7 +13,7 @@
  *
  * 写入前按当前站点集剔除：站点删除后其点击必须一起消失（同 health.js 的口径）。
  */
-import { get, put } from '@vercel/blob'
+import { get, put } from '#store'
 import { normalizeIncrements, mergeClicks, tallyClicks, EMPTY_CLICKS } from '../shared/clicks-core.mjs'
 
 const PATHNAME = 'ops/clicks.json'

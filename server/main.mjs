@@ -40,12 +40,18 @@ const PORT = Number(process.env.PORT) || 3000
 const HOST = process.env.HOST || '0.0.0.0'
 
 /**
- * 管理密钥回填：发布沙箱没有环境变量注入，构建脚本会把共享密钥写进 `data/admin-key.txt`
- * （不入 git；静态服务对 `/data/*` 一律拒绝）。启动时读回 process.env —— shared/auth.mjs
- * 在调用时才读环境变量，所以这里补上即可，鉴权源码零改动。
+ * 管理凭据回填：发布沙箱没有环境变量注入，构建脚本把两项配置写进 data/ 下的小文件
+ * （不入 git；静态服务对 `/data/*` 一律拒绝）。启动时读回 process.env ——
+ * shared/auth.mjs 在**调用时**才读环境变量，所以这里补上即可，鉴权源码零改动。
+ *   admin-key.txt            → SITES_ADMIN_KEY（共享密钥直连，CLI/脚本用）
+ *   admin-password-hash.txt  → ADMIN_PASSWORD_HASH（scrypt 口令哈希，登录用）
+ * 没配口令哈希时登录接口会明确回 500「未配置登录口令」，共享密钥路径照常可用。
  */
 if (!process.env.SITES_ADMIN_KEY) {
   try { process.env.SITES_ADMIN_KEY = readFileSync(join(ROOT, 'data', 'admin-key.txt'), 'utf8').trim() } catch { /* 没有就没有：写接口按未配置拒绝 */ }
+}
+if (!process.env.ADMIN_PASSWORD_HASH) {
+  try { process.env.ADMIN_PASSWORD_HASH = readFileSync(join(ROOT, 'data', 'admin-password-hash.txt'), 'utf8').trim() } catch { /* 未配口令：登录不可用，密钥直连不受影响 */ }
 }
 
 /* ---------------- /api/* 处理器 ---------------- */
@@ -53,7 +59,23 @@ if (!process.env.SITES_ADMIN_KEY) {
 const metadataHandler = (await import('./api/metadata.js')).default
 const sitesHandler = (await import('./api/sites.js')).default
 const sessionHandler = (await import('./api/session.js')).default
+const clicksHandler = (await import('./api/clicks.js')).default
+const opsHandler = (await import('./api/ops.js')).default
+const authHandler = (await import('./api/auth.js')).default
+const healthHandler = (await import('./api/health.js')).default
 const { etagOf } = await import('./store.mjs')
+const { startHealthCron } = await import('./cron.mjs')
+
+/** 路由表：一个接口文件一个 handler，语义零改动（v10 清单第一条） */
+const API_ROUTES = {
+  '/api/metadata': metadataHandler,
+  '/api/sites': sitesHandler,
+  '/api/session': sessionHandler,
+  '/api/clicks': clicksHandler,
+  '/api/ops': opsHandler,
+  '/api/auth': authHandler,
+  '/api/health': healthHandler,
+}
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */
 function withHelpers(res) {
@@ -167,10 +189,9 @@ const server = http.createServer(async (req, res) => {
     const pathname = url.pathname
 
     /* ---- API ----
-     * sites/session 是 v9 数据回归的主路径（SQLite 适配层）；
-     * metadata 是自动补全的真实抓取；其余 /api/* 一律 404 JSON ——
-     * 前端靠「404」判定「这个部署没有该接口」（CLOUD_FATAL 停轮询），
-     * 绝不能回 index.html 把语义搅浑。 */
+     * v10：除 metadata 外全部接口都接回来了（sites/session/clicks/ops/auth/health）。
+     * 路由表里没有的一律 404 JSON —— 前端靠「404」判定「这个部署没有该接口」
+     * （CLOUD_FATAL 停轮询），绝不能回 index.html 把语义搅浑。 */
     if (pathname.startsWith('/api/')) {
       /**
        * 鉴权自检：只暴露布尔值与密钥指纹（sha256 前 10 位，不可逆），
@@ -190,47 +211,32 @@ const server = http.createServer(async (req, res) => {
           receivedBearerFp: received ? createHash('sha256').update(received.replace(/^Bearer\s+/i, '').trim()).digest('hex').slice(0, 10) : '',
           receivedXNavLen: xnav.length,
           receivedXNavFp: xnav ? createHash('sha256').update(xnav).digest('hex').slice(0, 10) : '',
+          routes: Object.keys(API_ROUTES),
         })
         return
       }
 
-      if (pathname === '/api/metadata' && req.method === 'GET') {
-        // 尊重接口自带的 SSRF 防护：它读 req.headers（UA）与 req.query（url）
-        await metadataHandler(
-          { headers: req.headers, query: parseQuery(req.url), socket: req.socket },
-          withHelpers(res),
-        )
+      const handler = API_ROUTES[pathname]
+      if (!handler) {
+        sendJson(res, 404, { error: `接口不存在：${pathname}（本部署提供 ${Object.keys(API_ROUTES).join('、')}）` })
         return
       }
 
-      if (pathname === '/api/sites') {
-        // 条件请求：store 里 sites.json 的 etag 就是响应 ETag（Blob 时代由平台自动加，
-        // 自建后自己补 —— 客户端 30s 轮询靠它拿到 304 零字节）。数据没变时直接 304，
-        // 不进 handler，省掉一次全量读 + 序列化。
-        if (req.method === 'GET') {
-          const etag = etagOf('sites.json')
-          const inm = String(req.headers['if-none-match'] || '').trim()
-          if (etag && inm && inm === etag) { res.statusCode = 304; res.end(); return }
-          if (etag) res.setHeader('ETag', etag)
-        }
-        await attachBody(req)
-        await sitesHandler(
-          { headers: req.headers, query: parseQuery(req.url), socket: req.socket, method: req.method, body: req.body },
-          withHelpers(res),
-        )
-        return
+      // GET /api/sites 的条件请求：Blob 时代由平台自动加 ETag，自建后自己补，
+      // 命中 If-None-Match 直接 304，省掉一次全量读 + 序列化
+      if (pathname === '/api/sites' && req.method === 'GET') {
+        const etag = etagOf('sites.json')
+        const inm = String(req.headers['if-none-match'] || '').trim()
+        if (etag && inm && inm === etag) { res.statusCode = 304; res.end(); return }
+        if (etag) res.setHeader('ETag', etag)
       }
 
-      if (pathname === '/api/session') {
-        await attachBody(req)
-        await sessionHandler(
-          { headers: req.headers, query: parseQuery(req.url), socket: req.socket, method: req.method, body: req.body },
-          withHelpers(res),
-        )
-        return
-      }
-
-      sendJson(res, 404, { error: `接口不存在：${pathname}（本部署提供 /api/sites、/api/session、/api/metadata）` })
+      await attachBody(req)
+      // 各接口自己管鉴权（checkAuthHeader 已优先读 X-Nav-Key）与方法白名单
+      await handler(
+        { headers: req.headers, query: parseQuery(req.url), socket: req.socket, method: req.method, body: req.body },
+        withHelpers(res),
+      )
       return
     }
 
@@ -272,3 +278,9 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`[nav-server] listening on http://${HOST}:${PORT}  root=${ROOT}`)
 })
+
+/**
+ * 启动常驻健康巡检（v10）。放在 listen 之后：端口先通、再跑可选的后台任务，
+ * 即使巡检引擎出问题也不影响站点本体可用（cron 内部自己吞异常）。
+ */
+const cron = startHealthCron()

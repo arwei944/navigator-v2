@@ -10,8 +10,8 @@
  * 为什么要重算：客户端只提供事实（HTTP 码），不提供结论。
  * 这样即便某个旧版控制台/脚本用了过时口径，也不会把「限流」写成「失效」污染全站角标。
  */
-import { get, put } from '@vercel/blob'
-import { verdictOf, tally } from '../shared/health-rules.mjs'
+import { get, put } from '#store'
+import { verdictOf, tally, buildHealthPayload } from '../shared/health-rules.mjs'
 import { checkAuthHeader } from '../shared/auth.mjs'
 
 const PATHNAME = 'ops/health.json'
@@ -111,26 +111,21 @@ export default async function handler(req, res) {
 
     let prev = null
     try { prev = await readStored() } catch { /* 首次写入，无前值 */ }
-    const prevResults = prev && prev.results && typeof prev.results === 'object' ? prev.results : {}
 
     // 合并而非整体覆盖：控制台 / CLI 都支持「只探某几个站点」（--ids / --limit），
     // 覆盖式写入会让没被探到的站点集体退回「未探测」，比不发布更糟。
     // 合并之后再按当前站点集剔除：站点删除后其判定必须一起消失，否则残留条目会
     // 被 counts 计入，也可能被未来同 id 的新站点继承（合并写入本身只增不删）。
+    // 合并口径在 shared/health-rules.mjs#buildHealthPayload —— 服务端定时巡检共用同一实现。
     const known = await knownSiteIds()
-    const merged = {}
-    for (const [id, r] of Object.entries({ ...prevResults, ...incoming })) {
-      if (!known || known.has(id)) merged[id] = r
-    }
-    const version = ((prev && Number(prev.version)) || 0) + 1
-
     const data = {
-      version,
-      updatedAt: new Date().toISOString(),
-      actor: String(body.actor || auth.via || 'unknown').slice(0, 40),
-      proxy: String(body.proxy || '').slice(0, 120),
-      counts: { total: Object.keys(merged).length, ...tally(Object.values(merged)) },
-      results: merged,
+      ...buildHealthPayload({
+        prev,
+        incoming,
+        knownIds: known,
+        actor: body.actor || auth.via || 'unknown',
+        proxy: body.proxy || '',
+      }),
       patched: ids.length,
     }
     await put(PATHNAME, JSON.stringify(data), {

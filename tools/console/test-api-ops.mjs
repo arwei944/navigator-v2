@@ -3,7 +3,7 @@
  *
  * 为什么要单独测它：`api/sites.js` 是数据面，`api/ops.js` 是运维面，
  * 两者都在 Serverless 上跑，本地没有 Blob 无法直接联调。
- * 这里用 `node:test` 的模块 mock 顶掉 `@vercel/blob`，把 handler 当普通函数调，
+ * 这里用 `node:test` 的模块 mock 顶掉 `#store`（v9 起 ops 的存储适配层），把 handler 当普通函数调，
  * 从而在本地把「鉴权 / 路由 / 落盘语义」跑通，不依赖任何网络或凭据。
  *
  * 运行：node --experimental-test-module-mocks tools/console/test-api-ops.mjs
@@ -15,7 +15,7 @@ import assert from 'node:assert/strict'
 
 const store = new Map()
 
-mock.module('@vercel/blob', {
+mock.module('#store', {
   namedExports: {
     get: async (pathname) => {
       if (!store.has(pathname)) return null

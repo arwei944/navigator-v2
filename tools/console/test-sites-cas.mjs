@@ -11,7 +11,7 @@
  *     而线上没有比它更新的兜底。写入前与读取后都用同一把尺子（shared/sanitize.mjs）量。
  *     另外「读失败」与「没有数据」必须分开：前者 503，绝不写；后者才允许种子初始化。
  *
- * 用 `node:test` 的模块 mock 顶掉 `@vercel/blob`（含 ETag 与条件写语义），不联网、无凭据。
+ * 用 `node:test` 的模块 mock 顶掉 `#store`（存储适配层，含 ETag 与条件写语义），不联网、无凭据。
  * 运行：node --experimental-test-module-mocks tools/console/test-sites-cas.mjs
  */
 import { test, mock, beforeEach, after } from 'node:test'

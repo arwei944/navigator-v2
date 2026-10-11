@@ -23,7 +23,7 @@
  * 路由清单从 `src/router/index.js` 里**自动提取**，不手写 —— 否则以后加一条路由
  * 又会悄悄漏掉（这类「加了新东西忘了同步」正是本项目吃过亏的地方）。
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, rmSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, rmSync, cpSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -76,18 +76,24 @@ mkdirSync(join(DIST, 'api'), { recursive: true })
 mkdirSync(join(DIST, 'shared'), { recursive: true })
 copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
 copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
-copyFileSync(join(root, 'api', 'metadata.js'), join(DIST, 'api', 'metadata.js'))
-// v9 数据回归：sites/session 复活（SQLite 适配层 '#store'）
-copyFileSync(join(root, 'api', 'sites.js'), join(DIST, 'api', 'sites.js'))
-copyFileSync(join(root, 'api', 'session.js'), join(DIST, 'api', 'session.js'))
+copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
+// v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js']) {
+  copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
+}
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
 copyFileSync(join(root, 'shared', 'auth.mjs'), join(DIST, 'shared', 'auth.mjs'))
 const sharedSrc = join(root, 'shared')
 let sharedCount = 0
-for (const f of readdirSync(sharedSrc)) {
-  if (!f.endsWith('.mjs')) continue
-  copyFileSync(join(sharedSrc, f), join(DIST, 'shared', f))
-  sharedCount++
+/**
+ * **递归**复制 shared/** —— v10 教训：原先只 copyDirSync 顶层 .mjs，漏掉
+ * `shared/ops/`（audit-core / snapshot-core），ops.js 与 auth.js 在沙箱里
+ * 会直接加载失败（后台与登录整块死掉，且报错发生在 import 期而非请求期，很难联想到构建）。
+ * 用 cpSync(recursive) 一劳永逸，以后再加子目录也不会漏。
+ */
+cpSync(sharedSrc, join(DIST, 'shared'), { recursive: true })
+for (const f of readdirSync(sharedSrc, { recursive: true })) {
+  if (String(f).endsWith('.mjs')) sharedCount++
 }
 // 发布工具识别 Node 项目的依据是 package.json 的 start 脚本（光有 server.js 不够）。
 // type:module 必须有 —— server.js 与 api/ 都是 ESM；imports 映射让 api/*.js 的
@@ -103,12 +109,20 @@ writeFileSync(join(DIST, 'package.json'), JSON.stringify({
 // 二是每次发布等于清库。服务端首启自建目录并做首启迁移。
 rmSync(join(DIST, 'data'), { recursive: true, force: true })
 mkdirSync(join(DIST, 'data'), { recursive: true })
-// 管理密钥：沙箱没有环境变量注入，构建时把 .env.local 的共享密钥带进 data/（服务端启动时
-// 读回 process.env，静态服务对 /data/* 一律 403，git 也不收 dist）。共享密钥本就随
-// .env.local 存本机，换成随发布包进沙箱，不新增暴露面。
-try {
-  const envFile = readFileSync(join(root, '.env.local'), 'utf-8')
-  const m = envFile.match(/^SITES_ADMIN_KEY="?([^"]*)"?$/m)
-  if (m && m[1]) writeFileSync(join(DIST, 'data', 'admin-key.txt'), m[1])
-} catch { /* 没有 .env.local 就不带：写接口按未配置拒绝 */ }
-console.log(`✅ 已带上 Node 服务（server.js + store.mjs + api/sites|session|metadata + shared ×${sharedCount}）—— 云同步与真实抓取齐备`)
+// 管理凭据：沙箱没有环境变量注入，构建时把 .env.local 的两项配置带进 data/（服务端启动时
+// 读回 process.env，静态服务对 /data/* 一律 403，git 也不收 dist）。口径与共享密钥完全一致：
+// 只是换个运输通道，不新增暴露面。
+//   SITES_ADMIN_KEY      → admin-key.txt           共享密钥直连（CLI / 脚本 / 旧客户端）
+//   ADMIN_PASSWORD_HASH  → admin-password-hash.txt scrypt 口令哈希（后台登录；未配置时登录接口
+//                                                     明确回 500，密钥直连照常可用）
+for (const [file, key] of [['admin-key.txt', 'SITES_ADMIN_KEY'], ['admin-password-hash.txt', 'ADMIN_PASSWORD_HASH']]) {
+  try {
+    const envFile = readFileSync(join(root, '.env.local'), 'utf-8')
+    const m = envFile.match(new RegExp('^' + key + '=?([^\\n]*)$', 'm'))
+    if (m) {
+      const value = m[1].trim().replace(/^"(.*)"$/, '$1').trim()
+      if (value) writeFileSync(join(DIST, 'data', file), value)
+    }
+  } catch { /* 没有 .env.local 就不带该配置 */ }
+}
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×7 + shared ×${sharedCount}）—— 后台/统计/巡检齐备`)
