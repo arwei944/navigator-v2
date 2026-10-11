@@ -18,7 +18,9 @@
 import { writeFileSync } from 'node:fs'
 
 const PORT = process.argv[2] || '9346'
-const BASE = process.argv[3] || 'http://127.0.0.1:4173'
+// 去掉尾斜杠：否则 `BASE + '/favorites'` 会拼出 `https://host//favorites`，
+// 双斜杠路径在部分宿主/vue-router 下行为不稳定（表现为子页面时好时坏）。
+const BASE = (process.argv[3] || 'http://127.0.0.1:4173').replace(/\/+$/, '')
 
 let pass = 0
 const failures = []
@@ -78,6 +80,28 @@ const evalJs = async (expr) => {
   return r.result.value
 }
 
+const sleep = ms => new Promise(s => setTimeout(s, ms))
+
+/**
+ * 轮询等待页面到达某个状态，替代固定 sleep。
+ * 固定 sleep 在「连续 navigate 多条子页面」时会读到中间态（壳还没挂上），
+ * 把正常页面误判成渲染失败 —— 线上验证时真实踩到过。
+ */
+async function waitFor(expr, timeout = 12000, label = expr) {
+  const deadline = Date.now() + timeout
+  for (;;) {
+    let v = false
+    try { v = await evalJs(`(() => { try { return !!(${expr}) } catch { return false } })()`) } catch { /* 导航中文档已销毁，下一轮再试 */ }
+    if (v) return true
+    if (Date.now() > deadline) {
+      failures.push(`等待超时：${label}`)
+      console.log(`  ❌ 等待超时：${label}`)
+      return false
+    }
+    await sleep(250)
+  }
+}
+
 await send('Page.enable')
 await send('Runtime.enable')
 await send('Log.enable')
@@ -88,7 +112,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, de
 console.log(`\n▶ 静态托管可用性验证  BASE=${BASE}\n`)
 
 await send('Page.navigate', { url: BASE + '/' })
-await new Promise(s => setTimeout(s, 4000))
+await waitFor(`document.querySelector('.card')`, 15000, '首页卡片渲染')
 
 /* ---------- 1. 页面与异常 ---------- */
 const errors = events
@@ -116,8 +140,15 @@ const apiSeen = await evalJs(`window.__navCloudErrorProbe ?? null`)
 const noticeText = await evalJs(`(document.querySelector('.cloud-notice-text')||{}).textContent || ''`)
 
 /* ---------- 3. 云端状态条说的是真话 ---------- */
-ok(!/已离线/.test(noticeText), '状态条不再谎报「已离线」', noticeText.trim() || '(无状态条)')
-ok(/未接入云端同步|本机数据/.test(noticeText), '状态条说明了真实情况（本机数据 / 未接入云同步）', noticeText.trim())
+// 注意「无状态条」也是正确结果：本探针写就时站点是纯静态托管（无 /api/*），
+// 现在线上是 Node 服务、云端同步可用，此时**不该**弹提示 —— 弹了反而是谎报。
+// 所以验收口径是：有状态条就必须说真话，没有状态条（同步正常）直接算过。
+ok(!/已离线/.test(noticeText), '状态条不再谎报「已离线」', noticeText.trim() || '(无状态条，云端同步可用)')
+ok(
+  !noticeText.trim() || /未接入云端同步|本机数据/.test(noticeText),
+  '状态条说明了真实情况（本机数据 / 未接入云同步，或无状态条）',
+  noticeText.trim() || '(无状态条，云端同步可用)'
+)
 
 /* ---------- 4. 轮询已停：不再对着不存在的接口空转 ---------- */
 const pollProbe = await evalJs(`(async () => {
@@ -168,11 +199,32 @@ eq(canWrite, true, 'localStorage 可写（本地增删改依赖它）')
  * scripts/postbuild-spa-fallbacks.mjs）。
  */
 
+/**
+ * 导航并等待页面到达状态；失败重试一次。
+ *
+ * 为什么必须重试：连续 navigate 六七次之后，headless Chrome 偶发「导航了但
+ * 什么都没加载」（layout=false、侧栏 0 项，且持续不恢复）。单独跑同一个 URL
+ * 完全正常 —— 是工具侧的长序列劣化，不是应用缺陷。重试一次即可恢复。
+ */
+async function navigateAndWait(url, expr, timeout = 25000, label = url) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    await send('Page.navigate', { url })
+    const okp = await waitFor(expr, timeout, `${label}（第 ${attempt} 次）`)
+    if (okp) return true
+  }
+  return false
+}
+
 const DEEP_ROUTES = ['/favorites', '/recent', '/archived', '/feed', '/trash', '/admin']
 const deepBad = []
 for (const route of DEEP_ROUTES) {
-  await send('Page.navigate', { url: BASE + route })
-  await new Promise(s => setTimeout(s, 2500))
+  // 轮询而非固定 sleep：连续 navigate 多条路由时，固定 2500ms 在慢网络 /
+  // 渲染进程繁忙下会读到「壳还没挂上」的中间态，误判成渲染失败。
+  await navigateAndWait(
+    BASE + route,
+    `document.querySelector('.app-layout, .app-shell') || /Error code:\\s*404|File not found/i.test(document.body.innerText.slice(0, 300))`,
+    25000, `${route} 直达启动`
+  )
   const state = await evalJs(`JSON.stringify({
     notFound: /Error code:\\s*404|File not found/i.test(document.body.innerText.slice(0, 300)),
     appMounted: !!document.querySelector('.app-layout, .app-shell, #app > *'),
@@ -185,8 +237,14 @@ for (const route of DEEP_ROUTES) {
 ok(deepBad.length === 0, `${DEEP_ROUTES.length} 条子页面直达都能启动应用（不是宿主 404 页）`, deepBad.join(' '))
 
 // 子页面同时也要能拿到数据（种子兜底），不能是空壳
-await send('Page.navigate', { url: BASE + '/favorites' })
-await new Promise(s => setTimeout(s, 2500))
+// 等高亮落到「收藏」而不是只等外壳：`.app-layout` 首帧就出现，而 vue-router 的
+// 初始导航是异步的，`applyRouteToStore`（watch route.fullPath）要等它完成后才把
+// activeNav 从 'discover' 改成 'favorites' —— 早一步查就会读到「全部」。
+await navigateAndWait(
+  BASE + '/favorites',
+  `(document.querySelector('.sidebar-nav-item.active')||{}).textContent?.includes('收藏')`,
+  25000, '/favorites 落在收藏范围'
+)
 const favState = JSON.parse(await evalJs(`JSON.stringify({
   path: location.pathname,
   navItems: document.querySelectorAll('.sidebar-nav-item').length,
@@ -201,7 +259,7 @@ ok(/收藏/.test(favState.active), '直达 /favorites 后落在「收藏」范�
 
 /* ---------- 截图（回到首页，画面才有代表性） ---------- */
 await send('Page.navigate', { url: BASE + '/' })
-await new Promise(s => setTimeout(s, 2500))
+await waitFor(`document.querySelector('.card')`, 25000, '截图前首页就绪')
 const shot = await send('Page.captureScreenshot', { format: 'png' })
 writeFileSync('probe/static-standalone.png', Buffer.from(shot.data, 'base64'))
 console.log('\n  📸 截图已保存 probe/static-standalone.png')
