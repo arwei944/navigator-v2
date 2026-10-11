@@ -17,16 +17,25 @@
  *  - 跳过归档站；并发 8、单站超时 8s、单轮上限 400 站。
  *  - 任何异常都吞掉并记日志：这是常驻进程里的可选任务，不能因为它把站点服务带崩。
  */
-import { get, put } from './store.mjs'
-import { fetchCapped } from './shared/http-fetch.mjs'
-import { buildHealthPayload, toIncoming } from './shared/health-rules.mjs'
+/**
+ * 依赖用**子路径 imports**（`#store` / `#shared/*`）而不是相对路径：
+ * server/*.mjs 会被原样复制到部署根目录（server.js / cron.mjs），相对路径在部署包
+ * 里能解析、在仓库里不能（`server/shared/` 不存在）—— 于是本地根本 import 不进来，
+ * 巡检出问题时连单测都写不了。两处 package.json 各自把 `#shared/*` 映射到
+ * 各自的 shared 目录，源码零分支。
+ */
+import { get, put } from '#store'
+import { fetchCapped } from '#shared/http-fetch.mjs'
+import { buildHealthPayload, toIncoming } from '#shared/health-rules.mjs'
 
 const PATHNAME = 'ops/health.json'
 const SITES_PATHNAME = 'sites.json'
 const INTERVAL_MS = 6 * 60 * 60 * 1000
 const BOOT_DELAY_MS = 45 * 1000
-const CONCURRENCY = 8
-const TIMEOUT_MS = 8000
+const CONCURRENCY = 10
+const TIMEOUT_MS = 6000
+/** 每几批落一次库：300 站跑完可能要几分钟，增量落库让健康角标早早就动起来 */
+const FLUSH_EVERY_CHUNKS = 5
 const MAX_SITES = 400
 const UA = 'Mozilla/5.0 (compatible; NavigatorHealthBot/1.0; +https://navigator.local)'
 
@@ -41,7 +50,17 @@ async function readSites() {
   try {
     const data = await readJson(SITES_PATHNAME)
     if (!data || !Array.isArray(data.sites)) return null
-    const sites = data.sites.filter(s => s && s.id && typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && !s.archived)
+    /**
+     * 站点表里的 `url` **多数是裸域名**（`chat.openai.com`）—— 补协议再探。
+     * （踩过的坑：一开始按 /^https?:\/\// 过滤，结果 300 条全被滤掉、巡检永远「站点表为空」。）
+     */
+    const sites = []
+    for (const s of data.sites) {
+      if (!s || !s.id || s.archived) continue
+      const raw = typeof s.url === 'string' ? s.url.trim() : ''
+      if (!raw) continue
+      sites.push({ id: s.id, name: s.name, url: /^https?:\/\//i.test(raw) ? raw : `https://${raw}` })
+    }
     return { sites, knownIds: new Set(data.sites.map(s => s.id)) }
   } catch {
     return null
@@ -68,17 +87,40 @@ async function probeOne(url) {
  * 启动巡检。返回 `{ runNow, stop }` 便于测试与手动触发。
  * 关闭开关：环境变量 `NAV_CRON=0`（本地 console 调试时不想它跑）。
  */
+/**
+ * 运行状态 —— 只为**远程可观测**存在：进程内定时任务坏掉时没有任何 4xx/5xx、
+ * 前端也没有症状（只是健康角标一直空），没有这块就只能靠猜。
+ * `/api/_diag` 会把它读出来（main.mjs 与本模块是同一个模块实例）。
+ */
+export const status = {
+  enabled: false,
+  started: false,
+  running: false,
+  lastRunAt: 0,
+  lastPhase: '未启动',
+  lastError: '',
+  lastCount: 0,
+  lastActor: '',
+}
+
 export function startHealthCron() {
   if (process.env.NAV_CRON === '0') {
+    status.enabled = false
+    status.lastPhase = '已由 NAV_CRON=0 关闭'
     console.log('[cron] 健康巡检已由 NAV_CRON=0 关闭')
     return { runNow: async () => null, stop() {} }
   }
 
+  status.enabled = true
   let running = false
 
   async function run(reason) {
     if (running) return null
     running = true
+    status.running = true
+    status.lastRunAt = Date.now()
+    status.lastPhase = `开始（${reason}）`
+    status.lastError = ''
     try {
       const prev = await readJson(PATHNAME).catch(() => null)
       // 6h 内已有判定就不重探：发布后首启、控制台刚手动探过，都属这种情况
@@ -88,39 +130,61 @@ export function startHealthCron() {
         return null
       }
 
+      status.lastPhase = '读取站点表'
       const snapshot = await readSites()
-      if (!snapshot || !snapshot.sites.length) return null
+      if (!snapshot || !snapshot.sites.length) {
+        status.lastPhase = snapshot ? '站点表为空' : '读不到站点表'
+        return null
+      }
       const sites = snapshot.sites.slice(0, MAX_SITES)
 
+      let base = prev
+      let payload = null
       const rows = []
+      const flush = async (phase) => {
+        payload = buildHealthPayload({
+          prev: base,
+          incoming: toIncoming(rows),
+          knownIds: snapshot.knownIds,
+          actor: 'cron',
+        })
+        await put(PATHNAME, JSON.stringify(payload), {
+          access: 'private',
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          contentType: 'application/json',
+        })
+        base = payload
+        console.log(`[cron] 健康巡检${phase}（${reason}）：已探 ${rows.length}/${sites.length} 站 → ${JSON.stringify(payload.counts)}`)
+        return payload
+      }
+
+      status.lastPhase = `探测中（共 ${sites.length} 站）`
+      let chunkNo = 0
       for (let i = 0; i < sites.length; i += CONCURRENCY) {
         const chunk = sites.slice(i, i + CONCURRENCY)
         const out = await Promise.all(chunk.map(async s => ({ id: s.id, ...(await probeOne(s.url)) })))
         rows.push(...out)
+        chunkNo++
+        if (chunkNo % FLUSH_EVERY_CHUNKS === 0) await flush('增量落库')
       }
-
-      const payload = buildHealthPayload({
-        prev,
-        incoming: toIncoming(rows),
-        knownIds: snapshot.knownIds,
-        actor: 'cron',
-      })
-      await put(PATHNAME, JSON.stringify(payload), {
-        access: 'private',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        contentType: 'application/json',
-      })
-      console.log(`[cron] 健康巡检完成（${reason}）：${rows.length} 站 → ${JSON.stringify(payload.counts)}`)
-      return payload
+      const final = await flush('完成')
+      status.lastPhase = `完成（${rows.length} 站）`
+      status.lastCount = rows.length
+      return final
     } catch (e) {
+      status.lastError = String((e && e.message) || e)
+      status.lastPhase = `失败：${status.lastError}`
       console.error('[cron] 健康巡检失败：', String((e && e.message) || e))
       return null
     } finally {
       running = false
+      status.running = false
     }
   }
 
+  status.started = true
+  status.lastPhase = `已启动，${Math.round(BOOT_DELAY_MS / 1000)}s 后跑首轮`
   const boot = setTimeout(() => {
     void run('启动首轮')
     setInterval(() => { void run('每 6 小时') }, INTERVAL_MS)
@@ -130,4 +194,69 @@ export function startHealthCron() {
     runNow: () => run('手动触发'),
     stop() { clearTimeout(boot) },
   }
+}
+/* ══════════════════════ 请求驱动的分片巡检 ══════════════════════
+ *
+ * 为什么需要它：发布沙箱**没有长驻进程** —— 实测每个请求都会起一个新进程
+ * （`/api/_diag` 的 `uptimeSec` 恒为 0），所以 `setTimeout`/`setInterval`
+ * 这类进程内定时器永远不会触发（startHealthCron 在那里是死代码）。
+ * 于是服务端巡检改成「谁请求谁推进一小步」：
+ *
+ *   - 进度（游标）落在 `ops/health-sweep.json`，不依赖进程内存 —— 进程随时被回收也不丢。
+ *   - 每次只探 budget 个站（默认 2），**在响应发完之后**才跑，不给请求加延迟。
+ *   - 探到的判定用同一套 buildHealthPayload 合并进 ops/health.json（口径不分叉）。
+ *   - 一轮跑完（或 6h 内已跑完一轮）就什么都不做。
+ *
+ * 主力路径仍然是控制台/CLI 的一次性体检（走本机 curl + Clash 代理，并发快、准）；
+ * 这里只是「没人操作时也会慢慢收敛」的兜底。
+ */
+
+const SWEEP_PATHNAME = 'ops/health-sweep.json'
+const DEFAULT_BUDGET = 4
+
+export async function tickOnDemand({ budget = DEFAULT_BUDGET } = {}) {
+  const prev = await readJson(PATHNAME).catch(() => null)
+  let sweep = null
+  try { sweep = await readJson(SWEEP_PATHNAME) } catch { /* 首轮无进度 */ }
+
+  const snapshot = await readSites()
+  if (!snapshot || !snapshot.sites.length) return null
+  const sites = snapshot.sites
+  const now = Date.now()
+
+  /**
+   * 顺序很重要（踩过的坑）：先看「本轮有没有跑完」，再看新鲜度。
+   * 早先写成「只要刚写过判定就整体跳过」—— 于是第一次 tick 写下 2 条之后，
+   * 后续每个请求都被自己的成果挡住，整轮永远停在 2/300。
+   */
+  const inRound = sweep && !sweep.done && Number(sweep.cursor) < sites.length
+    && now - Number(sweep.roundStart || 0) <= INTERVAL_MS
+  if (!inRound) {
+    const age = prev && prev.updatedAt ? Date.now() - Date.parse(prev.updatedAt) : Infinity
+    if (Number.isFinite(age) && age < INTERVAL_MS) return null // 本轮已跑完且判定还新鲜 → 什么都不做
+    sweep = { cursor: 0, done: false, roundStart: now, startedAt: new Date(now).toISOString() }
+    await put(SWEEP_PATHNAME, JSON.stringify(sweep), { allowOverwrite: true, contentType: 'application/json' })
+  }
+
+  const batch = sites.slice(Number(sweep.cursor), Number(sweep.cursor) + Math.max(1, budget))
+
+  /**
+   * **逐站落库**：进程随时可能被回收，探一站存一站才不会白干。
+   * （探一站的代价一次探测、一次几 KB 的写，对 SQLite 完全可忽略。）
+   */
+  let base = prev
+  let cursor = Number(sweep.cursor)
+  for (const s of batch) {
+    const row = { id: s.id, ...(await probeOne(s.url)) }
+    base = buildHealthPayload({ prev: base, incoming: toIncoming([row]), knownIds: snapshot.knownIds, actor: 'cron' })
+    await put(PATHNAME, JSON.stringify(base), { allowOverwrite: true, contentType: 'application/json' })
+    cursor += 1
+    await put(SWEEP_PATHNAME, JSON.stringify({ ...sweep, cursor, done: cursor >= sites.length }), { allowOverwrite: true, contentType: 'application/json' })
+  }
+
+  status.lastRunAt = Date.now()
+  status.lastPhase = `分片巡检 ${cursor}/${sites.length}`
+  status.lastCount = base.counts.total
+  console.log(`[cron] 分片巡检：${cursor}/${sites.length} 站 → ${JSON.stringify(base.counts)}`)
+  return base
 }

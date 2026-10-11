@@ -577,6 +577,7 @@ async function runSync(job, steps, opts) {
       '-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`,
       '-H', 'Content-Type: application/json',
       '-H', `Authorization: Bearer ${key}`,
+      '-H', `X-Nav-Key: ${key}`,
       '--data-binary', '@' + payload,
     ], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true })
     const j = JSON.parse(stdout)

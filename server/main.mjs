@@ -64,7 +64,8 @@ const opsHandler = (await import('./api/ops.js')).default
 const authHandler = (await import('./api/auth.js')).default
 const healthHandler = (await import('./api/health.js')).default
 const { etagOf } = await import('./store.mjs')
-const { startHealthCron } = await import('./cron.mjs')
+const cronMod = await import('./cron.mjs')
+const { startHealthCron } = cronMod
 
 /** 路由表：一个接口文件一个 handler，语义零改动（v10 清单第一条） */
 const API_ROUTES = {
@@ -212,6 +213,18 @@ const server = http.createServer(async (req, res) => {
           receivedXNavLen: xnav.length,
           receivedXNavFp: xnav ? createHash('sha256').update(xnav).digest('hex').slice(0, 10) : '',
           routes: Object.keys(API_ROUTES),
+          // 进程内定时任务的状态：它坏掉时没有任何请求症状，只能靠这里看
+          cron: {
+            enabled: cronMod.status.enabled,
+            started: cronMod.status.started,
+            running: cronMod.status.running,
+            phase: cronMod.status.lastPhase,
+            lastRunAgoSec: cronMod.status.lastRunAt ? Math.round((Date.now() - cronMod.status.lastRunAt) / 1000) : null,
+            lastCount: cronMod.status.lastCount,
+            lastError: cronMod.status.lastError,
+            nodeMajor: process.versions.node.split('.')[0],
+            uptimeSec: Math.round(process.uptime()),
+          },
         })
         return
       }
@@ -237,6 +250,15 @@ const server = http.createServer(async (req, res) => {
         { headers: req.headers, query: parseQuery(req.url), socket: req.socket, method: req.method, body: req.body },
         withHelpers(res),
       )
+
+      /**
+       * 顺带推进健康巡检一小步（**在响应已经发出之后**才做，不给请求加延迟）。
+       * 沙箱没有长驻进程（uptimeSec 恒为 0），定时器不触发，只能靠请求驱动；
+       * 进度落在存储里，进程被回收也不丢。失败一律吞掉 —— 它绝不能影响本次响应。
+       */
+      if (pathname === '/api/sites' || pathname === '/api/health') {
+        cronMod.tickOnDemand().catch(() => { /* 巡检是兜底，失败不影响本次请求 */ })
+      }
       return
     }
 
@@ -280,7 +302,8 @@ server.listen(PORT, HOST, () => {
 })
 
 /**
- * 启动常驻健康巡检（v10）。放在 listen 之后：端口先通、再跑可选的后台任务，
- * 即使巡检引擎出问题也不影响站点本体可用（cron 内部自己吞异常）。
+ * 常驻健康巡检（v10）：仅在**进程会长驻**的环境里有效（本地 console）。
+ * 发布沙箱实测每个请求一个新进程（`/api/_diag` 的 uptimeSec 恒为 0），
+ * 这里的定时器不会触发 —— 线上靠 `tickOnDemand()` 请求驱动分片，见 cron.mjs 注释。
  */
-const cron = startHealthCron()
+startHealthCron()

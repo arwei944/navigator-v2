@@ -47,6 +47,9 @@ export async function publishHealth(results, { actor = 'console' } = {}) {
       '-s', '--max-time', '60', '-X', 'POST', `${SITE_URL}/api/health`,
       '-H', 'Content-Type: application/json',
       '-H', `Authorization: Bearer ${key}`,
+  // X-Nav-Key：发布沙箱的网关会改写 Authorization 头（见 shared/auth.mjs#bearerOf），
+  // 打云端的 curl 调用必须双头并发，否则一律 401。
+      '-H', `X-Nav-Key: ${key}`,
       '--data-binary', '@' + payload,
     ], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, windowsHide: true })
     const j = JSON.parse(stdout)

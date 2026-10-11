@@ -102,7 +102,7 @@ step('4/5 热更新云端数据')
 const payload = join(root, 'tmp-payload.json')
 writeFileSync(payload, JSON.stringify({ sites }), 'utf-8')
 try {
-  const out = execFileSync('curl.exe', ['-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`, '-H', 'Content-Type: application/json', '-H', `Authorization: Bearer ${key}`, '--data-binary', '@' + payload], { encoding: 'utf8' })
+  const out = execFileSync('curl.exe', ['-s', '--max-time', '120', '-X', 'POST', `${SITE_URL}/api/sites`, '-H', 'Content-Type: application/json', '-H', `Authorization: Bearer ${key}`, '-H', `X-Nav-Key: ${key}`, '--data-binary', '@' + payload], { encoding: 'utf8' })
   const j = JSON.parse(out)
   console.log(`发布成功: version=${j.version} count=${j.sites.length} withIcons=${j.sites.filter(s => s.icon).length}`)
   record({

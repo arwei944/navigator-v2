@@ -24,7 +24,7 @@ function requireKey() {
 
 async function callCloud(path, { method = 'GET', body = null, timeout = 60 } = {}) {
   const args = ['-s', '--max-time', String(timeout), '-X', method, `${SITE_URL}${path}`,
-    '-H', `Authorization: Bearer ${requireKey()}`]
+    '-H', `Authorization: Bearer ${requireKey()}`, '-H', `X-Nav-Key: ${requireKey()}`]
   if (body !== null) {
     args.push('-H', 'Content-Type: application/json', '--data-binary', JSON.stringify(body))
   }

@@ -102,7 +102,7 @@ writeFileSync(join(DIST, 'package.json'), JSON.stringify({
   name: 'nav-dist',
   private: true,
   type: 'module',
-  imports: { '#store': './store.mjs' },
+  imports: { '#store': './store.mjs', '#shared/*': './shared/*' },
   scripts: { start: 'node server.js' },
 }, null, 2) + '\n')
 // data/（SQLite + 管理密钥）绝不能随发布包上传：一是会把本机测试数据盖到线上，
