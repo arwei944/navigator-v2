@@ -32,3 +32,6 @@ probe/_*/
 .workbuddy/
 # SQLite 数据目录（本机 console 调试用，线上在沙箱 data/，均不入库）
 server/data/
+
+# 一次性代理探测产物（本机状态，不入库）
+tools/proxy-ports.txt
