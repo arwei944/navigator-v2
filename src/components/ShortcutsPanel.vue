@@ -1,9 +1,9 @@
 <template>
   <Teleport to="body">
     <div v-if="visible" class="shortcuts-overlay" @click.self="close">
-      <div class="shortcuts-panel">
+      <div ref="panelRef" class="shortcuts-panel" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
         <div class="shortcuts-header">
-          <h3 class="shortcuts-title">键盘快捷键</h3>
+          <h3 id="shortcuts-title" class="shortcuts-title">键盘快捷键</h3>
           <button class="shortcuts-close" @click="close" aria-label="关闭">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -23,9 +23,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const visible = ref(false)
+const panelRef = ref(null)
+// 焦点陷阱 + 关闭后焦点归还：此前这个面板既没有 role=dialog 也不管焦点，
+// 键盘用户按 Tab 会走到面板背后的卡片网格里（视觉上被盖住，却不知道焦点在哪）
+const trap = useFocusTrap(panelRef)
+watch(visible, (v) => { if (v) trap.activate(); else trap.release() })
 
 // 这几条必须与真实绑定一致：此前 Ctrl+D 写了却没实现，是纯误导
 const shortcuts = [

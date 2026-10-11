@@ -155,6 +155,8 @@ const expectKeys = [
   '--font-size-base', '--title-weight', '--transition', '--card-anim',
   // 卡片大小的无单位乘数 + 自适应排列的卡片最小宽度（「卡片设置」面板用）
   '--card-scale', '--card-min',
+  // 图表（v11 洞察面板）：圆角 / 趋势图高度 / 是否填充面积
+  '--chart-radius', '--chart-height', '--chart-area',
   // 语义状态色（卡片/控件的 ok·warn·danger·收藏·热度·实底前景），随主题模式取明暗两套值
   '--color-ok', '--color-warn', '--color-danger', '--color-muted',
   '--color-favorite', '--color-favorite-bg', '--color-favorite-border',

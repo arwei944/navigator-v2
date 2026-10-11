@@ -1,5 +1,8 @@
 <template>
-  <div class="cards-container" ref="containerRef">
+  <div class="cards-container" ref="containerRef"
+       :role="sidebarStore.activeNav === 'trash' ? null : 'grid'"
+       :aria-label="sidebarStore.activeNav === 'trash' ? null : '站点网格：方向键移动，回车打开'"
+       @keydown="onGridKeydown" @focusin="onGridFocusIn">
     <!-- 回收站视图 -->
     <template v-if="sidebarStore.activeNav === 'trash'">
       <div class="trash-header">
@@ -54,8 +57,9 @@
         ghost-class="dragging-ghost"
         :disabled="!dragEnabled"
       >
-        <template #item="{ element: site }">
+        <template #item="{ element: site, index }">
           <SiteCard :site="site" :is-list="sitesStore.viewMode === 'list'"
+                    :tab-index="index === focusIndex ? 0 : -1"
                     :show-drag-handle="dragEnabled"
                     :density="cardDensity"
                     :batch-mode="batchMode"
@@ -75,8 +79,9 @@
         handle=".drag-handle"
         @change="onDragChange"
       >
-        <template #item="{ element: site }">
+        <template #item="{ element: site, index }">
           <SiteCard :site="site" :is-list="sitesStore.viewMode === 'list'"
+                    :tab-index="index === focusIndex ? 0 : -1"
                     :show-drag-handle="true"
                     :density="cardDensity"
                     :batch-mode="batchMode"
@@ -166,6 +171,7 @@ import SiteCard from '@/components/SiteCard.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Draggable from 'vuedraggable'
+import { nextIndex, NAV_KEYS, columnsFromStyle } from '@/utils/gridnav'
 
 const sitesStore = useSitesStore()
 const sidebarStore = useSidebarStore()
@@ -235,6 +241,61 @@ const batchMode = computed({
   set: (v) => { if (!v) sitesStore.toggleBatchMode() }
 })
 
+/* ---------- 网格键盘导航（v11） ----------
+ *
+ * roving tabindex：同一时刻只有一张卡的 tabindex 是 0，其余是 -1。
+ * 之前每张卡都是 tabindex="0"，键盘用户想跳过网格就得按 300 次 Tab ——
+ * 而方向键什么都不做，等于 300 张卡完全没有键盘导航。
+ *
+ * 「下一个是谁」全在 utils/gridnav.js（纯函数，有穷举测试），
+ * 这里只负责读实际列数、移动 DOM 焦点、以及吃掉方向键别让它滚页面。
+ */
+// 初始必须是 0 而不是 -1：roving tabindex 要求「同一时刻恰好一张卡是 0」。
+// 取 -1 会让全部卡都是 tabindex="-1"，键盘用户 Tab 一圈也进不了网格 ——
+// 方向键测试还全绿（因为 programmatically focus() 对 -1 也生效），
+// 只有真机按 Tab 才能发现，属于「单测覆盖不到的那类」。
+const focusIndex = ref(0)
+
+function cardEls() {
+  return containerRef.value ? [...containerRef.value.querySelectorAll('.card[data-site-id]')] : []
+}
+
+/** 实际列数从 CSS 读：自适应布局按视口算列，用令牌值会与视觉上的「正下方」对不上 */
+function currentCols() {
+  if (sitesStore.viewMode === 'list') return 1
+  const grid = containerRef.value?.querySelector('.cards-grid')
+  if (!grid) return 1
+  return columnsFromStyle(getComputedStyle(grid).gridTemplateColumns)
+}
+
+async function focusAt(i) {
+  focusIndex.value = i
+  await nextTick()
+  cardEls()[i]?.focus()
+}
+
+function onGridKeydown(e) {
+  if (e.altKey || e.ctrlKey || e.metaKey) return
+  if (!NAV_KEYS.has(e.key)) return
+  // 焦点在表单控件里时不抢方向键（批量栏的下拉、搜索框等自己要用）
+  const tag = e.target?.tagName
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return
+  const total = displaySites.value.length
+  if (!total) return
+  const next = nextIndex(focusIndex.value, e.key, { cols: currentCols(), total })
+  if (next < 0) return
+  e.preventDefault()
+  focusAt(next)
+}
+
+/** 用户用 Tab / 点击聚焦了某张卡：让 roving 的「当前那张」跟上，否则下次按方向键会跳回开头 */
+function onGridFocusIn(e) {
+  const card = e.target?.closest?.('.card[data-site-id]')
+  if (!card) return
+  const i = cardEls().indexOf(card)
+  if (i >= 0) focusIndex.value = i
+}
+
 // 自动添加成功后要把新卡片滚到视野中间，否则列表长时「加了但看不见」
 const containerRef = ref(null)
 
@@ -248,6 +309,9 @@ const containerRef = ref(null)
  */
 watch(displaySites, (list) => {
   sitesStore.pruneSelection(list.map(s => s.id))
+  // 列表变短后 roving 下标可能越界：收敛到末尾。不收敛的话下次按方向键会命中
+  // gridnav 的「焦点不在网格内」分支，从第一张重新开始 —— 位置莫名其妙跳走。
+  if (focusIndex.value >= list.length) focusIndex.value = list.length - 1
 })
 
 watch(() => sitesStore.highlightSiteId, async (id) => {

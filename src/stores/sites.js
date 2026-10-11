@@ -8,6 +8,7 @@ import { safeSetItem } from '@/utils/safeStorage'
 import { sanitizeSites } from '../../shared/sanitize.mjs'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
+import { usePreferencesStore } from '@/stores/preferences'
 import { useHistoryStore } from '@/stores/history'
 import { buildSignals, hasSignal, rankSites as rankSmart } from '@/utils/smartRank'
 
@@ -46,6 +47,7 @@ export const useSitesStore = defineStore('sites', () => {
   const categoriesStore = useCategoriesStore()
   // 点击量是**云端全局口径**（所有访客的总和），与本地 visitCounts 是两回事
   const clicksStore = useClicksStore()
+  const prefs = usePreferencesStore()
   // 智能排序要用访问记录（时段偏好与共现）—— 这是本地信号，不上云
   const historyStore = useHistoryStore()
 
@@ -161,7 +163,12 @@ export const useSitesStore = defineStore('sites', () => {
     // 有搜索词：相关性排序说了算。显式排序只作同分并列时的次序，
     // 绝不整体重排——否则选「名称降序」会把最相关的站点挤到后面。
     if (q) {
-      return rankSites(categorySites.value, q, { tieBreak: SORT_COMPARATORS[sortBy.value] })
+      // 「常访问」加权（v11）：相关性同档时热度高的在前。开关一关就退回纯相关性排序，
+      // 这条路径与 v10 完全等价 —— 加权只插在「相关性」与「显式排序」之间。
+      return rankSites(categorySites.value, q, {
+        tieBreak: SORT_COMPARATORS[sortBy.value],
+        clicks: prefs.clickBoost ? clicksStore.mergedCounts : null,
+      })
     }
 
     const list = applySort(categorySites.value, sortBy.value)

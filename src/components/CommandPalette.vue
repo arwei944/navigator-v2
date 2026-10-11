@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div v-if="visible" class="cp-overlay" @click.self="close" @keydown="onOverlayKeydown">
-      <div class="cp-panel">
+      <div ref="panelRef" class="cp-panel" role="dialog" aria-modal="true" aria-label="全能框">
         <div class="cp-search-wrap">
           <svg class="cp-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -35,10 +35,15 @@
 <script setup>
 import { nextTick, ref } from 'vue'
 import { useOmniBox } from '@/composables/useOmniBox'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 import OmniResults from '@/components/OmniResults.vue'
 
 const visible = ref(false)
 const inputRef = ref(null)
+const panelRef = ref(null)
+// 焦点陷阱：Tab 在面板内循环，关闭后焦点还给触发它的元素
+// —— 此前按 Tab 会走到面板背后的卡片网格里（被盖住，看不见焦点在哪）
+const trap = useFocusTrap(panelRef)
 
 const omni = useOmniBox({ mode: 'palette', onDone: () => close() })
 const {
@@ -49,10 +54,13 @@ const {
 function open() {
   visible.value = true
   reset()
+  trap.activate()
   nextTick(() => inputRef.value?.focus())
 }
 
 function close() {
+  // 先归还焦点、再隐藏：反过来的话焦点会掉到 body 上（触发它的元素可能正在卸载）
+  trap.release()
   visible.value = false
   reset()
 }

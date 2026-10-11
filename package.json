@@ -46,7 +46,7 @@
     "console:test:localmeta": "node tools/console/test-local-meta.mjs",
     "console:test:cloud-poll": "node tools/console/test-cloud-poll.mjs",
     "console:test:bundle": "node tools/console/test-bundle.mjs",
-    "console:test:all": "node tools/console/test-trust.mjs && node tools/console/test-infer.mjs && node tools/console/test-purposes.mjs && node tools/console/test-visual-scheme.mjs && node tools/console/test-url.mjs && node tools/console/test-auto-add.mjs && node tools/console/test-auto-category.mjs && node tools/console/test-guard.mjs && node tools/console/test-hunks.mjs && node tools/console/test-ops.mjs && node --experimental-test-module-mocks tools/console/test-api-ops.mjs && node tools/console/test-netguard.mjs && node tools/console/test-robust.mjs && node tools/console/test-frontend.mjs && node --experimental-test-module-mocks tools/console/test-session.mjs && node --experimental-test-module-mocks tools/console/test-sites-cas.mjs && node tools/console/test-notes.mjs && node tools/console/test-livesync.mjs && node tools/console/test-theme.mjs && node tools/console/test-theme-boot.mjs && node tools/console/test-intent.mjs && node tools/console/test-meta-fetch.mjs && node tools/console/test-local-meta.mjs && node tools/console/test-cloud-poll.mjs && node tools/console/test-bundle.mjs",
+    "console:test:all": "node tools/console/test-trust.mjs && node tools/console/test-infer.mjs && node tools/console/test-purposes.mjs && node tools/console/test-visual-scheme.mjs && node tools/console/test-url.mjs && node tools/console/test-auto-add.mjs && node tools/console/test-auto-category.mjs && node tools/console/test-guard.mjs && node tools/console/test-hunks.mjs && node tools/console/test-ops.mjs && node --experimental-test-module-mocks tools/console/test-api-ops.mjs && node tools/console/test-netguard.mjs && node tools/console/test-robust.mjs && node tools/console/test-frontend.mjs && node --experimental-test-module-mocks tools/console/test-session.mjs && node --experimental-test-module-mocks tools/console/test-sites-cas.mjs && node tools/console/test-notes.mjs && node tools/console/test-livesync.mjs && node tools/console/test-theme.mjs && node tools/console/test-theme-boot.mjs && node tools/console/test-intent.mjs && node tools/console/test-meta-fetch.mjs && node tools/console/test-local-meta.mjs && node tools/console/test-cloud-poll.mjs && node tools/console/test-bundle.mjs && node tools/console/test-gridnav.mjs && node tools/console/test-chartkit.mjs",
     "console:autostart": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1",
     "console:autostart:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/install-autostart.ps1 -Uninstall",
     "console:start": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/console/launcher/start.ps1",
@@ -61,7 +61,9 @@
     "console:test:store": "node tools/console/test-store.mjs",
     "console:test:health": "node tools/console/test-health.mjs",
     "console:test:cron": "node tools/console/test-cron.mjs",
-    "console:test:v10": "node tools/console/test-v10.mjs"
+    "console:test:v10": "node tools/console/test-v10.mjs",
+    "console:test:gridnav": "node tools/console/test-gridnav.mjs",
+    "console:test:chartkit": "node tools/console/test-chartkit.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

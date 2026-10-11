@@ -20,11 +20,12 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { useToastStore } from '@/stores/toast'
 import { useOmniStore } from '@/stores/omni'
 import { buildCommands } from '@/utils/commands'
-import { rankSites, matchAny, scoreText, scoreSite } from '@/utils/search'
+import { rankSites, matchAny, scoreText, scoreSite, clickTier } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
 import { openInNewTab } from '@/utils/open'
 import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
+import { useClicksStore } from '@/stores/clicks'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
 /** 分组顺序：inline 站点优先，palette 命令优先 */
@@ -76,6 +77,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const omni = useOmniStore()
   const notes = useNotesStore()
   const siteNotes = useSiteNotesStore()
+  const clicks = useClicksStore()
 
   const raw = ref('')
   const selectedIndex = ref(0)
@@ -155,7 +157,11 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     if (!q) return []
     if (prefix.value && prefix.value !== 'site') return []
     // 命令面板是全局检索：始终搜全量站点，不受当前分类与页面搜索词影响
-    return rankSites(sites.sites, q, { limit: SITE_LIMIT }).map(s => ({
+    //
+    // 加权口径与首页搜索保持一致（同一开关、同一份点击数据）：两处排序若不一致，
+    // 用户会看到「命令面板里排第一、回到首页却排在后面」这种说不清的差别。
+    const boost = preferences.clickBoost ? clicks.mergedCounts : null
+    return rankSites(sites.sites, q, { limit: SITE_LIMIT, clicks: boost }).map(s => ({
       key: `site:${s.id}`,
       type: 'site',
       title: s.name,
@@ -163,6 +169,8 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
       site: s,
       icon: '',
       danger: false,
+      // 加权改变了顺序，就必须把「为什么」标出来，而不是默默把某条顶上去
+      frequent: boost ? clickTier(boost, s.id) >= 2 : false,
       run: () => openSite(s)
     }))
   })

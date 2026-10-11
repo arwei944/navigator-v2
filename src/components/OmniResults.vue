@@ -33,7 +33,8 @@
             <span class="omni-item-title"><template
               v-for="(seg, si) in splitHighlight(item.title, query)" :key="'t' + si"
             ><mark v-if="seg.hit">{{ seg.text }}</mark><template v-else>{{ seg.text }}</template></template><span
-              v-if="aliasOf(item)" class="omni-item-alias">别名 · {{ aliasOf(item) }}</span></span>
+              v-if="aliasOf(item)" class="omni-item-alias">别名 · {{ aliasOf(item) }}</span><span
+              v-if="item.frequent" class="omni-item-freq">常访问</span></span>
             <span v-if="item.subtitle" class="omni-item-sub"><template
               v-for="(seg, si) in splitHighlight(item.subtitle, query)" :key="'s' + si"
             ><mark v-if="seg.hit">{{ seg.text }}</mark><template v-else>{{ seg.text }}</template></template></span>
@@ -147,6 +148,8 @@ watch(() => props.selectedIndex, async (v) => {
   white-space: nowrap;
 }
 .omni-item-alias { color: var(--accent); font-weight: 500; margin-left: 6px; font-size: 11px; }
+/* 「常访问」：搜索排序被加权时把它标出来 —— 顺序变了却不说原因，等于悄悄骗人 */
+.omni-item-freq { margin-left: 6px; font-size: 11px; font-weight: 500; color: var(--color-heat-warm); background: var(--color-heat-warm-bg); padding: 1px 6px; border-radius: 8px; }
 .omni-item-sub {
   font-size: 11px;
   color: var(--text-secondary);

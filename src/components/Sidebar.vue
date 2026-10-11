@@ -42,6 +42,11 @@
         <span v-show="!iconOnly">回收站</span>
         <span v-if="sitesStore.trash.length > 0" class="badge">{{ sitesStore.trash.length }}</span>
       </div>
+      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'insights' }"
+           @click="navigate('Insights')" @keydown.enter="navigate('Insights')" :title="iconOnly ? '洞察' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="3" x2="3" y2="21"/><line x1="3" y1="21" x2="21" y2="21"/><polyline points="7 15 11 10 14 13 19 6"/></svg>
+        <span v-show="!iconOnly">洞察</span>
+      </div>
     </nav>
 
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。

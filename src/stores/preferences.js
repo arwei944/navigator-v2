@@ -21,6 +21,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const visualOverrides = ref({})
   // 首页「此刻推荐」横条：个性化推荐是打扰还是帮助，取决于用户，所以必须能关
   const smartBar = ref(true)
+  // 搜索排序的「常访问」加权（v11）：同一相关性档位内，点得多的站点排前。
+  // 默认开；关掉即退回纯相关性排序。见 utils/search.js#clickTier —— 那里刻意用
+  // 分档而不是连续值，就是为了让「为什么这条在前」能说清楚。
+  const clickBoost = ref(true)
 
   /**
    * 配色「归谁管」：'preset' = 由内置预设落色，'custom' = 由自定义主题落色。
@@ -60,6 +64,10 @@ export const usePreferencesStore = defineStore('preferences', () => {
     smartBar.value = Boolean(v)
   }
 
+  function setClickBoost(v) {
+    clickBoost.value = Boolean(v)
+  }
+
   function getCurrentEngine() {
     return engines.find(e => e.id === searchEngine.value) || engines[0]
   }
@@ -79,6 +87,16 @@ export const usePreferencesStore = defineStore('preferences', () => {
    * 与 applyPreset 写的是**同一批**变量、同一套键名 —— 这样「内置配色」与
    * 「用户调出来的配色」在组件眼里没有区别，不需要组件去分辨当前是哪种。
    */
+  /**
+   * :root 元素。node 侧（测试 / CLI）没有 DOM、或 document 只是个空壳时返回 null。
+   *
+   * 本 store 里所有落色都必须走它：直接写 `document.documentElement` 在 node 里会炸，
+   * 而且炸在 setup 阶段（几个 watch 都是 immediate），表现为「某个测试一 import 就崩」，
+   * 很难联想到是这里少了一道守卫。v11 让 sites.js 读排序开关时连着炸了三次，
+   * 一次修一处是修不完的 —— 统一成一个入口。
+   */
+  const rootEl = () => (typeof document === 'undefined' ? null : (document.documentElement || null))
+
   const CSS_VAR_OF = {
     bg: '--bg', bgWhite: '--bg-white', sidebarBg: '--sidebar-bg',
     accent: '--accent', accentLight: '--accent-light'
@@ -86,7 +104,8 @@ export const usePreferencesStore = defineStore('preferences', () => {
   function applyColors(colors) {
     if (!colors || typeof colors !== 'object') return
     colorsOwner = 'custom'
-    const root = document.documentElement
+    const root = rootEl()
+    if (!root) return
     for (const [k, cssVar] of Object.entries(CSS_VAR_OF)) {
       const v = colors[k]
       if (typeof v === 'string' && v) root.style.setProperty(cssVar, v)
@@ -103,11 +122,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
     const preset = THEME_PRESETS[id]
     if (!preset) return
     colorsOwner = 'preset'
-
+    // 与 applyVisual 同理：node 侧（测试 / CLI）没有可写的 DOM，落色这一步跳过。
+    // 标记先写（它是状态，与 DOM 无关），守卫放在它后面。
     const isDark = theme.value === 'dark'
     const colors = isDark ? preset.dark : preset
-
-    const root = document.documentElement
+    const root = rootEl()
+    if (!root) return
     root.style.setProperty('--bg', colors.bg)
     root.style.setProperty('--bg-white', colors.bgWhite)
     root.style.setProperty('--sidebar-bg', colors.sidebarBg)
@@ -117,11 +137,13 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   function setWallpaper(url) {
     wallpaper.value = url
+    const root = rootEl()
+    if (!root) return
     if (url) {
-      document.documentElement.style.setProperty('--wallpaper', `url(${url})`)
-      document.documentElement.style.setProperty('--wallpaper-blur', wallpaperBlur.value ? 'blur(8px)' : 'none')
+      root.style.setProperty('--wallpaper', `url(${url})`)
+      root.style.setProperty('--wallpaper-blur', wallpaperBlur.value ? 'blur(8px)' : 'none')
     } else {
-      document.documentElement.style.removeProperty('--wallpaper')
+      root.style.removeProperty('--wallpaper')
     }
   }
 
@@ -152,8 +174,14 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   /** 把当前令牌写成 :root 上的 CSS 变量，全站组件通过变量响应 */
   function applyVisual() {
+    // 这个 store 会被 node 侧加载（测试、CLI）：那里要么没有 document，
+    // 要么 document 只是个空壳（有 stub 但没有 documentElement）。
+    // 所以判的是**真正要用的那个对象**而不是「有没有 document」—— 后一种判法
+    // 会在空壳场景下照样抛错。少了这道守卫，任何在 node 里 import 到本 store 的链路
+    // 都会在 setup 阶段直接崩（watch immediate 在 setup 里就跑一次）。
+    const root = rootEl()
+    if (!root) return
     const vars = tokensToCssVars(activeTokens.value, theme.value)
-    const root = document.documentElement
     for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v)
   }
 
@@ -184,7 +212,9 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   // 监听主题变化，同步当前预设
   watch(theme, (val) => {
-    document.documentElement.setAttribute('data-theme', val)
+    // 这个 watch 是 immediate：store 一 setup 就跑，node 侧必须能活着走过去
+    const root = rootEl()
+    if (root) root.setAttribute('data-theme', val)
     // 重新应用当前预设（延后一拍是为了让 CSS 变量与 data-theme 同帧生效）。
     // 但自定义主题的配色是逐模式指定的，这条重放会把它盖掉 —— 那种情况交给 theme store 重落色。
     setTimeout(() => { if (colorsOwner !== 'custom') applyPreset(themePreset.value) }, 10)
@@ -201,11 +231,11 @@ export const usePreferencesStore = defineStore('preferences', () => {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
-    cardLayoutMode, cardDisplay, smartBar,
-    toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar,
+    cardLayoutMode, cardDisplay, smartBar, clickBoost,
+    toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar, setClickBoost,
     setThemePreset, setWallpaper, applyColors, THEME_PRESETS,
     setVisualScheme, setVisualToken, setVisualTokens, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'visualScheme', 'visualOverrides'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides'])
 })

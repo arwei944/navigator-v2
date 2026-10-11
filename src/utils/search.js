@@ -218,21 +218,52 @@ function fuzzySites(sites, q) {
 }
 
 /**
+ * 点击量分档（v11）：把「点了多少次」压成 4 档，只用于**同一相关性档位内部**的先后。
+ *
+ * 为什么是分档而不是 log(1+n) 这类连续值：搜索结果必须能解释「为什么这条在前面」。
+ * 连续值会让「7 次」与「8 次」产生无法归因的先后差异，而分档只有四个可能的原因，
+ * 前端还能直接把它标成「常访问」。这是刻意选的可解释性，不是精度上的取舍。
+ *
+ * 为什么只在同一档位内生效：相关性永远压过热度。热门站点不该挤掉精确命中的那条，
+ * 否则搜索就从「按你输入的词排序」退化成「按热度排序」。
+ */
+export const CLICK_TIERS = [1, 5, 20]
+
+export function clickTier(clicks, id) {
+  const n = Math.max(0, Math.floor(Number(clicks?.[id]) || 0))
+  if (n >= CLICK_TIERS[2]) return 3
+  if (n >= CLICK_TIERS[1]) return 2
+  if (n >= CLICK_TIERS[0]) return 1
+  return 0
+}
+
+/**
  * 按相关性返回排序后的站点数组；query 为空时返回空数组。
  * tieBreak 仅用于同一评分档位内部的先后（稳定排序不会跨档乱序），
  * 因此「切换排序方式」不会推翻相关性。
+ *
+ * `clicks`（可选，`{ [siteId]: 次数 }`）启用「常访问」加权：档位相同时热度高的在前，
+ * 优先级**低于相关性、高于 tieBreak**。不传即完全不启用，行为与 v10 一致。
  */
-export function rankSites(sites, query, { limit, tieBreak } = {}) {
+export function rankSites(sites, query, { limit, tieBreak, clicks, clickBoost = true } = {}) {
   const q = String(query ?? '').trim().toLowerCase()
   if (!q) return []
+  // 点击加权只在**同一评分档位内部**生效，且必须显式传入 clicks 才启用：
+  // search.js 是纯函数模块，自己不认得 store，谁有数据谁喂进来。
+  const tierOf = clickBoost && clicks && typeof clicks === 'object'
+    ? (s) => clickTier(clicks, s.id)
+    : null
   const scored = []
   for (const s of sites) {
     const score = scoreSite(s, q)
-    if (score > 0) scored.push({ site: s, score })
+    if (score > 0) scored.push({ site: s, score, tier: tierOf ? tierOf(s) : 0 })
   }
   let out
   if (scored.length) {
-    scored.sort((a, b) => (b.score - a.score) || (tieBreak ? tieBreak(a.site, b.site) : 0))
+    scored.sort((a, b) =>
+      (b.score - a.score) ||
+      (b.tier - a.tier) ||
+      (tieBreak ? tieBreak(a.site, b.site) : 0))
     out = scored.map(x => x.site)
   } else {
     // 模糊兜底已按 Fuse 自身评分排序，不再叠加 tieBreak 以免打乱

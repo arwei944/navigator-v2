@@ -1,8 +1,8 @@
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal">
+    <div ref="panelRef" class="modal" role="dialog" aria-modal="true" aria-labelledby="edit-site-title">
       <div class="modal-header">
-        <h3>编辑站点</h3>
+        <h3 id="edit-site-title">编辑站点</h3>
         <button class="modal-close" @click="$emit('close')" aria-label="关闭">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -64,11 +64,12 @@
 </template>
 
 <script setup>
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import PurposePicker from '@/components/PurposePicker.vue'
 import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps({
   site: { type: Object, required: true }
@@ -90,7 +91,12 @@ const form = reactive({
   archived: false
 })
 
+// 焦点陷阱：与添加弹窗同构 —— 挂载即显示，卸载时 composable 自动归还焦点
+const panelRef = ref(null)
+const trap = useFocusTrap(panelRef)
+
 onMounted(() => {
+  trap.activate()
   form.name = props.site.name
   form.url = props.site.url
   form.desc = props.site.desc

@@ -1,8 +1,8 @@
 <template>
   <div class="modal-overlay" @click.self="requestClose">
-    <div class="modal">
+    <div ref="panelRef" class="modal" role="dialog" aria-modal="true" aria-labelledby="add-site-title">
       <div class="modal-header">
-        <h3>添加站点</h3>
+        <h3 id="add-site-title">添加站点</h3>
         <button class="modal-close" @click="requestClose" aria-label="关闭">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -123,7 +123,7 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import PurposePicker from '@/components/PurposePicker.vue'
@@ -134,6 +134,7 @@ import { fetchSiteMeta, metaFailureText } from '@/services/meta'
 import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
 import { loadSuggestCategory } from '@/services/autoAdd'
 import { aiApi } from '@/services/aiApi'
+import { useFocusTrap } from '@/composables/useFocusTrap'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
@@ -227,9 +228,17 @@ function categoryMetaFromStore() {
  * 只替换用户**还没手动改过**的字段 —— 润色结果要能一眼看出改了什么，
  * 而且不能把人已经写好的内容冲掉。
  */
+// 焦点陷阱：这个弹窗是「v-if 挂载即显示」，所以 onMounted 就开陷阱；
+// 卸载时由 composable 的 onBeforeUnmount 自动归还焦点（此前 Tab 会走到弹窗背后的卡片里）
+const panelRef = ref(null)
+const trap = useFocusTrap(panelRef)
+onMounted(() => trap.activate())
+
 const aiReady = ref(false)
 const aiBusy = ref(false)
-aiApi.probe().then(p => { aiReady.value = p.ready })
+// v11：用 canPolish 而不是 ready —— 服务端必须同时满足「配好了」与「润色免鉴权」。
+// 只看 ready 时，没有管理 key 的人会看到一个点了就报「请求失败」的按钮（这正是本次要修的）。
+aiApi.probe().then(p => { aiReady.value = p.canPolish })
 
 async function aiPolish() {
   aiBusy.value = true

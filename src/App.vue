@@ -28,6 +28,11 @@
         <ContentFeed />
       </template>
 
+      <!-- 洞察面板（v11）：整页图表，不需要搜索工具栏与卡片网格 -->
+      <template v-else-if="scope === 'insights'">
+        <InsightsView />
+      </template>
+
       <!-- 常规视图 -->
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
@@ -162,6 +167,8 @@ const ThemeEditor = defineAsyncComponent(() => import('@/components/ThemeEditor.
  * 越过 600 KiB 预算）。改成异步后整条链路落到异步 chunk，首屏反而省下一截。
  */
 const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModal.vue'))
+// 洞察面板：整页图表，只在点进 /insights 时才需要 —— 必须异步，否则图表原语会进首屏包
+const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -408,14 +415,16 @@ const SCOPE_BY_ROUTE = {
   Recent: 'recent',
   Feed: 'feed',
   Trash: 'trash',
-  Archived: 'archived'
+  Archived: 'archived',
+  Insights: 'insights'
 }
 const SCOPE_LABEL = {
   favorites: '收藏',
   recent: '最近',
   archived: '归档',
   feed: '内容聚合',
-  trash: '回收站'
+  trash: '回收站',
+  insights: '洞察'
 }
 
 const scope = computed(() => SCOPE_BY_ROUTE[route.name] || 'discover')

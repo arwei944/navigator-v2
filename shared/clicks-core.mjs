@@ -93,4 +93,137 @@ export function rankByClicks(sites, clicks, { limit } = {}) {
 }
 
 /** 云端未存储时的空统计（前端据此显示「暂无点击数据」而不是报错） */
-export const EMPTY_CLICKS = { version: 0, updatedAt: null, sites: 0, total: 0, clicks: {} }
+export const EMPTY_CLICKS = { version: 0, updatedAt: null, sites: 0, total: 0, clicks: {}, series: {} }
+
+/* ------------------------------------------------------------------ *
+ * 时间分桶（v11）
+ *
+ * 为什么是**平行于 clicks 的第二份结构**而不是把 clicks 的值改成
+ * `{ total, buckets }`：clicks 是三个读写方共用了很久的口径（前端角标、排行、
+ * 后台看板都直接读它），改值等于让既有 29 套件的断言与所有读点一起重写。
+ * series 只服务于「趋势图」这一个新增用途，缺了它页面降级成「暂无趋势」，
+ * 不会让任何既有能力坏掉 —— 这是纯增量，不是破坏性迁移。
+ * ------------------------------------------------------------------ */
+
+/** 时间分桶保留天数（超出即裁剪，防止云端对象随站点数无限膨胀） */
+export const SERIES_DAYS = 90
+/** 趋势图默认取最近多少天 */
+export const SERIES_WINDOW = 30
+
+function toDate(input) {
+  if (input instanceof Date) return Number.isNaN(input.getTime()) ? null : new Date(input.getTime())
+  if (typeof input === 'number' || typeof input === 'string') {
+    const d = new Date(input)
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  return null
+}
+
+/**
+ * 归一成桶键 `'YYYY-MM-DD'`。
+ * 按**本地时区**而非 UTC：用户在 GMT+8，UTC 分桶会把晚上的点击记到前一天，
+ * 趋势图横轴对不上直觉。跨端时区差异会让桶键不完全一致，但这是统计量，
+ * 误差远小于「横轴错一天」的观感代价。非法输入返回空串（调用方据此跳过写入）。
+ */
+export function dayKey(input) {
+  const d = toDate(input)
+  if (!d) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** 在给定日期上加减天数（用 setDate 而非毫秒，避开夏令时与月末进位） */
+function shiftDays(input, delta) {
+  const d = toDate(input)
+  if (!d) return null
+  d.setDate(d.getDate() + delta)
+  return d
+}
+
+/**
+ * 裁剪 series：丢掉早于「今天往前 keepDays-1 天」的桶。
+ * 桶键是定长 `YYYY-MM-DD`，字典序等于时间序，直接字符串比较即可，不必解析日期。
+ */
+export function pruneSeries(series, today = new Date(), keepDays = SERIES_DAYS) {
+  const base = shiftDays(today, -(Math.max(1, keepDays) - 1))
+  const cutoff = base ? dayKey(base) : ''
+  const out = {}
+  for (const [id, buckets] of Object.entries(series || {})) {
+    if (!buckets || typeof buckets !== 'object') continue
+    const kept = {}
+    for (const [key, n] of Object.entries(buckets)) {
+      const v = Math.floor(Number(n) || 0)
+      if (v <= 0 || typeof key !== 'string' || key.length !== 10) continue
+      if (cutoff && key < cutoff) continue
+      kept[key] = v
+    }
+    if (Object.keys(kept).length) out[id] = kept
+  }
+  return out
+}
+
+/**
+ * 把一次上报的增量 `{id: n}` 叠加进 series，并顺带裁剪。
+ * 纯函数：不修改入参。非法桶键 / 非正值在裁剪环节被一并清掉，脏数据不会落库。
+ */
+export function applySeries(prev, increments, { today = new Date(), keepDays = SERIES_DAYS } = {}) {
+  const out = {}
+  for (const [id, buckets] of Object.entries(prev || {})) {
+    if (!buckets || typeof buckets !== 'object') continue
+    const kept = {}
+    for (const [key, n] of Object.entries(buckets)) {
+      const v = Math.floor(Number(n) || 0)
+      if (v > 0 && typeof key === 'string' && key.length === 10) kept[key] = v
+    }
+    if (Object.keys(kept).length) out[id] = kept
+  }
+  const key = dayKey(today)
+  if (key) {
+    for (const [id, n] of Object.entries(increments || {})) {
+      const step = Math.floor(Number(n) || 0)
+      if (step <= 0) continue
+      const cur = out[id] || (out[id] = {})
+      cur[key] = Math.floor(Number(cur[key]) || 0) + step
+    }
+  }
+  return pruneSeries(out, today, keepDays)
+}
+
+/**
+ * 取某站点最近 days 天的定长数组（**从旧到新**，缺失补 0）—— sparkline 直接吃这个。
+ * 定长是刻意的：图表不该自己算日期，否则每个组件都要复制一遍「补零 / 排序」逻辑。
+ */
+export function seriesOf(series, id, { days = SERIES_WINDOW, today = new Date() } = {}) {
+  const span = Math.max(1, Math.floor(Number(days) || SERIES_WINDOW))
+  const buckets = (series || {})[id]
+  const map = buckets && typeof buckets === 'object' ? buckets : {}
+  const out = new Array(span).fill(0)
+  const base = toDate(today) || new Date()
+  base.setHours(12, 0, 0, 0)
+  for (let back = span - 1; back >= 0; back -= 1) {
+    const d = new Date(base.getTime())
+    d.setDate(d.getDate() - back)
+    out[span - 1 - back] = Math.max(0, Math.floor(Number(map[dayKey(d)]) || 0))
+  }
+  return out
+}
+
+/**
+ * 按当前站点集剔除 series 里的孤儿桶：站点删了，它的趋势也必须一起消失，
+ * 否则既污染趋势图，也可能被未来同 id 的新站点继承。`known` 为空时整份保留。
+ */
+export function filterSeries(series, known) {
+  if (!known || typeof known.has !== 'function') return series || {}
+  const out = {}
+  for (const [id, buckets] of Object.entries(series || {})) {
+    if (known.has(id)) out[id] = buckets
+  }
+  return out
+}
+
+/** series 里某站点的窗口内总量（与 countOf 的区别：只数窗口内的，用于「近 30 天」口径） */
+export function windowedCount(series, id, opts = {}) {
+  return seriesOf(series, id, opts).reduce((a, b) => a + b, 0)
+}

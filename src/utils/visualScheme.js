@@ -25,14 +25,15 @@ export const FONT_LABELS = {
   mono: '等宽'
 }
 
-/** 六个维度，用于设置面板分组 */
+/** 七个维度，用于设置面板分组 */
 export const DIMENSIONS = [
   { id: 'shape', label: '圆角与形状' },
   { id: 'elevation', label: '阴影与层次' },
   { id: 'density', label: '密度与间距' },
   { id: 'glass', label: '玻璃与透明' },
   { id: 'type', label: '字体与字号' },
-  { id: 'motion', label: '动效与配色' }
+  { id: 'motion', label: '动效与配色' },
+  { id: 'chart', label: '图表' }
 ]
 
 /**
@@ -76,7 +77,13 @@ export const TOKENS = {
   showHeat: { dim: 'motion', panel: 'card', label: '热度徽章', type: 'toggle', default: true },
   showCategoryTag: { dim: 'motion', panel: 'card', label: '分类标签', type: 'toggle', default: true },
   showPurposes: { dim: 'motion', panel: 'card', label: '用途标签', type: 'toggle', default: true },
-  showBadges: { dim: 'motion', panel: 'card', label: '置顶 / 未访问徽章', type: 'toggle', default: true }
+  showBadges: { dim: 'motion', panel: 'card', label: '置顶 / 未访问徽章', type: 'toggle', default: true },
+
+  /* ---- 图表（v11）：只服务洞察面板，与卡片令牌同样受方案预设覆盖 ---- */
+
+  chartRadius: { dim: 'chart', label: '图表圆角', type: 'range', min: 0, max: 16, step: 2, unit: 'px', default: 6 },
+  chartHeight: { dim: 'chart', label: '趋势图高度', type: 'range', min: 24, max: 64, step: 4, unit: 'px', default: 32 },
+  chartArea: { dim: 'chart', label: '趋势图填充面积', type: 'toggle', default: true }
 }
 
 /**
@@ -125,41 +132,50 @@ const NEUTRAL_LAYOUT = {
 }
 
 /**
+ * 图表令牌的中性取值。
+ *
+ * 图表是 v11 才出现的新用途，任何一套既有方案都不该因为多了这几个令牌就变样，
+ * 所以统一取中性值展开 —— 与 NEUTRAL_LAYOUT 同一条理由：既要「方案完整取值」
+ * （测试守卫），又不能改变方案外观。
+ */
+const NEUTRAL_CHART = { chartRadius: 6, chartHeight: 32, chartArea: true }
+
+/**
  * 预设方案。每套都是完整取值，不依赖继承，切换即整体换装。
  * accent / mode 直接驱动现有的 themePreset / theme，所以配色也是方案的一部分。
  */
 export const SCHEMES = [
   {
     id: 'apple', name: '苹果原生', desc: '当前默认，均衡克制', accent: 'default', mode: 'light',
-    tokens: { radiusCard: 12, radiusControl: 8, borderStrength: 100, shadowLevel: 100, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 20, glassAlpha: 72, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: true, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 12, radiusControl: 8, borderStrength: 100, shadowLevel: 100, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 20, glassAlpha: 72, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: true, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'flat', name: '极简扁平', desc: '去阴影、小圆角、边界靠描边', accent: 'default', mode: 'light',
-    tokens: { radiusCard: 4, radiusControl: 4, borderStrength: 55, shadowLevel: 0, cardPadding: 16, gridGap: 12, gridCols: 3, navItemHeight: 38, glassBlur: 0, glassAlpha: 100, fontFamily: 'system', fontSizeBase: 14, titleWeight: 500, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 4, radiusControl: 4, borderStrength: 55, shadowLevel: 0, cardPadding: 16, gridGap: 12, gridCols: 3, navItemHeight: 38, glassBlur: 0, glassAlpha: 100, fontFamily: 'system', fontSizeBase: 14, titleWeight: 500, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'glass', name: '玻璃拟态', desc: '大圆角、强模糊、半透明面板', accent: 'purple', mode: 'light',
-    tokens: { radiusCard: 18, radiusControl: 12, borderStrength: 70, shadowLevel: 55, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 34, glassAlpha: 52, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 220, cardAnim: true, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 18, radiusControl: 12, borderStrength: 70, shadowLevel: 55, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 34, glassAlpha: 52, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 220, cardAnim: true, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'compact', name: '紧凑高密度', desc: '小内边距、5 列、矮导航', accent: 'green', mode: 'light',
-    tokens: { radiusCard: 8, radiusControl: 6, borderStrength: 100, shadowLevel: 60, cardPadding: 10, gridGap: 8, gridCols: 5, navItemHeight: 32, glassBlur: 12, glassAlpha: 88, fontFamily: 'system', fontSizeBase: 13, titleWeight: 600, motionDuration: 100, cardAnim: false, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 8, radiusControl: 6, borderStrength: 100, shadowLevel: 60, cardPadding: 10, gridGap: 8, gridCols: 5, navItemHeight: 32, glassBlur: 12, glassAlpha: 88, fontFamily: 'system', fontSizeBase: 13, titleWeight: 600, motionDuration: 100, cardAnim: false, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'cozy', name: '宽松舒适', desc: '大内边距、2 列、慢过渡', accent: 'orange', mode: 'light',
-    tokens: { radiusCard: 16, radiusControl: 10, borderStrength: 80, shadowLevel: 110, cardPadding: 26, gridGap: 22, gridCols: 2, navItemHeight: 48, glassBlur: 26, glassAlpha: 82, fontFamily: 'system', fontSizeBase: 15, titleWeight: 600, motionDuration: 240, cardAnim: true, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 16, radiusControl: 10, borderStrength: 80, shadowLevel: 110, cardPadding: 26, gridGap: 22, gridCols: 2, navItemHeight: 48, glassBlur: 26, glassAlpha: 82, fontFamily: 'system', fontSizeBase: 15, titleWeight: 600, motionDuration: 240, cardAnim: true, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'contrast', name: '高对比硬朗', desc: '直角、重阴影、深色底', accent: 'default', mode: 'dark',
-    tokens: { radiusCard: 2, radiusControl: 2, borderStrength: 100, shadowLevel: 140, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 42, glassBlur: 0, glassAlpha: 100, fontFamily: 'sans', fontSizeBase: 15, titleWeight: 700, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 2, radiusControl: 2, borderStrength: 100, shadowLevel: 140, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 42, glassBlur: 0, glassAlpha: 100, fontFamily: 'sans', fontSizeBase: 15, titleWeight: 700, motionDuration: 120, cardAnim: false, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'paper', name: '宣纸', desc: '暖白纸感、松石绿点缀、克制的阴影', accent: 'paper', mode: 'light',
-    tokens: { radiusCard: 14, radiusControl: 10, borderStrength: 85, shadowLevel: 70, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 8, glassAlpha: 90, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 180, cardAnim: true, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 14, radiusControl: 10, borderStrength: 85, shadowLevel: 70, cardPadding: 20, gridGap: 16, gridCols: 3, navItemHeight: 42, glassBlur: 8, glassAlpha: 90, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 180, cardAnim: true, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   },
   {
     id: 'night', name: '夜航', desc: '深墨蓝底、低饱和青、关掉毛玻璃', accent: 'night', mode: 'dark',
-    tokens: { radiusCard: 10, radiusControl: 8, borderStrength: 90, shadowLevel: 90, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 0, glassAlpha: 95, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: false, ...NEUTRAL_LAYOUT }
+    tokens: { radiusCard: 10, radiusControl: 8, borderStrength: 90, shadowLevel: 90, cardPadding: 18, gridGap: 14, gridCols: 3, navItemHeight: 40, glassBlur: 0, glassAlpha: 95, fontFamily: 'system', fontSizeBase: 14, titleWeight: 600, motionDuration: 150, cardAnim: false, ...NEUTRAL_LAYOUT, ...NEUTRAL_CHART }
   }
 ]
 
@@ -302,6 +318,12 @@ export function tokensToCssVars(tokens, mode = 'light') {
     '--grid-gap': px(tokens.gridGap),
     '--grid-cols': String(tokens.gridCols),
     '--nav-item-h': px(tokens.navItemHeight),
+
+    // 图表（洞察面板）：圆角与高度给 SVG 用；面积开关是 0/1 字符串，
+    // 因为 setProperty 只吃字符串，布尔没法直接进 CSS 变量
+    '--chart-radius': px(tokens.chartRadius),
+    '--chart-height': px(tokens.chartHeight),
+    '--chart-area': tokens.chartArea ? '1' : '0',
 
     // 卡片大小：无单位乘数（供 calc() 用），控制图标/字号等内容的整体比例
     '--card-scale': String(tokens.cardScale / 100),

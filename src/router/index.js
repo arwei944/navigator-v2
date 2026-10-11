@@ -14,6 +14,7 @@ const routes = [
   { path: '/archived', name: 'Archived', component: HomeView },
   { path: '/feed', name: 'Feed', component: HomeView },
   { path: '/trash', name: 'Trash', component: HomeView },
+  { path: '/insights', name: 'Insights', component: () => import('@/views/InsightsView.vue') },
   // 旧链接兼容：分类曾在路径里，统一重定向到 query 形式（保留范围与其余 query）
   {
     path: '/c/:id',

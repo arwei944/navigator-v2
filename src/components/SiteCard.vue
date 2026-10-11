@@ -7,7 +7,7 @@
        :data-site-id="site.id"
        :data-visited="visited ? '1' : '0'"
        role="button"
-       tabindex="0"
+       :tabindex="tabIndex"
        :aria-label="ariaLabel"
        :title="titleAttr"
        @click="onCardClick"
@@ -15,12 +15,18 @@
        @keydown.space.prevent="onActivate"
        @contextmenu.prevent="openMenu"
        @mouseenter="onHover" @mouseleave="onHoverLeave">
-    <!-- 批量选择复选框 -->
-    <div v-if="batchMode" class="card-checkbox" :class="{ checked: selected }">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 批量选择复选框：真 <input> 而不是 div —— 之前是 div，键盘根本到不了，
+         批量模式对键盘用户等于完全不存在（v11 修）。视觉仍是那颗圆点，
+         input 透明地盖在上面，点击与空格都落在它身上。 -->
+    <label v-if="batchMode" class="card-checkbox" :class="{ checked: selected }">
+      <input type="checkbox" class="card-checkbox-input" :checked="selected"
+             :aria-label="`选择 ${site.name}`"
+             @click.stop @keydown.enter.stop
+             @change="$emit('select', site)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <polyline v-if="selected" points="20 6 9 17 4 12"/>
       </svg>
-    </div>
+    </label>
 
     <div class="card-header">
       <div v-if="showDragHandle && !batchMode" class="drag-handle" title="拖拽排序" @click.stop>
@@ -121,7 +127,13 @@ const props = defineProps({
   batchMode: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
   /** 信息密度：compact 只留名称与域名；standard 为当前形态；rich 再补别名 */
-  density: { type: String, default: 'standard' }
+  density: { type: String, default: 'standard' },
+  /**
+   * roving tabindex（v11 网格键盘导航）：同一时刻只有一张卡是 0，其余 -1。
+   * 于是 Tab 进出网格只停一次（而不是 300 次），网格内部靠方向键移动。
+   * 默认 0 保持既有行为 —— 不传这个 prop 的调用点（回收站列表等）不受影响。
+   */
+  tabIndex: { type: Number, default: 0 }
 })
 
 const emit = defineEmits(['edit', 'delete', 'select'])
@@ -499,6 +511,9 @@ function onHoverLeave() {
 }
 .card-checkbox.checked { background: var(--accent); border-color: var(--accent); }
 .card-checkbox svg { width: 12px; height: 12px; color: var(--color-on-solid); }
+/* 真 input 透明地盖在圆点上：键盘可达、点击生效，视觉与之前完全一致 */
+.card-checkbox-input { position: absolute; inset: -2px; margin: 0; opacity: 0; cursor: pointer; }
+.card-checkbox:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 列表模式 */
 .card-list { display: flex; align-items: center; gap: 16px; padding: 12px 18px; border-left-width: 3px; }

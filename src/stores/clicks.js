@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { countOf } from '../../shared/clicks-core.mjs'
+import { countOf, dayKey } from '../../shared/clicks-core.mjs'
 import { decodeStored, encodeStored } from '@/utils/storeVersioning'
 import { safeSetItem } from '@/utils/safeStorage'
 import { setVisibleInterval } from '@/utils/visibility'
@@ -26,6 +26,7 @@ const FLUSH_DELAY = 4000
 
 export const useClicksStore = defineStore('clicks', () => {
   const counts = ref({})     // { [siteId]: 全局点击量 }
+  const series = ref({})     // { [siteId]: { 'YYYY-MM-DD': n } } 时间分桶，趋势图唯一数据源
   const total = ref(0)       // 全站总点击量
   const sites = ref(0)       // 有点击的站点数
   const updatedAt = ref(null)
@@ -41,6 +42,25 @@ export const useClicksStore = defineStore('clicks', () => {
     for (const [id, n] of Object.entries(pending.value)) {
       const v = Number(n) || 0
       if (v > 0) out[id] = (out[id] || 0) + v
+    }
+    return out
+  })
+
+  /**
+   * 趋势图读这一份：云端已确认 + 本地待发（待发部分全部记在**今天**的桶里）。
+   * 没有待发时**直接复用 series.value 的引用** —— 趋势图订阅的是对象身份，
+   * 每次都造新对象会让「没变化也重算」，300 站的图表全量重绘。
+   */
+  const mergedSeries = computed(() => {
+    const pend = Object.entries(pending.value).filter(([, n]) => Number(n) > 0)
+    if (!pend.length) return series.value
+    const key = dayKey(new Date())
+    if (!key) return series.value
+    const out = {}
+    for (const [id, buckets] of Object.entries(series.value)) out[id] = buckets
+    for (const [id, n] of pend) {
+      const cur = out[id] || {}
+      out[id] = { ...cur, [key]: (Number(cur[key]) || 0) + Number(n) }
     }
     return out
   })
@@ -128,6 +148,7 @@ export const useClicksStore = defineStore('clicks', () => {
         // 服务端返回的是合并后的全量：直接采用，顺带把并发期间的他人点击也拉齐
         if (j && j.clicks && typeof j.clicks === 'object') {
           counts.value = j.clicks
+          if (j.series && typeof j.series === 'object') series.value = j.series
           total.value = Number(j.total) || 0
           sites.value = Number(j.sites) || 0
           updatedAt.value = j.updatedAt || updatedAt.value
@@ -156,6 +177,7 @@ export const useClicksStore = defineStore('clicks', () => {
         if (!res.ok) return
         const j = await res.json()
         counts.value = j && j.clicks && typeof j.clicks === 'object' ? j.clicks : {}
+        series.value = j && j.series && typeof j.series === 'object' ? j.series : {}
         total.value = Number(j?.total) || 0
         sites.value = Number(j?.sites) || 0
         updatedAt.value = j?.updatedAt || null
@@ -188,7 +210,7 @@ export const useClicksStore = defineStore('clicks', () => {
   }
 
   return {
-    counts, total, sites, updatedAt, loaded, pending, mergedCounts,
+    counts, series, total, sites, updatedAt, loaded, pending, mergedCounts, mergedSeries,
     countFor, record, flush, load, refresh,
   }
 })

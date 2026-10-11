@@ -14,7 +14,7 @@
  * 写入前按当前站点集剔除：站点删除后其点击必须一起消失（同 health.js 的口径）。
  */
 import { get, put } from '#store'
-import { normalizeIncrements, mergeClicks, tallyClicks, EMPTY_CLICKS } from '../shared/clicks-core.mjs'
+import { normalizeIncrements, mergeClicks, tallyClicks, applySeries, filterSeries, EMPTY_CLICKS } from '../shared/clicks-core.mjs'
 
 const PATHNAME = 'ops/clicks.json'
 const SITES_PATHNAME = 'sites.json'
@@ -124,12 +124,18 @@ export default async function handler(req, res) {
     const merged = mergeClicks(prevClicks, normalized.entries, { known })
     const counts = tallyClicks(merged)
 
+    // 时间分桶与累计值同源同步：都用同一份 known 剔除、都在这一次写入里落库。
+    // 分成两次写会出现「有总数没趋势」的中间态，趋势图就得为它写降级分支。
+    const prevSeries = prev && prev.series && typeof prev.series === 'object' ? prev.series : {}
+    const series = filterSeries(applySeries(prevSeries, normalized.entries, { today: new Date() }), known)
+
     const data = {
       version: ((prev && Number(prev.version)) || 0) + 1,
       updatedAt: new Date().toISOString(),
       sites: counts.sites,
       total: counts.total,
       clicks: merged,
+      series,
       patched: normalized.sites,
       added: normalized.total,
     }

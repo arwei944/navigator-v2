@@ -51,6 +51,7 @@ export function buildCommands(ctx) {
     { id: 'archived', name: 'Archived', title: '归档', icon: 'archive', keywords: ['guidang', 'gd', 'archived'] },
     { id: 'feed', name: 'Feed', title: '内容聚合', icon: 'feed', keywords: ['juhe', 'jh', 'feed', 'neirong'] },
     { id: 'trash', name: 'Trash', title: '回收站', icon: 'trash', keywords: ['huishouzhan', 'hsz', 'trash', 'laji'] },
+    { id: 'insights', name: 'Insights', title: '洞察面板', icon: 'feed', keywords: ['dongcha', 'dc', 'insights', 'tongji', 'tj', 'fenxi', 'fx', 'tubiao', 'tb'] },
     { id: 'admin', name: 'Admin', title: '管理后台', icon: 'settings', keywords: ['guanli', 'gl', 'houtai', 'ht', 'admin'] }
   ]
   for (const p of pages) {
@@ -84,6 +85,16 @@ export function buildCommands(ctx) {
     icon: 'layout',
     keywords: ['shitu', 'st', 'wangge', 'wg', 'liebiao', 'lb', 'grid', 'list', 'view'],
     run: () => sites.setViewMode(sites.viewMode === 'grid' ? 'list' : 'grid')
+  })
+
+  cmds.push({
+    id: 'view.clickboost',
+    title: preferences.clickBoost ? '关闭常访问加权' : '开启常访问加权',
+    subtitle: preferences.clickBoost ? '当前：开启 → 搜索将只按相关性排序' : '当前：关闭 → 同相关性时点得多的排前',
+    section: 'view',
+    icon: 'sort',
+    keywords: ['changfangwen', 'cfw', 'jiaquan', 'jq', 'clickboost', 'reli', 'rl', 'paixu', 'px'],
+    run: () => preferences.setClickBoost(!preferences.clickBoost)
   })
 
   for (const s of SORTS) {

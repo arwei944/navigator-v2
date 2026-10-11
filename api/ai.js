@@ -20,8 +20,11 @@
  *  - 出网目标由**服务端配置**决定，调用方不能传 URL（否则又是一个开放代理）。
  *  - 单次请求条数与文本长度封顶；响应只取 content，不透传上游的原始响应体。
  */
+import { get, put } from '#store'
 import { checkAuthHeader } from '../shared/auth.mjs'
+import { dayKey } from '../shared/clicks-core.mjs'
 import { existsSync, readFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -29,6 +32,24 @@ const ROOT = dirname(fileURLToPath(import.meta.url))
 const TIMEOUT_MS = 45 * 1000
 const MAX_BATCH = 20
 const MAX_TEXT = 400
+
+/**
+ * 免鉴权动作（v11）：`polish` 面向所有访客开放。
+ *
+ * 为什么必须开放：「添加网站」弹窗里的润色按钮此前一律带 admin key 请求，
+ * 于是**没有管理 key 的人点了必定失败**，而且失败文案只说「请求失败」——
+ * 看上去像功能坏了，实际是鉴权设计把普通用户挡在门外。
+ *
+ * 为什么不干脆全部免鉴权：`categorize` / `summarize` 是批量动作（一次 20 条、
+ * 800 token），且需要站点表与巡检数据，属于管理作业。只有 polish 是单条、
+ * 300 token、输入已被截断到 400 字的轻量动作，适合开放。
+ *
+ * 开放的代价是**必须自己限流**：走的仍是服务端的 key 与额度。
+ */
+const PUBLIC_ACTIONS = new Set(['polish'])
+/** 免鉴权动作的每日额度（按 IP 指纹计） */
+const PUBLIC_DAILY = 30
+const QUOTA_PATH = 'ops/ai-quota.json'
 
 function noStore(res) {
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
@@ -38,6 +59,51 @@ function readBody(req) {
   if (typeof req.body === 'string') return Promise.resolve(JSON.parse(req.body))
   if (req.body && typeof req.body.getReader === 'function') return new Response(req.body).json()
   return Promise.resolve(req.body || {})
+}
+
+/* ---------------- 免鉴权动作的额度 ---------------- */
+
+function clientIp(req) {
+  const fwd = req.headers['x-forwarded-for']
+  const raw = Array.isArray(fwd) ? fwd[0] : fwd
+  return String(raw || req.socket?.remoteAddress || 'unknown').split(',')[0].trim()
+}
+
+/** 只落指纹、不存明文 IP：这张表会被运维导出，明文 IP 属于不必留的个人信息 */
+function ipFingerprint(ip) {
+  return createHash('sha256').update(`ai:${ip}`).digest('hex').slice(0, 16)
+}
+
+/**
+ * 扣一次当日额度。
+ *
+ * 与点击统计同一取舍：Serverless 无共享状态，读-改-写理论上会并发丢更新。
+ * 额度是**防刷的保险**而非计费账本，少扣几次不构成问题；反过来，
+ * 存储抖动时**仍然放行** —— 不能因为存不下就让正常用户用不了润色。
+ */
+async function quotaTake(key, today, limit = PUBLIC_DAILY) {
+  let cur = {}
+  try {
+    const blob = await get(QUOTA_PATH, { access: 'private', useCache: false })
+    if (blob && blob.stream) {
+      const data = JSON.parse(await new Response(blob.stream).text())
+      const days = data && data.days && typeof data.days === 'object' ? data.days : {}
+      if (days[today] && typeof days[today] === 'object') cur = days[today]
+    }
+  } catch { /* 首次使用：从零开始 */ }
+
+  const used = Number(cur[key]) || 0
+  if (used >= limit) return { ok: false, left: 0 }
+
+  try {
+    await put(QUOTA_PATH, JSON.stringify({
+      // 额度按天，昨天的数据没有任何留存价值 —— 顺手清掉，表不会无限变大
+      days: { [today]: { ...cur, [key]: used + 1 } },
+      updatedAt: new Date().toISOString(),
+    }), { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' })
+  } catch { /* 落盘失败也放行，理由见上面 */ }
+
+  return { ok: true, left: limit - used - 1 }
 }
 
 /** 配置优先级：环境变量 > data/ai-config.json（文件不进 git，沙箱没有环境变量注入） */
@@ -185,22 +251,39 @@ export default async function handler(req, res) {
 
   // 可用性自检：前端拿它决定入口显不显示（不泄露任何 key 材料）
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, ready: cfg.ready, model: cfg.ready ? cfg.model : '', actions: Object.keys(ACTIONS) })
+    res.status(200).json({
+      ok: true, ready: cfg.ready, model: cfg.ready ? cfg.model : '',
+      actions: Object.keys(ACTIONS),
+      // 前端据此决定「润色」是出现在添加弹窗里（免鉴权）还是只在后台出现
+      publicActions: [...PUBLIC_ACTIONS],
+    })
     return
   }
   if (req.method !== 'POST') { res.status(405).json({ ok: false, error: 'Method not allowed' }); return }
 
-  const auth = checkAuthHeader(req)
-  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  // body 要先读出来才能分流鉴权：路由取决于 action，而不是请求头
+  let body
+  try { body = await readBody(req) } catch { res.status(400).json({ ok: false, error: 'Invalid JSON body' }); return }
+  const action = String(body.action || '')
+
+  if (PUBLIC_ACTIONS.has(action)) {
+    // 免鉴权路径：只查额度、不看 admin key（理由见文件头 PUBLIC_ACTIONS 的注释）
+    const q = await quotaTake(ipFingerprint(clientIp(req)), dayKey())
+    if (!q.ok) {
+      res.status(429).json({ ok: false, error: `今日润色额度已用完（${PUBLIC_DAILY} 次/天）` })
+      return
+    }
+  } else {
+    const auth = checkAuthHeader(req)
+    if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  }
+
   if (!cfg.ready) {
     res.status(501).json({ ok: false, error: 'AI 未配置：请在 data/ai-config.json 或环境变量里设置 AI_BASE_URL 与 AI_API_KEY' })
     return
   }
 
-  let body
-  try { body = await readBody(req) } catch { res.status(400).json({ ok: false, error: 'Invalid JSON body' }); return }
-
-  const fn = ACTIONS[String(body.action || '')]
+  const fn = ACTIONS[action]
   if (!fn) { res.status(400).json({ ok: false, error: `未知动作（可用：${Object.keys(ACTIONS).join(' / ')}）` }); return }
 
   try {
