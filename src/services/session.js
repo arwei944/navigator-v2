@@ -18,7 +18,9 @@ export function storeKey(k) {
 }
 
 function authHeaders(key, extra) {
-  return { Authorization: `Bearer ${key || ''}`, ...(extra || {}) }
+  // X-Nav-Key：发布沙箱的网关会改写 Authorization（见 shared/auth.mjs#bearerOf），
+  // 自定义头可完整穿透；Authorization 保留给本机直连与旧服务端。
+  return { Authorization: `Bearer ${key || ''}`, 'X-Nav-Key': key || '', ...(extra || {}) }
 }
 
 /**

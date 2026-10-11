@@ -12,7 +12,7 @@
  * 体积门禁则是另一回事：`任何人可无限次 POST 任意大小 JSON 灌满 Blob` 的正解是
  * 硬上限（content-length + 合并后实际大小），限流只是 best-effort 的补充。
  *
- * 用 `node:test` 的模块 mock 顶掉 `@vercel/blob`，把 handler 当普通函数调，不联网、无凭据。
+ * 用 `node:test` 的模块 mock 顶掉 `#store`（v9 起 session 的存储适配层），把 handler 当普通函数调，不联网、无凭据。
  * 运行：node --experimental-test-module-mocks tools/console/test-session.mjs
  */
 import { test } from 'node:test'
@@ -23,7 +23,7 @@ import assert from 'node:assert/strict'
 const store = new Map()
 
 const { mock } = await import('node:test')
-mock.module('@vercel/blob', {
+mock.module('#store', {
   namedExports: {
     get: async (pathname) => (store.has(pathname) ? { stream: new Response(store.get(pathname)).body } : null),
     put: async (pathname, body) => { store.set(pathname, String(body)); return { pathname } },

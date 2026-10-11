@@ -34,7 +34,7 @@ class BlobPreconditionFailedError extends Error {
   constructor(msg = 'precondition failed') { super(msg); this.name = 'BlobPreconditionFailedError' }
 }
 
-mock.module('@vercel/blob', {
+mock.module('#store', {
   namedExports: {
     BlobPreconditionFailedError,
     get: async (pathname) => {
@@ -147,6 +147,24 @@ test('GET：站点表走可重验证缓存（不是 no-store，否则每次轮�
 
 test('POST：无鉴权 → 401', async () => {
   const res = await call(makeReq({ method: 'POST', headers: { authorization: '' }, body: { sites: OK_SITES } }))
+  assert.equal(res.statusCode, 401)
+})
+
+test('POST：仅 X-Nav-Key（自定义头）→ 放行（网关会改写 Authorization，见 shared/auth.mjs#bearerOf）', async () => {
+  const res = await call(makeReq({
+    method: 'POST',
+    headers: { authorization: '', 'x-nav-key': ADMIN_KEY }, // 只带自定义头
+    body: { sites: OK_SITES },
+  }))
+  assert.equal(res.statusCode, 200, `实得 ${res.statusCode} ${JSON.stringify(res.payload || {})}`)
+})
+
+test('POST：X-Nav-Key 值错误 → 401（自定义头也要过比对，不是旁路）', async () => {
+  const res = await call(makeReq({
+    method: 'POST',
+    headers: { authorization: '', 'x-nav-key': 'wrong-key' },
+    body: { sites: OK_SITES },
+  }))
   assert.equal(res.statusCode, 401)
 })
 

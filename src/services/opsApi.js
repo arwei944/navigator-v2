@@ -67,10 +67,14 @@ function qs(params = {}) {
 }
 
 async function call(url, { key, method = 'GET', body } = {}) {
+  const k = key || getAdminKey()
   const res = await fetch(url, {
     method,
     headers: {
-      Authorization: `Bearer ${key || getAdminKey()}`,
+      // 双头并发：Authorization 给本机直连，X-Nav-Key 穿透发布沙箱的网关
+      // （网关会改写 Authorization，见 shared/auth.mjs#bearerOf）
+      Authorization: `Bearer ${k}`,
+      'X-Nav-Key': k,
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

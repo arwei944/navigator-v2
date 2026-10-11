@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { get, put, list, del, BlobPreconditionFailedError } from '@vercel/blob'
+// v9：Blob → 本地 SQLite 适配层（同名同签名，见 server/store.mjs）。仅改这一行 import，
+// 校验/CAS/快照逻辑不动 —— test-sites-cas 换 mock 目标后继续守护它们。
+import { get, put, list, del, BlobPreconditionFailedError } from '#store'
 import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, snapshotPathname, parseSnapshotName, prunableSnapshots, isSnapshotPathname } from '../shared/snapshots.mjs'
 import { sanitizeGroups } from '../shared/categories.mjs'
 import { sanitizeSites } from '../shared/sanitize.mjs'

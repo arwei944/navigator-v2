@@ -13,7 +13,8 @@ async function post(body, { key } = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+      // X-Nav-Key 与 opsApi 同因：穿透发布沙箱网关对 Authorization 的改写
+      ...(key ? { Authorization: `Bearer ${key}`, 'X-Nav-Key': key } : {}),
     },
     body: JSON.stringify(body),
   })

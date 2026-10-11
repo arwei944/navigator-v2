@@ -140,9 +140,17 @@ export function authConfig(env = process.env) {
 
 /** 从请求头取 Bearer 凭据 */
 export function bearerOf(req) {
-  const auth = (req && req.headers && req.headers.authorization) || ''
-  const raw = String(auth)
-  return /^Bearer\s+/i.test(raw) ? raw.replace(/^Bearer\s+/i, '').trim() : raw.trim()
+  const h = (req && req.headers) || {}
+  /**
+   * 凭据**优先**读 `X-Nav-Key`：发布沙箱的反向网关会用它自己的内部令牌改写
+   * Authorization 头（实测每次请求都是 386 字符、指纹逐请求变化），
+   * 客户端真正发的 Bearer 根本到不了应用 —— 自定义头可完整穿透。
+   * Authorization 仍保留：本机直连（console / CLI 不经网关）与旧客户端不受影响。
+   */
+  const custom = String(h['x-nav-key'] || '').trim()
+  if (custom) return custom
+  const auth = String(h.authorization || '')
+  return /^Bearer\s+/i.test(auth) ? auth.replace(/^Bearer\s+/i, '').trim() : auth.trim()
 }
 
 /**

@@ -23,7 +23,7 @@
  * 路由清单从 `src/router/index.js` 里**自动提取**，不手写 —— 否则以后加一条路由
  * 又会悄悄漏掉（这类「加了新东西忘了同步」正是本项目吃过亏的地方）。
  */
-import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -75,8 +75,13 @@ console.log(`✅ 已为 ${paths.length} 条静态路由生成入口：${paths.jo
 mkdirSync(join(DIST, 'api'), { recursive: true })
 mkdirSync(join(DIST, 'shared'), { recursive: true })
 copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
+copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'api', 'metadata.js'), join(DIST, 'api', 'metadata.js'))
+// v9 数据回归：sites/session 复活（SQLite 适配层 '#store'）
+copyFileSync(join(root, 'api', 'sites.js'), join(DIST, 'api', 'sites.js'))
+copyFileSync(join(root, 'api', 'session.js'), join(DIST, 'api', 'session.js'))
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
+copyFileSync(join(root, 'shared', 'auth.mjs'), join(DIST, 'shared', 'auth.mjs'))
 const sharedSrc = join(root, 'shared')
 let sharedCount = 0
 for (const f of readdirSync(sharedSrc)) {
@@ -85,11 +90,25 @@ for (const f of readdirSync(sharedSrc)) {
   sharedCount++
 }
 // 发布工具识别 Node 项目的依据是 package.json 的 start 脚本（光有 server.js 不够）。
-// type:module 必须有 —— server.js 与 api/ 都是 ESM。
+// type:module 必须有 —— server.js 与 api/ 都是 ESM；imports 映射让 api/*.js 的
+// `import ... from '#store'` 在沙箱里解析到 dist/store.mjs（仓库里则指向 server/store.mjs）。
 writeFileSync(join(DIST, 'package.json'), JSON.stringify({
   name: 'nav-dist',
   private: true,
   type: 'module',
+  imports: { '#store': './store.mjs' },
   scripts: { start: 'node server.js' },
 }, null, 2) + '\n')
-console.log(`✅ 已带上 Node 服务（server.js + api/metadata.js + shared ×${sharedCount}）—— 自动补全为真实抓取`)
+// data/（SQLite + 管理密钥）绝不能随发布包上传：一是会把本机测试数据盖到线上，
+// 二是每次发布等于清库。服务端首启自建目录并做首启迁移。
+rmSync(join(DIST, 'data'), { recursive: true, force: true })
+mkdirSync(join(DIST, 'data'), { recursive: true })
+// 管理密钥：沙箱没有环境变量注入，构建时把 .env.local 的共享密钥带进 data/（服务端启动时
+// 读回 process.env，静态服务对 /data/* 一律 403，git 也不收 dist）。共享密钥本就随
+// .env.local 存本机，换成随发布包进沙箱，不新增暴露面。
+try {
+  const envFile = readFileSync(join(root, '.env.local'), 'utf-8')
+  const m = envFile.match(/^SITES_ADMIN_KEY="?([^"]*)"?$/m)
+  if (m && m[1]) writeFileSync(join(DIST, 'data', 'admin-key.txt'), m[1])
+} catch { /* 没有 .env.local 就不带：写接口按未配置拒绝 */ }
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + api/sites|session|metadata + shared ×${sharedCount}）—— 云同步与真实抓取齐备`)

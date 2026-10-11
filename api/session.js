@@ -17,7 +17,7 @@
  * 体积门禁：写入前既看 `content-length` 也看合并后的实际大小。这条是「任何人可无限次
  * POST 任意大小 JSON 灌满 Blob」的正解 —— 限流是 best-effort，体积上限是硬门禁。
  */
-import { get, put } from '@vercel/blob'
+import { get, put } from '#store'
 
 /**
  * 单次写入的体量上限。
@@ -63,6 +63,9 @@ function sanitizeKey(key) {
 
 /** 从 Authorization 头取 key；**不再接受 query** */
 function keyOf(req) {
+  // 发布沙箱的网关会改写 Authorization（见 shared/auth.mjs#bearerOf 的说明），自定义头优先
+  const custom = String((req.headers && req.headers['x-nav-key']) || '').trim()
+  if (custom) return custom
   const auth = String((req.headers && req.headers.authorization) || '')
   const m = auth.match(/^Bearer\s+(.+)$/i)
   return m ? m[1].trim() : ''
