@@ -1,9 +1,9 @@
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
+  <div class="modal-overlay" @click.self="requestClose">
     <div class="modal">
       <div class="modal-header">
         <h3>添加站点</h3>
-        <button class="modal-close" @click="$emit('close')" aria-label="关闭">
+        <button class="modal-close" @click="requestClose" aria-label="关闭">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
@@ -108,7 +108,7 @@
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn btn-cancel" @click="$emit('close')">取消</button>
+          <button type="button" class="btn btn-cancel" @click="requestClose">取消</button>
           <button type="submit" class="btn btn-primary">添加</button>
         </div>
       </form>
@@ -126,6 +126,7 @@ import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
 import { findDuplicate, buildSiteFromDraft } from '@/utils/siteDraft'
 import { fetchSiteMeta, metaFailureText } from '@/services/meta'
 import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
+import { loadSuggestCategory } from '@/services/autoAdd'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
@@ -214,6 +215,57 @@ function categoryMetaFromStore() {
   return map
 }
 
+/** 本次会话里由引擎自动新建的分类：没被人采纳时要在关闭前回收，避免留下空分类 */
+let autoCategoryCreated = null
+
+/** 修剪：自动新建的分类若没被采纳（用户换了分类 / 未提交就关闭）且无站点使用 → 回收 */
+function pruneAutoCategory() {
+  const ac = autoCategoryCreated
+  if (!ac) return
+  if (ac.id === form.categoryId) return
+  const used = sitesStore.sites.some(s => s.categoryId === ac.id)
+  if (!used) categoriesStore.removeCategory(ac.id)
+  autoCategoryCreated = null
+}
+
+/**
+ * 「分类未识别」的智能兜底：按页面内容（名称 / 描述 / 域名 / 用途）给出分类 ——
+ * 本地已有同名分类就复用，没有就**自动新建**并归入（引擎永远有解，最后兜底「其他」）。
+ *
+ * 两段式的差异是刻意的：
+ *   - 本地秒填阶段（空 HTML，只有域名信号）**只复用不新建** —— 建类是重动作，
+ *     要等真实页面内容回来再定；此时用户看到「分类未识别」属预期。
+ *   - 真实抓取阶段（拿到页面 title / 描述，且已译成中文）才允许新建，
+ *     关键词匹配（主题表）与用途推断都在这个阶段才有真数据。
+ */
+async function ensureSmartCategory(data, { allowCreate, isAlive } = {}) {
+  if (hasCategory(form.categoryId)) return
+  let plan = null
+  try {
+    const suggestCategory = await loadSuggestCategory()
+    plan = suggestCategory({
+      categoryId: data.categoryId || '',
+      categoryConfidence: data.confidence?.category || '',
+      name: data.name || '',
+      desc: data.desc || '',
+      domain: data.domain || hostOf(form.url),
+      purposes: data.purposes || [],
+      existing: categoriesStore.categories.map(c => ({
+        id: c.id, label: c.label, groupId: categoriesStore.getGroupByCategory(c.id)?.id || '',
+      })),
+      domainIds: categoriesStore.domains.map(d => d.id),
+    })
+  } catch { /* 引擎加载失败（pinyin chunk 拉取失败等）：保持未分类，用户手选 */ }
+  if (!plan) return
+  if (isAlive && !isAlive()) return
+  if (plan.kind === 'use') { form.categoryId = plan.categoryId; return }
+  if (!allowCreate) return
+  const r = categoriesStore.addCategory(plan.groupId, { id: plan.id, label: plan.label, dotColor: plan.dotColor })
+  if (!r.ok) return
+  autoCategoryCreated = { id: r.id, label: plan.label }
+  form.categoryId = r.id
+}
+
 /** 只覆盖「用户没改过」的字段；用户改过的保留，避免自动补全把人的输入冲掉 */
 function applyMeta(data) {
   if (!touched.name && data.name) form.name = data.name
@@ -249,6 +301,7 @@ function resetTouched() {
 function resetForNewHost() {
   resetTouched()
   quickDraftHost = ''
+  pruneAutoCategory()
   form.name = ''
   form.desc = ''
   form.categoryId = ''
@@ -262,9 +315,11 @@ function resetForNewHost() {
 
 function summarize(data) {
   const parts = []
-  // 分类必须是本地下拉框里真有的项，否则说「已补全分类 X」而选中项没变，用户会以为补全坏了
-  const catLabel = data.categoryLabel || categoriesStore.getCategoryLabel(data.categoryId)
-  parts.push(hasCategory(data.categoryId) ? `分类 ${catLabel}` : '分类未识别')
+  // 生效分类 = 表单当前选中的（含自动新建的）；推断结果无效时才回落到 data 里的值
+  const effCat = hasCategory(form.categoryId) ? form.categoryId : data.categoryId
+  const catLabel = data.categoryLabel || categoriesStore.getCategoryLabel(effCat)
+  const isNew = autoCategoryCreated && autoCategoryCreated.id === effCat
+  parts.push(hasCategory(effCat) ? `分类 ${catLabel}${isNew ? '（自动新建）' : ''}` : '分类未识别')
   const low = Object.entries(data.confidence || {}).filter(([, v]) => v === 'low').length
   if (low) parts.push(`${low} 项为推断值`)
   return `已补全：${parts.join(' · ')}`
@@ -298,6 +353,9 @@ async function fetchMeta() {
     applyMeta(local.data)
     localApplied = true
     fetching.value = false
+    // 本地阶段**只复用不新建**（空 HTML 信号不足），建类等真实内容
+    await ensureSmartCategory(local.data, { allowCreate: false, isAlive: () => seq === reqSeq })
+    if (seq !== reqSeq) return
     status.value = '已按域名秒填草稿，正在后台抓取站点真实信息…'
     statusKind.value = 'loading'
   } else {
@@ -327,6 +385,10 @@ async function fetchMeta() {
       (data.faviconUrl && data.faviconUrl !== local.data.faviconUrl)
     meta.value = data
     applyMeta(data)
+    // 真实内容（含已译中文的描述）到齐，此时才允许**智能新建分类**并归入
+    await ensureSmartCategory(data, { allowCreate: true, isAlive: () => seq === reqSeq })
+    if (seq !== reqSeq) return
+    pruneAutoCategory()
     if (better) {
       status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
       statusKind.value = data.warning ? 'warn' : 'ok'
@@ -397,6 +459,12 @@ function submit() {
   const created = sitesStore.addSite(site)
   // 带上 id：App 据此把视图切到该分类并滚动定位到新卡片
   emit('saved', { id: created.id, name: site.name, url: site.url })
+  requestClose()
+}
+
+/** 关闭前回收：自动新建但无人使用的分类一并清掉（用户已选它或站点已用它则保留） */
+function requestClose() {
+  pruneAutoCategory()
   emit('close')
 }
 
@@ -406,6 +474,14 @@ if (props.prefillUrl) {
   form.url = normalizeUrl(props.prefillUrl)
   fetchMeta()
 }
+
+/**
+ * 预热：本地推断引擎（site-infer）与智能建类引擎（auto-category → pinyin-pro）都是
+ * 动态 import 的 chunk —— 首次使用要等加载（实测 ~1.3s）。弹窗一打开就拉，
+ * 用户粘贴网址时 chunk 已就位，「零延迟」对**第一次**添加也成立。
+ */
+import('../../shared/site-infer.mjs').catch(() => {})
+loadSuggestCategory().catch(() => {})
 </script>
 
 <style scoped>

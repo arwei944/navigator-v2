@@ -102,17 +102,30 @@ console.log(`  📋 最终状态条: ${finalStatus}`)
 ok(/已补全|推断/.test(finalStatus), '状态条收敛为终态', finalStatus)
 
 /* ---------- 2. 提交 → 自动定位 + 最新在前 ---------- */
-// 分类是必选项：推断不出时用户必须手选（既有交互）。探针选第一个有效分类再提交。
-await evalJs(`(() => {
+/**
+ * 分类未识别时，引擎应**根据页面内容智能新建类别并归入**（shared/auto-category 的
+ * 主题表 → 用途 → 其他 兜底链）—— 提交前 select 就该有值，不需要用户手选。
+ * 仅在仍为空时才代选（正常不应走到）。
+ */
+const selState = JSON.parse(await evalJs(`JSON.stringify((() => {
   const sel = document.querySelector('.modal select, [class*="modal"] select')
-  if (!sel) return 'no-select'
-  const opt = [...sel.options].find(o => o.value)
-  if (!opt) return 'no-option'
-  sel.value = opt.value
-  sel.dispatchEvent(new Event('change', { bubbles: true }))
-  return opt.value
-})()`)
-await sleep(200)
+  if (!sel) return { absent: true }
+  return { value: sel.value, label: sel.selectedOptions[0]?.textContent?.trim() || '', optionCount: sel.options.length }
+})())`))
+if (selState.absent) {
+  ok(false, '弹窗里找不到分类下拉框')
+} else if (selState.value) {
+  ok(true, '分类已按页面内容智能新建/归入（提交前 select 已有值）', `${selState.label} (${selState.value})`)
+} else {
+  ok(false, '分类仍为空 —— 智能建类未生效', `可选分类 ${selState.optionCount} 个`)
+  await evalJs(`(() => {
+    const sel = document.querySelector('.modal select, [class*="modal"] select')
+    const opt = [...sel.options].find(o => o.value)
+    if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change', { bubbles: true })) }
+    return 'ok'
+  })()`)
+  await sleep(200)
+}
 await evalJs(`document.querySelector('.modal button[type="submit"], [class*="modal"] button[type="submit"]')?.click()`)
 await sleep(1800)
 
@@ -140,8 +153,8 @@ if (dupDetected) {
   ok(/vite/i.test(firstTitle), '已收录的站点仍居当前视图第一位（最新在前）', `第一张卡 = ${firstTitle}`)
 } else {
   ok(after.modalGone, '提交后弹窗关闭')
-  // 定位后视图已切到新站的分类，这里数的是该分类的卡片数（不等于全站总数）
-  ok(after.total >= 5, `当前分类视图正常渲染（${after.total} 张，新站居首单独断言）`)
+  // 定位后视图切到了新站的分类 —— 全新分类时只有 1 张卡（就是新站）属正确表现
+  ok(after.total >= 1, `当前分类视图正常渲染（${after.total} 张，新站居首单独断言）`)
   ok(after.highlight, '新卡片带高亮（自动定位生效）')
   ok(/vite/i.test(firstTitle), '新添加的站点排在当前视图第一位（最新在前）', `第一张卡 = ${firstTitle}`)
 }
