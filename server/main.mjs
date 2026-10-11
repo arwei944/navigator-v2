@@ -63,6 +63,9 @@ const clicksHandler = (await import('./api/clicks.js')).default
 const opsHandler = (await import('./api/ops.js')).default
 const authHandler = (await import('./api/auth.js')).default
 const healthHandler = (await import('./api/health.js')).default
+const backupHandler = (await import('./api/backup.js')).default
+const coverHandler = (await import('./api/cover.js')).default
+const aiHandler = (await import('./api/ai.js')).default
 const { etagOf } = await import('./store.mjs')
 const cronMod = await import('./cron.mjs')
 const { startHealthCron } = cronMod
@@ -76,6 +79,9 @@ const API_ROUTES = {
   '/api/ops': opsHandler,
   '/api/auth': authHandler,
   '/api/health': healthHandler,
+  '/api/backup': backupHandler,
+  '/api/cover': coverHandler,
+  '/api/ai': aiHandler,
 }
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */

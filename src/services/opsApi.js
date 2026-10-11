@@ -107,6 +107,9 @@ export const opsApi = {
   audit: (key, params = {}) => call(`/api/ops?${qs({ audit: 1, limit: 200, ...params })}`, { key }),
 
   /** 追加一条审计记录（旁路，失败不影响主流程） */
+  /** 备份与恢复（P5）：GET 导出 / POST 覆盖恢复。响应可能是文件，这里不走 res.json 的失败分支 */
+  backup: (key) => call('/api/backup', { key }),
+  restoreBackup: (key, data) => call('/api/backup', { key, method: 'POST', body: { data } }),
   appendAudit: (key, entry) => call('/api/ops', { key, method: 'POST', body: { action: 'audit.append', entry } }),
 
   /** 云端快照清单（回滚的可选目标） */

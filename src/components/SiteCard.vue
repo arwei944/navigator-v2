@@ -38,6 +38,9 @@
         <div class="card-url">{{ site.url }}</div>
       </div>
     </div>
+    <!-- 封面图（rich 档）：服务端按需抓 og:image 落盘后回字节；没封面回 204 → 隐藏并降级 -->
+    <img v-if="showCover" :src="coverSrc" alt="" class="card-cover" loading="lazy" decoding="async"
+         @error="coverFailed = true">
     <div v-if="!isList && showDesc" class="card-body">
       <div class="card-desc">{{ site.desc }}</div>
     </div>
@@ -96,7 +99,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
@@ -163,6 +166,16 @@ const showDesc = computed(() => props.density !== 'compact')
 const showPurposesByDensity = computed(() => props.density !== 'compact')
 const aliases = computed(() => (Array.isArray(props.site.aliases) ? props.site.aliases.filter(Boolean) : []))
 const showAliases = computed(() => props.density === 'rich' && aliases.value.length > 0)
+
+/**
+ * 封面图：**只在 rich 档出现** —— 沿用「新增信息必须挂密度档」的纪律，不新增视觉令牌
+ * （那要动所有方案的取值与 test-visual-scheme 的键集快照）。
+ * 端点是服务端按需抓取 + 落盘缓存的 `/api/cover?site=<id>`：命中缓存直接回字节；
+ * 没有封面回 204 → onerror 摘掉图层，降级到原有图标/字母块（不会出破图）。
+ */
+const coverFailed = ref(false)
+const coverSrc = computed(() => `/api/cover?site=${encodeURIComponent(props.site.id)}`)
+const showCover = computed(() => props.density === 'rich' && !coverFailed.value && !!props.site.id)
 
 // 全网点击量（所有访客累计）——点完立刻 +1，不等云端往返
 const clickCount = computed(() => clicksStore.countFor(props.site.id))
@@ -296,6 +309,8 @@ function onHoverLeave() {
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: var(--bg-white); box-sizing: border-box; }
 .card:hover .card-favicon { transform: scale(1.05); }
+/* 封面：整卡宽度的顶部大图，圆角与卡片一致；懒加载 + 失败即摘，图层失败不影响任何交互 */
+.card-cover { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: calc(10px * var(--cs)); margin-bottom: calc(8px * var(--cs)); background: var(--bg-subtle); }
 
 /* 在线状态角标 */
 .health-dot {

@@ -337,6 +337,44 @@ export function pickFaviconPrefer(htmls, base) {
   return bare
 }
 
+/**
+ * 取封面图地址：og:image → twitter:image（Twitter 卡片是无 og 时的常见替补）。
+ *
+ * 为什么单独一个函数而不是塞进 pickFavicon：封面与图标是**两类资源**（尺寸、用途、
+ * 失败影响面都不同），塞在一起会让「图标有兜底」的语义污染封面 —— 封面本来就允许没有。
+ *
+ * 尺寸门槛写在服务端（下载时按 maxBytes 封顶），这里只做**地址层面的清理**：
+ * 丢掉 data: 与 1×1 像素图（跟踪像素当封面的页面不少），以及非 http(s) 协议。
+ */
+export function pickCover(html, base) {
+  const from = (re) => {
+    for (const m of String(html || '').matchAll(re)) {
+      // 注意：metaContent 是**按 meta 自身的 property/name** 取值的（它回答的是
+      // 「这个 meta 是不是 og:image，内容是什么」），这里已经用正则锁定了具体 meta，
+      // 所以直接读 content/href 属性即可 —— 早先误用 metaContent 恒返回空。
+      const raw = attrValue(m[0], 'content') || attrValue(m[0], 'href')
+      const href = resolveIconHref(decodeEntities(raw).trim(), base)
+      if (!href) continue
+      if (!/^https?:\/\//i.test(href)) continue
+      if (isInlineImage(href)) continue
+      return href
+    }
+    return ''
+  }
+  return from(/<meta[^>]+(?:property|name)=["']og:image(?::secure_url|:url)?["'][^>]*>/gi)
+    || from(/<meta[^>]+(?:property|name)=["']twitter:image(?::src)?["'][^>]*>/gi)
+    || from(/<link[^>]+rel=["']image_src["'][^>]*>/gi)
+}
+
+/** 多页取封面：子页优先（子页更具体），根页兜底 */
+export function pickCoverPrefer(htmls, base) {
+  for (const html of htmls) {
+    const href = pickCover(html, base)
+    if (href) return href
+  }
+  return ''
+}
+
 /* ---------------- 配色 ---------------- */
 
 /** 归一化为小写 #rrggbb；近白/近黑/全透明一律弃用（做卡片底色没有辨识度） */

@@ -78,7 +78,7 @@ copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
 copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
 // v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js']) {
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js']) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
@@ -125,4 +125,18 @@ for (const [file, key] of [['admin-key.txt', 'SITES_ADMIN_KEY'], ['admin-passwor
     }
   } catch { /* 没有 .env.local 就不带该配置 */ }
 }
-console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×7 + shared ×${sharedCount}）—— 后台/统计/巡检齐备`)
+// AI 配置（v10-P4）：baseURL / model / apiKey 随包进 data/ —— key 绝不进前端，
+// 静态服务对 /data/* 一律 403，git 也不收 dist。
+try {
+  const envFile = readFileSync(join(root, '.env.local'), 'utf-8')
+  const pick = (k) => {
+    const m = envFile.match(new RegExp('^' + k + '=?([^\\n]*)$', 'm'))
+    if (!m) return ''
+    return m[1].trim().replace(/^"(.*)"$/, '$1').trim()
+  }
+  const baseURL = pick('AI_BASE_URL'), apiKey = pick('AI_API_KEY'), model = pick('AI_MODEL')
+  if (baseURL && apiKey) {
+    writeFileSync(join(DIST, 'data', 'ai-config.json'), JSON.stringify({ baseURL, apiKey, model: model || 'gpt-4o-mini' }, null, 2))
+  }
+} catch { /* 没配 AI 就没有这个文件，接口回 501、前端隐藏入口 */ }
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×10 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI 齐备`)

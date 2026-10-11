@@ -60,7 +60,8 @@
     "mcp:test": "node tools/mcp/test-mcp.mjs",
     "console:test:store": "node tools/console/test-store.mjs",
     "console:test:health": "node tools/console/test-health.mjs",
-    "console:test:cron": "node tools/console/test-cron.mjs"
+    "console:test:cron": "node tools/console/test-cron.mjs",
+    "console:test:v10": "node tools/console/test-v10.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

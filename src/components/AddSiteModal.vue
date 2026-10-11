@@ -46,6 +46,12 @@
           <textarea v-model="form.desc" required placeholder="一句话描述这个站点..." class="form-input form-textarea" rows="3"
                     @input="touched.desc = true"></textarea>
           <div v-if="meta && !touched.desc" class="field-note">{{ sourceText('desc') }}</div>
+          <div v-if="aiReady && (form.name || form.desc)" class="ai-row">
+            <button type="button" class="ai-btn" :disabled="aiBusy" @click="aiPolish">
+              {{ aiBusy ? '润色中…' : 'AI 润色文案' }}
+            </button>
+            <span class="ai-hint">只改措辞不改事实，改完由你确认</span>
+          </div>
           <div v-if="meta && !touched.desc && translatedNote('desc')" class="field-note translated">{{ translatedNote('desc') }}</div>
         </div>
 
@@ -127,6 +133,7 @@ import { findDuplicate, buildSiteFromDraft } from '@/utils/siteDraft'
 import { fetchSiteMeta, metaFailureText } from '@/services/meta'
 import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
 import { loadSuggestCategory } from '@/services/autoAdd'
+import { aiApi } from '@/services/aiApi'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
@@ -213,6 +220,30 @@ function categoryMetaFromStore() {
     for (const c of g.categories) map[c.id] = { label: c.label, color: c.dotColor, group: g.label }
   }
   return map
+}
+
+/**
+ * AI 润色（P4）：服务端声明可用才显示入口（沿用 v8「无 key 隐藏入口」的纪律）。
+ * 只替换用户**还没手动改过**的字段 —— 润色结果要能一眼看出改了什么，
+ * 而且不能把人已经写好的内容冲掉。
+ */
+const aiReady = ref(false)
+const aiBusy = ref(false)
+aiApi.probe().then(p => { aiReady.value = p.ready })
+
+async function aiPolish() {
+  aiBusy.value = true
+  try {
+    const r = await aiApi.polish(form.name, form.desc)
+    if (!r.ok) throw new Error(r.error || '失败')
+    if (r.name && !touched.name) form.name = r.name
+    if (r.desc && !touched.desc) form.desc = r.desc
+  } catch (e) {
+    status.value = 'AI 润色失败：' + (e.message || e) + '（已保留原内容）'
+    statusKind.value = 'warn'
+  } finally {
+    aiBusy.value = false
+  }
 }
 
 /** 本次会话里由引擎自动新建的分类：没被人采纳时要在关闭前回收，避免留下空分类 */
@@ -569,6 +600,10 @@ loadSuggestCategory().catch(() => {})
 }
 .btn-cancel { background: var(--border-light); color: var(--text-secondary); }
 .btn-cancel:hover { background: var(--border); }
+.ai-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.ai-btn { padding: 4px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: transparent; color: var(--text-primary); cursor: pointer; }
+.ai-btn:disabled { opacity: .6; cursor: default; }
+.ai-hint { font-size: 11px; color: var(--color-muted); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { filter: brightness(1.1); }
 .btn-small { padding: 4px 12px; font-size: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-white); color: var(--text-secondary); cursor: pointer; white-space: nowrap; }

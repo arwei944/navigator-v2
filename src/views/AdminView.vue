@@ -130,6 +130,14 @@
           <div v-else-if="activeTab === 'notify'" class="admin-section">
             <AdminNotifications :admin-key="adminKey" @badge="unreadBadge = $event" />
           </div>
+
+          <div v-else-if="activeTab === 'backup'" class="admin-section">
+            <AdminBackup :admin-key="adminKey" />
+          </div>
+
+          <div v-else-if="activeTab === 'ai'" class="admin-section">
+            <AdminAi :admin-key="adminKey" />
+          </div>
         </div>
       </div>
     </template>
@@ -152,6 +160,8 @@ import AdminSnapshots from '@/components/admin/AdminSnapshots.vue'
 import AdminPublishHistory from '@/components/admin/AdminPublishHistory.vue'
 import AdminAuditLog from '@/components/admin/AdminAuditLog.vue'
 import AdminNotifications from '@/components/admin/AdminNotifications.vue'
+import AdminBackup from '@/components/admin/AdminBackup.vue'
+import AdminAi from '@/components/admin/AdminAi.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { authApi } from '@/services/authApi'
@@ -190,6 +200,8 @@ const TABS = [
   { id: 'history', label: '发布历史' },
   { id: 'audit', label: '操作审计' },
   { id: 'notify', label: '通知中心' },
+  { id: 'backup', label: '备份与恢复' },
+  { id: 'ai', label: 'AI 助手' },
 ]
 const DEFAULT_TAB = 'overview'
 const TAB_IDS = new Set(TABS.map(t => t.id))
