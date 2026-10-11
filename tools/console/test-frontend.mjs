@@ -35,8 +35,10 @@ const server = await createServer({
   appType: 'custom',
   logLevel: 'error',
   customLogger: quietLogger,
-  // pinyin-pro 是 CJS 包，交给 Vite 转换而不是让 Node 直接 import（后者命名导出可能取不到）
-  ssr: { noExternal: ['pinyin-pro'] },
+  // pinyin-pro 是 CJS 包，交给 Vite 转换而不是让 Node 直接 import（后者命名导出可能取不到）。
+  // pinia 进 noExternal 是为了让「测试脚本取到的 pinia」与「store 内部 import 的 pinia」
+  // 是同一个模块实例 —— 否则 setActivePinia 设的状态 store 看不见（见下文序 20 注释）。
+  ssr: { noExternal: ['pinyin-pro', 'pinia'] },
 })
 
 try {
@@ -84,11 +86,15 @@ try {
 
   /* ══════════ [B][C] 序 20：浏览历史 store ══════════ */
 
-  // 注意：pinia 必须用**裸 import** 取，不能过 ssrLoadModule ——
-  // ssrLoadModule 会给出另一个模块实例，setActivePinia 设的状态在 store 那边看不见。
-  // 而 history.js 里的 'pinia' 在 SSR 下被 Vite externalize 成原生 import，两者才是同一个。
-  const { createPinia, setActivePinia } = await import('pinia')
-  setActivePinia(createPinia())
+  // pinia 必须与 store **同源**：两边都走 ssrLoadModule，配 ssr.noExternal:['pinia']，
+  // 这样 Vite runner 里只有一份 pinia 模块，setActivePinia 设的状态 store 才看得见。
+  //
+  // 曾经反过来用「裸 import('pinia')」—— store 里的 'pinia' 被 Vite externalize 成
+  // 原生 import，与测试脚本拿到的是**两个模块实例**，activePinia 各存一份，
+  // 于是 useHistoryStore() 必抛「no active Pinia」。实测探针 store 里
+  // getActivePinia() 直接抛错即坐实双实例。改同源后 history 恢复可用。
+  const piniaMod = await server.ssrLoadModule('pinia')
+  piniaMod.setActivePinia(piniaMod.createPinia())
   const { useHistoryStore } = await server.ssrLoadModule('/src/stores/history.js')
   const history = useHistoryStore()
 

@@ -29,6 +29,20 @@ const eq = (a, b, label) => ok(Object.is(a, b), label, `期望 ${JSON.stringify(
 const cssVars = new Map()
 const attrs = new Map()
 const mem = new Map()
+/** 最小元素替身：只为让 @vue/runtime-dom 的 CJS 顶层（createElement('template')）不炸 */
+function makeEl(tag, text) {
+  const el = {
+    tagName: String(tag).toUpperCase(), nodeName: String(tag).toUpperCase(),
+    innerHTML: '', textContent: text ?? '', nodeType: 1,
+    style: { setProperty() {}, removeProperty() {}, getPropertyValue() { return '' } },
+    attributes: {}, childNodes: [], children: [], firstChild: null, parentNode: null, content: null,
+    setAttribute() {}, removeAttribute() {}, getAttribute() { return null }, hasAttribute() { return false },
+    appendChild() {}, removeChild() {}, insertBefore() {}, replaceChild() {}, remove() {},
+    addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true },
+    cloneNode() { return el }, querySelector() { return null }, querySelectorAll() { return [] },
+  }
+  return el
+}
 /** 系统明暗：由场景切换 */
 let systemDark = false
 /** 注册过的定时器（真的跑 60s 轮询会把测试进程挂住，只记账不执行） */
@@ -45,6 +59,13 @@ const documentStub = {
     getAttribute(k) { return attrs.has(k) ? attrs.get(k) : null },
     removeAttribute(k) { attrs.delete(k) },
   },
+  // @vue/runtime-dom 的 CJS 产物在**模块顶层**就执行
+  // `doc.createElement('template')`（templateContainer），document stub 缺这个方法
+  // 会让整个 import 链在加载期炸掉，报错还指不回本套件。
+  createElement(tag) { return makeEl(tag) },
+  createTextNode(t) { return makeEl('#text', t) },
+  createComment() { return makeEl('#comment') },
+  createDocumentFragment() { return makeEl('#fragment') },
 }
 
 const localStorageStub = {
@@ -72,6 +93,10 @@ const server = await createServer({
   appType: 'custom',
   logLevel: 'error',
   customLogger: quietLogger,
+  // pinia 必须与 store 同源（都走 Vite runner）：默认 externalize 会让
+  // 「裸 import('pinia') 拿到的实例」与「store 内部 import 的 pinia」成为两份，
+  // setActivePinia 设的状态 store 看不见 —— useThemeStore() 必抛 no active Pinia。
+  ssr: { noExternal: ['pinia'] },
 })
 
 globalThis.document = documentStub
@@ -86,8 +111,10 @@ globalThis.setInterval = (fn, ms) => { intervals.push({ fn, ms }); return interv
 
 /* ══════════ 装载 store（必须用真实 pinia 实例） ══════════ */
 
-// pinia 走**裸 import**：过 ssrLoadModule 会拿到另一个模块实例，setActivePinia 在 store 那边看不见
-const { createPinia, setActivePinia } = await import('pinia')
+// pinia 与 store 都走 ssrLoadModule（配上面的 noExternal），保证是**同一个**模块实例。
+// 曾经这里用裸 import('pinia')：store 里的 pinia 被 Vite 处理成另一份，
+// setActivePinia 设的状态 store 那边看不见，useThemeStore() 必抛「no active Pinia」。
+const { createPinia, setActivePinia } = await server.ssrLoadModule('pinia')
 const { createApp } = await import('vue')
 const persistPlugin = (await import('pinia-plugin-persistedstate')).default
 

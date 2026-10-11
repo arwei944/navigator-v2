@@ -26,10 +26,28 @@ const eq = (a, b, label) => ok(Object.is(a, b), label, `期望 ${JSON.stringify(
 /* ══════════ 浏览器与时钟替身 ══════════ */
 
 const docListeners = new Map()
+/** 最小元素替身：@vue/runtime-dom 的 CJS 产物在模块顶层就 createElement('template') */
+function makeEl(tag, text) {
+  const el = {
+    tagName: String(tag).toUpperCase(), nodeName: String(tag).toUpperCase(),
+    innerHTML: '', textContent: text ?? '', nodeType: 1,
+    style: { setProperty() {}, removeProperty() {}, getPropertyValue() { return '' } },
+    attributes: {}, childNodes: [], children: [], firstChild: null, parentNode: null, content: null,
+    setAttribute() {}, removeAttribute() {}, getAttribute() { return null }, hasAttribute() { return false },
+    appendChild() {}, removeChild() {}, insertBefore() {}, replaceChild() {}, remove() {},
+    addEventListener() {}, removeEventListener() {}, dispatchEvent() { return true },
+    cloneNode() { return el }, querySelector() { return null }, querySelectorAll() { return [] },
+  }
+  return el
+}
 const documentStub = {
   visibilityState: 'visible',
   addEventListener(type, fn) { if (!docListeners.has(type)) docListeners.set(type, new Set()); docListeners.get(type).add(fn) },
   removeEventListener(type, fn) { docListeners.get(type)?.delete(fn) },
+  createElement(tag) { return makeEl(tag) },
+  createTextNode(t) { return makeEl('#text', t) },
+  createComment() { return makeEl('#comment') },
+  createDocumentFragment() { return makeEl('#fragment') },
 }
 function setVisibility(state) {
   documentStub.visibilityState = state
@@ -128,6 +146,10 @@ const server = await createServer({
   appType: 'custom',
   logLevel: 'error',
   customLogger: { info() {}, warn() {}, warnOnce() {}, clearScreen() {}, hasWarned: false, error(m) { if (!/WebSocket server error/.test(String(m))) console.error(m) } },
+  // pinia 必须与 store 同源（都走 Vite runner）：默认 externalize 会让
+  // 「裸 import('pinia') 拿到的实例」与「store 内部 import 的 pinia」成为两份，
+  // setActivePinia 设的状态 store 看不见 —— useSitesStore() 必抛 no active Pinia。
+  ssr: { noExternal: ['pinia'] },
 })
 
 globalThis.document = documentStub
@@ -146,7 +168,8 @@ globalThis.fetch = async (url, init = {}) => {
   return r
 }
 
-const { createPinia, setActivePinia } = await import('pinia')
+// pinia 与 store 都走 ssrLoadModule（配上面的 noExternal），保证是**同一个**模块实例
+const { createPinia, setActivePinia } = await server.ssrLoadModule('pinia')
 const { createApp } = await import('vue')
 setActivePinia(createPinia())
 const { useSitesStore } = await server.ssrLoadModule('/src/stores/sites.js')
