@@ -143,7 +143,7 @@ const LAZY_PARTS = [
   // 它有 700+ 行，而 siteDraft.js 只用它的 hashColor —— 标记串必须取 site-infer **独有**的
   // 一句（「地址无法解析」在 shared/ops/site-ops.mjs 里也出现，会把判定带偏）。
   // AddSiteModal 改成异步组件后整条链路才真正离开首屏（591.6 → 608.4 → 回落，实测踩过）。
-  ['正在抓取站点信息', '添加站点弹窗'],
+  ['已按域名秒填草稿', '添加站点弹窗'],
   ['反爬挑战页', 'site-infer 推断引擎'],
 ]
 for (const [mark, name] of LAZY_PARTS) {

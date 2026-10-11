@@ -278,6 +278,10 @@ function rebuild() {
       ...site
     }
     localAdds.value.push(created)
+    // 新收录的站排在**最前面**：localOrder 只描述这批 id 的相对顺序，把新 id 放到
+    // 位置 0 即可让它在默认顺序（云端原序）里排第一 —— 「最新收录一眼看到」，
+    // 且不影响其余站点的相对顺序，用户随后仍可拖拽调整。
+    localOrder.value = [created.id, ...localOrder.value]
     rebuild()
     saveOverlay()
     // 自动添加需要拿这条记录去做预览卡片与撤销，故返回创建结果

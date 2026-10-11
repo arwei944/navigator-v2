@@ -81,7 +81,10 @@ export function parseMyMemory(raw) {
   try {
     const j = JSON.parse(String(raw ?? ''))
     const t = j?.responseData?.translatedText
-    return typeof t === 'string' ? unescapeEntities(t).trim() : ''
+    if (typeof t !== 'string') return ''
+    // MyMemory 免费额度耗尽时不报错，而是在译文位置回一句警告 —— 不能把它当译文收下
+    if (/MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID (SOURCE|TARGET)/i.test(t)) return ''
+    return unescapeEntities(t).trim()
   } catch {
     return ''
   }
@@ -110,7 +113,12 @@ export function myMemoryUrl(text, { from = 'en', to = 'zh-CN' } = {}) {
 /* ---------------- 主入口 ---------------- */
 
 /**
- * 翻译单条文本。Google 优先，失败（网络 / 解析不出内容）时退 MyMemory。
+ * 翻译单条文本。**MyMemory 优先，Google 兜底**。
+ *
+ * 顺序是按部署环境实测定的：服务器在国内网络时 `translate.googleapis.com` 不可达，
+ * 请求会一直挂到超时 —— 而它排在首位时会把整个翻译预算吃光，让可达的 MyMemory
+ * 根本轮不到执行（线上实测两个引擎都返回空）。反过来 MyMemory 响应快且国内可达，
+ * 先走它几乎总是命中；本机/海外部署时 Google 依旧作为兜底可用。
  * 两个都拿不到就返回空串 —— 调用方据此保留原文，绝不写入空译文。
  *
  * @param {string} text
@@ -122,13 +130,13 @@ export async function translateToZh(text, { fetchText, from = 'en' } = {}) {
   if (!src || typeof fetchText !== 'function') return { text: '', engine: '' }
 
   try {
-    const { text: out, source } = parseGoogle(await fetchText(googleUrl(src)))
-    if (out && out !== src) return { text: out, engine: 'google' }
+    const out = parseMyMemory(await fetchText(myMemoryUrl(src, { from })))
+    if (out && out !== src) return { text: out, engine: 'mymemory' }
   } catch { /* 换兜底引擎 */ }
 
   try {
-    const out = parseMyMemory(await fetchText(myMemoryUrl(src, { from })))
-    if (out && out !== src) return { text: out, engine: 'mymemory' }
+    const { text: out, source } = parseGoogle(await fetchText(googleUrl(src)))
+    if (out && out !== src) return { text: out, engine: 'google' }
   } catch { /* 两个引擎都不可用，返回空串由调用方保留原文 */ }
 
   return { text: '', engine: '' }

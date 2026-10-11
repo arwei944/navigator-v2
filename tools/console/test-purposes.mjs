@@ -230,33 +230,44 @@ ok(myMemoryUrl('hi', { from: 'fr', to: 'ja' }).includes('langpair=fr%7Cja'), 'My
 eq(typeof googleUrl(undefined), 'string', '空文本构造地址不抛错')
 eq(new URL(myMemoryUrl('x'.repeat(1000))).searchParams.get('q').length, 480, 'MyMemory 查询串被截到 480 字符')
 
-/* ---------------- 翻译：引擎链路 ---------------- */
+/* ---------------- 翻译：引擎链路 ----------------
+ * 顺序是按部署实测定的：服务器在国内网络时 translate.googleapis.com 不可达（挂到超时、
+ * 吃光预算），故 **MyMemory 优先、Google 兜底**（见 shared/translate.mjs#translateToZh）。 */
 
-const googleOk = async (url) => (url.includes('translate.googleapis') ? gRaw : '')
-const r1 = await translateToZh('Best free online tools', { fetchText: googleOk })
-eq(r1.text, '最佳免费在线工具', 'Google 优先命中')
-eq(r1.engine, 'google', '引擎标记为 google')
+const myMemoryOk = async (url) => (url.includes('mymemory') ? '{"responseData":{"translatedText":"最佳免费在线工具"}}' : '')
+const r1 = await translateToZh('Best free online tools', { fetchText: myMemoryOk })
+eq(r1.text, '最佳免费在线工具', 'MyMemory 优先命中')
+eq(r1.engine, 'mymemory', '引擎标记为 mymemory')
 
-const googleFail = async (url) => {
-  if (url.includes('translate.googleapis')) throw new Error('boom')
-  return '{"responseData":{"translatedText":"兜底译文"}}'
+const myMemoryFail = async (url) => {
+  if (url.includes('mymemory')) throw new Error('boom')
+  return JSON.stringify([[['兜底译文', 'x']], null, 'en'])
 }
-const r2 = await translateToZh('Some english text', { fetchText: googleFail })
-eq(r2.text, '兜底译文', 'Google 失败时退 MyMemory')
-eq(r2.engine, 'mymemory', '引擎标记为 mymemory')
+const r2 = await translateToZh('Some english text', { fetchText: myMemoryFail })
+eq(r2.text, '兜底译文', 'MyMemory 失败时退 Google')
+eq(r2.engine, 'google', '引擎标记为 google')
 
-// Google 返回原文（等于没翻）时也应继续尝试兜底，而不是把原文当译文收下
-const googleEcho = async (url) => {
-  if (url.includes('translate.googleapis')) return JSON.stringify([[['Some english text', 'Some english text']], null, 'en'])
-  return '{"responseData":{"translatedText":"真正的译文"}}'
+// MyMemory 返回额度警告时必须视为失败（不能把警告句当译文收下），继续尝试 Google
+const myMemoryWarning = async (url) => {
+  if (url.includes('mymemory')) return '{"responseData":{"translatedText":"MYMEMORY WARNING: YOU USED ALL AVAILABLE QUERIES"}}'
+  return JSON.stringify([[['谷歌兜底译文', 'x']], null, 'en'])
 }
-eq((await translateToZh('Some english text', { fetchText: googleEcho })).text, '真正的译文', '译文与原文相同视为未翻译，继续兜底')
+const r3 = await translateToZh('Some english text', { fetchText: myMemoryWarning })
+eq(r3.text, '谷歌兜底译文', '额度警告视为失败，退 Google')
+eq(r3.engine, 'google', '警告场景引擎标记为 google')
+
+// 译文与原文相同视为未翻译，继续尝试兜底
+const myMemoryEcho = async (url) => {
+  if (url.includes('mymemory')) return '{"responseData":{"translatedText":"Some english text"}}'
+  return JSON.stringify([[['真正的译文', 'x']], null, 'en'])
+}
+eq((await translateToZh('Some english text', { fetchText: myMemoryEcho })).text, '真正的译文', '译文与原文相同视为未翻译，继续兜底')
 
 const allFail = async () => { throw new Error('offline') }
 eq((await translateToZh('Hello', { fetchText: allFail })).text, '', '两个引擎都失败返回空串')
 eq((await translateToZh('Hello', { fetchText: allFail })).engine, '', '失败时引擎为空')
 eq((await translateToZh('Hello', {})).text, '', '未注入 fetchText 时安全返回空')
-eq((await translateToZh('', { fetchText: googleOk })).text, '', '空文本不发起翻译')
+eq((await translateToZh('', { fetchText: myMemoryOk })).text, '', '空文本不发起翻译')
 
 // Google 解析不出内容（空段 / 非 JSON）时同样要退兜底，而不是直接判定失败
 const googleBlank = async (url) => (url.includes('translate.googleapis')
@@ -281,7 +292,11 @@ await translateToZh('   spaced text   ', { fetchText: async (url) => { qSeen = n
 eq(qSeen, 'spaced text', '入参两端空白在请求前被裁掉')
 
 let seenUrl = ''
-await translateToZh('Bonjour', { fetchText: async (url) => { seenUrl = url; return '' }, from: 'fr' })
+await translateToZh('Bonjour', {
+  // Google 在部署网络不可达（同线上实测），只应观察到 MyMemory 的请求地址
+  fetchText: async (url) => { if (!url.includes('mymemory')) throw new Error('unreachable'); seenUrl = url; return '' },
+  from: 'fr',
+})
 ok(seenUrl.includes('langpair=fr%7Czh-CN'), 'from 参数透传到 MyMemory 地址')
 
 /* ---------------- 翻译：字段编排 ---------------- */
@@ -335,7 +350,7 @@ eq(f5.translated.name, false, '缺省字段标记为未翻译')
 // from 透传到传输层
 let fUrl = ''
 await translateSiteFields({ name: 'Bonjour Monde', desc: '' },
-  { fetchText: async (url) => { fUrl = url; return '' }, from: 'fr' })
+  { fetchText: async (url) => { if (!url.includes('mymemory')) throw new Error('unreachable'); fUrl = url; return '' }, from: 'fr' })
 ok(fUrl.includes('langpair=fr%7Czh-CN'), 'translateSiteFields 透传 from 参数')
 
 /* ---------------- 结果 ---------------- */

@@ -8,9 +8,10 @@
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { normalizeUrl, hostOf } from '@/utils/url'
-import { fetchSiteMeta } from '@/services/meta'
+import { fetchSiteMeta, META_TIMEOUT_MS } from '@/services/meta'
+import { localSiteMeta } from '@/services/localMeta'
 import {
-  AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft,
+  AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft, domainOf,
 } from '@/utils/siteDraft'
 
 /**
@@ -29,19 +30,43 @@ export async function loadSuggestCategory() {
   return m.suggestCategory
 }
 
-const META_TIMEOUT_MS = 8000
-
 /**
  * 在途锁：并发提交共享同一次执行，锁键是**域名** —— 与查重口径（findDuplicate 按域名
- * 去重）对齐，同域不同路径的提交也落进同一次执行。连按两次回车时第二次若重跑全流程，
- * 查重会扑在「首次还在抓元数据」的异步窗口上 —— 两次都判无重复、各写一条，就重复入库了。
+ * 去重）对齐，同域不同路径的提交也落进同一次执行。
  */
 const inFlight = new Map()
 
-/** 抓元数据：超时 / 非 2xx / 非 JSON / 网络异常都返回 null，由后续「域名兜底」接手，不再拦人 */
-async function fetchMeta(url) {
-  const r = await fetchSiteMeta(url, { timeoutMs: META_TIMEOUT_MS })
-  return r.ok ? r.data : null
+/**
+ * 后台升级：真实抓取（读对方页面）回来后，把秒填时的域名推断值替换成真实信息。
+ *
+ * 只升级 name / desc / 图标 / 配色 —— **分类不动**：分类在添加那一刻已经决定了
+ * （本机推断或新建），事后改分类会让卡片在用户眼前换位置，比「分类略欠准」糟糕得多。
+ *
+ * 覆盖守卫：以添加时刻的 `updatedAt` 为凭。用户在抓取返回前编辑过这条站点
+ * （updatedAt 变了）就整体放弃升级 —— 自动补全绝不能覆盖人的输入。
+ * 抓取失败（超时 / 站点反爬）静默放弃：本地推断值仍然可用。
+ */
+function scheduleMetaUpgrade(url, created) {
+  const capturedAt = created.updatedAt
+  const domain = domainOf(url)
+  fetchSiteMeta(url, { timeoutMs: META_TIMEOUT_MS })
+    .then((r) => {
+      if (!r.ok) return
+      const cur = sitesStore.sites.find(s => s.id === created.id)
+      if (!cur || cur.updatedAt !== capturedAt) return
+      const patch = {}
+      if (r.data.name && r.data.name !== cur.name) {
+        patch.name = r.data.name
+        patch.initial = String(r.data.name).charAt(0).toUpperCase()
+      }
+      if (r.data.desc && r.data.desc !== cur.desc) patch.desc = r.data.desc
+      if (r.data.color && r.data.color !== cur.color) patch.color = r.data.color
+      const fav = r.data.faviconUrl || r.data.favicon
+      // 与 buildSiteFromDraft 同一条规则：只挂「图标来源域名 === 本站域名」的图标，宁可回落字母块
+      if (fav && /^https?:\/\//i.test(fav) && hostOf(fav) === domain) patch.iconUrl = fav
+      if (Object.keys(patch).length) sitesStore.updateSite(created.id, patch)
+    })
+    .catch(() => { /* 静默：升级是锦上添花，失败不打扰 */ })
 }
 
 function duplicateResult(duplicate) {
@@ -81,13 +106,22 @@ async function runAutoAdd(normalized) {
   const duplicate = findDuplicate(sitesStore.sites, normalized)
   if (duplicate) return duplicateResult(duplicate)
 
-  const meta = await fetchMeta(normalized)
+  // **零延迟**：元数据改用本地推断（与服务端同一个 inferSite 引擎，传空 HTML）同步秒出，
+  // 不再等最长 8s 的真实抓取 —— 添加动作即刻完成。真实信息随后在后台升级本条记录
+  // （scheduleMetaUpgrade；用户若已手动编辑则不覆盖）。同域已收录时沿用真名，准确度不打折。
+  const local = await localSiteMeta(normalized, {
+    existingSites: sitesStore.sites,
+    categoryMeta: categoriesStore.groups.reduce((m, g) => {
+      for (const c of g.categories) m[c.id] = { label: c.label, color: c.dotColor, group: g.label }
+      return m
+    }, {}),
+  })
+  const meta = local.ok ? local.data : null
 
-  // 抓取的整个异步窗口里，别的入口（弹窗手动添加）可能已把同域名写进库：
+  // 本地推断是同步过程，但「识别窗口」里别的入口（弹窗手动添加）仍可能把同域名写进库：
   // 写库前复检一次，查重不能只发生在窗口之前
   const raced = findDuplicate(sitesStore.sites, normalized)
   if (raced) return duplicateResult(raced)
-
   // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」。
   // 引擎（auto-category → pinyin-pro）是**按需加载**的（见文件顶部 loadSuggestCategory 的注释）。
   // 加载失败不阻断添加：退化为「未分类入库」，与「新建分类失败」的处理口径一致。
@@ -135,6 +169,8 @@ async function runAutoAdd(normalized) {
     const draft = fallbackDraftFromMeta({ url: normalized, meta, categoryId })
     const { site } = buildSiteFromDraft(draft)
     const created = sitesStore.addSite(site)
+    // 入库即刻返回，真实抓取放后台 —— 慢站（github.com 实测 ~9s）也不拖住添加动作
+    scheduleMetaUpgrade(normalized, created)
     return {
       ok: true,
       site: created,

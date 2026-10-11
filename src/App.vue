@@ -84,7 +84,7 @@
   <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
 
   <!-- 添加站点：入口在右上角工具栏与全能框，弹窗宿主上提到这里（原挂在左侧栏内） -->
-  <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" />
+  <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" @saved="onAddSaved" />
 
   <!-- 编辑站点：全能框「编辑」命令的宿主。卡片上的编辑仍走 CardsContainer 自己的实例，
        这里只补命令层够不着的那一条路径 -->
@@ -290,6 +290,12 @@ function closeAddSite() {
   showAddModal.value = false
   addPrefillUrl.value = ''
   addNotice.value = ''
+}
+
+// 弹窗手动添加成功后与搜索栏路径同等待遇：切到该分类并滚动定位到新卡片
+function onAddSaved({ id }) {
+  const site = sitesStore.sites.find(s => s.id === id)
+  if (site) locateSite(site)
 }
 
 function openBookmarkImport() {

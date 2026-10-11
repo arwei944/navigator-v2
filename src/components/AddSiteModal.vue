@@ -248,6 +248,7 @@ function resetTouched() {
  */
 function resetForNewHost() {
   resetTouched()
+  quickDraftHost = ''
   form.name = ''
   form.desc = ''
   form.categoryId = ''
@@ -279,64 +280,97 @@ async function fetchMeta() {
   lastHost = host
 
   const seq = ++reqSeq
-  fetching.value = true
-  status.value = '正在抓取站点信息…'
-  statusKind.value = 'loading'
-  // 抓取一律走 services/meta.js：非 JSON 的响应（平台暂停部署的 402 纯文本、
-  // 网关的 5xx HTML、SPA 兜底的 index.html）在那里被翻成人话，不会露出 JSON 解析错误
-  const r = await fetchSiteMeta(url)
+
+  /**
+   * ① **本地推断先秒填，不等网络**：跑的是与服务端同一个 inferSite 引擎（空 HTML），
+   * 同域已收录直接沿用真名。第一次会动态加载引擎 chunk（毫秒级、有缓存），
+   * 之后就是纯本地计算 —— 表单在粘贴后立刻有内容，而不是盯着「抓取中」等 1~10 秒。
+   * 用户改过的字段有 touched 守卫，稍后真实抓取回来也不会覆盖。
+   */
+  const local = await localSiteMeta(url, {
+    existingSites: sitesStore.sites,
+    categoryMeta: categoryMetaFromStore(),
+  })
   if (seq !== reqSeq) return
-  if (!r.ok) {
-    // 服务端抓取不可用（纯静态托管没有 /api/metadata，或后端临时故障）时退回本地推断：
-    // 跑的是与服务端同一个 inferSite 引擎，只是手上没有 HTML ——
-    // 名称/分类/配色来自域名（同域已收录则沿用真名），描述与图标是推断值。
-    // 这比直接报错强得多：用户拿到的是一份可复核的草稿，而不是从零手填。
-    const local = await localSiteMeta(url, {
-      existingSites: sitesStore.sites,
-      categoryMeta: categoryMetaFromStore(),
-    })
-    if (seq !== reqSeq) return
-    if (local.ok) {
-      meta.value = local.data
-      applyMeta(local.data)
-      status.value = localMetaNotice(local.data)
-      statusKind.value = 'warn'
-      fetching.value = false
-      return
-    }
-    meta.value = null
-    faviconUrl.value = ''
-    faviconHost.value = ''
-    status.value = metaFailureText(r)
+  let localApplied = false
+  if (local.ok) {
+    meta.value = local.data
+    applyMeta(local.data)
+    localApplied = true
+    fetching.value = false
+    status.value = '已按域名秒填草稿，正在后台抓取站点真实信息…'
+    statusKind.value = 'loading'
+  } else {
+    // 网址本身不合法：真实抓取也不会有结果，直接给错误态
+    status.value = local.message + '（可手动填写）'
     statusKind.value = 'err'
     fetching.value = false
     return
   }
+
+  /**
+   * ② 后台真实抓取（读对方页面的 title / 描述 / 图标），回来升级**未被手动改过**的字段。
+   * 任何失败都静默保留本地草稿 —— 草稿已经可用了，失败只是「少一次升级」。
+   */
+  const r = await fetchSiteMeta(url)
+  if (seq !== reqSeq) return
+  if (!r.ok) {
+    status.value = localMetaNotice(local.data)
+    statusKind.value = 'warn'
+    return
+  }
   try {
     const data = r.data
+    // 真实抓取没有比本地推断多出任何东西（极端：站点无 title 且无描述）→ 保留原状态即可
+    const better = (data.name && data.name !== local.data.name) ||
+      (data.desc && data.desc !== local.data.desc) ||
+      (data.faviconUrl && data.faviconUrl !== local.data.faviconUrl)
     meta.value = data
     applyMeta(data)
-    status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
-    statusKind.value = data.warning ? 'warn' : 'ok'
+    if (better) {
+      status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
+      statusKind.value = data.warning ? 'warn' : 'ok'
+    } else {
+      status.value = localMetaNotice(local.data)
+      statusKind.value = 'warn'
+    }
   } catch (e) {
     // 抓取成功但回填失败（字段结构意外）—— 仍然是「可手动填写」，不能把弹窗卡在 loading
-    meta.value = null
-    faviconUrl.value = ''
-    faviconHost.value = ''
-    status.value = '抓取结果无法解析：' + e.message + '（可手动填写）'
+    status.value = '抓取结果无法解析：' + e.message + '（已保留域名推断草稿）'
     statusKind.value = 'err'
-  } finally {
-    if (seq === reqSeq) fetching.value = false
   }
 }
 
 // 粘贴/输入网址后自动补全：停顿 600ms 再抓，避免边打边请求
 let inputTimer = null
+
+/**
+ * **零延迟**：本地推断不进防抖 —— 粘贴的瞬间表单就有内容（同域已收录沿用真名），
+ * 600ms 防抖只留给真实抓取。partial 输入（还构不成网址）会被 localSiteMeta 的
+ * URL 校验直接跳过；host 没变就不重算，避免逐字符重复计算。
+ */
+let quickDraftHost = ''
+async function quickLocalDraft(raw) {
+  const url = normalizeUrl(raw)
+  if (!url) return
+  const host = hostOf(url)
+  if (!host || host === quickDraftHost) return
+  quickDraftHost = host
+  const seq = ++reqSeq
+  const local = await localSiteMeta(url, {
+    existingSites: sitesStore.sites,
+    categoryMeta: categoryMetaFromStore(),
+  })
+  if (seq !== reqSeq || !local.ok) return
+  meta.value = local.data
+  applyMeta(local.data)
+}
 function onUrlInput() {
   submitError.value = ''
   clearTimeout(inputTimer)
   const host = hostOf(form.url)
   if (!host || host === lastHost) return
+  quickLocalDraft(form.url.trim())
   inputTimer = setTimeout(() => { if (form.url.trim()) fetchMeta() }, 600)
 }
 
@@ -360,8 +394,9 @@ function submit() {
     faviconHost: faviconHost.value,
   })
 
-  sitesStore.addSite(site)
-  emit('saved', { name: site.name, url: site.url })
+  const created = sitesStore.addSite(site)
+  // 带上 id：App 据此把视图切到该分类并滚动定位到新卡片
+  emit('saved', { id: created.id, name: site.name, url: site.url })
   emit('close')
 }
 
