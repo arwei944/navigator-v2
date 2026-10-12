@@ -104,6 +104,10 @@
         <div class="batch-actions">
           <button class="batch-btn" @click="sitesStore.selectAll(displaySites.map(s => s.id))">全选</button>
           <button class="batch-btn" @click="sitesStore.clearSelection()">取消全选</button>
+          <button class="batch-btn" @click="sitesStore.invertSelection(displaySites.map(s => s.id))"
+                  title="反选当前可见的站点">反选</button>
+          <button class="batch-btn" @click="applyBatchPin">置顶</button>
+          <button class="batch-btn" @click="applyBatchArchive">归档</button>
           <select v-model="batchCategory" class="batch-select" aria-label="批量修改分类" @change="applyBatchCategory">
             <option value="">改分类…</option>
             <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.label }}</option>
@@ -166,6 +170,7 @@ import { useHistoryStore } from '@/stores/history'
 import { useCategoriesStore } from '@/stores/categories'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useToastStore } from '@/stores/toast'
+import { useUndoActions } from '@/composables/useUndoActions'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 import SiteCard from '@/components/SiteCard.vue'
 import EditSiteModal from '@/components/EditSiteModal.vue'
@@ -180,6 +185,7 @@ const historyStore = useHistoryStore()
 const categoriesStore = useCategoriesStore()
 const preferencesStore = usePreferencesStore()
 const toastStore = useToastStore()
+const { undoablePatch, undoableDelete } = useUndoActions()
 
 const editingSite = ref(null)
 const deletingSite = ref(null)
@@ -346,11 +352,19 @@ function doDelete() {
 }
 
 function doBatchDelete() {
-  sitesStore.batchDeleteToTrash()
+  const ids = [...sitesStore.selectedIds]
   showBatchDeleteConfirm.value = false
+  // 删除是唯一有二次容器的操作，但「去回收站里翻」是翻找成本：
+  // 顺手给一条 5 秒的撤销入口，误删当场就能回。
+  undoableDelete({ ids, label: '批量删除' })
 }
 
-/* ---------- 批量改分类 / 批量加用途 ---------- */
+/* ---------- 批量改分类 / 加用途 / 置顶 / 归档 / 反选 ----------
+ *
+ * 五个动作共用同一条路径：算反向补丁 → 执行 → 入撤销栈 → 弹带「撤销」的提示。
+ * 这里**只传字段名**（patch 的键），原值由 undoCore#undoPatches 从站点当前值读 ——
+ * 撤销要回到各自的原值，不是一律取反（本来就已置顶的站，取反会把它改成未置顶）。
+ */
 
 const categoryOptions = computed(() => categoriesStore.categories)
 const purposeOptions = computed(() => PURPOSE_TAGS)
@@ -359,27 +373,53 @@ function applyBatchCategory() {
   const id = batchCategory.value
   batchCategory.value = ''
   if (!id) return
-  const ids = [...sitesStore.selectedIds]
-  const n = sitesStore.batchSetCategory(ids, id)
-  if (n) {
-    toastStore.push({ message: `已把 ${n} 个站点改到「${categoriesStore.getCategoryLabel(id)}」`, tone: 'ok', duration: 4000 })
-    sitesStore.clearSelection()
-  }
+  const label = categoriesStore.getCategoryLabel(id)
+  const n = undoablePatch({
+    label: '改分类',
+    ids: [...sitesStore.selectedIds],
+    patch: { categoryId: id },
+    message: k => `已把 ${k} 个站点改到「${label}」`,
+  })
+  if (n) sitesStore.clearSelection()
 }
 
 function applyBatchPurpose() {
   const id = batchPurpose.value
   batchPurpose.value = ''
   if (!id) return
-  const ids = [...sitesStore.selectedIds]
-  const n = sitesStore.batchAddPurpose(ids, id)
   const label = PURPOSE_TAGS.find(p => p.id === id)?.label || id
-  if (n) {
-    toastStore.push({ message: `已为 ${n} 个站点加上「${label}」用途`, tone: 'ok', duration: 4000 })
-    sitesStore.clearSelection()
-  } else {
-    toastStore.push({ message: `选中的站点都已有「${label}」用途`, tone: 'info', duration: 3000 })
-  }
+  // 加用途是「每站补丁各不相同」：已有该用途的站要跳过，撤销时也要各自回到原数组。
+  // 所以 patch 只声明字段名（purposes），真正的执行交给 forward。
+  const n = undoablePatch({
+    label: '加用途',
+    ids: [...sitesStore.selectedIds],
+    patch: { purposes: null },
+    forward: list => sitesStore.batchAddPurpose(list, id),
+    message: k => `已为 ${k} 个站点加上「${label}」`,
+  })
+  if (n) sitesStore.clearSelection()
+  else toastStore.push({ message: `选中的站点都已有「${label}」用途`, tone: 'info', duration: 3000 })
+}
+
+function applyBatchPin() {
+  const n = undoablePatch({
+    label: '置顶',
+    ids: [...sitesStore.selectedIds],
+    patch: { pinned: true, archived: false },
+    message: k => `已置顶 ${k} 个站点`,
+  })
+  if (n) sitesStore.clearSelection()
+}
+
+function applyBatchArchive() {
+  const n = undoablePatch({
+    label: '归档',
+    ids: [...sitesStore.selectedIds],
+    patch: { archived: true, pinned: false },
+    // 归档的站点会当场从日常范围里消失，说清去处，否则像「按了没反应 / 凭空少了几张卡」
+    message: k => `已归档 ${k} 个站点（可在「归档」里找到）`,
+  })
+  if (n) sitesStore.clearSelection()
 }
 
 function permanentDeleteConfirm(site) {

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="toast-host" role="status" aria-live="polite">
+    <div class="toast-host" :class="{ 'above-batch-bar': batchBarVisible }" role="status" aria-live="polite">
       <TransitionGroup name="toast">
         <div v-for="t in toastStore.items" :key="t.id"
              class="toast" :class="'toast-' + t.tone"
@@ -15,9 +15,23 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useToastStore } from '@/stores/toast'
+import { useSitesStore } from '@/stores/sites'
 
 const toastStore = useToastStore()
+const sitesStore = useSitesStore()
+
+/**
+ * 批量栏挡在底部时把提示抬上去。
+ *
+ * 批量栏（z-index 200）与提示（700）都贴在底边，提示按设计压在批量栏之上 ——
+ * 于是「已置顶 3 个站点 · 撤销」这几秒里，它正好盖住批量栏中间的按钮。
+ * 以前提示 4~5 秒就自动消失，问题一闪而过；而撤销提示是**用户要读、要点的**，
+ * 盖住「置顶 / 归档 / 改分类」就成了实打实的误点与点不到。
+ * 抬高偏移量与批量栏自身的几何是同一套数（见 CardsContainer 的 .batch-bar / 移动端媒体查询）。
+ */
+const batchBarVisible = computed(() => sitesStore.batchMode && sitesStore.selectedIds.size > 0)
 
 function runAction(t) {
   toastStore.dismiss(t.id)
@@ -39,6 +53,13 @@ function runAction(t) {
   gap: 8px;
   pointer-events: none;
   max-width: 96vw;
+  transition: bottom .18s ease;
+}
+/* 批量栏在下方时抬到它之上：59px（批量栏自身高度 = 14 上下内边距 + 31 控件）＋ 12 间隙 ＋ 原 24 */
+.toast-host.above-batch-bar { bottom: calc(95px + env(safe-area-inset-bottom)); }
+@media (max-width: 768px) {
+  /* 移动端批量栏被抬到 tab 栏之上（bottom: 56px），提示要再高一层 */
+  .toast-host.above-batch-bar { bottom: calc(176px + env(safe-area-inset-bottom)); }
 }
 .toast {
   pointer-events: auto;

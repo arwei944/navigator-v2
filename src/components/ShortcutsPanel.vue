@@ -38,6 +38,7 @@ const shortcuts = [
   { id: 'omni', label: '打开全能框（命令）', key: 'Ctrl+K' },
   { id: 'search', label: '聚焦顶部搜索框', key: 'Ctrl+F' },
   { id: 'theme', label: '切换明暗', key: 'Ctrl+D' },
+  { id: 'undo', label: '撤销最近的批量改动/删除', key: 'Ctrl+Z' },
   { id: 'noteNew', label: '新建便利贴', key: 'Ctrl+Alt+N' },
   { id: 'noteBoard', label: '打开便签墙', key: 'Ctrl+Shift+N' },
   { id: 'shortcuts', label: '查看快捷键', key: '?' },

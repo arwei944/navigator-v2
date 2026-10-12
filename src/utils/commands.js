@@ -38,7 +38,7 @@ const DENSITIES = [
 ]
 
 export function buildCommands(ctx) {
-  const { router, sites, categories, preferences, sidebar, omni, toast, favorites, notes } = ctx
+  const { router, sites, categories, preferences, sidebar, omni, toast, favorites, notes, undo } = ctx
 
   const cmds = []
   const notesCount = notes?.count ?? 0
@@ -313,6 +313,18 @@ export function buildCommands(ctx) {
     icon: 'close',
     keywords: ['qingchu', 'qc', 'qingkongsousuo', 'clear', 'chongzhi', 'cz'],
     run: () => sites.setSearchQuery('')
+  })
+
+  cmds.push({
+    id: 'action.undo',
+    title: '撤销上一步',
+    subtitle: '撤回最近一次批量改分类/加用途/置顶/归档或删除（5 秒内有效）',
+    section: 'action',
+    icon: 'undo',
+    // 后端（stores/undo.js）只留 5 秒窗口，所以这条命令天然会「过了就撤不了」——
+    // 撤不动时 undo 自己会弹「这一步已经撤不回来了」，不用命令表操心
+    keywords: ['chexiao', 'cx', 'undo', 'huitui', 'ht', 'shouhua'],
+    run: () => undo?.()
   })
 
   /* ── 站点操作：不进注册表，因为需要 site 参数 ── */

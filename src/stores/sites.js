@@ -359,6 +359,69 @@ function rebuild() {
   }
 
   /**
+   * 批量应用**各不相同**的补丁：`[{ id, patch }, ...]`。
+   *
+   * 与 `batchUpdate`（同一个 patch 给所有 id）分工明确：
+   *   - 前进用 batchUpdate（语义清晰，调用方不必构造每条的补丁）；
+   *   - 撤销用本函数（每个站要恢复成各自不同的原值）。
+   * 同样是一次遍历 + 一次 rebuild。
+   */
+  function batchPatch(ops) {
+    const now = Date.now()
+    let touched = 0
+    for (const o of Array.isArray(ops) ? ops : []) {
+      if (!o || !o.id || !o.patch || typeof o.patch !== 'object') continue
+      const p = { ...o.patch, updatedAt: now }
+      const idx = localAdds.value.findIndex(s => s.id === o.id)
+      if (idx !== -1) {
+        localAdds.value[idx] = { ...localAdds.value[idx], ...p }
+        touched++
+        continue
+      }
+      if (sites.value.some(s => s.id === o.id)) {
+        localEdits.value[o.id] = { ...(localEdits.value[o.id] || {}), ...p }
+        touched++
+      }
+    }
+    if (touched) { rebuild(); saveOverlay() }
+    return touched
+  }
+
+  /**
+   * 批量置顶。语义与单站 `togglePin` 一致：置顶同时退出归档
+   * —— 否则「已归档的站被置顶后仍藏在归档范围里」，用户看不到刚置顶了它。
+   */
+  function batchPin(ids) {
+    const list = [...new Set(ids || [])]
+    if (!list.length) return 0
+    return batchUpdate(list, { pinned: true, archived: false })
+  }
+
+  /** 批量归档。与单站 `toggleArchive` 一致：归档同时取消置顶。 */
+  function batchArchive(ids) {
+    const list = [...new Set(ids || [])]
+    if (!list.length) return 0
+    return batchUpdate(list, { archived: true, pinned: false })
+  }
+
+  /**
+   * 反选：以 `visibleIds`（当前可见的站点）为全集取反。
+   *
+   * 刻意**不**用全部站点做全集：在 A 分类选了 3 个，切到 B 分类点反选，
+   * 意图是「选中 B 里除了这 3 个之外的全部」—— 用全量会把 A 里没选的全选上，
+   * 接着一次批量删除就是误删。与 `pruneSelection` 同一条思路：只动看得见的。
+   */
+  function invertSelection(visibleIds) {
+    const visible = new Set(Array.isArray(visibleIds) ? visibleIds : [])
+    const next = new Set()
+    for (const id of visible) {
+      if (!selectedIds.value.has(id)) next.add(id)
+    }
+    selectedIds.value = next
+    return next.size
+  }
+
+  /**
    * 撤销一次「自动添加」：只从本地新增层摘掉，不进回收站。
    * 自动添加没有人工确认这一步，撤销就要能彻底当没发生过。
    * 返回是否真的摘掉了一条。
@@ -823,7 +886,9 @@ function fetchCloud() {
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded, cloudError,
     addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
-    batchUpdate, batchSetCategory, batchAddPurpose, togglePin, toggleArchive, setArchivedScope,
+    batchUpdate, batchPatch, batchSetCategory, batchAddPurpose,
+    batchPin, batchArchive, invertSelection,
+    togglePin, toggleArchive, setArchivedScope,
     archivedCount, archivedScope,
     setSearchQuery, setCategory, setPurpose, setSortBy, setViewMode,
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, pruneSelection,

@@ -150,6 +150,7 @@ import { useOmniStore } from '@/stores/omni'
 import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useThemeStore } from '@/stores/theme'
+import { useUndoActions } from '@/composables/useUndoActions'
 import { startLiveSync } from '@/services/liveSync'
 
 /**
@@ -181,6 +182,8 @@ const toastStore = useToastStore()
 const omniStore = useOmniStore()
 const notesStore = useNotesStore()
 const siteNotesStore = useSiteNotesStore()
+// 撤销：批量改分类/加用途/置顶/归档/删除都入栈，Ctrl+Z 与提示上的「撤销」按钮共用一份逻辑
+const { undoableDelete, undoLast } = useUndoActions()
 /**
  * 主题 store 必须在启动时就实例化，**不能**只靠主题设置面板去创建它：
  * 「跟随系统」「日落自动换深色」「自建主题刷新后补应用」都挂在它的初始化里，
@@ -397,12 +400,13 @@ function confirmDeleteSite() {
   const site = deleteSite.value
   deleteSite.value = null
   if (!site) return
-  sitesStore.deleteSite(site.id)
-  toastStore.push({
-    message: `已把「${site.name}」移入回收站`,
-    tone: 'ok',
-    actionLabel: '撤销',
-    onAction: () => sitesStore.restoreFromTrash(site.id)
+  // 单站删除也入撤销栈：这样 Ctrl+Z 撤的总是「刚刚那件破坏性的事」，
+  // 而不是「上一次批量操作」—— 撤销键的含义不该随操作规模变化。
+  undoableDelete({
+    ids: [site.id],
+    label: '删除',
+    forward: list => sitesStore.deleteSite(list[0]),
+    message: () => `已把「${site.name}」移入回收站`,
   })
 }
 
@@ -567,6 +571,15 @@ function onKeydown(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
     e.preventDefault()
     commandPaletteRef.value?.open()
+    return
+  }
+  // Ctrl+Z 撤销最近一次批量改动 / 删除（5 秒窗口内，见 stores/undo.js）
+  // 焦点在输入框里时不接管：那是浏览器/编辑器自己的文本撤销，抢过来是破坏
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    const tag = e.target?.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+    e.preventDefault()
+    undoLast()
     return
   }
   // Ctrl+D 切换主题：快捷键面板里写了这条但一直没实现，这里补上
