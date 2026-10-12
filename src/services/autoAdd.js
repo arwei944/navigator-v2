@@ -8,10 +8,9 @@
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { normalizeUrl, hostOf } from '@/utils/url'
-import { fetchSiteMeta, META_TIMEOUT_MS } from '@/services/meta'
 import { localSiteMeta } from '@/services/localMeta'
 import {
-  AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft, domainOf,
+  AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft,
 } from '@/utils/siteDraft'
 
 /**
@@ -36,39 +35,6 @@ export async function loadSuggestCategory() {
  */
 const inFlight = new Map()
 
-/**
- * 后台升级：真实抓取（读对方页面）回来后，把秒填时的域名推断值替换成真实信息。
- *
- * 只升级 name / desc / 图标 / 配色 —— **分类不动**：分类在添加那一刻已经决定了
- * （本机推断或新建），事后改分类会让卡片在用户眼前换位置，比「分类略欠准」糟糕得多。
- *
- * 覆盖守卫：以添加时刻的 `updatedAt` 为凭。用户在抓取返回前编辑过这条站点
- * （updatedAt 变了）就整体放弃升级 —— 自动补全绝不能覆盖人的输入。
- * 抓取失败（超时 / 站点反爬）静默放弃：本地推断值仍然可用。
- */
-function scheduleMetaUpgrade(url, created) {
-  const capturedAt = created.updatedAt
-  const domain = domainOf(url)
-  fetchSiteMeta(url, { timeoutMs: META_TIMEOUT_MS })
-    .then((r) => {
-      if (!r.ok) return
-      const cur = sitesStore.sites.find(s => s.id === created.id)
-      if (!cur || cur.updatedAt !== capturedAt) return
-      const patch = {}
-      if (r.data.name && r.data.name !== cur.name) {
-        patch.name = r.data.name
-        patch.initial = String(r.data.name).charAt(0).toUpperCase()
-      }
-      if (r.data.desc && r.data.desc !== cur.desc) patch.desc = r.data.desc
-      if (r.data.color && r.data.color !== cur.color) patch.color = r.data.color
-      const fav = r.data.faviconUrl || r.data.favicon
-      // 与 buildSiteFromDraft 同一条规则：只挂「图标来源域名 === 本站域名」的图标，宁可回落字母块
-      if (fav && /^https?:\/\//i.test(fav) && hostOf(fav) === domain) patch.iconUrl = fav
-      if (Object.keys(patch).length) sitesStore.updateSite(created.id, patch)
-    })
-    .catch(() => { /* 静默：升级是锦上添花，失败不打扰 */ })
-}
-
 function duplicateResult(duplicate) {
   return {
     ok: false,
@@ -81,9 +47,12 @@ function duplicateResult(duplicate) {
 /**
  * @param {{ url: string }} input 搜索栏给出的原始网址
  * @returns {Promise<
- *   { ok: true, site: object, category: { id: string, label: string, created: boolean } } |
+ *   { ok: true, site: object, upgrade: Promise<object>,
+ *     category: { id: string, label: string, created: boolean } } |
  *   { ok: false, reason: string, message: string, existing?: object }
  * >}
+ *   `upgrade` 是后台真实抓取 + 翻译的完成信号（`{ changed, real, reason, name }`），
+ *   调用方可以据此给用户一条「信息已补全」的回执；不 await 它也不会阻塞添加。
  */
 export function autoAddSite({ url }) {
   const normalized = normalizeUrl(url)
@@ -169,15 +138,45 @@ async function runAutoAdd(normalized) {
     const draft = fallbackDraftFromMeta({ url: normalized, meta, categoryId })
     const { site } = buildSiteFromDraft(draft)
     const created = sitesStore.addSite(site)
-    // 入库即刻返回，真实抓取放后台 —— 慢站（github.com 实测 ~9s）也不拖住添加动作
-    scheduleMetaUpgrade(normalized, created)
+    /**
+     * 入库即刻返回，真实抓取 + 翻译放后台 —— 慢站（github.com 实测 ~10s）也不拖住添加动作。
+     * 返回这个 Promise 而不是就地 await：调用方（App）拿它挂「信息已补全」的回执，
+     * 添加动作本身仍然是毫秒级完成。
+     *
+     * `services/metaUpgrade` 走**动态 import**：它只在「用户真的粘了网址并且加成功」这条
+     * 路径上才需要，首屏一次都用不到 —— 而它连带引入的 `services/meta.js`（抓取容错与
+     * 文案表）同理。两者一起离开首屏静态图，把这条链路的开销整个让出首屏预算。
+     *
+     * ⚠️ 历史教训：这段逻辑原先就在**本文件里**，是模块级函数却引用了下面这个 `sitesStore`
+     * 局部变量 —— 每跑必抛 ReferenceError，又被 `.catch(() => {})` 吞掉，于是抓取 / 翻译 /
+     * 改写全程静默失败整整一个版本，用户永远停在秒加那份草稿上。现在编排在
+     * `services/metaUpgrade.js` 里、store 由这里显式传入，代码级异常会在那边走
+     * `console.warn`，不再有第二次。
+     */
+    const upgrade = import('@/services/metaUpgrade')
+      .then(m => m.runMetaUpgrade({ store: sitesStore, url: normalized, created }))
+      // 只兜「异步 chunk 加载失败」这种基础设施问题（陈旧的 SW 缓存 / 部署缺口）：
+      // 它不在 runMetaUpgrade 的职责范围内，但同样不许静默
+      .catch((e) => {
+        console.warn('[auto-add] 后台升级模块加载失败，本次不做真实信息补全：', e)
+        return { changed: false, real: false, reason: 'error', name: created.name, patch: null }
+      })
     return {
       ok: true,
       site: created,
       category: { id: categoryId, label: categoryLabel, created: createdCategory },
+      upgrade,
     }
-  } catch {
-    // 落库阶段的任何异常都归为写库失败
+  } catch (e) {
+    /**
+     * 落库阶段的异常归为写库失败 —— 但**必须留下痕迹**。
+     *
+     * 存储配额溢出走的是 `safeSetItem`（它自己 catch 并告警），根本到不了这里；
+     * 所以能走到这里的几乎都是**代码级缺陷**（脏数据、字段名打错、store 未就绪）。
+     * 静默地把它们一律说成「本机存储写入被拒绝」，就是后台升级那次事故的同款病灶：
+     * 一个必然复现的错误伪装成「偶尔的环境问题」，谁也不会去查。
+     */
+    console.warn('[auto-add] 添加站点在落库阶段抛错：', e)
     return { ok: false, reason: AUTO_ADD_REASON.WRITE_FAILED, message: '添加失败：本机存储写入被拒绝，请稍后重试。' }
   }
 }

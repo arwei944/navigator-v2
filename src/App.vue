@@ -251,6 +251,22 @@ async function runAutoAdd(url) {
       onAction: () => undoAutoAdd(res.site.id, res.category),
     })
     await locateSite(res.site)
+    /**
+     * 秒加入库用的是「按域名推断」的草稿，真实名称 / 描述 / 图标是后台抓完才回来的。
+     * 不说一声的话，用户只会看到卡片标题在几秒后**自己变了**，像出了 bug。
+     *
+     * 只在 `real`（真的读到了对方页面，因此名称与描述是译成中文的真值）时回执：
+     * 只拿到「按域名推断」的结果时保持安静 —— 用一个猜测去宣告「已补全」才是撒谎。
+     */
+    res.upgrade?.then((u) => {
+      if (!u || !u.changed || !u.real) return
+      toastStore.push({
+        message: `已补全「${u.name}」的名称与描述`,
+        tone: 'info',
+        actionLabel: '查看',
+        onAction: () => locateSite(res.site),
+      })
+    })
     return
   }
 

@@ -39,11 +39,21 @@ const MAX_REDIRECTS = 4
  *
  * 为什么不去 vercel.json 调 `maxDuration`：超过账户计划上限会让**整个部署失败**，
  * 属于「用整站可部署性赌一个字段」。真正的问题是内部预算没有上限，那就从内部收敛：
- * 抓取占前 6s，翻译用剩下的时间（并保证至少 2s），任何一步超时都退回原文/域名推断。
+ * 抓取占前 6s，翻译用剩下的时间，任何一步超时都退回原文/域名推断。
+ *
+ * ## TRANSLATE_MIN_MS 为什么是 3.5s 而不是 2s
+ *
+ * 翻译和抓取**争同一个预算**：抓取（含补抓 manifest）吃掉 6s 后，翻译只剩
+ * `max(下限, 9s - 已用)` —— 下限就是它在最坏情况下的全部时间。
+ *
+ * 线上实测（同一站点连打 4 次）：总耗时 5.2s / 5.5s / 7.3s 的三次都译成了中文，
+ * 而总耗时 9.4s 的那次译文为空（下限 2s 不够 MyMemory 往返）→ 描述落成英文原文。
+ * 下限提到 3.5s 后，最坏总时长 `6s 抓取 + 3.5s 翻译 ≈ 9.5~10s`，
+ * 仍在实测被平台正常返回的区间内（9.4s 那次是完整返回的，只是译文空）。
  */
 const FETCH_BUDGET_MS = 6000
 const TOTAL_BUDGET_MS = 9000
-const TRANSLATE_MIN_MS = 2000
+const TRANSLATE_MIN_MS = 3500
 
 function blockedHostError() {
   const err = new Error('该地址指向内网或本机')
@@ -246,8 +256,9 @@ export default async function handler(req, res) {
   if (info.blocked) warning = BLOCKED_WARNING
 
   // 自动翻译：把非中文的名称 / 描述译成中文，原文一并回传，让 UI 能展示「译文 + 原文」对照。
-  // 用**剩余预算**（至少 2s）而不是固定 6s —— 固定值会让「抓取用满 6s + 翻译用满 6s」
-  // 顶到 12s，越过函数默认的 10s 上限直接 504。翻译是锦上添花，超时就保留原文。
+  // 用**剩余预算**（下限见 TRANSLATE_MIN_MS，约 3.5s）而不是固定 6s —— 固定值会让
+  // 「抓取用满 6s + 翻译用满 6s」顶到 12s，越过函数默认的 10s 上限直接 504。
+  // 翻译是锦上添花，超时就保留原文。
   const tr = await autoTranslate(info, UA, Math.max(TRANSLATE_MIN_MS, TOTAL_BUDGET_MS - (Date.now() - startedAt)))
 
   // 抓取结果随目标页变动，不缓存，避免同域名二次抓取拿到旧标题
