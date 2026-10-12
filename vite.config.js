@@ -7,7 +7,17 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      /**
+       * 必须是 `prompt`，不能是 `autoUpdate`。
+       *
+       * `autoUpdate` 下 registerSW 模板**根本不会调用 `onNeedRefresh`** ——
+       * 它只挂一个 `activated` 监听器直接 `window.location.reload()`（见
+       * vite-plugin-pwa/dist/client/build/register.js 第 38-47 行）。于是「弹提示让用户
+       * 自己决定」的代码是死代码，无提示刷新照旧发生，现场照旧丢。
+       * `prompt` 模式下才会走 `waiting → onNeedRefresh()`，用户点刷新后
+       * `updateServiceWorker(true)` 发 skipWaiting，SW 拿到控制权再 reload。
+       */
+      registerType: 'prompt',
       injectRegister: null,
       // 这里引用的文件必须真实存在，否则预缓存清单会挂一个 404（原来是 favicon.ico，实际只有 favicon.svg）
       includeAssets: ['favicon.svg'],
