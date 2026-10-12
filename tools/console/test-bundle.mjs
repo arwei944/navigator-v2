@@ -150,6 +150,11 @@ const LAZY_PARTS = [
   ['深浅色', '中文别名表'],
   // 新版本提示：只在真有新版本时才被调用，首访者一次都用不到
   ['有新版本可用', 'PWA 更新提示'],
+  // 秒加后的真实信息补全（services/metaUpgrade.js，由 services/autoAdd.js 动态 import）。
+  // 它连带拖着 services/meta.js（抓取容错与文案表），而这条链路只在「粘网址并加成功」之后
+  // 才走得到 —— 一旦有人把它改回静态 import，两者会一起回到首屏。
+  // 标记取模块里**独有**的一句告警文案（「升级过程抛错」在别处没有）。
+  ['升级过程抛错', '秒加后的真实信息补全'],
 ]
 for (const [mark, name] of LAZY_PARTS) {
   const owners = allJs.filter(f => readAsset(f).includes(mark))
