@@ -20,6 +20,8 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { useToastStore } from '@/stores/toast'
 import { useOmniStore } from '@/stores/omni'
 import { buildCommands } from '@/utils/commands'
+import { matchPhrase, describePhrase, PHRASE_MIN } from '@/utils/commandPhrases'
+import { useUndoActions } from '@/composables/useUndoActions'
 import { rankSites, matchAny, scoreText, scoreSite, clickTier } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
 import { openInNewTab } from '@/utils/open'
@@ -45,7 +47,8 @@ const GROUP_LABEL = {
   external: '站外',
   recent: '最近访问',
   common: '常用命令',
-  siteAction: '站点操作'
+  siteAction: '站点操作',
+  phrase: '理解'
 }
 
 /** 前缀语义：> 只命令，@ 只站点，/ 只页面 */
@@ -78,7 +81,33 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const notes = useNotesStore()
   const siteNotes = useSiteNotesStore()
   const clicks = useClicksStore()
+  // 「撤销上一步」命令：撤销按钮的逻辑复用 useUndoActions，命令表只拿一个回调
+  const { undoLast } = useUndoActions()
 
+  /**
+   * 中文别名表按需取。
+   *
+   * 它是纯数据（`utils/phraseAliases.js`，2.5 KiB 中文串），首屏**渲染**一次都用不到 ——
+   * 压在入口里却会把 600 KiB 首屏预算吃满。所以拆成独立 chunk，由本函数动态取。
+   * 取法是「挂载即发起」而不是「等 idle」：这是一次独立 chunk 拉取，不阻塞渲染，
+   * 而别名表没到时「打中文出不来理解项」是**不确定**的行为 —— 宁可多发一个 2.5 KiB
+   * 请求（在入口已下载完之后，与关键路径无争），也不让首发体验时好时坏。
+   * 两个外壳共用同一份 ref，所以只拉一次。
+   */
+  const phraseAliases = ref({})
+  let aliasesLoading = false
+  async function loadPhraseAliases() {
+    if (aliasesLoading || Object.keys(phraseAliases.value).length) return
+    aliasesLoading = true
+    try {
+      const m = await import('@/utils/phraseAliases')
+      phraseAliases.value = m.PHRASE_ALIASES || {}
+    } catch {
+      // 拉不到就退化成「只有标题 / 特征名两级匹配」——比抛出去炸掉整个搜索框好
+    } finally {
+      aliasesLoading = false
+    }
+  }
   const raw = ref('')
   const selectedIndex = ref(0)
   // 页面栈：null = root；否则为 { site }
@@ -93,7 +122,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
 
   const ctx = {
     router, sites, categories, preferences, favorites, history, sidebar, omni, toast, openSite,
-    notes, siteNotes
+    notes, siteNotes, undo: undoLast
   }
 
   const commands = computed(() => buildCommands(ctx))
@@ -110,6 +139,10 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   })
 
   const trimmed = computed(() => query.value.trim())
+
+  // 挂载即取别名表，并在用户开始打字时兜底重试（首次失败不留下「永远没有中文理解」）
+  loadPhraseAliases()
+  watch(trimmed, v => { if (v) loadPhraseAliases() })
 
   // 输入变化时把选中项复位到第一条，否则上一条的高亮会落在新结果之外
   watch(query, () => { selectedIndex.value = 0 })
@@ -326,6 +359,43 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
       .map(x => ({ ...x.a, key: `act:${x.a.id}`, type: 'action' }))
   })
 
+  /* ---------- 自然语言 → 命令（I3） ---------- */
+
+  /**
+   * 一句话直接解析成一条命令：「切换到深色」→ 切换主题。
+   *
+   * 三条约束：
+   * 1. **只在无前缀时**：`>` / `@` / `/` 已有明确语义，不让自然语言插手；
+   * 2. **只在 root 页**：站点二级页里用户是在挑对某个站的操作，不是在下达全局命令；
+   * 3. **解析不出就返回 null**：猜错的代价是这条搜索结果整段消失，所以宁可不猜。
+   *
+   * 误命中怎么退：phrase 项是结果的第一项（默认选中），按一下 ↓ 就移到搜索结果，
+   * 不需要记特殊快捷键，也不与 Esc=关闭面板的既有语义冲突。
+   */
+  const phraseHint = computed(() => {
+    if (prefix.value || page.value) return null
+    const q = trimmed.value
+    if (q.length < PHRASE_MIN) return null
+    return matchPhrase(q, commands.value, phraseAliases.value)
+  })
+
+  const phraseItem = computed(() => {
+    const hit = phraseHint.value
+    if (!hit) return null
+    return {
+      key: `phrase:${hit.cmd.id}`,
+      type: 'phrase',
+      title: hit.cmd.title,
+      // 「理解为：深色 → 切换主题」—— 用户在按回车之前就能看到系统理解成了什么
+      subtitle: `理解为：${describePhrase(hit)} · ↓ 看其它结果`,
+      icon: hit.cmd.icon,
+      danger: false,
+      // 徽标用：明说这是系统猜的，不是用户搜出来的
+      phrase: true,
+      run: hit.cmd.run
+    }
+  })
+
   /* ---------- 分组输出 ---------- */
 
   // 命令侧最高分 / 站点侧最高分，用于决定 inline 下谁先露面
@@ -371,9 +441,17 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
       external: externalItem.value
     }
 
-    return groupOrder.value
+    const list = groupOrder.value
       .map(t => ({ type: t, label: GROUP_LABEL[t], items: byType[t] || [] }))
       .filter(g => g.items.length)
+
+    // 自然语言命中时置顶，且**只此一条**独占一组 —— 它是「系统猜你的意图」，
+    // 与普通结果混在一起会让用户分不清哪条是猜的。作为第一项默认选中，
+    // 回车即执行；按 ↓ 立即让位给下面的搜索结果。
+    if (phraseItem.value) {
+      list.unshift({ type: 'phrase', label: GROUP_LABEL.phrase, items: [phraseItem.value] })
+    }
+    return list
   })
 
   const flatItems = computed(() => groups.value.flatMap(g => g.items))
@@ -469,6 +547,9 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     groups, flatItems, selectedIndex, empty, breadcrumb, page: page,
     moveDown, moveUp, selected, enter, tab, backspace, back, reset,
     pushSiteActions, openSite,
-    collected, domainCandidate
+    collected, domainCandidate,
+    // 暴露给外壳：inline 的「意图筛选」提示条在自然语言命中命令时应当让位，
+    // 否则「按点击量排序」会同时得到两条语义重复的提示
+    phraseHint
   }
 }

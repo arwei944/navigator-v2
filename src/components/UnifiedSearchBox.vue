@@ -80,10 +80,10 @@ const searchInput = ref(null)
 const rootEl = ref(null)
 const focused = ref(false)
 
-const omni = useOmniBox({ mode: 'inline' })
+const omni = useOmniBox({ mode: 'inline', onDone: item => done(item) })
 const {
   raw, trimmed, groups, selectedIndex, empty, breadcrumb, page,
-  moveDown, moveUp, enter, tab, backspace, back
+  moveDown, moveUp, enter, tab, backspace, back, phraseHint
 } = omni
 
 const filteredCount = computed(() => sitesStore.filteredSites.length)
@@ -95,7 +95,10 @@ const filteredCount = computed(() => sitesStore.filteredSites.length)
 const intentSuppressed = ref(false)
 
 const intent = computed(() => {
-  if (intentSuppressed.value || page.value) return { hit: false, matched: [] }
+  // 自然语言已命中一条命令时，意图筛选提示条让位 ——
+  // 「按点击量排序」同时得到「理解为：按点击量 → 排序」和应用筛选按钮是重复的，
+  // 而命令是回车即执行、筛选还要多点一次，留命令那条更直接。
+  if (intentSuppressed.value || page.value || phraseHint.value) return { hit: false, matched: [] }
   return parseIntent(trimmed.value)
 })
 const intentText = computed(() => describeIntent(intent.value))
