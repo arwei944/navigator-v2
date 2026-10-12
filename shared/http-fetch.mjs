@@ -14,7 +14,7 @@
 import { request as httpRequest } from 'node:http'
 import { request as httpsRequest } from 'node:https'
 import { lookup as dnsLookup } from 'node:dns'
-import { createGunzip, createBrotliDecompress, createInflate, createUnzip } from 'node:zlib'
+import { createGunzip, createBrotliDecompress, createInflate } from 'node:zlib'
 import { createPinnedLookup, isBlockedHost } from './net-guard.mjs'
 
 export const DEFAULT_MAX_BYTES = 256 * 1024
@@ -25,12 +25,17 @@ export const DEFAULT_MAX_BYTES = 256 * 1024
  * @param {AbortSignal} [opts.signal]
  * @param {Record<string,string>} [opts.headers]
  * @param {number} [opts.maxBytes] 响应体读取上限，超出按截断返回
+ * @param {string|string[]} [opts.stopAt] **早断标记**：读到该标记（含标记本身）就断开。
+ *   用于「只需要 `<head>`」的场景 —— 实测只读 32KB 比读满 256KB 快 1.5~6 倍，
+ *   而 title/描述/图标/主题色/manifest 全都在 head 里，没有理由把正文也读完。
+ *   跨 chunk 的标记也能命中（内部保留 `标记长度-1` 字节的尾部做拼接）。
+ *   找不到标记时**退化为 maxBytes 截断**，不会一直读到流结束。
  * @param {Function} [opts.lookup] **仅供测试注入**：默认是 IP 校验版 lookup。
  *   传了它就等于显式声明「这是测试路径」—— 字面主机名检查也会一并跳过，
  *   否则测试没法连本机服务器。生产路径永远不该传它。
- * @returns {Promise<{status:number, headers:Record<string,string>, body:Buffer, truncated:boolean}>}
+ * @returns {Promise<{status:number, headers:Record<string,string>, body:Buffer, truncated:boolean, stoppedAt:''|'marker'|'maxBytes'}>}
  */
-export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAULT_MAX_BYTES, lookup } = {}) {
+export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAULT_MAX_BYTES, lookup, stopAt } = {}) {
   const u = new URL(href)
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
     const e = new Error(`不支持的协议：${u.protocol}`)
@@ -60,10 +65,12 @@ export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAU
     port: u.port || (isHttps ? 443 : 80),
     path: u.pathname + u.search,
     method: 'GET',
-    // 主动要 identity：自己解压要额外处理 raw deflate 等边角情况，而这里的响应体
-    // 本就有 256KB 上限、请求频率也很低，不值得为此引入解压分支。
-    // 但仍保留下面的解压兜底 —— 有服务器会无视这个头照发 gzip。
-    headers: { 'accept-encoding': 'identity', ...headers },
+    // 主动要压缩。**这条曾经是 identity**，理由是「自己解压要额外处理 raw deflate 等
+    // 边角情况，不值得引入解压分支」—— 但下面那组解压分支早就写好了（gzip/br/deflate/unzip），
+    // 于是 identity 只剩下副作用：HTML 白传 5~10 倍字节。
+    // 实测（本机 3 轮中位数）：vercel 697→381ms、openai 1634→1158ms、figma 1588→1249ms。
+    // maxBytes 上限作用在**解压后**的字节上（见下面的 data 处理），所以不存在压缩炸弹把内存撑爆的问题。
+    headers: { 'accept-encoding': 'gzip, br', ...headers },
     // 第二层：域名解析即校验。对「域名解析到内网」这是唯一的正解（字面规则看不见解析结果）。
     lookup: lookup || createPinnedLookup(dnsLookup),
     signal,
@@ -74,6 +81,14 @@ export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAU
     const done = (fn, v) => { if (!settled) { settled = true; fn(v) } }
     const fail = e => done(reject, e)
 
+    // 早断标记：统一成 Buffer，便于在字节层面 indexOf（标记都是 ASCII，不会有编码歧义）
+    const markers = (Array.isArray(stopAt) ? stopAt : [stopAt])
+      .filter(s => typeof s === 'string' && s.length)
+      .map(s => Buffer.from(s, 'latin1'))
+    const maxMarker = markers.reduce((m, b) => Math.max(m, b.length), 0)
+    // 跨 chunk 匹配用：保留上一轮的尾部，避免标记正好被切在两个 chunk 之间而漏掉
+    let tail = Buffer.alloc(0)
+
     const req = (isHttps ? httpsRequest : httpRequest)(opts, res => {
       let stream = res
       const enc = String(res.headers['content-encoding'] || '').toLowerCase().trim()
@@ -81,21 +96,58 @@ export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAU
         if (enc === 'gzip' || enc === 'x-gzip') stream = res.pipe(createGunzip())
         else if (enc === 'br') stream = res.pipe(createBrotliDecompress())
         else if (enc === 'deflate') stream = res.pipe(createInflate())
-        // 服务器无视 identity 时也照解码；未知编码则不处理，按原字节返回
-        else if (enc !== 'identity') stream = res.pipe(createUnzip())
+        // 未知编码（zstd 等）**不猜也不抛**：按原字节返回。
+        // 从前这里对所有非 identity 值一律 `createUnzip()`，遇到 zstd 会抛
+        // `incorrect header check` → 整个请求失败。后果不只是「读不到标题」：
+        // `server/cron.mjs` 的健康巡检会据此把一个**正常站点**记成不可达 —— 假阴性诊断。
+        // 我们不主动要 zstd，但 CDN 有可能自作主张发；此时保留状态码与原始字节，
+        // 让调用方自己决定（元信息抓取拿不到 title 会退化为域名推断 + warning，这是对的）。
+        else if (enc !== 'identity') stream = res
       }
 
       const chunks = []
       let total = 0
       let truncated = false
+      let stoppedAt = ''
+      const finish = (why) => {
+        const body = Buffer.concat(chunks)
+        stream.destroy()
+        req.destroy()
+        done(resolve, { status: res.statusCode || 0, headers: res.headers, body, truncated, stoppedAt: why })
+      }
+
       stream.on('data', chunk => {
         if (truncated) return
+
+        // ① 命中早断标记 → 截到标记结束处（保证标记本身完整，别切在标签中间）
+        if (markers.length) {
+          const hay = tail.length ? Buffer.concat([tail, chunk]) : chunk
+          let hit = -1
+          let hitLen = 0
+          for (const m of markers) {
+            const i = hay.indexOf(m)
+            if (i >= 0 && (hit < 0 || i < hit)) { hit = i; hitLen = m.length }
+          }
+          if (hit >= 0) {
+            const keepInChunk = Math.max(0, hit + hitLen - tail.length)
+            if (keepInChunk > 0) { chunks.push(chunk.subarray(0, keepInChunk)); total += keepInChunk }
+            truncated = true
+            stoppedAt = 'marker'
+            finish('marker')
+            return
+          }
+          // 未命中：滚动保留尾部（标记可能跨 chunk）
+          tail = hay.length > maxMarker - 1 ? hay.subarray(hay.length - (maxMarker - 1)) : hay
+        }
+
+        // ② 没有标记（或还没出现）→ 退回字节上限
         total += chunk.length
         if (total > maxBytes) {
           truncated = true
+          stoppedAt = 'maxBytes'
           // 超限即断开：不必把剩下的几百 KB 也读进内存
-          stream.destroy()
-          req.destroy()
+          chunks.push(chunk.subarray(0, Math.max(0, chunk.length - (total - maxBytes))))
+          finish('maxBytes')
           return
         }
         chunks.push(chunk)
@@ -106,11 +158,12 @@ export async function fetchCapped(href, { signal, headers = {}, maxBytes = DEFAU
         headers: res.headers,
         body: Buffer.concat(chunks).subarray(0, maxBytes),
         truncated,
+        stoppedAt,
       }))
       // 3xx：正文没有用处，直接断开，避免为一次重定向白读一个页面
       if ((res.statusCode || 0) >= 300 && (res.statusCode || 0) < 400) {
         res.destroy()
-        done(resolve, { status: res.statusCode || 0, headers: res.headers, body: Buffer.alloc(0), truncated: false })
+        done(resolve, { status: res.statusCode || 0, headers: res.headers, body: Buffer.alloc(0), truncated: false, stoppedAt: '' })
       }
     })
 
