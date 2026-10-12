@@ -78,7 +78,8 @@ copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
 copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
 // v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js']) {
+// 本轮：translate 独立成接口（翻译不再串在抓取响应里，见 api/translate.js 的注释）
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js']) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
@@ -139,4 +140,4 @@ try {
     writeFileSync(join(DIST, 'data', 'ai-config.json'), JSON.stringify({ baseURL, apiKey, model: model || 'gpt-4o-mini' }, null, 2))
   }
 } catch { /* 没配 AI 就没有这个文件，接口回 501、前端隐藏入口 */ }
-console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×10 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI 齐备`)
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×11 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI/翻译 齐备`)

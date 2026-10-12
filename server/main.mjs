@@ -57,6 +57,7 @@ if (!process.env.ADMIN_PASSWORD_HASH) {
 /* ---------------- /api/* 处理器 ---------------- */
 
 const metadataHandler = (await import('./api/metadata.js')).default
+const translateHandler = (await import('./api/translate.js')).default
 const sitesHandler = (await import('./api/sites.js')).default
 const sessionHandler = (await import('./api/session.js')).default
 const clicksHandler = (await import('./api/clicks.js')).default
@@ -73,6 +74,7 @@ const { startHealthCron } = cronMod
 /** 路由表：一个接口文件一个 handler，语义零改动（v10 清单第一条） */
 const API_ROUTES = {
   '/api/metadata': metadataHandler,
+  '/api/translate': translateHandler,
   '/api/sites': sitesHandler,
   '/api/session': sessionHandler,
   '/api/clicks': clicksHandler,

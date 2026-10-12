@@ -16,39 +16,11 @@
 
 /* ---------------- 中文判定 ---------------- */
 
-const HAN = /\p{Script=Han}/u
-const LETTER = /\p{L}/u
-
-/**
- * 是否已是中文（含任何汉字即视为中文）。
- * 判据取「出现即算」而不是「汉字占比过半」：混合文案（"ChatGPT 中文站"）里
- * 汉字已经承载了主要语义，再翻一遍只会把品牌名也翻坏。
- */
-export function looksChinese(text) {
-  return HAN.test(String(text ?? ''))
-}
-
-/** 是否值得送去翻译：非空、含字母、且不是中文。纯数字 / 纯符号不译 */
-export function needsTranslation(text) {
-  const s = String(text ?? '').trim()
-  if (!s) return false
-  if (looksChinese(s)) return false
-  return LETTER.test(s)
-}
-
-/**
- * 站点名是否该翻译。
- *
- * 品牌名（Uniswap / OpenAI / DeepSeek）翻成中文只会得到一串音译垃圾，
- * 而它们本来就是用户要认的那几个字。因此只翻「词组型」名称（含空格，如
- * "Best Free Online Tools"）——单词型基本是品牌，保持原样。
- * 描述是散文，不存在这个问题，非中文一律翻。
- */
-export function shouldTranslateName(name) {
-  const s = String(name ?? '').trim()
-  if (!needsTranslation(s)) return false
-  return /\s/.test(s)
-}
+// 判定「该不该译」的纯逻辑已拆到 shared/translatable.mjs —— 前端（L2 本地模型）
+// 需要同一套判据，而本文件禁止被 src/ 引用（它带着出网细节）。这里 re-export 保持
+// 既有 import 路径不变，真相仍只有一份。
+export { looksChinese, needsTranslation, shouldTranslateName } from './translatable.mjs'
+import { needsTranslation, shouldTranslateName } from './translatable.mjs'
 
 /* ---------------- 解析 ---------------- */
 
