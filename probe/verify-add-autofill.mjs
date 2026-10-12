@@ -90,13 +90,26 @@ ok(modalUp === 'ok', '添加站点弹窗已打开（异步组件能加载）')
 
 /* ---------- 2. 输入一个**未知**域名，看本地推断填了什么 ---------- */
 /**
- * 输入网址后轮询等抓取完成。**不能睡固定时长**：抓取上限是 12s，慢站（github.com
- * 实测 ~9s）在固定 3.5s 的等待里还没回来，会被误判成「没填上」。
+ * 输入网址后轮询等抓取走到**终态**。两个坑都踩过，所以判据必须两条一起用：
+ *
+ *   ① 不能睡固定时长 —— 抓取上限 12s，慢站（github.com 实测 ~10s）在固定 3.5s
+ *      的等待里还没回来，会被误判成「没填上」。
+ *   ② 不能只靠文本关键词 —— 曾经的判据是 `!/正在抓取/`，而真实 loading 文案是
+ *      「已按域名秒填草稿，**正在后台抓取**站点真实信息…」（是「正在后台抓取」不是
+ *      「正在抓取」），正则匹配不上，于是第一次轮询就把 loading 态当成了终态。
+ *      改为看状态元素的 kind 类名（`.status-line.loading`），文案怎么改都不受影响。
  */
 const waitForMeta = async () => {
-  for (let i = 0; i < 30; i++) {
-    const st = await evalJs(`(document.querySelector('.form-status, [class*="status"]')||{}).textContent || ''`)
-    if (st && !/正在抓取/.test(st)) return st
+  for (let i = 0; i < 44; i++) {           // 44 × 500ms ≈ 22s > 12s 抓取上限 + 600ms 防抖
+    const raw = await evalJs(`(() => {
+      const el = document.querySelector('.status-line, .form-status, [class*="status"]');
+      if (!el) return '';
+      return JSON.stringify({ t: el.textContent.trim(), c: el.className || '' });
+    })()`)
+    try {
+      const { t, c } = JSON.parse(raw)
+      if (t && !/loading/.test(c)) return t
+    } catch { /* 元素还没挂上 */ }
     await sleep(500)
   }
   return '(等待超时)'
