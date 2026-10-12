@@ -61,13 +61,55 @@ export async function localSiteMeta(url, { existingSites = [], categoryMeta = nu
 }
 
 /**
- * 把本地推断结果拼成界面文案。
- * 注意描述**不是空的**：引擎会按「名称（域名）—— 分类方向」生成一句模板话，
+ * 「这次拿到的还是域名推断值」这件事本身该怎么交代。
+ *
+ * 描述**不是空的**：引擎会按「名称（域名）—— 分类方向」生成一句模板话，
  * 看着像正经描述，实际是我们编的 —— 必须说清楚，不然用户会当成站点自述。
  */
-export function localMetaNotice(data) {
+function noticeTail(data) {
   const low = Object.entries(data?.confidence || {}).filter(([, v]) => v === 'low').length
   return low
-    ? `后端抓取不可用，已按域名推断（${low} 项为推断值，描述为生成文案，请复核）`
-    : '后端抓取不可用，已按域名推断（描述为生成文案，请复核）'
+    ? `${low} 项为推断值，描述为生成文案，请复核`
+    : '描述为生成文案，请复核'
+}
+
+/**
+ * 弹窗里「这一轮没拿到真实信息」的状态文案。
+ *
+ * ## 为什么必须把「后端挂了」和「站点页面读不到」分开说
+ *
+ * 旧实现在两种情况下共用同一句「后端抓取不可用，已按域名推断…」，于是
+ * **接口明明 200 正常返回、只是没能读出对方页面时，也对用户说后端坏了**。
+ * 真机复现（github.com）：接口 9986ms 返回 200，服务端已经把原因写在
+ * `warning = '抓取超时，已按域名推断，请复核名称与分类'` 里 —— 前端把这句真话丢掉，
+ * 换成了自己的猜测。项目对这种事的口径很明确：**错误码的粒度决定 UI 能不能说真话**
+ * （不要把「在线但接口不可用」写成「已离线」，反过来也一样）。
+ *
+ * 同理，`!ok` 时也不再一律说「后端不可用」：传输层已经给了一句具体的人话
+ * （限流「请求过于频繁」、内网地址被拒、部署被平台暂停、网络不可达……），
+ * 直接用它比我们自己的概括更准确、更可行动。
+ *
+ * @param {object} data   本地推断结果（用来数「几项为推断值」）
+ * @param {null | { ok: false, message?: string } | { ok: true, warning?: string }} [remote]
+ *        服务端那一轮的结果。**不传时退回旧文案**，只作为兼容默认值。
+ */
+export function localMetaNotice(data, remote = null) {
+  const tail = noticeTail(data)
+
+  // ① 接口没打成：用传输层/服务端给的具体原因，别替它概括。
+  //    注意 message 本身是**完整句子**（「抓取服务不存在（HTTP 404），可能是部署已下线」），
+  //    所以用「；」而不用「，」接续，否则会连读成三连逗号。
+  if (remote && remote.ok === false) {
+    const why = String(remote.message || '').trim()
+    return why ? `${why}；已按域名推断（${tail}）` : `后端抓取不可用，已按域名推断（${tail}）`
+  }
+
+  // ② 接口通了，但没读出对方页面：直接用服务端的 warning 原文 —— 它已经写清了原因
+  //    （抓取超时 / 可能被反爬拦截 / 疑似反爬挑战页），且本来就以「请复核」收尾
+  if (remote && remote.ok === true) {
+    const warning = String(remote.warning || '').trim()
+    return warning || `站点页面已读取，但未取得更准确的名称与描述，已保留域名推断草稿（${tail}）`
+  }
+
+  return `后端抓取不可用，已按域名推断（${tail}）`
 }

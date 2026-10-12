@@ -413,13 +413,15 @@ async function fetchMeta() {
   const r = await fetchSiteMeta(url)
   if (seq !== reqSeq) return
   if (!r.ok) {
-    status.value = localMetaNotice(local.data)
+    // 传输层已经给了具体原因（限流 / 内网地址被拒 / 接口不存在 / 网络不可达…），
+    // 用它比我们自己的「后端抓取不可用」准确得多
+    status.value = localMetaNotice(local.data, { ok: false, message: r.message })
     statusKind.value = 'warn'
     return
   }
   try {
     const data = r.data
-    // 真实抓取没有比本地推断多出任何东西（极端：站点无 title 且无描述）→ 保留原状态即可
+    // 真实抓取没有比本地推断多出任何东西（典型：服务端也抓超时了，于是回退到同一套域名推断）
     const better = (data.name && data.name !== local.data.name) ||
       (data.desc && data.desc !== local.data.desc) ||
       (data.faviconUrl && data.faviconUrl !== local.data.faviconUrl)
@@ -433,7 +435,8 @@ async function fetchMeta() {
       status.value = data.warning ? `${summarize(data)}；${data.warning}` : summarize(data)
       statusKind.value = data.warning ? 'warn' : 'ok'
     } else {
-      status.value = localMetaNotice(local.data)
+      // 接口是通的 —— 这里只能说「对方页面没读到」，不能像从前那样说「后端抓取不可用」
+      status.value = localMetaNotice(local.data, { ok: true, warning: data.warning })
       statusKind.value = 'warn'
     }
   } catch (e) {
