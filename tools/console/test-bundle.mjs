@@ -145,6 +145,11 @@ const LAZY_PARTS = [
   // AddSiteModal 改成异步组件后整条链路才真正离开首屏（591.6 → 608.4 → 回落，实测踩过）。
   ['已按域名秒填草稿', '添加站点弹窗'],
   ['反爬挑战页', 'site-infer 推断引擎'],
+  // 中文别名表：纯数据（2.5 KiB 中文串），只在用户打中文时才用得上。
+  // 标记取一条**只在这里出现**的说法（「深浅色」在 commandPhrases/commands 里都没有）。
+  ['深浅色', '中文别名表'],
+  // 新版本提示：只在真有新版本时才被调用，首访者一次都用不到
+  ['有新版本可用', 'PWA 更新提示'],
 ]
 for (const [mark, name] of LAZY_PARTS) {
   const owners = allJs.filter(f => readAsset(f).includes(mark))
@@ -168,6 +173,24 @@ ok(staticRoutes.length > 0, '从路由表里能提取到静态路由', `${static
 ok(missingRoutes.length === 0,
   `${staticRoutes.length} 条静态路由都有目录入口（刷新子页面不 404）`,
   `缺 ${missingRoutes.join(' ')}（检查 package.json 的 build 是否带上 postbuild-spa-fallbacks）`)
+
+/* ══════════ 9. PWA 更新必须是「提示 + 用户决定」，不许自动刷新 ══════════
+   registerType 只有 `prompt` 才会调用 `onNeedRefresh`；`autoUpdate` 下 registerSW 模板
+   直接挂 `activated` 监听器 reload（插件源码写死），提示代码变成**死代码** ——
+   而这件事在浏览器里几乎测不出来（只有真发一次新版才触发），首屏预算也照样绿。
+   所以在产物上钉住两头：
+   ① 提示文案得**存在于产物**（证明 onNeedRefresh 那条路没被 dead-code 掉）
+   ② 首屏包里不许有 autoUpdate 的那条自动刷新监听（证明走的是 prompt 分支）
+   摘掉任一头都会红：registerType 改回 autoUpdate 时，① 的文案随之消失、② 的监听同时出现。
+   注意 ① 查的是全量产物而不是首屏清单 —— 提示模块本身是懒加载的（见 LAZY_PARTS）。 */
+
+const swPromptOwners = allJs.filter(f => readAsset(f).includes('有新版本可用'))
+ok(swPromptOwners.length > 0, '「有新版本可用」提示路径存在于产物中（onNeedRefresh 没被 dead-code 掉）')
+
+const swAutoReloadOwners = initialJs.filter(f => readAsset(f).includes('addEventListener("activated"'))
+ok(swAutoReloadOwners.length === 0,
+  '首屏包内没有 autoUpdate 的自动刷新监听（registerType 必须是 prompt）',
+  `出现在 ${swAutoReloadOwners.join(' ')} —— 说明被切回 autoUpdate，用户填表单时会被无提示刷新`)
 
 /* ---------------- 结果 ---------------- */
 
