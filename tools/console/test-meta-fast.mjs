@@ -32,7 +32,8 @@ mock.module('../../shared/http-fetch.mjs', {
     DEFAULT_MAX_BYTES: 256 * 1024,
     fetchCapped: async (href, opts = {}) => {
       calls.push({ href, opts })
-      const r = script(href, opts) || {}
+      // `await` 是必要的：有几个用例要模拟「主抓耗时很久」，异步 script 才表达得出来
+      const r = (await script(href, opts)) || {}
       return {
         status: r.status ?? 200,
         headers: r.headers || {},
@@ -101,6 +102,12 @@ try {
     script = () => ({ status: 200, body: PAGE })
     const res = await call({ url: 'https://example.com' })
     eq(res.statusCode, 200, '正常抓取返回 200')
+    /**
+     * 服务端自报的抓取耗时：调用方测到的端到端里叠着网络 RTT 与宿主冷启动，
+     * 线上实测能差出 400~1300ms。没有这个字段，就无法区分「服务端超了预算」与「宿主慢」。
+     */
+    ok(Number.isFinite(res.payload.fetchMs) && res.payload.fetchMs >= 0,
+      '★ 响应带回服务端抓取耗时 fetchMs（与端到端耗时区分）', String(res.payload.fetchMs))
     eq(calls.length, 1, '一次请求只抓一次（有 theme-color 就不补抓 manifest）')
 
     const o = calls[0].opts
@@ -243,6 +250,47 @@ try {
     eq(e2.payload.color, '#abcdef', '★ 空结果不进缓存，第二次仍然去试并拿到了颜色')
   }
 
+  /* ══════════ 4f. manifest 补抓的预算必须被**总预算**夹住 ══════════
+   *
+   * 线上实测（部署沙箱出口比本机慢）：figma 3372ms、github 3317ms，都越过了
+   * 「3s 预算 + 400ms 余量」的硬上限。数字能对上根因 —— 3372 ≈ 2472 主抓 + 900 manifest：
+   * manifest 有**独立**预算，却不受总预算约束，于是硬生生叠在 3s 之上。
+   */
+  {
+    const NO_THEME = '<!DOCTYPE html><html><head><title>No Theme</title>'
+      + '<meta name="description" content="A site without a theme color">'
+      + '<link rel="icon" href="/favicon.ico">'
+      + '<link rel="manifest" href="/site.webmanifest"></head><body>x</body></html>'
+    const MANIFEST = JSON.stringify({ name: 'No Theme', theme_color: '#abcdef' })
+
+    // ① 主抓吃满预算 → 剩余不足 → **整个跳过**补抓，不让它把请求顶出预算
+    calls.length = 0
+    let t0 = Date.now()
+    script = async (href) => {
+      if (/webmanifest/.test(href)) return { status: 200, body: MANIFEST }
+      await new Promise(r => setTimeout(r, 2900))
+      return { status: 200, body: NO_THEME }
+    }
+    const g1 = await call({ url: 'https://budgetfull.example.com/' })
+    eq(calls.filter(c => /webmanifest/.test(c.href)).length, 0,
+      '★ 主抓吃完预算时整个跳过 manifest 补抓（不让 900ms 叠在 3s 之上）')
+    eq(g1.payload.color === '#abcdef', false, '跳过补抓 → 拿不到 manifest 里的品牌色（可接受的代价）')
+    ok(Date.now() - t0 <= 3400, '整次请求仍在硬上限内', `${Date.now() - t0}ms`)
+
+    // ② 主抓只用了一半 → 剩余够 → 照常补抓（不能矫枉过正地一律跳过）
+    calls.length = 0
+    t0 = Date.now()
+    script = async (href) => {
+      if (/webmanifest/.test(href)) return { status: 200, body: MANIFEST }
+      await new Promise(r => setTimeout(r, 1200))
+      return { status: 200, body: NO_THEME }
+    }
+    const g2 = await call({ url: 'https://budgetleft.example.com/' })
+    eq(calls.filter(c => /webmanifest/.test(c.href)).length, 1, '预算还有余量时仍会补抓 manifest')
+    eq(g2.payload.color, '#abcdef', '拿到了品牌色')
+    ok(Date.now() - t0 <= 3400, '仍在上限内', `${Date.now() - t0}ms`)
+  }
+
   /* ══════════ 5. 失败路径的文案与状态码（口径不能回退） ══════════ */
   {
     // 超时 → 域名推断 + warning，仍然是 200（抓不到不算失败）
@@ -253,6 +301,14 @@ try {
     ok(/超时/.test(res.payload.warning || ''), 'warning 说明是超时', res.payload.warning)
     ok(res.payload.name, '仍然产出了名称（域名推断）', res.payload.name)
     ok(res.payload.needsTranslate, '超时路径也带 needsTranslate')
+    /**
+     * ★ 超时**不再**回退 http 重抓。
+     *
+     * 回退存在的理由是「少数站点只在 http 上响应」，而超时与协议无关；
+     * 且此时预算已耗尽，再发一次请求只可能把整次调用顶过硬上限。
+     * 曾经这里漏判 AbortError，于是超时会多出一次出网（实得 2 次）。
+     */
+    eq(calls.length, 1, '★ 超时后不再发起 http 回退重抓（预算已耗尽，重试会突破上限）')
 
     // 目标站点非 2xx 且没有根页可用
     calls.length = 0

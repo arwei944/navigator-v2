@@ -79,8 +79,15 @@ const FETCH_BUDGET_MS = 3000
 const TOTAL_BUDGET_MS = 9000
 const TRANSLATE_MIN_MS = 3500
 
-/** manifest 补抓的**独立**上限：它排在主抓之后，不能让它把剩余预算拖空 */
+/**
+ * manifest 补抓的**独立**上限：它排在主抓之后，不能让它把剩余预算拖空。
+ *
+ * 注意它会被总预算夹住（`min(900, 剩余)`）—— 线上实测过「固定 900ms 叠在 3s 之上」
+ * 会把整次请求顶到 3.4s 之外。见 `manifestThemeOf`。
+ */
 const MANIFEST_BUDGET_MS = 900
+/** 剩余预算小于这个值就整个跳过补抓：往返都不止这么久，只会把请求拖过总预算 */
+const MANIFEST_MIN_MS = 150
 
 /* ---------------- 同域抓取缓存 ---------------- */
 
@@ -269,7 +276,17 @@ export default async function handler(req, res) {
       if (!okStatus(resp.status)) return { html: '', status: resp.status }
       return { html: decodeHtmlBytes(resp.body), status: resp.status }
     } catch (e) {
-      if (e.code === 'BLOCKED_HOST' || u.protocol !== 'https:') throw e
+      /**
+       * 超时（AbortError）**不回退 http**：预算已经耗尽，再抓一次只可能把请求拖过硬上限。
+       *
+       * 这条曾经漏掉 —— 判据只有 `BLOCKED_HOST` 与协议，于是「主抓 3s 超时」会走进回退分支
+       * 再发一次请求。回退用的还是**同一个已 abort 的 signal**，所以它在当前 Node 上会立刻失败、
+       * 看不出损害（本地实测超时路径 3011~3191ms）；但那是**依赖实现细节**的运气：
+       * 一旦某条路径上 abort 未被立即观察到，这次多余的出网就会实打实地突破预算。
+       * 语义上也本就不该重试 —— 回退存在的理由是「少数站点只在 http 上响应」，
+       * 而超时的站点与协议无关。其余错误（连接被拒 / 证书失败等）照常回退。
+       */
+      if (e.code === 'BLOCKED_HOST' || e.name === 'AbortError' || u.protocol !== 'https:') throw e
       const httpU = new URL(u.href)
       httpU.protocol = 'http:'
       const resp = await fetchHtml(httpU.href, controller.signal)
@@ -295,8 +312,19 @@ export default async function handler(req, res) {
   const manifestThemeOf = (mHref, signal) => dedupe(
     'manifest:' + mHref,
     async () => {
-      // 独立的小上限：挂住的 manifest 不能把剩余预算全吃掉（900ms 够取几百字节 JSON）
-      const budget = withBudget(signal, MANIFEST_BUDGET_MS)
+      /**
+       * 独立上限，**但必须被总预算夹住**。
+       *
+       * 曾经写法是「固定 900ms」—— 于是它能叠在主抓的 3s 之上：线上实测 figma 3372ms
+       * （≈2472 主抓 + 900 manifest）、github 3317ms，**整次请求被顶到 3.4s 以外**，
+       * 而这两个站点的 manifest 只为一个装饰性品牌色服务。
+       *
+       * 现在取 `min(900, 距总预算到点还剩多少)`：主抓已经吃满预算时就**整个跳过**补抓，
+       * 让「抓取阶段 ≤ 3s」成为真正的硬上限，而不是「3s + 900ms」。
+       */
+      const left = startedAt + FETCH_BUDGET_MS - Date.now()
+      if (left < MANIFEST_MIN_MS) return ''
+      const budget = withBudget(signal, Math.min(MANIFEST_BUDGET_MS, left))
       try {
         const mr = await fetchHtml(mHref, budget.signal, 'application/manifest+json,application/json,text/plain,*/*', null)
         return okStatus(mr.status) ? manifestThemeColor(decodeHtmlBytes(mr.body)) : ''
@@ -353,6 +381,17 @@ export default async function handler(req, res) {
     clearTimeout(timer)
   }
 
+  /**
+   * 抓取阶段真实耗时（含超时收尾），**不含**后续的推断/序列化。
+   *
+   * 为什么要把它单独报出来：`FETCH_BUDGET_MS` 是**服务端**能承诺的硬上限，而调用方测到的
+   * 耗时里还叠着网络 RTT 与宿主冷启动 —— 线上实测同一批站点，服务端 3011~3191ms 的抓取
+   * 在部署端表现为 3405~4294ms（沙箱开销 400~1300ms，且抖动不可控）。
+   * 用端到端耗时去判「服务端有没有守住预算」，会在慢宿主上给出假失败；
+   * 反之，缺了它就只能看到端到端数字，无法区分「服务端超了」和「网络慢」。
+   */
+  const fetchMs = Date.now() - startedAt
+
   // 抓不到页面不算失败：照常产出一份按域名推断的草稿，让用户只需复核而不是从零手填
   const info = inferSite({
     html,
@@ -406,6 +445,8 @@ export default async function handler(req, res) {
     translateMode: wantsInline ? 'inline' : 'deferred',
     // 本次抓取是否命中了服务端同域缓存（探针据此区分「快是因为缓存」与「快是因为早断」）
     cached: cacheHits > 0,
+    // 服务端抓取阶段的真实耗时 —— 与「调用方测到的端到端」分开，理由见 handler 里的注释
+    fetchMs,
   })
 }
 
