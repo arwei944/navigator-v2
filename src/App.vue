@@ -255,13 +255,20 @@ async function runAutoAdd(url) {
      * 秒加入库用的是「按域名推断」的草稿，真实名称 / 描述 / 图标是后台抓完才回来的。
      * 不说一声的话，用户只会看到卡片标题在几秒后**自己变了**，像出了 bug。
      *
-     * 只在 `real`（真的读到了对方页面，因此名称与描述是译成中文的真值）时回执：
-     * 只拿到「按域名推断」的结果时保持安静 —— 用一个猜测去宣告「已补全」才是撒谎。
+     * 只在 `real`（真的读到了对方页面）时回执：只拿到「按域名推断」的结果时保持安静 ——
+     * 用一个猜测去宣告「已补全」才是撒谎。
+     *
+     * 译文来源也一并交代（本地模型 / 在线引擎 / 只有词表关键词）：
+     * 「描述显示的是中文」和「描述显示的是中文**译文**」是两件事，后者才值得用户放心。
      */
     res.upgrade?.then((u) => {
       if (!u || !u.changed || !u.real) return
+      const tr = u.translation
+      let tail = ''
+      if (tr?.translated?.desc && tr.note) tail = `，描述译文来自${tr.note}`
+      else if (tr && !tr.translated?.desc && tr.keywords) tail = '，描述未译成中文（已抽取关键词）'
       toastStore.push({
-        message: `已补全「${u.name}」的名称与描述`,
+        message: `已补全「${u.name}」的名称与描述${tail}`,
         tone: 'info',
         actionLabel: '查看',
         onAction: () => locateSite(res.site),

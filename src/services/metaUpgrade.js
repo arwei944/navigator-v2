@@ -9,17 +9,17 @@
  * 用户看到的永远是秒加那一刻的域名推断草稿，后台升级从未生效过一次。
  *
  * 所以这里做两件事：
- *   ① **依赖全部显式注入**（store / fetchMeta / warn），作用域漏取这类缺陷结构上不可能再发生；
+ *   ① **依赖全部显式注入**（store / fetchMeta / translate / warn），作用域漏取这类缺陷结构上不可能再发生；
  *   ② 不吞错 —— 抓取失败是预期内的（静默），**代码抛错走 `warn`**，不再和前者混为一谈。
  *
  * 纯函数（`upgradePatchFromMeta`）与编排（`runMetaUpgrade`）分开，前者可零依赖穷举。
  *
- * ## 关于翻译
+ * ## 关于翻译（本轮改造）
  *
- * `/api/metadata` 在响应前已经把 `name` / `desc` **就地替换成中文译文**
- * （见 `api/metadata.js` 的 `autoTranslate`），所以这里拿到的 `data.name` 就是中文，
- * 不需要前端再译一次。`nameOriginal` 是译文对应的原文，落成别名，保证改中文名后
- * 用户搜英文原名仍然找得到。
+ * `/api/metadata` **不再内联翻译**（它曾为等一个可能失败的 MyMemory 往返多花最多 3.5s，
+ * 是 figma.com 端到端 10.3s 的一大块）。现在它返回原文 + `needsTranslate`，
+ * 由这里异步补译：**L2 浏览器本地模型 → L3 服务端在线引擎 → L1 离线词表关键词**。
+ * 译文只覆盖「确实译到了」的字段，译不到就保留原文并如实标注来源。
  */
 import { hostOf } from '../utils/url.js'
 import { domainOf } from '../utils/siteDraft.js'
@@ -75,6 +75,15 @@ export function upgradePatchFromMeta(cur, meta, domain) {
 }
 
 /**
+ * 默认的翻译实现：**动态** import，避免把词表与浏览器适配器拖进本模块的静态图。
+ * 注入点存在是为了可测 —— 用例不需要真去调 `/api/translate`。
+ */
+async function defaultTranslate(fields) {
+  const m = await import('./translateFields')
+  return m.translateFields(fields)
+}
+
+/**
  * 执行一次后台升级。**永不抛错** —— 所有失败原因都通过返回值与 `warn` 表达。
  *
  * @param {object}   o
@@ -82,14 +91,16 @@ export function upgradePatchFromMeta(cur, meta, domain) {
  * @param {string}   o.url          已归一化的网址
  * @param {object}   o.created      `addSite()` 返回的那条记录（用它的 id 与 updatedAt）
  * @param {Function} [o.fetchMeta]  抓取实现，测试可注入
+ * @param {Function} [o.translate]  翻译实现（L2→L3→L1 编排），测试可注入
  * @param {number}   [o.timeoutMs]
  * @param {Function} [o.warn]       代码级异常的出口（默认 console.warn）
- * @returns {Promise<{changed: boolean, real: boolean, reason: string, name: string, patch: object|null, data?: object}>}
- *   `changed` 库里记录是否被改写；`real` 是否真的读到了对方页面（拿到译文的前提）；
+ * @returns {Promise<{changed: boolean, real: boolean, reason: string, name: string, patch: object|null, data?: object, translation?: object}>}
+ *   `changed` 库里记录是否被改写；`real` 是否真的读到了对方页面（拿到原文/译文的前提）；
  *   `reason` ∈ `'' | 'fetch-failed' | 'gone' | 'edited' | 'same' | 'error'`。
  */
 export async function runMetaUpgrade({
-  store, url, created, fetchMeta = fetchSiteMeta, timeoutMs = META_TIMEOUT_MS, warn = console.warn,
+  store, url, created, fetchMeta = fetchSiteMeta, translate = defaultTranslate,
+  timeoutMs = META_TIMEOUT_MS, warn = console.warn,
 }) {
   const base = { changed: false, real: false, reason: '', name: created?.name || '', patch: null }
   try {
@@ -103,20 +114,58 @@ export async function runMetaUpgrade({
     // 就整体放弃 —— 自动补全绝不能覆盖人的输入。
     if (cur.updatedAt !== created.updatedAt) return { ...base, reason: 'edited' }
 
-    const patch = upgradePatchFromMeta(cur, r.data, domainOf(url))
-    if (!Object.keys(patch).length) return { ...base, reason: 'same', data: r.data }
+    /**
+     * 异步补译：只对**服务端标记为需要翻译**的字段动手。
+     * 译不到就保留原文（`translateFields` 自己的纪律是永不返回空译文）。
+     * 这一步失败**不影响**抓取结果的落地 —— 它是锦上添花，不是前置条件。
+     */
+    let translation = null
+    const data = r.data || {}
+    const needs = data.needsTranslate || null
+    const wantTr = needs
+      ? (needs.name || needs.desc)
+      // 兼容旧版响应（内联翻译过、没有 needsTranslate 字段）：按「名称非中文」粗判
+      : false
+    if (wantTr) {
+      try {
+        translation = await translate({
+          name: needs.name ? data.name : '',
+          desc: needs.desc ? data.desc : '',
+        })
+      } catch (e) {
+        warn('[meta-upgrade] 补译抛错，本次保留原文：', e)
+      }
+    }
 
-    store.updateSite(created.id, patch)
-    return {
-      changed: true,
+    // 合并：译文只覆盖「确实译到了」的字段；原文与别名口径不变
+    const merged = { ...data }
+    if (translation?.translated?.desc && translation.desc) merged.desc = translation.desc
+    if (translation?.translated?.name && translation.name) merged.name = translation.name
+
+    const patch = upgradePatchFromMeta(cur, merged, domainOf(url))
+    const result = {
+      changed: false,
       // 服务端在抓取失败 / 命中反爬挑战页时会给 warning，此时它回的是「按域名推断」，
       // 跟秒加时的本地推断同源，不构成「拿到了真信息」
-      real: !r.data.warning,
+      real: !data.warning,
       reason: '',
       name: patch.name || cur.name,
-      patch,
-      data: r.data,
+      patch: null,
+      data: merged,
+      translation: translation
+        ? {
+            source: translation.source || '',
+            note: translation.note || '',
+            keywords: translation.keywords || '',
+            translated: translation.translated || { name: false, desc: false },
+          }
+        : null,
     }
+
+    if (!Object.keys(patch).length) return { ...result, reason: 'same' }
+
+    store.updateSite(created.id, patch)
+    return { ...result, changed: true, patch }
   } catch (e) {
     // 走到这里说明是**代码级缺陷**（作用域漏取、字段名打错、store 未就绪……），
     // 不是「站点抓不到」。绝不能静默：这正是上一版后台升级死了整整一轮的原因。

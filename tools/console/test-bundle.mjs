@@ -155,6 +155,14 @@ const LAZY_PARTS = [
   // 才走得到 —— 一旦有人把它改回静态 import，两者会一起回到首屏。
   // 标记取模块里**独有**的一句告警文案（「升级过程抛错」在别处没有）。
   ['升级过程抛错', '秒加后的真实信息补全'],
+  // 翻译编排（services/translateFields.js）+ 离线词表（shared/glossary.mjs）+
+  // 浏览器本地模型适配器（services/browserTranslate.js）。
+  // 这三样是「实时免费」的三层，主体是**数据表**（词表 500+ 条）而不是逻辑 ——
+  // 首屏只剩 ~2KiB 余量，它们进首屏就会立刻越预算。
+  // 标记取各自独有的字符串：词表用一条长短语，编排用一句独有的说明文案。
+  ['虚拟专用网络', '离线词表'],
+  ['在线引擎翻译', '翻译编排'],
+  ['downloadprogress', '浏览器本地翻译适配器'],
 ]
 for (const [mark, name] of LAZY_PARTS) {
   const owners = allJs.filter(f => readAsset(f).includes(mark))

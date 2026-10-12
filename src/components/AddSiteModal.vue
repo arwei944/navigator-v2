@@ -232,7 +232,15 @@ function categoryMetaFromStore() {
 // 卸载时由 composable 的 onBeforeUnmount 自动归还焦点（此前 Tab 会走到弹窗背后的卡片里）
 const panelRef = ref(null)
 const trap = useFocusTrap(panelRef)
-onMounted(() => trap.activate())
+onMounted(() => {
+  trap.activate()
+  /**
+   * L2 预热：浏览器本地翻译模型首次使用要下载几十 MB 语言包。
+   * 放在**弹窗挂载的那一刻**开始，等用户粘贴完网址、抓取回来时通常已经就绪 ——
+   * 既不让用户等，也不浪费这次下载。失败静默（翻译是锦上添花）。
+   */
+  import('@/services/translateFields').then(m => m.warmUpTranslate()).catch(() => {})
+})
 
 const aiReady = ref(false)
 const aiBusy = ref(false)
@@ -438,6 +446,45 @@ async function fetchMeta() {
       // 接口是通的 —— 这里只能说「对方页面没读到」，不能像从前那样说「后端抓取不可用」
       status.value = localMetaNotice(local.data, { ok: true, warning: data.warning })
       statusKind.value = 'warn'
+    }
+
+    /**
+     * ③ 异步补译（第 2 跳）。**不阻塞**上面那条「已抓取」的结论 ——
+     * 用户此刻已经看到真实名称与原文描述，中文是稍后到的加强，不是前置条件。
+     *
+     * 三层依次尝试（L2 浏览器本地模型 → L3 服务端在线引擎 → L1 离线词表），
+     * 由 `translateFields` 内部决定。译不到就保留原文，并如实说明只拿到了关键词。
+     */
+    const needs = data.needsTranslate
+    if (needs && (needs.name || needs.desc)) {
+      const prevStatus = status.value
+      const prevKind = statusKind.value
+      status.value = `${prevStatus}；正在获取中文译文…`
+      statusKind.value = 'loading'
+      try {
+        const { translateFields } = await import('@/services/translateFields')
+        const tr = await translateFields({ name: data.name, desc: data.desc })
+        if (seq !== reqSeq) return
+        const applied = []
+        if (tr.translated.name && tr.name && !touched.name) { form.name = tr.name; applied.push('名称') }
+        if (tr.translated.desc && tr.desc && !touched.desc) { form.desc = tr.desc; applied.push('描述') }
+        if (applied.length) {
+          status.value = `${prevStatus}；${tr.note || '已翻译'}：${applied.join('、')}`
+          statusKind.value = 'ok'
+        } else if (tr.keywords) {
+          // 没有任何引擎译出来 —— 给关键词而不是假装翻过（词表产物必须标明来源）
+          status.value = `${prevStatus}；未取得中文译文，已按词表抽取关键词：${tr.keywords}`
+          statusKind.value = 'warn'
+        } else {
+          status.value = prevStatus
+          statusKind.value = prevKind
+        }
+      } catch (e) {
+        // 补译是可选的：失败必须回到「已抓取」那条结论，不能把弹窗变成错误态
+        console.warn('[add-site] 补译失败，已保留原文：', e)
+        status.value = prevStatus
+        statusKind.value = prevKind
+      }
     }
   } catch (e) {
     // 抓取成功但回填失败（字段结构意外）—— 仍然是「可手动填写」，不能把弹窗卡在 loading
