@@ -10,6 +10,9 @@
  *   ③ 描述为推断值（confidence.desc === 'low'）—— 说清楚边界，不假装抓到了；
  *   ④ 非法网址 → 与 fetchSiteMeta 同构的失败结构，调用方不用多写一层分支。
  *
+ * 另守一条出过事故的契约（第 6 节）：提示文案必须区分「接口没打成」与「接口通了但
+ * 没读出对方页面」，否则接口 200 时会对用户说「后端抓取不可用」。
+ *
  * 运行：node tools/console/test-local-meta.mjs
  */
 import { readFileSync } from 'node:fs'
@@ -99,6 +102,43 @@ const knownHost = knownUrl.replace(/^https?:\/\//, '').replace(/^www\./, '').spl
   const r2 = await localSiteMeta(knownUrl, { existingSites: SEED, categoryMeta: META })
   ok(typeof localMetaNotice(r2.data) === 'string' && localMetaNotice(r2.data).length > 0,
     '已收录域名的提示文案也能生成')
+}
+
+/* ══════════ 6. 两种失败必须分开说（接口通 ≠ 接口不通） ══════════
+ *
+ * 真机事故：github.com 走 /api/metadata 拿到 HTTP 200，服务端已经把原因写在
+ * warning = '抓取超时，已按域名推断，请复核名称与分类' 里，前端却丢掉这句真话，
+ * 换成了「后端抓取不可用」—— 对用户说了假话（接口明明是通的）。
+ * 这几条断言就是钉住「接口通不说后端坏、接口不通要说具体原因」。
+ */
+
+{
+  const base = await localSiteMeta('https://tapecode.ai/', { existingSites: SEED, categoryMeta: META })
+
+  // ① 接口通了，但没读出对方页面 → 直接用服务端 warning 原文
+  const remark = localMetaNotice(base.data, { ok: true, warning: '抓取超时，已按域名推断，请复核名称与分类' })
+  eq(remark, '抓取超时，已按域名推断，请复核名称与分类', '接口通时原样转达服务端的 warning')
+  ok(!/后端抓取不可用/.test(remark), '★ 接口通时绝不说「后端抓取不可用」（真机复现的假话）', remark)
+
+  // ② 服务端没给 warning → 归因到「对方页面」，同样不能说后端坏了
+  const noWarn = localMetaNotice(base.data, { ok: true, warning: '' })
+  ok(!/后端抓取不可用/.test(noWarn), '★ 接口通但无 warning 时也不能说后端不可用', noWarn)
+  ok(/页面/.test(noWarn), '改说「页面」，把归因指向对方站点而不是自己的后端', noWarn)
+  ok(/推断/.test(noWarn) && /描述/.test(noWarn), '仍然交代了推断值与生成描述', noWarn)
+
+  // ③ 接口真的没打成 → 用传输层给的具体原因（限流不能笼统说成「后端不可用」）
+  const rate = localMetaNotice(base.data, { ok: false, message: '请求过于频繁，请稍后再试' })
+  ok(/请求过于频繁/.test(rate), '接口失败时转达传输层的具体原因', rate)
+  ok(!/后端抓取不可用/.test(rate), '★ 有具体原因时不再笼统说「后端抓取不可用」', rate)
+  // message 本身是完整句子，接续不能连读成三连逗号；同时「推断值/生成描述」这两条提醒不能丢
+  ok(!/试，已按域名推断/.test(rate), '具体原因与后半句用分号断开（避免三连逗号）', rate)
+  ok(/推断/.test(rate) && /描述/.test(rate), '失败分支同样交代推断值与生成描述', rate)
+
+  // ④ 失败但传输层也没给原因 → 才退回旧文案（兼容默认，保证不出现空串）
+  ok(/后端抓取不可用/.test(localMetaNotice(base.data, { ok: false, message: '' })),
+    '失败且无原因时退回旧文案')
+  ok(typeof localMetaNotice(base.data) === 'string' && /推断/.test(localMetaNotice(base.data)),
+    '不传第二参时仍返回非空文案（兼容旧调用点）')
 }
 
 /* ---------------- 结果 ---------------- */
