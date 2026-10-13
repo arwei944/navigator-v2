@@ -12,7 +12,13 @@
  *
  * 硬约束：本文件只在 Node 侧被引用（api/、tools/），**不得被 src/ 引用** ——
  * 它依赖网络能力，一旦被前端打包会把不存在的传输层带进浏览器。
+ *
+ * 引擎可拔插：内核只保留「该不该译 / 传什么 / 拿到空怎么办」，
+ * 具体译厂（URL 构造 + 响应解析）注册到 shared/translate-engine.mjs 的注册表。
+ * 本文件在加载时把内建两引擎注册进去，**默认顺序与行为完全不变**。
  */
+
+import { registerTranslator, translateWithChain } from './translate-engine.mjs'
 
 /* ---------------- 中文判定 ---------------- */
 
@@ -82,10 +88,33 @@ export function myMemoryUrl(text, { from = 'en', to = 'zh-CN' } = {}) {
   return `${MYMEMORY}?${params.toString()}`
 }
 
+/* ---------------- 内建引擎注册 ---------------- */
+
+/**
+ * 默认顺序 MyMemory(100) → Google(200)，按部署网络实测定的（见 translateToZh 注释）。
+ * 数字留空档，便于日后在中间插入自建引擎（LLM 引擎已由注册表以 300 排在链尾）。
+ */
+
+registerTranslator({
+  id: 'mymemory',
+  label: 'MyMemory',
+  order: 100,
+  buildUrl: (text, { from = 'en', to = 'zh-CN' } = {}) => myMemoryUrl(text, { from, to }),
+  parse: parseMyMemory,
+})
+
+registerTranslator({
+  id: 'google',
+  label: 'Google（非官方）',
+  order: 200,
+  buildUrl: (text) => googleUrl(text),
+  parse: (raw) => parseGoogle(raw).text,
+})
+
 /* ---------------- 主入口 ---------------- */
 
 /**
- * 翻译单条文本。**MyMemory 优先，Google 兜底**。
+ * 翻译单条文本。默认按注册链顺序尝试：**MyMemory 优先，Google 兜底**。
  *
  * 顺序是按部署环境实测定的：服务器在国内网络时 `translate.googleapis.com` 不可达，
  * 请求会一直挂到超时 —— 而它排在首位时会把整个翻译预算吃光，让可达的 MyMemory
@@ -93,25 +122,15 @@ export function myMemoryUrl(text, { from = 'en', to = 'zh-CN' } = {}) {
  * 先走它几乎总是命中；本机/海外部署时 Google 依旧作为兜底可用。
  * 两个都拿不到就返回空串 —— 调用方据此保留原文，绝不写入空译文。
  *
+ * 顺序与集合可覆盖：`NAV_TRANSLATE_ENGINES=mymemory,google`（逗号分隔），
+ * 或传 `chain` 显式指定；可用引擎见 shared/translate-engine.mjs 的 listTranslators()。
+ *
  * @param {string} text
- * @param {{ fetchText: (url: string) => Promise<string>, from?: string }} opts
+ * @param {{ fetchText: (url: string, init?: object) => Promise<string>, from?: string, to?: string, chain?: object[] }} opts
  * @returns {Promise<{ text: string, engine: string }>}
  */
-export async function translateToZh(text, { fetchText, from = 'en' } = {}) {
-  const src = String(text ?? '').trim()
-  if (!src || typeof fetchText !== 'function') return { text: '', engine: '' }
-
-  try {
-    const out = parseMyMemory(await fetchText(myMemoryUrl(src, { from })))
-    if (out && out !== src) return { text: out, engine: 'mymemory' }
-  } catch { /* 换兜底引擎 */ }
-
-  try {
-    const { text: out, source } = parseGoogle(await fetchText(googleUrl(src)))
-    if (out && out !== src) return { text: out, engine: 'google' }
-  } catch { /* 两个引擎都不可用，返回空串由调用方保留原文 */ }
-
-  return { text: '', engine: '' }
+export async function translateToZh(text, { fetchText, from = 'en', to = 'zh-CN', chain } = {}) {
+  return translateWithChain(text, { fetchText, from, to, chain })
 }
 
 /**

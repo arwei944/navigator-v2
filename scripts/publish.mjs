@@ -11,10 +11,10 @@ import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { record } from '../tools/console/lib/audit.mjs'
 import { applyProxyEnv } from '../shared/proxy.mjs'
+import { resolvePublisher } from '../shared/publisher.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(root, 'api', 'sites-data.json')
-const SITE_URL = 'https://navigator-v2-two.vercel.app'
 
 // 从 .env.local 加载环境变量（如存在），避免把密钥硬编码进脚本
 try {
@@ -50,6 +50,15 @@ if (!key) {
   console.error('   请配置 .env.local 中的 SITES_ADMIN_KEY，或使用 --key=<key> 传入。')
   process.exit(1)
 }
+
+/**
+ * 发布通道（部署命令 + 站点地址 + 能力）由注册表给出：
+ * 换 Netlify / 静态托管只改 `NAV_PUBLISHER`，**不用动这个脚本**。
+ * 默认 `vercel`，命令与地址与改动前逐字一致。
+ */
+const publisher = resolvePublisher()
+const SITE_URL = publisher.siteUrl()
+console.log(`发布通道: ${publisher.label}（${publisher.id}）${publisher.hotUpdate ? '' : ' · 不支持热更新'}`)
 
 const actor = process.env.NAV_AUDIT_ACTOR || 'publish.mjs'
 record({ action: 'publish.start', actor, target: skipBuild ? '跳过构建' : '含构建', detail: '启动发布流水线' })
@@ -95,8 +104,18 @@ if (skipBuild) {
   shell('npm run build')
 }
 
-step('3/5 部署到 Vercel')
-shell('npx vercel deploy --prod --yes')
+step(`3/5 部署到 ${publisher.label}`)
+shell(publisher.deployCommand)
+
+/**
+ * 静态托管没有 `/api/sites` 接口：热更新与收敛验证都不适用，到这里就算发布完成。
+ * 提早在这一步收尾，好过让脚本跑完两步、再以一个「连不上接口」的错误退出。
+ */
+if (!publisher.hotUpdate) {
+  console.log(`\n✅ 部署完成（${publisher.label} 不支持云端热更新，整站发布即生效）`)
+  record({ action: 'publish.done', actor, target: publisher.label, detail: '静态通道：构建 + 部署完成' })
+  process.exit(0)
+}
 
 step('4/5 热更新云端数据')
 const payload = join(root, 'tmp-payload.json')

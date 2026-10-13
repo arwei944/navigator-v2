@@ -22,6 +22,7 @@
  */
 import { get, put } from '#store'
 import { checkAuthHeader } from '../shared/auth.mjs'
+import { chatWithChain } from '../shared/llm-engine.mjs'
 import { dayKey } from '../shared/clicks-core.mjs'
 import { existsSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -127,34 +128,29 @@ export function aiConfig() {
   }
 }
 
-/** 调一次 chat/completions，拿 content */
+/**
+ * 调一次 chat/completions，拿 content。
+ *
+ * 传输与解析已抽到 `shared/llm-engine.mjs`（后端注册表）：
+ * 这里是**唯一**把服务端配置（key / baseURL / model）交给后端的地方 ——
+ * 后端自己不认识 `data/ai-config.json`，也就没有第二条可能泄漏 key 的路径。
+ *
+ * 换中转或私有化部署：`NAV_LLM_BACKENDS` 换序、或配 `LLM_GATEWAY_ENDPOINT` 多一个后端，
+ * 本函数不用动。注意全链失败会**抛错**（不像翻译会静默回原文）—— 助手失败必须可见。
+ */
 async function chat(cfg, system, user, { maxTokens = 600 } = {}) {
-  const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS)
-  try {
-    const res = await fetch(`${cfg.baseURL}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({
-        model: cfg.model,
-        temperature: 0.2,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      }),
-      signal: ctl.signal,
-    })
-    if (!res.ok) {
-      const t = await res.text().catch(() => '')
-      const err = new Error(`上游返回 ${res.status}${t ? `：${t.slice(0, 120)}` : ''}`)
-      err.upstream = res.status
-      throw err
-    }
-    const j = await res.json()
-    return String(j?.choices?.[0]?.message?.content || '').trim()
-  } finally { clearTimeout(timer) }
+  const { text } = await chatWithChain(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    {
+      config: { baseURL: cfg.baseURL, apiKey: cfg.apiKey, model: cfg.model },
+      maxTokens,
+      timeoutMs: TIMEOUT_MS,
+    },
+  )
+  return text
 }
 
 const clip = (s, n = MAX_TEXT) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, n)

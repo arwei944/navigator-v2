@@ -1,6 +1,17 @@
+/**
+ * 站点图标批量补抓。
+ *
+ * **抓取逻辑已抽到 `shared/image-engine.mjs`**：三级回退链
+ * （页面 icon 声明 → `/favicon.ico` → favicon.im）现在是三个可换序、可裁剪、
+ * 可替换的 provider。本脚本只负责**批量调度与落盘**
+ * —— 换图标源改一个环境变量（`NAV_ICON_PROVIDERS=page-links,favicon-im`），不碰这里。
+ *
+ * 用法: node scripts/fetch-favicons.mjs [--limit N] [--only <siteId>]
+ */
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolveImage } from '../shared/image-engine.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const root = path.resolve(__dirname, '..')
@@ -11,153 +22,11 @@ fs.mkdirSync(iconsDir, { recursive: true })
 
 const sites = JSON.parse(fs.readFileSync(dataPath, 'utf8'))
 const CONCURRENCY = 6
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
-const TIMEOUT = 12000
 
-function withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
-  ])
-}
-
-async function fetchBuf(url) {
-  const res = await withTimeout(fetch(url, {
-    headers: { 'User-Agent': UA, 'Accept': '*/*' },
-    redirect: 'follow'
-  }), TIMEOUT)
-  if (!res.ok) throw new Error('HTTP ' + res.status)
-  const buf = Buffer.from(await res.arrayBuffer())
-  if (!buf.length) throw new Error('empty')
-  return buf
-}
-
-function detectExt(buf) {
-  if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return 'png'
-  if (buf.length >= 4 && buf[0] === 0x00 && buf[1] === 0x00 && buf[2] === 0x01 && buf[3] === 0x00) return 'ico'
-  if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpg'
-  if (buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return 'webp'
-  if (buf.length >= 6 && buf.toString('latin1', 0, 4) === 'GIF8') return 'gif'
-  if (buf.length >= 12 && buf.toString('latin1', 0, 12) === '\x00\x00\x00\x1cftypavif') return 'avif'
-  const head = buf.toString('latin1', 0, 200)
-  if (head.includes('<svg') || head.includes('<?xml')) return 'svg'
-  return 'bin'
-}
-
-function toAbsolute(href, base) {
-  const h = String(href || '').trim()
-  if (!h) return null
-  // `data:,`（抑制 favicon 请求）等于没声明；`data:image/…` 是真实内联图标，原样保留
-  if (h.startsWith('data:')) {
-    const comma = h.indexOf(',')
-    if (comma < 0 || !/^image\//i.test(h.slice(5, comma))) return null
-    return h.slice(comma + 1).trim() ? h : null
-  }
-  try { return new URL(h, base).href } catch { return null }
-}
-
-/** 内联 data: 图片解码为 Buffer；非 data: 或解码失败返回 null */
-function decodeDataUri(uri) {
-  const comma = uri.indexOf(',')
-  if (comma < 0) return null
-  const meta = uri.slice(5, comma)
-  const payload = uri.slice(comma + 1)
-  try {
-    return /;base64/i.test(meta)
-      ? Buffer.from(payload, 'base64')
-      : Buffer.from(decodeURIComponent(payload), 'utf8')
-  } catch { return null }
-}
-
-function normalizeHost(url) {
-  return url.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '')
-}
-
-/**
- * 取标签属性值，按定界引号配对。
- * 不能用 `[^"']+`：内联 SVG 的 href 值是双引号包裹、内部含单引号
- * （`href="data:image/svg+xml,%3Csvg xmlns='…'"`），会从第一个单引号处被截断。
- */
-function attrValue(tag, name) {
-  const quoted = tag.match(new RegExp(name + "\\s*=\\s*([\"'])([\\s\\S]*?)\\1", 'i'))
-  if (quoted) return quoted[2]
-  const bare = tag.match(new RegExp(name + '\\s*=\\s*([^\\s>]+)', 'i'))
-  return bare ? bare[1] : ''
-}
-
-async function extractIconLinks(html, base) {
-  const links = []
-  const re = /<link[^>]+rel=["']([^"']*icon[^"']*)["'][^>]*>/gi
-  let m
-  while ((m = re.exec(html)) !== null) {
-    const rel = m[1].toLowerCase()
-    const href = attrValue(m[0], 'href')
-    if (!href) continue
-    const abs = toAbsolute(href, base)
-    if (!abs) continue
-    links.push({ url: abs, rel, sizes: attrValue(m[0], 'sizes') })
-  }
-  links.sort((a, b) => {
-    const rank = (l) => {
-      if (l.rel.includes('apple-touch-icon')) return 0
-      if (l.sizes.includes('180') || l.sizes.includes('192') || l.sizes.includes('96') || l.sizes.includes('128')) return 1
-      return 2
-    }
-    return rank(a) - rank(b)
-  })
-  return links
-}
-
-/**
- * favicon.im 对查不到图标的域名会返回 200 + 灰色占位 SVG（灰圆 + 斜体 f），
- * 体积小、格式合法，若不识别会被当成真图标落盘。
- */
-function isPlaceholderIcon(buf) {
-  if (buf.length > 512) return false
-  const text = buf.toString('utf8')
-  return text.includes('<svg') && text.includes('#808080') && /<text[^>]*>\s*f\s*<\/text>/i.test(text)
-}
-
-async function tryDownload(url) {
-  const buf = url.startsWith('data:') ? decodeDataUri(url) : await fetchBuf(url)
-  if (!buf || !buf.length) throw new Error('empty')
-  const ext = detectExt(buf)
-  if (ext === 'bin') throw new Error('unknown format')
-  if (isPlaceholderIcon(buf)) throw new Error('placeholder icon (source has no real favicon)')
-  return { buf, ext }
-}
-
+/** 取一张图标；全链失败返回 null（「这站没有图标」是常态，不是异常） */
 async function getFavicon(site) {
-  const url = site.url
-  const base = url.includes('://') ? url : 'https://' + url
-
-  // 1. parse page HTML for icon links
-  try {
-    const html = (await fetchBuf(base)).toString('utf8')
-    const links = await extractIconLinks(html, base)
-    for (const l of links.slice(0, 3)) {
-      try {
-        const { buf, ext } = await tryDownload(l.url)
-        return { buf, ext }
-      } catch { /* next */ }
-    }
-  } catch { /* page blocked or unavailable */ }
-
-  // 2. try /favicon.ico
-  try {
-    const u = new URL('/favicon.ico', base).href
-    const { buf, ext } = await tryDownload(u)
-    return { buf, ext }
-  } catch { /* none */ }
-
-  // 3. favicon.im fallback (accept any raster format)
-  try {
-    const host = normalizeHost(url)
-    const { buf, ext } = await tryDownload(`https://favicon.im/${host}?format=png&size=128`)
-    return { buf, ext }
-  } catch { /* none */ }
-
-  throw new Error('all sources failed')
+  const out = await resolveImage(site, { kind: 'favicon' })
+  return out ? { buf: out.buf, ext: out.ext } : null
 }
 
 async function run() {
@@ -178,9 +47,10 @@ async function run() {
       const id = site.id
       const prev = site.icon
       try {
-        const { buf, ext } = await getFavicon(site)
-        const fname = `${id}.${ext}`
-        fs.writeFileSync(path.join(iconsDir, fname), buf)
+        const got = await getFavicon(site)
+        if (!got) throw new Error('all sources failed')
+        const fname = `${id}.${got.ext}`
+        fs.writeFileSync(path.join(iconsDir, fname), got.buf)
         site.icon = `icons/${fname}`
         updated.push(id)
       } catch (e) {

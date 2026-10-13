@@ -28,10 +28,13 @@
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { get, put } from '#store'
 import { fetchCapped } from '../shared/http-fetch.mjs'
-import { pickCoverPrefer, decodeHtmlBytes } from '../shared/site-infer.mjs'
+import { resolveImage, registerImageProvider } from '../shared/image-engine.mjs'
+// 封面 provider（og:image）的实现放在 shared：它的注册必须在任何非 serverless 消费方
+// （测试/控制台）里也成立 —— 留在本文件会让注册只在 serverless 进程里存在。
+import { fetchHtmlFollowing } from '../shared/cover-source.mjs'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const COVER_DIR = join(ROOT, 'data', 'covers')
@@ -66,6 +69,8 @@ const EXTS = [
   ['.svg', 'image/svg+xml'],
 ]
 const EXT_BY_MIME = Object.fromEntries(EXTS.map(([ext, mime]) => [mime, ext]))
+/** 反向映射（提供者只回 ext 时补 mime）；ico 不在 EXTS 里，单独补 */
+const MIME_BY_EXT = { ...Object.fromEntries(EXTS.map(([ext, mime]) => [ext.slice(1), mime])), ico: 'image/x-icon' }
 
 /** 站点 id 会拼进文件名，只允许安全字符 */
 const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/
@@ -112,85 +117,67 @@ function sendImage(res, file) {
 export const coverDebug = { siteId: '', pageUrl: '', stage: '', pageStatus: 0, contentType: '', coverHref: '', imageStatus: 0, imageMime: '', reason: '', at: 0 }
 
 /**
- * 抓页面（**手动跟重定向**，最多 3 跳）。
- *
- * 为什么不用自动跟随：`fetchCapped` 刻意**不跟**重定向 —— 自动跟随会把请求带到
- * 未校验的目标，绕过 SSRF 防护（这层是公网可触达端点的底线）。代价是：绝大多数站点
- * 会 301/302 到规范地址（apex→www、http→https、语言前缀），于是拿到一个空 body、
- * 解析不出任何 meta —— 实测命中率只有 1/10。
- *
- * 所以自己跟：每一跳都用 fetchCapped 重新校验目标（内网/本机照样被拦），
- * 只接受 http(s) 的 Location，并保留相对地址的解析基准。
- *
- * 只跟 1 跳：多跳在慢站上会把请求拖到「拿不到响应」的长度，而多出来的封面收益很小。
+ * 抓页面（手动跟重定向）**已移至 `shared/cover-source.mjs`** ——
+ * 那里是「封面 provider」的共同实现，出网纪律（fetchCapped / 超时 / 跳数 / 体积）
+ * 由本文件经 ctx 注入，因为那些数字是发布平台约束逼出来的部署知识。
+ * 本文件只保留落盘、负缓存与诊断。
  */
-async function fetchHtmlFollowing(startUrl, { maxHops = MAX_HOPS } = {}) {
-  let url = startUrl
-  let hops = 0
-  let last = null
-  while (hops <= maxHops) {
-    const ctl = new AbortController()
-    const timer = setTimeout(() => ctl.abort(), HOP_TIMEOUT_MS)
-    try {
-      const r = await fetchCapped(url, { signal: ctl.signal, headers: { 'user-agent': UA }, maxBytes: PAGE_MAX_BYTES })
-      last = r
-      const status = Number(r.status) || 0
-      const loc = r.headers && r.headers.location
-      if (status >= 300 && status < 400 && loc && hops < maxHops) {
-        let next = ''
-        try { next = new URL(String(loc), url).href } catch { next = '' }
-        if (next && /^https?:\/\//i.test(next)) { url = next; hops++; continue }
-      }
-      return { res: r, finalUrl: url, hops }
-    } catch (e) {
-      return { res: null, finalUrl: url, hops, error: String((e && e.message) || e) }
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-  return { res: last, finalUrl: url, hops, error: '跳转次数超限' }
+
+/** 读 public/ 下的图标（供 favicon-as-cover 用）；越界或不存在返回 null */
+function readPublicIcon(rel) {
+  const base = join(process.cwd(), 'public')
+  const abs = join(base, String(rel || '').replace(/^\/+/, ''))
+  if (!abs.startsWith(base + sep)) return null
+  try { return existsSync(abs) ? readFileSync(abs) : null } catch { return null }
 }
 
-/** 抓页面 → 取 og:image → 下载落盘。返回落盘信息；失败返回 null（调用方回 204） */
-async function fetchAndStore(siteId, pageUrl) {
+/**
+ * 可选的第二来源：把站点**已经抓到的图标**当封面（零网络，秒回）。
+ *
+ * **默认关闭**（`NAV_COVER_FAVICON_FALLBACK=1` 才启用）——
+ * 它会把「og:image 抓不到 → 204 无封面」变成「拿图标顶上」，
+ * 这是产品行为变化，不该由一次重构悄悄带来。
+ */
+registerImageProvider({
+  id: 'favicon-as-cover',
+  label: '图标作封面（本地，零网络）',
+  kind: 'cover',
+  order: 200,
+  available: () => process.env.NAV_COVER_FAVICON_FALLBACK === '1',
+  fetch: async (site) => {
+    const rel = String((site && site.icon) || '').trim()
+    if (!rel) return null
+    const ext = ((rel.match(/\.([a-z0-9]+)$/i) || [])[1] || '').toLowerCase().replace('jpeg', 'jpg')
+    if (!MIME_BY_EXT[ext]) return null
+    const buf = readPublicIcon(rel)
+    if (!buf || !buf.length) return null
+    return { buf, ext, mime: MIME_BY_EXT[ext] }
+  },
+})
+
+/** 按提供者链取封面并落盘。返回落盘信息；失败返回 null（调用方回 204） */
+async function fetchAndStore(siteId, site) {
   ensureDir()
-
-  let coverHref = ''
-  const page = await fetchHtmlFollowing(pageUrl)
-  if (!page.res) {
-    coverDebug.reason = `页面抓取失败：${page.error || '未知错误'}`
-  } else {
-    coverDebug.pageStatus = Number(page.res.status) || 0
-    coverDebug.contentType = String(page.res.headers['content-type'] || '')
-    coverDebug.finalUrl = page.finalUrl
-    coverDebug.stage = page.hops ? `页面已取回（跟了 ${page.hops} 跳）` : '页面已取回'
-    if (/^text\/html/i.test(coverDebug.contentType)) {
-      const html = decodeHtmlBytes(page.res.body).toString('utf8')
-      coverDebug.stage = '解析 og:image'
-      // 相对地址要按**最终 URL** 解析（跟跳转后基准变了）
-      coverHref = pickCoverPrefer([html], page.finalUrl)
-      if (!coverHref) coverDebug.reason = `页面里没有 og:image/twitter:image（HTML ${html.length} 字节）`
-    } else {
-      coverDebug.reason = `页面不是 HTML：${coverDebug.contentType || '未知类型'}（HTTP ${coverDebug.pageStatus}）`
-    }
-  }
-
-  if (!coverHref) { markNoCover(siteId); return null }
-
-  const imgCtl = new AbortController()
-  const imgTimer = setTimeout(() => imgCtl.abort(), IMAGE_TIMEOUT_MS)
-  try {
-    const r = await fetchCapped(coverHref, { signal: imgCtl.signal, headers: { 'user-agent': UA }, maxBytes: MAX_BYTES })
-    coverDebug.stage = '下载封面'
-    coverDebug.imageStatus = Number(r.status) || 0
-    const mime = String(r.headers['content-type'] || '').split(';')[0].trim().toLowerCase()
-    coverDebug.imageMime = mime
-    const ext = EXT_BY_MIME[mime]
-    if (!ext) { coverDebug.reason = `封面地址返回的不是图片：${mime || '未知类型'}`; markNoCover(siteId); return null }
-    const path = join(COVER_DIR, siteId + ext)
-    writeFileSync(path, r.body)
-    return { path, mime }
-  } finally { clearTimeout(imgTimer) }
+  // 出网纪律全部经 ctx 注入：provider 只管「怎么找、怎么判」，不掌握部署参数
+  const out = await resolveImage(site, {
+    kind: 'cover',
+    ctx: {
+      fetchCapped,
+      debug: coverDebug,
+      extByMime: EXT_BY_MIME,
+      ua: UA,
+      hopTimeoutMs: HOP_TIMEOUT_MS,
+      maxHops: MAX_HOPS,
+      imageTimeoutMs: IMAGE_TIMEOUT_MS,
+      maxBytes: MAX_BYTES,
+      pageMaxBytes: PAGE_MAX_BYTES,
+    },
+  })
+  if (!out) { markNoCover(siteId); return null }
+  // provider 的 ext 契约是不带点（见 shared/image-engine.mjs），落盘方负责拼点
+  const path = join(COVER_DIR, siteId + '.' + out.ext)
+  writeFileSync(path, out.buf)
+  return { path, mime: out.mime || MIME_BY_EXT[out.ext] || 'application/octet-stream' }
 }
 
 export default async function handler(req, res) {
@@ -217,7 +204,7 @@ export default async function handler(req, res) {
   coverDebug.coverHref = ''
   coverDebug.at = Date.now()
   try {
-    const saved = await fetchAndStore(siteId, pageUrl)
+    const saved = await fetchAndStore(siteId, site)
     if (debug) { res.status(200).json({ ok: true, saved: Boolean(saved), ...coverDebug }); return }
     if (!saved) { res.status(204).end(); return }
     sendImage(res, saved)

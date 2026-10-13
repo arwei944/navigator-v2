@@ -5,7 +5,8 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
-import { CATEGORY_GROUPS, categoryMeta } from '../../../shared/categories.mjs'
+import { CATEGORY_GROUPS, sanitizeGroups } from '../../../shared/categories.mjs'
+import { categoryMetaFromGroups } from '../../../shared/category-source.mjs'
 import { hostOf } from '../../../shared/ops/site-ops.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
@@ -17,12 +18,29 @@ export function readSites() {
 }
 
 /**
+ * 当前生效的分类分组：**优先数据文件里的 `categories` 字段**（与云端同源），
+ * 结构非法或不存在则回落内置表 —— 换主题域只需换数据文件里的表，不必改代码。
+ * 读文件失败（坏 JSON / 权限）同样回落：控制台下拉绝不该因为数据文件坏了而空掉。
+ */
+function currentGroups() {
+  try {
+    const data = readSites()
+    const raw = Array.isArray(data) ? null : (Array.isArray(data.categories) ? data.categories : null)
+    if (raw) {
+      const groups = sanitizeGroups(raw)
+      if (groups && groups.length) return groups
+    }
+  } catch { /* 回落内置 */ }
+  return CATEGORY_GROUPS
+}
+
+/**
  * 分类分组，供控制台下拉框渲染。
- * 数据源是 shared/categories.mjs（与前端 store、线上接口同源），不再正则解析源码。
- * 这里把 dotColor 映射成控制台用的 color，避免两处模板各写一套字段名。
+ * 数据源与前端 store、线上接口同源（数据文件里的表 / shared/categories.mjs），
+ * 不再正则解析源码。这里把 dotColor 映射成控制台用的 color，避免两处模板各写一套字段名。
  */
 export function categoryGroups() {
-  return CATEGORY_GROUPS.map(g => ({
+  return currentGroups().map(g => ({
     id: g.id,
     label: g.label,
     categories: g.categories.map(c => ({ id: c.id, label: c.label, color: c.dotColor })),
@@ -31,7 +49,7 @@ export function categoryGroups() {
 
 /** 扁平分类元信息：id -> { label, color, group } */
 export function readCategoryMeta() {
-  return categoryMeta()
+  return categoryMetaFromGroups(currentGroups())
 }
 
 export function report() {

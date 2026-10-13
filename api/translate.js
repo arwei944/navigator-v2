@@ -111,8 +111,13 @@ async function onlineTranslate({ name, desc }, ua, timeoutMs) {
   const original = { name, desc }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
-  const fetchText = async (url) => {
-    const r = await fetch(url, { headers: { 'user-agent': ua }, signal: controller.signal })
+  // 支持引擎传入 init（LLM 引擎需要 POST）；只提供 GET 的引擎不受影响
+  const fetchText = async (url, init) => {
+    const r = await fetch(url, {
+      ...init,
+      headers: { 'user-agent': ua, ...((init && init.headers) || {}) },
+      signal: controller.signal,
+    })
     if (!r.ok) throw new Error(`translate http ${r.status}`)
     return r.text()
   }

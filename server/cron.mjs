@@ -1,13 +1,15 @@
 /**
  * 服务端常驻巡检（v10 第三批）。
  *
- * ## 为什么不能复用 shared/health-probe.mjs
+ * ## 探测实现来自共享注册表
  *
- * 那个引擎是**本机（Windows）专用**的：它靠 `curl.exe` 出网，因为本机 Node fetch 不走
- * 系统代理（Clash）。部署沙箱是 Linux，压根没有 curl.exe —— 直接复用会 300 个站点全 ERR。
- * 所以这里改走**纯 Node 的 fetchCapped**：零外部依赖，且它自带两层 SSRF 防护
- * （字面主机名拦截 + pinned lookup 防 DNS rebinding）。这层防护是公网可触达探测端点的底线，
+ * 沙箱是 Linux，没有 `curl.exe`，所以这里**显式**选 `fetch-http` 探针：
+ * 纯 Node fetch + `fetchCapped`，零外部依赖，且自带两层 SSRF 防护
+ * （字面主机名拦截 + pinned lookup 防 DNS rebinding）—— 这层防护是公网可触达探测端点的底线，
  * 绝不能为了省事自己拼 http.request。
+ *
+ * 本机（控制台 / CLI）走的是同一个注册表，只是 `curl-http` 的 `available()` 在 Windows
+ * 为 true 而优先命中。**两边共用「HEAD 不收就 GET 复核」的口径**，不再各写一遍。
  *
  * ## 口径
  *
@@ -25,8 +27,8 @@
  * 各自的 shared 目录，源码零分支。
  */
 import { get, put } from '#store'
-import { fetchCapped } from '#shared/http-fetch.mjs'
 import { buildHealthPayload, toIncoming } from '#shared/health-rules.mjs'
+import { probeChain, runProbe } from '#shared/probe-engine.mjs'
 
 const PATHNAME = 'ops/health.json'
 const SITES_PATHNAME = 'sites.json'
@@ -67,20 +69,16 @@ async function readSites() {
   }
 }
 
-/** 单站探测：只取状态码与耗时，body 封顶 2KB（判定用不上正文） */
+/**
+ * 单站探测：只取状态码与耗时。
+ *
+ * 显式指定 `fetch-http` 而不是走默认链：沙箱要的是「不依赖外部二进制」的那一个 ——
+ * 不该因为某天镜像里恰好装了 curl.exe 就悄悄换掉探测实现（那会让线上口径与本机对齐，
+ * 而本机是走代理的，两者前提不同）。
+ */
 async function probeOne(url) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
-  const t0 = Date.now()
-  try {
-    const r = await fetchCapped(url, { signal: controller.signal, headers: { 'user-agent': UA }, maxBytes: 2048 })
-    return { code: String(r.status || 0), ms: Date.now() - t0 }
-  } catch (e) {
-    // BLOCKED_HOST = 命中 SSRF 防护（站址指向内网），按失效记录，不重试
-    return { code: e && e.code === 'BLOCKED_HOST' ? 'BLOCKED' : 'ERR', ms: Date.now() - t0 }
-  } finally {
-    clearTimeout(timer)
-  }
+  const r = await runProbe(url, { timeoutMs: TIMEOUT_MS, ua: UA, chain: probeChain('fetch-http') })
+  return r ? { code: r.code, ms: r.ms } : { code: 'ERR', ms: 0 }
 }
 
 /**

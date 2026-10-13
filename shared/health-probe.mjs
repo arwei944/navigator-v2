@@ -1,69 +1,37 @@
 /**
- * 站点探活引擎：分级口径与探测方式在此唯一定义。
+ * 站点探活引擎：分级口径与**重试口径**在此唯一定义。
  *
  * 为什么单独抽出来：控制台可用性看板、CLI `nav sites check`、`scripts/check-sites.mjs`
  * 三处都要判「这个站点到底通不通」，口径一旦漂移就会出现「看板说好的、报告说要处理」。
  * 与 `shared/site-infer.mjs` 同理：同源一处，改一处即全生效。
  *
- * 分级口径来自 `shared/health-rules.mjs`（纯规则，前端与 Serverless 也读它）；
- * 本模块只负责「怎么探」——探测方式必须是 curl.exe：本机 Node fetch 不走系统代理，
- * 直连会大面积误判为不可达。
+ * ## 分工（本次拆分后）
+ *
+ *   · **怎么探**（HEAD→GET 复核、代理、curl vs fetch）→ `shared/probe-engine.mjs` 的探针注册表；
+ *   · **怎么定性**（ok/limited/down 分级、连续失败才判宕机的误报抑制）→ 本文件；
+ *   · **分级阈值本身** → `shared/health-rules.mjs`（纯规则，前端与 Serverless 也读它）。
+ *
+ * 拆开的好处很直接：原本 `server/cron.mjs`（Linux 沙箱，没有 curl.exe）不得不把
+ * 同一件事用 fetchCapped 再写一遍，两处口径靠人肉同步；现在两边都从注册表取探针，
+ * 沙箱因为 `curl-http` 的 `available()` 为 false 而自然落到 `fetch-http`，语义不分叉。
  */
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import { IGNORABLE, STATUS_LABEL, verdictOf, tally } from './health-rules.mjs'
 import { resolveProxyUrl } from './proxy.mjs'
-
-const pExecFile = promisify(execFile)
+import { runProbe } from './probe-engine.mjs'
 
 export { IGNORABLE, STATUS_LABEL, verdictOf, tally }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
-function normalize(url) {
-  return String(url || '').includes('://') ? String(url) : `https://${url}`
-}
-
 /**
- * 单次 curl，只取 http_code。
+ * 单次探测：交给注册表选出的探针（默认 `curl-http`；非 Windows 环境自动落到 `fetch-http`）。
  *
- * 关键：curl 超时（`--max-time`）会以非 0 码退出（exit 28），此时 `execFile` 的 Promise
- * 会 reject —— 但 `-w` 已经把 http_code 写进 stdout 了。若不从 error.stdout 取回，
- * 「HEAD 超时」就会被当成探测异常直接定性，GET 回落永远执行不到（曾导致 BlockBeats 误判）。
- */
-async function curlCode(args, timeout) {
-  try {
-    const { stdout } = await pExecFile('curl.exe', args, {
-      encoding: 'utf8', timeout: (timeout + 5) * 1000, windowsHide: true,
-    })
-    return stdout.trim()
-  } catch (e) {
-    return String(e.stdout || '').trim()
-  }
-}
-
-/** 2xx / 3xx 视为「HEAD 已足够定性」，其余一律需要 GET 复核 */
-function isReachable(code) {
-  const n = Number(code)
-  return Number.isFinite(n) && n >= 200 && n < 400
-}
-
-/**
- * 单次探测：先 HEAD 省流量，**只要 HEAD 不是 2xx/3xx 就用 GET 复核**。
- *
- * 为什么不能只信 HEAD：大量站点不支持 HEAD（返回 404 / 405）或对 HEAD 直接超时，
- * 而 GET 是正常的 200 —— 只按 HEAD 定性会把可用站点成批误判为「需处理」
- * （曾误伤 Kaggle / 文心一言 / BlockBeats）。GET 才是用户真实访问方式，故以它为准。
+ * 注意**不在这里做定性**：探针回什么 code 就照实往上报（哪怕 ERR），
+ * `ok`/`limited`/`down` 与重试都由下面的 `probe()` 决定。
  */
 async function probeOnce(url, timeout, proxy) {
-  const target = normalize(url)
-  // 显式指定代理，而不是依赖环境变量：代理端口会漂移，环境变量可能滞后
-  const via = proxy ? ['--proxy', proxy] : []
-  const base = ['-s', '-o', 'NUL', '-w', '%{http_code}', '-L', '--max-time', String(timeout), ...via]
-  const t0 = Date.now()
-  let code = await curlCode(['-I', ...base, target], timeout)
-  if (!isReachable(code)) code = await curlCode([...base, target], timeout)
-  return { code: code || 'ERR', ms: Date.now() - t0 }
+  const r = await runProbe(url, { timeoutS: timeout, proxy })
+  return r ? { code: r.code, ms: r.ms, probe: r.probe } : { code: 'ERR', ms: 0, probe: '' }
 }
 
 /**

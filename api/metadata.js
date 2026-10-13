@@ -16,6 +16,8 @@ import { fileURLToPath } from 'node:url'
 import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../shared/site-infer.mjs'
 import { translateSiteFields, needsTranslation, shouldTranslateName } from '../shared/translate.mjs'
 import { categoryMeta } from '../shared/categories.mjs'
+import { createCategoryResolver, categoryMetaFromGroups } from '../shared/category-source.mjs'
+import { get } from '#store'
 import { isBlockedHost } from '../shared/net-guard.mjs'
 import { fetchCapped } from '../shared/http-fetch.mjs'
 import { rejectAbusive, clientIp, rateLimited } from '../shared/rate-limit.mjs'
@@ -33,7 +35,34 @@ export { withBudget }
 const SEED_SITES = JSON.parse(
   readFileSync(fileURLToPath(new URL('./sites-data.json', import.meta.url)), 'utf-8')
 )
+/**
+ * 内置分类表：既是**默认值**，也是云端表不可用时的最终回退。
+ * 它只是模块级常量（冷启动算一次）—— 真正参与校验的是下面的 resolveCategoryMeta。
+ */
 const CATEGORY_META = categoryMeta()
+
+/**
+ * 运行时可解析的分类白名单：优先**云端表**（`sites.json` 的 `categories` 字段），
+ * 取不到或结构非法则回落内置 —— 候选表一律过 `sanitizeGroups`（半张表比旧表更危险）。
+ *
+ * 为什么值得加这一层：云端改了分类，前端（走 `sites.json`）会跟着变，
+ * 但这里的白名单原本是模块级常量 —— 于是线上「添加站点」仍按旧表校验，
+ * 推断出的新分类被判「未登记」，用户看到「已补全分类 X」而选中项没变。
+ *
+ * 60s 进程内缓存：serverless 每请求新进程时约等于「每请求读一次」（几 KB，可接受）；
+ * 常驻进程下明显省 IO。**读失败一律吞掉回落内置**：分类表读不到绝不该让抓取接口挂。
+ */
+const resolveCategoryMeta = createCategoryResolver({
+  ttlMs: 60_000,
+  ctx: {
+    loadJson: async (path) => {
+      try {
+        const blob = await get(path, { access: 'private', useCache: false })
+        return blob && blob.stream ? JSON.parse(await new Response(blob.stream).text()) : null
+      } catch { return null }
+    },
+  },
+})
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36'
 
@@ -265,6 +294,29 @@ export default async function handler(req, res) {
     return
   }
 
+  // 可选外部引擎（siteprobe）：只在显式配置时启用 —— 云端默认不可达 siteprobe，
+  // 不做无谓探活；未配置即走下面的内置流程（与从前完全一致）。
+  if (process.env.NAV_SITE_ENGINE === 'siteprobe' || process.env.SITEPROBE_ENDPOINT) {
+    try {
+      const { probeViaSiteprobe } = await import('../shared/site-engine.mjs')
+      const nav = await probeViaSiteprobe(target.href)
+      if (nav && nav.name) {
+        res.status(200).json({
+          ...nav,
+          url: target.href,
+          domain: target.hostname,
+          warning: nav.blocked ? BLOCKED_WARNING : '',
+          nameOriginal: nav.name,
+          descOriginal: nav.desc,
+          translated: false,
+          translateEngine: [],
+          engine: 'siteprobe',
+        })
+        return
+      }
+    } catch { /* 引擎层异常一律回退内置流程 */ }
+  }
+
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), FETCH_BUDGET_MS)
   const startedAt = Date.now()
@@ -399,7 +451,8 @@ export default async function handler(req, res) {
     manifestTheme,
     url: target.href,
     existingSites: SEED_SITES,
-    categoryMeta: CATEGORY_META,
+    // 云端表优先、内置兜底；跟着云端走，前端下拉与线上校验才不会各说各话
+    categoryMeta: categoryMetaFromGroups((await resolveCategoryMeta()).groups),
   })
 
   // 挑战页返回 200，抓取层看不出异常，只有内容层知道这是拦截页：warning 必须盖过抓取层文案
@@ -464,8 +517,13 @@ async function autoTranslate(info, ua, timeoutMs) {
   }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), Math.max(1000, Number(timeoutMs) || TRANSLATE_MIN_MS))
-  const fetchText = async (url) => {
-    const r = await fetch(url, { headers: { 'user-agent': ua }, signal: controller.signal })
+  // 支持引擎传入 init（LLM 引擎需要 POST）；只提供 GET 的引擎不受影响
+  const fetchText = async (url, init) => {
+    const r = await fetch(url, {
+      ...init,
+      headers: { 'user-agent': ua, ...((init && init.headers) || {}) },
+      signal: controller.signal,
+    })
     if (!r.ok) throw new Error(`translate http ${r.status}`)
     return r.text()
   }

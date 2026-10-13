@@ -254,6 +254,38 @@ function decodeDataUri(uri) {
 }
 
 /**
+ * 尝试用外部引擎（siteprobe）抓取；未启用 / 未在线 / 失败一律返回 null，由调用方回退内置流程。
+ *
+ * 翻译仍走本仓同一套（siteprobe 只产原文，不做翻译），保证两种引擎的落库字段一致。
+ * 详见 shared/site-engine.mjs 的「热拔插」说明。
+ */
+async function fetchMetaViaEngine(rawUrl) {
+  try {
+    const mod = await import('../../../shared/site-engine.mjs')
+    if ((await mod.resolveEngine()) !== 'siteprobe') return null
+    const nav = await mod.probeViaSiteprobe(rawUrl)
+    if (!nav || !nav.name) return null
+    const url = normalizeUrl(rawUrl)
+    const tr = await translateSiteFields({ name: nav.name, desc: nav.desc }, { fetchText: (u) => curlText(u) })
+    return {
+      ...nav,
+      name: tr.name,
+      desc: tr.desc,
+      url,
+      domain: url,
+      warning: nav.blocked ? BLOCKED_WARNING : '',
+      nameOriginal: tr.original.name,
+      descOriginal: tr.original.desc,
+      translated: tr.translated,
+      translateEngine: tr.engines,
+      engine: 'siteprobe',
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
  * 抓取并推断标题 / 描述 / 图标 / 配色 / 分类建议 —— 只填一个网址就能补全全部字段。
  *
  * 推断逻辑在 shared/site-infer.mjs，与线上 api/metadata.js 同源；
@@ -265,6 +297,11 @@ function decodeDataUri(uri) {
  * 抓取目标保留路径，https 失败回退 http —— 与线上接口同一套策略。
  */
 export async function fetchMeta(rawUrl) {
+  // 可选外部引擎：siteprobe 在线且被选中时，一次拿到更全的字段（含 DNS/TLS/robots 等扩展维度）。
+  // 任何失败都静默回退下面的内置流程 —— 引擎切换绝不降低可用性。
+  const viaEngine = await fetchMetaViaEngine(rawUrl)
+  if (viaEngine) return viaEngine
+
   const url = normalizeUrl(rawUrl)   // 落库口径：只留域名
   const target = toTarget(rawUrl)    // 抓取口径：保留路径
   let html = ''
@@ -348,6 +385,7 @@ export async function fetchMeta(rawUrl) {
     descOriginal: tr.original.desc,
     translated: tr.translated,
     translateEngine: tr.engines,
+    engine: 'native',
   }
 }
 
