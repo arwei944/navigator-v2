@@ -171,6 +171,72 @@ ok(!('aliases' in noOriginal), '响应没带 nameOriginal → 不写别名')
   eq(warn3.hits.length, 1, '完全不传 store 也要告警')
 }
 
+/**
+ * ⑨ **真实信息不得再被译文堵住**（2026-10-14 修）
+ *
+ * 上一版把「取译文」排在「写真实信息」之前 await。译文那一路有多难讲 —— L2 浏览器模型
+ * 首次要下几十 MB 语言包、L3 在线引擎常被共享 IP 的日配额挡住 —— 卡片就有多久停在草稿上。
+ * 线上实测 figma.com：真实信息 +2.0s 到手，+10.4s 才写进卡片，中间 8 秒用户以为没去抓。
+ *
+ * 下面三条是「摘掉两阶段写库即失败」的直接凭据：
+ *   ① 调用 translate 的那一刻，真实信息那次写库**已经发生**；
+ *   ② 译文到手后有一次补写，两写合起来才是最终结果；
+ *   ③ 等待译文期间用户改过 → 第二写放弃（覆盖守卫对第二写同样有效）。
+ */
+{
+  const NEEDS = { ...OK_META, name: 'Figma', desc: 'Figma is the canvas.', needsTranslate: { name: false, desc: true } }
+  const store = makeStore({ ...CREATED })
+  let writesWhenTranslating = -1
+  const lateTranslate = async () => {
+    writesWhenTranslating = store._state.writes.length
+    return {
+      name: '', desc: 'Figma 是设计与代码协作的画布。', source: 'browser', note: '浏览器本地模型',
+      translated: { name: false, desc: true }, keywords: '',
+    }
+  }
+  const r = await runMetaUpgrade({
+    store, url: 'https://www.figma.com', created: { ...CREATED },
+    fetchMeta: okFetch(NEEDS), translate: lateTranslate, warn: spyWarn(),
+  })
+  eq(writesWhenTranslating, 1, '★ 调 translator 之前真实信息已经落库（译文不再挡路）')
+  eq(store._state.writes[0].patch.desc, 'Figma is the canvas.', '第一次写的是抓到的原文')
+  eq(r.changed, true, '整体仍算「补全过」')
+  eq(store._state.writes.length, 2, '译文到手后有一次补写')
+  eq(store._state.sites[0].desc, 'Figma 是设计与代码协作的画布。', '最终描述是译文')
+  eq(r.translation?.source, 'browser', '回执带回译文来源')
+}
+
+{
+  // 译文与原文一致 / 压根没译出来 → 不该白写第二次
+  const NEEDS = { ...OK_META, needsTranslate: { name: false, desc: true } }
+  const store = makeStore({ ...CREATED })
+  const sameTranslate = async () => ({ name: '', desc: OK_META.desc, source: 'glossary', note: '', translated: { name: false, desc: true }, keywords: '' })
+  const r = await runMetaUpgrade({
+    store, url: 'https://www.figma.com', created: { ...CREATED },
+    fetchMeta: okFetch(NEEDS), translate: sameTranslate, warn: spyWarn(),
+  })
+  eq(store._state.writes.length, 1, '译文与既有值一致 → 不重复写库')
+  eq(r.changed, true, '真实信息那一次写库仍算补全')
+}
+
+{
+  // 等待译文期间用户动手改了 → 第二写必须放弃（第一写在“用户动手”之前，不受影响）
+  const NEEDS = { ...OK_META, needsTranslate: { name: false, desc: true } }
+  const store = makeStore({ ...CREATED })
+  const racingTranslate = async (fields) => {
+    // 模拟用户在这段时间里改了描述
+    store.updateSite(CREATED.id, { desc: '我手写的产品名' })
+    return { name: '', desc: '译文到场但没人要了', source: 'browser', note: '', translated: { name: false, desc: true }, keywords: '' }
+  }
+  const r = await runMetaUpgrade({
+    store, url: 'https://www.figma.com', created: { ...CREATED },
+    fetchMeta: okFetch(NEEDS), translate: racingTranslate, warn: spyWarn(),
+  })
+  eq(store._state.writes.length, 2, '第一写（真实信息）+ 用户自己的编辑，共两次')
+  eq(store._state.sites[0].desc, '我手写的产品名', '★ 译文绝不覆盖人的输入')
+  eq(r.changed, true, '真实信息那一次写库仍然有效')
+}
+
 if (failures.length) {
   console.error(`\n❌ 后台升级测试失败 ${failures.length} 项：`)
   failures.forEach(f => console.error('  - ' + f))

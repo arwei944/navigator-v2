@@ -48,6 +48,19 @@
       </label>
     </div>
 
+    <!-- 开发者工具 -->
+    <div class="section-header sub">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17l6-6-6-6"/><path d="M12 19h8"/></svg>
+      <span>排查工具</span>
+    </div>
+    <div class="setting-row">
+      <label class="setting-toggle">
+        <span class="setting-label"><span class="setting-hint-row">管线日志浮标常显</span><small class="setting-hint">显示添加站点 / 抓取 / 翻译每一跳的实时进度</small></span>
+        <input type="checkbox" :checked="prefs.pipelineLog" @change="prefs.setPipelineLog($event.target.checked)" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+    </div>
+
     <!-- 搜索 -->
     <div class="section-header sub">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -135,4 +148,7 @@ function updateBlur() {
 .setting-toggle input:checked + .toggle-track { background: var(--accent); }
 .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .setting-toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); }
+/* 副标题排版：label 本身是 nowrap（防止开关轨道被挤走），所以把两行内容各自放成块 */
+.setting-hint-row { display: block; }
+.setting-hint { display: block; margin-top: 2px; font-size: 11px; color: var(--text-secondary); opacity: 0.75; white-space: normal; line-height: 1.5; }
 </style>

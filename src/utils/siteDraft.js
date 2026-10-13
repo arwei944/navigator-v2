@@ -95,8 +95,20 @@ export function buildSiteFromDraft({ form, faviconUrl = '', faviconHost = '' }) 
 export function fallbackDraftFromMeta({ url, meta = null, categoryId = '' }) {
   const m = meta || {}
   const rawName = String(m.name || '').trim()
-  // 站名不可靠 = 没抓到名字，或抓到的是「按域名拼的」低置信结果 → 一律退回域名兜底
-  const nameReliable = Boolean(rawName) && m?.confidence?.name !== 'low'
+  /**
+   * 站名不可靠 = 没抓到名字，或抓到的是**页面里刮来的**低置信结果 → 退回域名兜底。
+   *
+   * ⚠️ 这里有个必须区分的例外（2026-10-14 修）：本地推断（抓不到页面时在浏览器里跑的那版）
+   * 永远不会给出置信度过高的名字 —— 它连页面都没读过，只能 `low`。于是旧规则每次都把它
+   * 的成果丢掉、退回**裸主机名**：`www.figma.com` 而不是 `Figma`。两条都源自域名，
+   * 区别只是后者整理掉了 www、首字母大写 —— 丢掉它纯属自伤（线上实测：秒加那一刻卡片写着
+   * `www.figma.com`，用户据此认定「信息压根没补全」）。
+   *
+   * 判据因此收窄到**来源**：`sources.name === 'domain'` 说明这个名字也是按域名拼的，
+   * 与兜底同源、不比兜底更可疑，那就用更好看的那一个；页面刮来的低置信仍然照旧退回。
+   */
+  const fromDomain = m?.sources?.name === 'domain'
+  const nameReliable = Boolean(rawName) && (m?.confidence?.name !== 'low' || fromDomain)
 
   return {
     form: {

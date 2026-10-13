@@ -168,6 +168,12 @@ const LAZY_PARTS = [
   ['虚拟专用网络', '离线词表'],
   ['在线引擎翻译', '翻译编排'],
   ['downloadprogress', '浏览器本地翻译适配器'],
+  // 管线日志（utils/pipelineTrace.js + components/PipelineLogPanel.vue）：排查多跳链路用的
+  // 观测层，普通人一次都不会打开 —— 它一旦被静态 import 拉回入口图，会连同 `services/autoAdd`
+  // 那条链路一起胖回超标（实测首屏 595.2 → 602.8 KiB 的那次就是这样）。
+  // 标记取各自**独有**的字面量：总线是它挂在全局上的探针出口名，面板取一个只在该模板里的类名。
+  ['__navPipeline__', '管线追踪总线'],
+  ['pipeline-pill-text', '管线日志面板'],
 ]
 for (const [mark, name] of LAZY_PARTS) {
   const owners = allJs.filter(f => readAsset(f).includes(mark))

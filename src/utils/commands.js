@@ -262,6 +262,16 @@ export function buildCommands(ctx) {
   })
 
   cmds.push({
+    id: 'action.pipeline',
+    title: '管线日志',
+    subtitle: '查看添加站点 / 抓取 / 翻译的实时进度流水线',
+    section: 'action',
+    icon: 'note',
+    keywords: ['guanxian', 'gx', 'rizhi', 'rz', 'liushuixian', 'lsx', 'log', 'pipeline', 'jindu', 'jd'],
+    run: () => omni.requestPanel('pipeline')
+  })
+
+  cmds.push({
     id: 'action.shortcuts',
     title: '查看快捷键',
     subtitle: '列出所有键盘快捷键',

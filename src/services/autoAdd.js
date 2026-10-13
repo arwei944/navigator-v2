@@ -9,6 +9,7 @@ import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { normalizeUrl, hostOf } from '@/utils/url'
 import { localSiteMeta } from '@/services/localMeta'
+import { beginRun } from '@/utils/pipelineTrace'
 import {
   AUTO_ADD_REASON, findDuplicate, preflightOf, fallbackDraftFromMeta, buildSiteFromDraft,
 } from '@/utils/siteDraft'
@@ -68,16 +69,30 @@ async function runAutoAdd(normalized) {
   const sitesStore = useSitesStore()
   const categoriesStore = useCategoriesStore()
 
+  const run = beginRun({ flow: 'auto-add', title: '搜索框添加站点', target: normalized })
+
+  const sPre = run.stage('preflight', '网址识别与预检')
   const invalid = preflightOf({ url: normalized })
-  if (invalid) return { ok: false, ...invalid }
+  if (invalid) {
+    sPre.fail(invalid.message)
+    run.end('fail', invalid.message)
+    return { ok: false, ...invalid }
+  }
+  sPre.ok(hostOf(normalized) || normalized)
 
   // 重复不进弹窗：把命中站点带回，App 用来定位已有卡片
   const duplicate = findDuplicate(sitesStore.sites, normalized)
-  if (duplicate) return duplicateResult(duplicate)
+  if (duplicate) {
+    run.stage('dedupe', '查重').skip(`已收录「${duplicate.name}」，本次不重复添加`)
+    run.end('skip', `已收录「${duplicate.name}」`)
+    return duplicateResult(duplicate)
+  }
+  run.stage('dedupe', '查重').ok('未收录，继续')
 
   // **零延迟**：元数据改用本地推断（与服务端同一个 inferSite 引擎，传空 HTML）同步秒出，
   // 不再等最长 8s 的真实抓取 —— 添加动作即刻完成。真实信息随后在后台升级本条记录
   // （scheduleMetaUpgrade；用户若已手动编辑则不覆盖）。同域已收录时沿用真名，准确度不打折。
+  const sInfer = run.stage('local-infer', '本地推断（按域名）')
   const local = await localSiteMeta(normalized, {
     existingSites: sitesStore.sites,
     categoryMeta: categoriesStore.groups.reduce((m, g) => {
@@ -86,14 +101,24 @@ async function runAutoAdd(normalized) {
     }, {}),
   })
   const meta = local.ok ? local.data : null
+  if (local.ok) {
+    const low = Object.values(meta?.confidence || {}).filter(v => v === 'low').length
+    sInfer.ok(`${meta?.name || '—'}${low ? ` · ${low} 项为推断值` : ''}`)
+  } else {
+    sInfer.warn(local.message, local.reason)
+  }
 
   // 本地推断是同步过程，但「识别窗口」里别的入口（弹窗手动添加）仍可能把同域名写进库：
   // 写库前复检一次，查重不能只发生在窗口之前
   const raced = findDuplicate(sitesStore.sites, normalized)
-  if (raced) return duplicateResult(raced)
+  if (raced) {
+    run.end('skip', `识别期间已被「${raced.name}」抢先收录`)
+    return duplicateResult(raced)
+  }
   // 分类决策：输入是元数据 + 本地分类表快照，输出「复用哪个」或「新建一个」。
   // 引擎（auto-category → pinyin-pro）是**按需加载**的（见文件顶部 loadSuggestCategory 的注释）。
   // 加载失败不阻断添加：退化为「未分类入库」，与「新建分类失败」的处理口径一致。
+  const sPlan = run.stage('category', '分类决策（含引擎加载）')
   let plan = null
   try {
     const suggestCategory = await loadSuggestCategory()
@@ -111,9 +136,12 @@ async function runAutoAdd(normalized) {
       })),
       domainIds: categoriesStore.domains.map(d => d.id),
     })
-  } catch {
+  } catch (e) {
+    // 引擎 chunk 拉取失败（离线 / 陈旧 SW 缓存）不该阻断添加，但要写明「为什么是未分类」
+    sPlan.fail(String(e?.message || e), 'chunk-load')
     plan = null
   }
+  if (plan) sPlan.ok(plan.kind === 'create' ? `拟新建「${plan.label}」` : `复用「${plan.label}」`)
 
   try {
     let categoryId = ''
@@ -129,6 +157,8 @@ async function runAutoAdd(normalized) {
         categoryId = r.id
         categoryLabel = plan.label
         createdCategory = true
+      } else {
+        sPlan.warn('新建分类失败，按未分类入库', 'category-add')
       }
     } else if (plan) {
       categoryId = plan.categoryId
@@ -138,6 +168,9 @@ async function runAutoAdd(normalized) {
     const draft = fallbackDraftFromMeta({ url: normalized, meta, categoryId })
     const { site } = buildSiteFromDraft(draft)
     const created = sitesStore.addSite(site)
+    run.stage('persist', '写入本机库').ok(
+      `${created.name} → ${categoryLabel || '未分类'}`,
+    )
     /**
      * 入库即刻返回，真实抓取 + 翻译放后台 —— 慢站（github.com 实测 ~10s）也不拖住添加动作。
      * 返回这个 Promise 而不是就地 await：调用方（App）拿它挂「信息已补全」的回执，
@@ -154,11 +187,13 @@ async function runAutoAdd(normalized) {
      * `console.warn`，不再有第二次。
      */
     const upgrade = import('@/services/metaUpgrade')
-      .then(m => m.runMetaUpgrade({ store: sitesStore, url: normalized, created }))
+      .then(m => m.runMetaUpgrade({ store: sitesStore, url: normalized, created, trace: run }))
       // 只兜「异步 chunk 加载失败」这种基础设施问题（陈旧的 SW 缓存 / 部署缺口）：
       // 它不在 runMetaUpgrade 的职责范围内，但同样不许静默
       .catch((e) => {
         console.warn('[auto-add] 后台升级模块加载失败，本次不做真实信息补全：', e)
+        run.stage('upgrade', '后台补全模块').fail(String(e?.message || e), 'chunk-load')
+        run.end('fail', '后台补全模块未能加载，站点停留在域名推断草稿')
         return { changed: false, real: false, reason: 'error', name: created.name, patch: null }
       })
     return {
@@ -177,6 +212,8 @@ async function runAutoAdd(normalized) {
      * 一个必然复现的错误伪装成「偶尔的环境问题」，谁也不会去查。
      */
     console.warn('[auto-add] 添加站点在落库阶段抛错：', e)
+    run.stage('persist', '写入本机库').fail(String(e?.message || e))
+    run.end('fail', '写入本机库失败')
     return { ok: false, reason: AUTO_ADD_REASON.WRITE_FAILED, message: '添加失败：本机存储写入被拒绝，请稍后重试。' }
   }
 }

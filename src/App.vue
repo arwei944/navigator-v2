@@ -88,6 +88,9 @@
   <!-- 导入导出面板 -->
   <BookmarkImport v-if="showBookmarkImport" @close="showBookmarkImport = false" />
 
+  <!-- 管线日志：常驻挂载、内部自管显隐（组件头注释说了为什么不能用 v-if 条件挂载） -->
+  <PipelineLogPanel :open-token="pipelineOpenToken" />
+
   <!-- 添加站点：入口在右上角工具栏与全能框，弹窗宿主上提到这里（原挂在左侧栏内） -->
   <AddSiteModal v-if="showAddModal" :prefill-url="addPrefillUrl" :notice="addNotice" @close="closeAddSite" @saved="onAddSaved" />
 
@@ -142,8 +145,12 @@ import ContextMenuHost from '@/components/ContextMenuHost.vue'
 import MobileDetailDrawer from '@/components/MobileDetailDrawer.vue'
 import StickyDock from '@/components/StickyDock.vue'
 import SmartBar from '@/components/SmartBar.vue'
-import { autoAddSite } from '@/services/autoAdd'
-import { AUTO_ADD_REASON } from '@/utils/siteDraft'
+/**
+ * `services/autoAdd` 走**动态 import**（见 `runAutoAdd` 里的说明）：把它写回静态
+ * import，整条秒加链路（含它引用的站点草稿工具与本次新增的管线追踪总线）会一起被提进入口
+ * chunk —— 实测首屏 597.8 → 602.8 KiB，越过 600 KiB 预算。
+ */
+const loadAutoAdd = () => Promise.all([import('@/services/autoAdd'), import('@/utils/siteDraft')])
 import { useToastStore } from '@/stores/toast'
 import { useOmniStore } from '@/stores/omni'
 import { useNotesStore } from '@/stores/notes'
@@ -174,6 +181,14 @@ const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModa
 const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteModal.vue'))
 // 洞察面板：整页图表，只在点进 /insights 时才需要 —— 必须异步，否则图表原语会进首屏包
 const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
+/**
+ * 管线日志：排查「多跳异步链路到底停在哪」用的 Observability 浮层。
+ *
+ * 它必须**异步挂载**（不做异步的话 trace 总线与面板模板都要压在首屏预算里，而预算只剩
+ * 个位数 KiB）；但挂载必须是**无条件的** —— 若等第一条 run 出现才去挂载，那一跳已经跑完、
+ * 埋点已被丢弃，而最需要看见的恰恰是「第一次为什么没发生」。
+ */
+const PipelineLogPanel = defineAsyncComponent(() => import('@/components/PipelineLogPanel.vue'))
 
 const route = useRoute()
 const router = useRouter()
@@ -213,6 +228,8 @@ const deleteSite = ref(null)
 const addPrefillUrl = ref('')
 // 自动添加被护栏拦下时，带进弹窗的原因提示
 const addNotice = ref('')
+// 管线日志面板的打开请求：命令层只给一个递增令牌，面板自己管打开状态
+const pipelineOpenToken = ref(0)
 
 // 连续触发时丢弃过期结果，避免旧请求把新卡片覆盖回去
 let autoAddSeq = 0
@@ -237,10 +254,15 @@ async function runAutoAdd(url) {
   const pendingId = toastStore.push({ message: '正在识别站点信息…', tone: 'info', duration: 60000 })
 
   let res
+  // 失败原因常量：随同一批动态 import 进来（它在 `utils/siteDraft.js` 里，
+  // 静态引它等于把 autoAdd 那条链路再拽回一半）
+  let reasonCodes = null
   try {
-    res = await autoAddSite({ url })
-  } catch {
-    res = { ok: false, reason: AUTO_ADD_REASON.WRITE_FAILED, message: '添加失败，请稍后重试。' }
+    const [autoAddMod, draftMod] = await loadAutoAdd()
+    reasonCodes = draftMod.AUTO_ADD_REASON
+    res = await autoAddMod.autoAddSite({ url })
+  } catch (e) {
+    res = { ok: false, reason: 'write-failed', message: '添加失败，请稍后重试。' }
   }
   toastStore.dismiss(pendingId)
   if (seq !== autoAddSeq) return
@@ -255,33 +277,11 @@ async function runAutoAdd(url) {
       onAction: () => undoAutoAdd(res.site.id, res.category),
     })
     await locateSite(res.site)
-    /**
-     * 秒加入库用的是「按域名推断」的草稿，真实名称 / 描述 / 图标是后台抓完才回来的。
-     * 不说一声的话，用户只会看到卡片标题在几秒后**自己变了**，像出了 bug。
-     *
-     * 只在 `real`（真的读到了对方页面）时回执：只拿到「按域名推断」的结果时保持安静 ——
-     * 用一个猜测去宣告「已补全」才是撒谎。
-     *
-     * 译文来源也一并交代（本地模型 / 在线引擎 / 只有词表关键词）：
-     * 「描述显示的是中文」和「描述显示的是中文**译文**」是两件事，后者才值得用户放心。
-     */
-    res.upgrade?.then((u) => {
-      if (!u || !u.changed || !u.real) return
-      const tr = u.translation
-      let tail = ''
-      if (tr?.translated?.desc && tr.note) tail = `，描述译文来自${tr.note}`
-      else if (tr && !tr.translated?.desc && tr.keywords) tail = '，描述未译成中文（已抽取关键词）'
-      toastStore.push({
-        message: `已补全「${u.name}」的名称与描述${tail}`,
-        tone: 'info',
-        actionLabel: '查看',
-        onAction: () => locateSite(res.site),
-      })
-    })
+    await settleUpgrade(res)
     return
   }
 
-  if (res.reason === AUTO_ADD_REASON.DUPLICATE) {
+  if (reasonCodes && res.reason === reasonCodes.DUPLICATE) {
     const existing = res.existing
     toastStore.push({
       message: res.message,
@@ -295,6 +295,80 @@ async function runAutoAdd(url) {
 
   // 网址不成立 / 写库失败：报错即可，自动路径不再退回弹窗
   toastStore.push({ message: res.message, tone: 'error' })
+}
+
+/**
+ * 秒加之后的回执。
+ *
+ * ## 为什么这里必须「说失败」
+ *
+ * 卡片入库的那一刻用的是域名推断草稿，真实信息要等后台抓取。只挂一条「已补全」的成功回执时，
+ * 抓不到的那些站（对方 CDN/WAF 限流、超时、配额耗尽）**全程没有任何声音** —— 用户看到的是
+ * 一张写着模板描述、分类也未必准的卡，既不知道它已经尽力、也不知道自己该怎么补。
+ * 「没补全」是一种**需要被告知的结果**，不是「什么都没发生」。
+ *
+ * 译文来源也一并交代（本地模型 / 在线引擎 / 只有词表关键词）：
+ * 「描述显示的是中文」和「描述显示的是中文**译文**」是两件事，后者才值得用户放心。
+ *
+ * @param {{site: object, upgrade?: Promise<object>, category: object}} res `autoAddSite()` 的结果
+ */
+async function settleUpgrade(res) {
+  if (!res.upgrade) return
+  // 真实抓取要花几秒，而「正在识别」那条 toast 此刻已经撤了 —— 中间这段空窗
+  // 正是用户以为「压根没去抓」的那几秒，给一条持续可见的进度提示补上
+  const progressId = toastStore.push({ message: '正在抓取站点真实信息…', tone: 'info', duration: 60000 })
+  const u = await res.upgrade.catch(() => null)
+  toastStore.dismiss(progressId)
+  if (!u) return
+
+  if (u.changed && u.real) {
+    const tr = u.translation
+    let tail = ''
+    if (tr?.translated?.desc && tr.note) tail = `，描述译文来自${tr.note}`
+    else if (tr && !tr.translated?.desc && tr.keywords) tail = '，描述未译成中文（已抽取关键词）'
+    toastStore.push({
+      message: `已补全「${u.name}」的名称与描述${tail}`,
+      tone: 'info',
+      actionLabel: '查看',
+      onAction: () => locateSite(res.site),
+    })
+    return
+  }
+
+  /**
+   * 降级回执：区分三种「没补全」，一句话说清楚是哪一种、接下去能做什么。
+   * 凡是站在用户面前的产品文案，都不许把「对方拒绝」说成「还没做」。
+   */
+  const manualLabel = '手动补全'
+  const manual = () => {
+    const cur = sitesStore.sites.find(s => s.id === res.site.id)
+    if (cur) editSite.value = cur
+  }
+  if (u.reason === 'fetch-failed') {
+    toastStore.push({
+      message: `「${u.name}」的真实信息没抓到：${u.message || '对方没有响应'}（名称与描述仍是推断值）`,
+      tone: 'error',
+      actionLabel: manualLabel,
+      onAction: manual,
+    })
+    return
+  }
+  if (!u.real) {
+    toastStore.push({
+      message: `「${u.name}」的页面没读到（${u.data?.warning || '对方返回了不可解析的内容'}），描述仍是推断值`,
+      tone: 'error',
+      actionLabel: manualLabel,
+      onAction: manual,
+    })
+    return
+  }
+  if (!u.changed) {
+    toastStore.push({
+      message: `已核对「${u.name}」，对方给出的信息与推断值一致`,
+      tone: 'info',
+      duration: 3000,
+    })
+  }
 }
 
 /**
@@ -393,6 +467,7 @@ watch(() => omniStore.panel, (name) => {
   else if (name === 'noteNew') createNote()
   else if (name === 'bookmarkImport') { showSettings.value = false; showBookmarkImport.value = true }
   else if (name === 'shortcuts') nextTick(() => shortcutsRef.value?.open())
+  else if (name === 'pipeline') pipelineOpenToken.value++
   // 一次性请求：消费后立即清空，不带到下一次
   omniStore.panel = ''
 })
@@ -548,6 +623,20 @@ onMounted(() => {
 
   // 备注 / 便利贴的自动上行：改完 5s 后推一次云端（没填会话密钥则完全不推）
   stopLiveSync = startLiveSync({ siteNotes: siteNotesStore, notes: notesStore })
+
+  /**
+   * 预热「秒加」那条链路的异步 chunk。
+   *
+   * 它现在是按需 `import()` 的（静态引会把整条链路压回入口、越过 600 KiB 预算），
+   * 代价是**用户按下回车的那一刻才开始下载**。首屏刚过、300 张卡的图标请求还在占着
+   * HTTP/1.1 的连接池时，那一跳可能要等好几秒才拿到 —— 而按回车恰恰是最不该等的时候。
+   *
+   * 所以空闲时先取一次（只是把 chunk 放进模块图，不做任何事）。
+   * 注：它**不改变**分包结果 —— 动态 import 的产物依然不在首屏清单里。
+   */
+  const warm = () => { loadAutoAdd().catch(() => {}) }
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 3000 })
+  else setTimeout(warm, 1200)
 })
 
 onBeforeUnmount(() => {

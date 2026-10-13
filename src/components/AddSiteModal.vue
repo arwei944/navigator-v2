@@ -135,6 +135,7 @@ import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
 import { loadSuggestCategory } from '@/services/autoAdd'
 import { aiApi } from '@/services/aiApi'
 import { useFocusTrap } from '@/composables/useFocusTrap'
+import { beginRun } from '@/utils/pipelineTrace'
 
 // 从搜索框「添加站点」入口带过来的网址；直接打开弹窗时为空
 const props = defineProps({
@@ -361,6 +362,9 @@ function resetForNewHost() {
   meta.value = null
 }
 
+/** 服务端有没有真的读到对方页面：响应带 warning 说明它也回退到了「按域名推断」 */
+function realRead(data) { return !data?.warning }
+
 function summarize(data) {
   const parts = []
   // 生效分类 = 表单当前选中的（含自动新建的）；推断结果无效时才回落到 data 里的值
@@ -390,6 +394,10 @@ async function fetchMeta() {
    * 之后就是纯本地计算 —— 表单在粘贴后立刻有内容，而不是盯着「抓取中」等 1~10 秒。
    * 用户改过的字段有 touched 守卫，稍后真实抓取回来也不会覆盖。
    */
+  const run = beginRun({ flow: 'add-modal', title: '添加弹窗补全', target: host })
+
+  const sDraft = run.stage('local-infer', '本地推断（按域名）')
+  const draftAt = Date.now()
   const local = await localSiteMeta(url, {
     existingSites: sitesStore.sites,
     categoryMeta: categoryMetaFromStore(),
@@ -397,6 +405,8 @@ async function fetchMeta() {
   if (seq !== reqSeq) return
   let localApplied = false
   if (local.ok) {
+    if (Date.now() - draftAt > 400) sDraft.warn(`${Date.now() - draftAt}ms（首次需加载推断引擎）`)
+    else sDraft.ok(`${Date.now() - draftAt}ms ${local.data.name || ''}`.trim())
     meta.value = local.data
     applyMeta(local.data)
     localApplied = true
@@ -411,6 +421,8 @@ async function fetchMeta() {
     status.value = local.message + '（可手动填写）'
     statusKind.value = 'err'
     fetching.value = false
+    sDraft.fail(local.message, local.reason)
+    run.end('fail', local.message)
     return
   }
 
@@ -418,6 +430,8 @@ async function fetchMeta() {
    * ② 后台真实抓取（读对方页面的 title / 描述 / 图标），回来升级**未被手动改过**的字段。
    * 任何失败都静默保留本地草稿 —— 草稿已经可用了，失败只是「少一次升级」。
    */
+  const sFetch = run.stage('fetch', '抓取站点真实信息')
+  const t0 = Date.now()
   const r = await fetchSiteMeta(url)
   if (seq !== reqSeq) return
   if (!r.ok) {
@@ -425,10 +439,18 @@ async function fetchMeta() {
     // 用它比我们自己的「后端抓取不可用」准确得多
     status.value = localMetaNotice(local.data, { ok: false, message: r.message })
     statusKind.value = 'warn'
+    sFetch.fail(r.message, r.reason)
+    run.end('fail', r.message)
     return
   }
   try {
     const data = r.data
+    const ms = Date.now() - t0
+    const serverMs = data.fetchMs
+    sFetch[realRead(data) ? 'ok' : 'warn'](
+      `${ms}ms${serverMs ? `（服务端 ${serverMs}ms）` : ''} ${data.name || ''}`.trim(),
+      realRead(data) ? '' : 'fallback',
+    )
     // 真实抓取没有比本地推断多出任何东西（典型：服务端也抓超时了，于是回退到同一套域名推断）
     const better = (data.name && data.name !== local.data.name) ||
       (data.desc && data.desc !== local.data.desc) ||
@@ -456,6 +478,7 @@ async function fetchMeta() {
      * 由 `translateFields` 内部决定。译不到就保留原文，并如实说明只拿到了关键词。
      */
     const needs = data.needsTranslate
+    const sTr = run.stage('translate', '中文补译')
     if (needs && (needs.name || needs.desc)) {
       const prevStatus = status.value
       const prevKind = statusKind.value
@@ -471,25 +494,34 @@ async function fetchMeta() {
         if (applied.length) {
           status.value = `${prevStatus}；${tr.note || '已翻译'}：${applied.join('、')}`
           statusKind.value = 'ok'
+          sTr.ok(tr.note || `已译：${applied.join('、')}`)
         } else if (tr.keywords) {
           // 没有任何引擎译出来 —— 给关键词而不是假装翻过（词表产物必须标明来源）
           status.value = `${prevStatus}；未取得中文译文，已按词表抽取关键词：${tr.keywords}`
           statusKind.value = 'warn'
+          sTr.warn(`未译出，关键词：${tr.keywords}`, 'keywords')
         } else {
           status.value = prevStatus
           statusKind.value = prevKind
+          sTr.warn('三层引擎都没译出，保留原文', 'no-translation')
         }
       } catch (e) {
         // 补译是可选的：失败必须回到「已抓取」那条结论，不能把弹窗变成错误态
         console.warn('[add-site] 补译失败，已保留原文：', e)
         status.value = prevStatus
         statusKind.value = prevKind
+        sTr.fail(String(e?.message || e))
       }
+    } else {
+      sTr.skip('无需翻译')
     }
+    run.end(realRead(data) ? 'ok' : 'warn', summarize(data))
   } catch (e) {
     // 抓取成功但回填失败（字段结构意外）—— 仍然是「可手动填写」，不能把弹窗卡在 loading
     status.value = '抓取结果无法解析：' + e.message + '（已保留域名推断草稿）'
     statusKind.value = 'err'
+    run.stage('patch', '回填表单').fail(String(e?.message || e))
+    run.end('fail', String(e?.message || e))
   }
 }
 

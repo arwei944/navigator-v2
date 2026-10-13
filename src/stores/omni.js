@@ -12,7 +12,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 /** 可以被命令唤起的面板（对应 App.vue 里的同名开关） */
-export const OMNI_PANELS = ['settings', 'cardSettings', 'todo', 'bookmarkImport', 'shortcuts']
+export const OMNI_PANELS = ['settings', 'cardSettings', 'todo', 'bookmarkImport', 'shortcuts', 'pipeline']
 
 export const useOmniStore = defineStore('omni', () => {
   // 请求编辑某个站点

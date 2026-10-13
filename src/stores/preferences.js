@@ -334,12 +334,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
     cardLayoutMode, cardDisplay, smartBar, clickBoost,
-    rightPanelMode, rightSections, activeRightSections, rightCollapsePolicy,
+    rightPanelMode, rightSections, activeRightSections, rightCollapsePolicy, pipelineLog,
     toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar, setClickBoost,
-    setRightPanelMode, setRightSection, resetRightSections, setRightCollapsePolicy,
+    setRightPanelMode, setRightSection, resetRightSections, setRightCollapsePolicy, setPipelineLog,
     setThemePreset, setWallpaper, applyColors, THEME_PRESETS,
     setVisualScheme, setVisualToken, setVisualTokens, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides', 'rightPanelMode', 'rightSections', 'rightCollapsePolicy'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides', 'rightPanelMode', 'rightSections', 'rightCollapsePolicy', 'pipelineLog'])
 })

@@ -101,6 +101,28 @@ const noName2 = fallbackDraftFromMeta({
 })
 eq(noName2.form.name, 'suno.ai', '名称为空时用域名兜底命名')
 
+/* ---- 「低置信」里的例外：名字本身就是按域名拼的，不该再退一级 ----
+   这条是 2026-10-14 修的真实缺陷：本地推断（抓不到页面时浏览器里跑的那版）连页面都没读过，
+   置信度永远是 low。旧规则不分青红皂白连它的成果一起丢掉、退回**裸主机名** ——
+   线上实测秒加那一刻卡片写着 `www.figma.com`，用户据此认定「信息压根没补全」。
+   两条都源自域名，区别只是后者整理掉了 www 与首字母大写，留后者显然更好。
+   判据收到 sources.name === 'domain'：同源才放行，页面刮来的低置信仍然照旧退回。 */
+const domainName = fallbackDraftFromMeta({
+  url: 'https://www.figma.com',
+  meta: { name: 'Figma', domain: 'figma.com', confidence: { name: 'low' }, sources: { name: 'domain' } },
+})
+eq(domainName.form.name, 'Figma', '★ 名字按域名拼出来的（sources.name=domain）→ 不再退回裸主机名')
+const scrapedName = fallbackDraftFromMeta({
+  url: 'https://www.figma.com',
+  meta: { name: '可疑堂', domain: 'figma.com', confidence: { name: 'low' }, sources: { name: 'title' } },
+})
+eq(scrapedName.form.name, 'www.figma.com', '页面刮来的低置信站名仍退回域名（旧规则不变）')
+const highName = fallbackDraftFromMeta({
+  url: 'https://www.figma.com',
+  meta: { name: 'Figma', domain: 'figma.com', confidence: { name: 'high' }, sources: { name: 'og:site_name' } },
+})
+eq(highName.form.name, 'Figma', '高置信站名照旧透传')
+
 /* ---- 兜底配色：同域稳定、不同域不同 ---- */
 ok(/^#[0-9a-f]{6}$/.test(noMeta.form.color), '兜底色是合法十六进制色值')
 eq(noMeta.form.color, fallbackDraftFromMeta({ url: 'https://www.GitHub.com/y', meta: null }).form.color,
