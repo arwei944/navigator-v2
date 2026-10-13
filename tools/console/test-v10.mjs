@@ -164,9 +164,15 @@ const SITES = [
   eq(res2.statusCode, 501, '未配置时调用 → 501（明确说怎么配）')
   ok(/AI_BASE_URL/.test(JSON.parse(res2.body).error || ''), '501 的文案告诉用户配置项')
 
+  /**
+   * v11 起 `polish` 是**免鉴权**动作（PUBLIC_ACTIONS），所以这里不该再期望 401：
+   * 未配置 AI 时它走的是「额度 → 配置检查」这条免鉴权分支，结果是 501 + 明确文案。
+   * （原断言写于 v11 之前，一直没同步 —— 本次全量回归时发现并修正。）
+   * 管理动作（categorize / summarize）仍需鉴权，由上面的 authReq 用例守住。
+   */
   const res3 = makeRes()
   await ai.default({ method: 'POST', body: { action: 'polish' }, query: {}, headers: {}, socket: {} }, res3)
-  eq(res3.statusCode, 401, 'AI 接口同样要鉴权（它是花钱的接口）')
+  eq(res3.statusCode, 501, 'polish 免鉴权（v11）：未配置时 → 501（配置检查仍在前）')
 
   const res4 = makeRes()
   await ai.default(authReq('POST', { action: '删除一切' }), res4)
