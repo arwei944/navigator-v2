@@ -14,7 +14,7 @@
        @keydown.enter.prevent="onActivate"
        @keydown.space.prevent="onActivate"
        @contextmenu.prevent="openMenu"
-       @mouseenter="onHover" @mouseleave="onHoverLeave">
+       @mouseenter="onHover">
     <!-- 批量选择复选框：真 <input> 而不是 div —— 之前是 div，键盘根本到不了，
          批量模式对键盘用户等于完全不存在（v11 修）。视觉仍是那颗圆点，
          input 透明地盖在上面，点击与空格都落在它身上。 -->
@@ -281,12 +281,9 @@ function openMenu(e) {
 }
 
 function onHover() {
+  // 折叠时面板不可见，不必为它做任何切换（300 张卡上省掉无谓的 store 写入）
   if (sidebarStore.rightCollapsed) return
-  sidebarStore.setHoveredSite(props.site)
-}
-
-function onHoverLeave() {
-  sidebarStore.clearHoveredSite()
+  sidebarStore.hoverSite(props.site)
 }
 </script>
 

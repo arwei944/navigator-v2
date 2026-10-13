@@ -139,7 +139,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useHealthStore } from '@/stores/health'
@@ -147,9 +147,12 @@ import { useClicksStore } from '@/stores/clicks'
 import { rankSites } from '@/utils/search'
 import { recordAudit } from '@/services/auditLog'
 import AdminBatchBar from '@/components/admin/AdminBatchBar.vue'
-import AddSiteModal from '@/components/AddSiteModal.vue'
-import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+
+// 两个弹窗都是「点开才用」。本面板虽然本身不在首屏，但必须与 App / CardsContainer
+// 保持同一个加载方式 —— 同一模块只要有一处静态引用，就会被提升进首屏静态图。
+const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModal.vue'))
+const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteModal.vue'))
 
 defineProps({ adminKey: { type: String, default: '' } })
 

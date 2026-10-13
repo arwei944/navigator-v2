@@ -5,6 +5,36 @@ import {
   SCHEMES, TOKENS, getScheme, resolveTokens, tokensToCssVars
 } from '@/utils/visualScheme'
 import { THEME_PRESETS } from '@/utils/themeSchema'
+import { RIGHT_PANEL_MODES } from '../../shared/right-panel.mjs'
+
+/**
+ * 右侧详情面板可逐项开关的区块。
+ *
+ * **头部与分类标签刻意不在列** —— 它们定义面板的主体，关掉只会得到一块
+ * 「不知道在看什么」的空白。开关只控制「允不允许显示」，
+ * 空数据仍然整段不渲染（沿用组件里既有的 `v-if="aliases.length"` 口径）。
+ */
+export const DEFAULT_RIGHT_SECTIONS = {
+  desc: true,
+  aliases: true,
+  purposes: true,
+  note: true,
+  stats: true,
+  timeline: true,
+  actions: true,
+}
+
+/**
+ * 面板显示模式：悬停预览 / 点击驱动 / 图钉固定。
+ *
+ * 取值来源是 `shared/right-panel.mjs`（那里还带着状态机的真值表），
+ * 这里只做 re-export —— **不要在本地再写一份数组**，两处一漂移就会出现
+ * 「设置项能选、状态机不认」的静默失效。
+ */
+export { RIGHT_PANEL_MODES }
+
+/** 折叠策略：每次展开（= 旧行为）/ 记住上次 / 每次折叠 */
+export const RIGHT_COLLAPSE_POLICIES = ['always-expand', 'remember', 'always-collapse']
 
 export const usePreferencesStore = defineStore('preferences', () => {
   const theme = ref('light')
@@ -25,6 +55,44 @@ export const usePreferencesStore = defineStore('preferences', () => {
   // 默认开；关掉即退回纯相关性排序。见 utils/search.js#clickTier —— 那里刻意用
   // 分档而不是连续值，就是为了让「为什么这条在前」能说清楚。
   const clickBoost = ref(true)
+
+  /**
+   * 右边栏（站点详情面板）的显示模式。
+   *
+   * 为什么必须可配：面板内容原本**完全由 hover 决定** —— 鼠标一移开就清空，
+   * 用户想读完一个字段或改一处都来不及，而且没有任何办法让它停下来。
+   *
+   * 注意三种模式的差别**只在于「谁来决定切换」**，而不是「面板什么时候消失」：
+   * 面板移开鼠标后一律保留（这正是要修的那个毛病）。渲染层不做分支，
+   * 只订阅 `sidebar.rightSite` 这一个状态（推导见 `shared/right-panel.mjs`）：
+   *   - `hover`：悬停即切换，主动打开也切换 —— 默认，与既有观感最接近
+   *   - `click`：忽略悬停，只有主动打开（右键「查看详情」）才切换
+   *   - `pin`  ：忽略悬停，主动打开是 **toggle**（再选同一张即收起），面板顶部常显图钉
+   */
+  const rightPanelMode = ref('hover')
+
+  /**
+   * 详情面板里各区块的显隐，默认全开。
+   *
+   * 与卡片那套不一样：卡片的显隐来自 `activeTokens`（300 张卡各解算一次会重复计算，
+   * 所以要收窄成 `cardDisplay`）；这里只服务**一个**面板，展开成本可忽略，直接存对象。
+   */
+  const rightSections = ref({ ...DEFAULT_RIGHT_SECTIONS })
+
+  /**
+   * 右侧面板的折叠策略。旧行为是「每次进入都展开」（`rightCollapsed` 故意不持久化），
+   * 这里把它从写死改成显式选项 —— 「把右边栏当按需查看」的用法也真实存在。
+   */
+  const rightCollapsePolicy = ref('always-expand')
+
+  /**
+   * 管线日志浮标是否常显。
+   *
+   * 默认关闭 = 「有事才出现」：一次添加/抓取在推进时浮标自动浮现，结束后停留数秒再退。
+   * 需要长期盯着（排查多跳链路为什么没补全）的人再打开常显 —— 日志是给人排障的，
+   * 不该在平时占着一块屏幕。
+   */
+  const pipelineLog = ref(false)
 
   /**
    * 配色「归谁管」：'preset' = 由内置预设落色，'custom' = 由自定义主题落色。
@@ -66,6 +134,31 @@ export const usePreferencesStore = defineStore('preferences', () => {
 
   function setClickBoost(v) {
     clickBoost.value = Boolean(v)
+  }
+
+  function setRightPanelMode(v) {
+    if (RIGHT_PANEL_MODES.includes(v)) rightPanelMode.value = v
+  }
+
+  /**
+   * 写单个区块开关。基于**合并后**的对象展开，避免把持久化里的残缺对象原样存回去
+   * ——否则每写一次都会再丢一次未定义的键，残缺被永久固化。
+   */
+  function setRightSection(key, on) {
+    if (!(key in DEFAULT_RIGHT_SECTIONS)) return
+    rightSections.value = { ...activeRightSections.value, [key]: Boolean(on) }
+  }
+
+  function resetRightSections() {
+    rightSections.value = { ...DEFAULT_RIGHT_SECTIONS }
+  }
+
+  function setRightCollapsePolicy(v) {
+    if (RIGHT_COLLAPSE_POLICIES.includes(v)) rightCollapsePolicy.value = v
+  }
+
+  function setPipelineLog(v) {
+    pipelineLog.value = Boolean(v)
   }
 
   function getCurrentEngine() {
@@ -172,6 +265,15 @@ export const usePreferencesStore = defineStore('preferences', () => {
     }
   })
 
+  /**
+   * 合并默认值后读取区块开关。
+   *
+   * 必要性：持久化里躺着的是**旧版本写下的对象**（没有后来新增的键），
+   * 直接取 `rightSections[key]` 会得到 undefined → 新加的区块默认不可见，
+   * 表现为「升级后某个区块凭空消失」。合并一次即可，不需要迁移脚本。
+   */
+  const activeRightSections = computed(() => ({ ...DEFAULT_RIGHT_SECTIONS, ...rightSections.value }))
+
   /** 把当前令牌写成 :root 上的 CSS 变量，全站组件通过变量响应 */
   function applyVisual() {
     // 这个 store 会被 node 侧加载（测试、CLI）：那里要么没有 document，
@@ -232,10 +334,12 @@ export const usePreferencesStore = defineStore('preferences', () => {
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
     cardLayoutMode, cardDisplay, smartBar, clickBoost,
+    rightPanelMode, rightSections, activeRightSections, rightCollapsePolicy,
     toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar, setClickBoost,
+    setRightPanelMode, setRightSection, resetRightSections, setRightCollapsePolicy,
     setThemePreset, setWallpaper, applyColors, THEME_PRESETS,
     setVisualScheme, setVisualToken, setVisualTokens, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides', 'rightPanelMode', 'rightSections', 'rightCollapsePolicy'])
 })

@@ -136,7 +136,6 @@ import CommandPalette from '@/components/CommandPalette.vue'
 import CardSettingsPanel from '@/components/CardSettingsPanel.vue'
 import TodoPanel from '@/components/TodoPanel.vue'
 import BookmarkImport from '@/components/BookmarkImport.vue'
-import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import ContextMenuHost from '@/components/ContextMenuHost.vue'
@@ -168,6 +167,11 @@ const ThemeEditor = defineAsyncComponent(() => import('@/components/ThemeEditor.
  * 越过 600 KiB 预算）。改成异步后整条链路落到异步 chunk，首屏反而省下一截。
  */
 const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModal.vue'))
+// 编辑站点弹窗同理：只在右键点「编辑」时才出现。它拖着 PurposePicker，
+// 静态引入会连带一起压在首屏（实测 598.3 → 604.0 KiB，越过 600 KiB 预算）。
+// **三处引用都得异步**（这里 / CardsContainer / AdminSitesPanel）——
+// 只要还剩一处静态 import，整个模块就会被提升回首屏，异步化等于白做。
+const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteModal.vue'))
 // 洞察面板：整页图表，只在点进 /insights 时才需要 —— 必须异步，否则图表原语会进首屏包
 const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
 
@@ -519,6 +523,11 @@ function updatePageTitle() {
 }
 
 onMounted(() => {
+  // 右侧面板的折叠策略：必须在**持久化回填之后**才读（persistedstate 是在 store
+  // setup 返回后才写回 ref 的，setup 里同步读只会拿到默认值）。放在这里与主题
+  // 启动动作同源 —— 都是「读持久化值得等回填」这一类。
+  sidebarStore.applyCollapsePolicy()
+
   // 云端站点热更新：启动拉取 + 轮询（失败会指数退避）
   sitesStore.initCloudSites()
   sitesStore.startPolling(30000)

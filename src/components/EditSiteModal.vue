@@ -69,6 +69,8 @@ import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import PurposePicker from '@/components/PurposePicker.vue'
 import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
+// 编辑字段的归一（域名 / 别名 / 空用途 / initial）与右边栏的内联编辑共用一份，避免两个入口漂移
+import { siteToForm, buildSitePatch } from '../../shared/site-edit.mjs'
 import { useFocusTrap } from '@/composables/useFocusTrap'
 
 const props = defineProps({
@@ -97,32 +99,10 @@ const trap = useFocusTrap(panelRef)
 
 onMounted(() => {
   trap.activate()
-  form.name = props.site.name
-  form.url = props.site.url
-  form.desc = props.site.desc
-  form.categoryId = props.site.categoryId
-  form.color = props.site.color
-  form.aliases = Array.isArray(props.site.aliases) ? props.site.aliases.join('、') : ''
-  form.purposes = normalizePurposes(props.site.purposes)
-  form.pinned = props.site.pinned === true
-  form.archived = props.site.archived === true
+  // 初值改由 siteToForm 提供：右边栏的内联编辑必须与本弹窗「打开时看到同一份东西」，
+  // 两处各写一遍必然漂移（别名分隔符、purposes 归一、pinned 的 === true 判定都容易漏）
+  Object.assign(form, siteToForm(props.site))
 })
-
-/** 别名入参归一：接受逗号 / 顿号 / 换行分隔；去重，并剔除与站名 / 域名同形的项 */
-function parseAliases(raw, name, host) {
-  const nameLower = String(name || '').trim().toLowerCase()
-  const out = []
-  const seen = new Set()
-  for (const part of String(raw || '').split(/[,，、\n]/)) {
-    const a = part.trim()
-    if (!a) continue
-    const lower = a.toLowerCase()
-    if (seen.has(lower) || lower === nameLower || lower === host) continue
-    seen.add(lower)
-    out.push(a)
-  }
-  return out
-}
 
 function autoCompleteUrl() {
   if (form.url && !form.url.startsWith('http://') && !form.url.startsWith('https://')) {
@@ -131,23 +111,11 @@ function autoCompleteUrl() {
 }
 
 function submit() {
-  const domain = form.url.replace(/^https?:\/\//, '').split('/')[0].toLowerCase().replace(/^www\./, '')
-  const purposes = normalizePurposes(form.purposes)
-  sitesStore.updateSite(props.site.id, {
-    name: form.name,
-    url: domain,
-    desc: form.desc,
-    categoryId: form.categoryId,
-    color: form.color,
-    initial: form.name.charAt(0).toUpperCase(),
-    aliases: parseAliases(form.aliases, form.name, domain),
-    // 清空时传 undefined 而不是空数组：空数组会让卡片渲染出「有用途但一个标签都没有」的空行
-    purposes: purposes.length ? purposes : undefined,
-    // false 显式写回，便于用户在此处取消置顶 / 取消归档
-    pinned: form.pinned,
-    archived: form.archived
-  })
-  emit('saved', { name: form.name, url: domain })
+  // 落库 patch 由 buildSitePatch 统一构造 —— 与右边栏内联编辑是同一份实现，
+  // 「域名怎么取、别名怎么切、空用途传什么」只在一处定义
+  const patch = buildSitePatch(form)
+  sitesStore.updateSite(props.site.id, patch)
+  emit('saved', { name: patch.name, url: patch.url })
   emit('close')
 }
 </script>

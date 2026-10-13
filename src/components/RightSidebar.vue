@@ -14,6 +14,13 @@
       </svg>
     </button>
 
+    <!-- 图钉（仅 pin 模式）：点击即「拔掉」，面板回到空状态。
+         其他模式没有"钉住"概念，所以不显示（避免多一个不知道干嘛的控件）。 -->
+    <button v-if="showPin" class="right-pin-toggle" title="取消固定" aria-label="取消固定"
+            @click="sidebarStore.clearRight()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+    </button>
+
     <!-- 站点详情面板 -->
     <SiteDetailPanel v-if="site" :site="site" />
 
@@ -25,7 +32,7 @@
         </svg>
       </div>
       <p class="empty-title">站点详情</p>
-      <p class="empty-desc">将鼠标悬停到中间栏的卡片上<br/>即可查看多维度的站点信息</p>
+      <p class="empty-desc">{{ emptyLines[0] }}<br/>{{ emptyLines[1] }}</p>
     </div>
 
     <!-- 拖拽调节宽度手柄：折叠时收起（此时没有可调宽度的余地） -->
@@ -36,10 +43,35 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSidebarStore } from '@/stores/sidebar'
+import { usePreferencesStore } from '@/stores/preferences'
+import { useSitesStore } from '@/stores/sites'
 import SiteDetailPanel from '@/components/right/SiteDetailPanel.vue'
 
 const sidebarStore = useSidebarStore()
-const site = computed(() => sidebarStore.hoveredSite)
+const prefs = usePreferencesStore()
+const sitesStore = useSitesStore()
+
+/**
+ * 面板显示谁：只订阅 sidebar 里的那**一个 id**，内容按 id 现取。
+ *
+ * 为什么不直接把 `rightSite` 这个对象传下去：`sitesStore.updateSite` 之后
+ * `rebuild()` 会为新内容生成**新对象**（memo 的 edit 身份变了），而 `rightSite`
+ * 还攥着旧引用 —— 内联编辑保存后面板会停在旧值上，表现为"保存了但没生效"。
+ * 按 id 从全量 `sites` 重取即可自动跟上（`sites` 是全量，不受筛选影响）。
+ */
+const site = computed(() => {
+  const cur = sidebarStore.rightSite
+  if (!cur) return null
+  return sitesStore.sites.find(s => s.id === cur.id) || cur
+})
+
+/** 图钉只在 `pin` 模式出现：它是那个模式的"拔掉"动作，其他模式没有"钉住"这个概念 */
+const showPin = computed(() => prefs.rightPanelMode === 'pin' && Boolean(site.value))
+
+/** 空状态提示随模式变：`hover` 之外的模式悬停不会打开面板，写「悬停」等于骗人 */
+const emptyLines = computed(() => (prefs.rightPanelMode === 'hover'
+  ? ['将鼠标悬停到中间栏的卡片上', '即可查看多维度的站点信息']
+  : ['在卡片上点右键，选「查看详情」', '即可在此查看并编辑站点']))
 
 // ≤1024px 面板收起不占宽度，≤768px 直接隐藏 —— 触屏无 hover，详情面板在此区间没有入口。
 // 宽度改由内联样式下发后，这个断点必须同时由 JS 判断，否则内联宽度会盖掉媒体查询。
@@ -115,6 +147,11 @@ onUnmounted(() => {
 .right-collapse-toggle svg { width: 12px; height: 12px; transition: transform .28s ease; }
 .right-collapse-toggle.collapsed svg { transform: rotate(180deg); }
 .right-collapse-toggle.collapsed { left: auto; right: 0; border-radius: 6px 0 0 6px; }
+/* 图钉（仅 pin 模式）：面板右上角。走「有底色但不抢焦点」的调子 ——
+   它是那个模式里唯一的"拔掉"入口，不能像折叠把手那样淡到几乎看不见。 */
+.right-pin-toggle { position: absolute; top: 10px; right: 10px; z-index: 20; width: 26px; height: 26px; padding: 0; border: none; border-radius: 8px; background: var(--border-light); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s ease; }
+.right-pin-toggle:hover { background: var(--accent-light); color: var(--accent); }
+.right-pin-toggle svg { width: 13px; height: 13px; }
 .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; text-align: center; gap: 8px; }
 .empty-icon { width: 48px; height: 48px; border-radius: 16px; background: var(--border-light); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); opacity: 0.5; margin-bottom: 4px; }
 .empty-icon svg { width: 24px; height: 24px; }

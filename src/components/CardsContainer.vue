@@ -162,7 +162,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, defineAsyncComponent, watch, nextTick } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useFavoritesStore } from '@/stores/favorites'
@@ -173,10 +173,14 @@ import { useToastStore } from '@/stores/toast'
 import { useUndoActions } from '@/composables/useUndoActions'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 import SiteCard from '@/components/SiteCard.vue'
-import EditSiteModal from '@/components/EditSiteModal.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import Draggable from 'vuedraggable'
 import { nextIndex, NAV_KEYS, columnsFromStyle } from '@/utils/gridnav'
+
+// 「点开才用」的重组件一律异步（与 App.vue 同源）：本组件在首屏，
+// 静态引入编辑弹窗会把整条链路（含 PurposePicker）一起提进首屏包。
+// 三处引用（App / 这里 / AdminSitesPanel）必须都是异步，漏一处即整模块提升。
+const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteModal.vue'))
 
 const sitesStore = useSitesStore()
 const sidebarStore = useSidebarStore()
