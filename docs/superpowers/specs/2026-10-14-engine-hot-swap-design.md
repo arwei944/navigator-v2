@@ -186,6 +186,7 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 
 - **只做机制与接线，不替换 `api/sites.js` 的生产写路径**。`site-store` 的接口、provider、契约测试就位，但生产写入仍走原路径。这是刻意保守：存储是数据安全的单点，先让契约被测住，再谈切换。
 - 未跑全量 `console:test:all`（45 个文件、耗时长），本次只逐一验证新挂的 8 个引擎测试 + 既有 `test-pipeline-trace.mjs`。
+- **补充**：收尾时已补跑全量 —— 45 个脚本**全部通过**，耗时 82 秒（05:17:21 → 05:18:43）。引擎接线未打破任何既有测试（含受影响的 `test-glossary` / `test-browser-translate` / `test-meta-fast` / `test-cron` / `test-health` 等）。
 
 ## 5. 不做的事
 
