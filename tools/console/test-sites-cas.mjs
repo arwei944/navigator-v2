@@ -16,6 +16,7 @@
  */
 import { test, mock, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { snapshotPathname } from '../../shared/snapshots.mjs'
 
 /* ---------------- 带 ETag 与条件写语义的假 Blob ---------------- */
@@ -272,4 +273,14 @@ test('POST rollback：合法快照 → 回滚成功且 version 继续递增（�
   assert.equal(res.payload.version, 10, 'version 必须继续递增，否则并发条件写会误判')
   assert.equal(res.payload.sites[0].id, 'restored')
   assert.equal(res.payload.restoredFrom, p)
+})
+
+test('接线对账：api/sites.js 经 site-store provider 存取，不再自带私有存储函数（防止「加了抽象但没接」）', async () => {
+  const src = readFileSync(new URL('../../api/sites.js', import.meta.url), 'utf8')
+  // 必须注入 provider（explicit 固定 kv —— 存储是数据安全单点，不交给环境变量）
+  assert.match(src, /resolveSiteStore\(\{\s*explicit:\s*'kv'/, 'api/sites.js 必须经 resolveSiteStore 注入 kv provider')
+  // 存储语义（CAS / 快照 / 读任意 pathname）应已搬进 provider，本文件不该再自带实现
+  for (const fn of ['readStoredWithEtag', 'putGuarded', 'function readJsonAt', 'function writeSnapshot', 'function pruneSnapshots']) {
+    assert.ok(!src.includes(fn), `api/sites.js 不应再自带 ${fn}（存储语义应已搬进 shared/site-store.mjs）`)
+  }
 })

@@ -13,12 +13,23 @@
  *
  * ## 接口契约（三条硬不变量）
  *
- *   `read()`                     → `{ data, etag }`（无数据时 `{ data: null, etag: null }`）
- *   `write(data, { ifMatch })`   → `{ etag }`（**原样写入**；`ifMatch` 与当前 etag 不符 → 抛错）
- *   `listSnapshots()`            → `[{ pathname, ... }]`（新到旧）
- *   `writeSnapshot(data)`        → `{ ok, pathname }`
- *   `pruneSnapshots()`           → `{ deleted }`
- *   `nextVersion(data)`          → `number`（纯函数）
+ *   `read()`                               → `{ data, etag }`（无数据 `{ data: null, etag: null }`）
+ *   `readAt(pathname)`                     → 任意 pathname 的 JSON 对象；不存在 → `null`
+ *   `write(data, { ifMatch, createOnly })` → `{ etag }`（**原样写入**；`ifMatch` 与当前 etag 不符 → 抛错；
+ *                                            `createOnly` → 只在不存在时创建，已存在 → 抛错）
+ *   `listSnapshots()`                      → `[{ pathname, size, uploadedAt }]`
+ *   `writeSnapshot(data)`                  → `{ ok, pathname }`（**撞名不覆盖**；失败 `{ ok: false, error }`）
+ *   `pruneSnapshots()`                     → `{ ok, deleted }`（失败 `{ ok: false, error }`）
+ *   `nextVersion(data)`                    → `number`（纯函数）
+ *
+ * **`read()` / `readAt()` 解析失败必须抛，不得吞成 `null`。** 上层把「读不出来」与「没有数据」
+ * 分成两条路：前者 503 保留现场，后者才允许种子初始化。provider 若把半截 JSON 静默变成 `null`，
+ * 上层就会把一次读故障当成「首次部署」，用种子覆盖掉线上真实数据 —— 这正是 `api/sites.js`
+ * 注释里反复强调的那条口径，provider 必须与它逐字对齐。
+ *
+ * **`write` 的三种模式**：`ifMatch` 给出 → 条件写（`allowOverwrite: true`）；
+ * `createOnly` → 只在不存在时创建（`allowOverwrite: false`，首次部署的并发保护）；
+ * 都不给 → 无条件覆盖写。前两种「失败宁可报错也不覆盖」。
  *
  * ① **CAS 是唯一闸门**：read-modify-write 必须带 `ifMatch`，否则并发会静默丢更新；
  * ② **版本单调递增**：由调用方用 `nextVersion()` 构造 data —— provider **不擅自改**传入的 data，
@@ -93,8 +104,11 @@ export function nextVersion(data) {
 export function resolveSiteStore({ explicit, ctx = {} } = {}) {
   const all = [...registry.values()].sort((a, b) => a.order - b.order)
   const want = String(explicit || process.env.NAV_SITE_STORE || '').trim().toLowerCase()
+  // 显式命中的 provider **也要**满足 available(ctx)：否则会返回一个 create() 当场崩掉的实例
+  // （如 ctx 没给 dir 却选到 fs，会抛在 path.join(undefined) 上）。
+  // 不可用时回落到 ctx 真正支持的那个 —— 回落目标由 ctx 决定，不会静默换到别的存储后端。
   const chosen = want
-    ? (all.find(p => p.id === want) || all.find(p => p.available(ctx)))
+    ? (all.find(p => p.id === want && p.available(ctx)) || all.find(p => p.available(ctx)))
     : all.find(p => p.available(ctx))
   const provider = chosen || all[0]
   if (!provider) throw new Error('没有可用的站点存储 provider')
@@ -115,20 +129,30 @@ registerSiteStore({
   create: (ctx) => {
     const kv = ctx.kv
     const pathname = String((ctx && ctx.pathname) || SITES_PATHNAME)
+    /**
+     * 读一个 pathname 的 JSON：不存在 → `{ data: null, etag: null }`；
+     * **解析失败原样抛**（见文件头「read() 解析失败必须抛」）。
+     */
+    async function readJsonAt(pathnameToRead) {
+      const blob = await kv.get(pathnameToRead, { access: 'private', useCache: false })
+      if (!blob || !blob.stream) return { data: null, etag: null }
+      const text = await new Response(blob.stream).text()
+      const data = JSON.parse(text)
+      // sites.js 读 (blob.blob && blob.blob.etag) || blob.etag —— 两个位置都认
+      const etag = (blob.blob && blob.blob.etag) || blob.etag || null
+      return { data, etag }
+    }
     return {
-      async read() {
-        const blob = await kv.get(pathname, { access: 'private', useCache: false })
-        if (!blob || !blob.stream) return { data: null, etag: null }
-        const text = await new Response(blob.stream).text()
-        let data = null
-        try { data = JSON.parse(text) } catch { data = null }
-        // sites.js 读 (blob.blob && blob.blob.etag) || blob.etag —— 两个位置都认
-        const etag = (blob.blob && blob.blob.etag) || blob.etag || null
-        return { data, etag }
-      },
-      async write(data, { ifMatch } = {}) {
-        const opts = { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' }
-        if (ifMatch != null) opts.ifMatch = ifMatch
+      read() { return readJsonAt(pathname) },
+      /** 读任意 pathname（快照内容）；不存在 → null，解析失败 → 抛 */
+      async readAt(p) { return (await readJsonAt(String(p))).data },
+      async write(data, { ifMatch, createOnly } = {}) {
+        const opts = { access: 'private', addRandomSuffix: false, contentType: 'application/json' }
+        if (ifMatch != null) { opts.ifMatch = ifMatch; opts.allowOverwrite = true }
+        // 只在不存在时创建：两个冷启动同时读到「没有数据」，只有一个能写成功，
+        // 另一个失败而不是互相覆盖（与 api/sites.js 原本的 putGuarded 逐字对齐）
+        else if (createOnly) { opts.allowOverwrite = false }
+        else { opts.allowOverwrite = true }
         const res = await kv.put(pathname, JSON.stringify(data), opts)
         return { etag: (res && res.etag) || null }
       },
@@ -139,18 +163,23 @@ registerSiteStore({
       async writeSnapshot(data) {
         const p = snapshotPathname(Number(data && data.version) || 0)
         try {
-          await kv.put(p, JSON.stringify(data), { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' })
+          // 名字里已带随机后缀（见 shared/snapshots.mjs），这里**不该**再允许覆盖：
+          // 万一真撞名，报错比「悄无声息地盖掉一份用于回滚的快照」安全得多。
+          await kv.put(p, JSON.stringify(data), { access: 'private', addRandomSuffix: false, allowOverwrite: false, contentType: 'application/json' })
           return { ok: true, pathname: p }
         } catch (e) {
           return { ok: false, pathname: p, error: String((e && e.message) || e) }
         }
       },
       async pruneSnapshots() {
-        const { blobs } = await kv.list({ prefix: SNAPSHOT_PREFIX, limit: 1000 })
-        const doomed = prunableSnapshots((blobs || []).map(b => b.pathname), SNAPSHOT_KEEP)
-        if (!doomed.length) return { deleted: 0 }
-        await kv.del(doomed)
-        return { deleted: doomed.length }
+        try {
+          const { blobs } = await kv.list({ prefix: SNAPSHOT_PREFIX, limit: 1000 })
+          const doomed = prunableSnapshots((blobs || []).map(b => b.pathname), SNAPSHOT_KEEP)
+          if (doomed.length) await kv.del(doomed)
+          return { ok: true, deleted: doomed.length }
+        } catch (e) {
+          return { ok: false, deleted: 0, error: String((e && e.message) || e) }
+        }
       },
     }
   },
@@ -174,43 +203,70 @@ registerSiteStore({
     const path = ctx.path
     const file = path.join(dir, SITES_PATHNAME)
     const snapDir = path.join(dir, 'snapshots')
-    const readJson = (p) => {
-      try { return fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : null } catch { return null }
+    const snapshotFile = (name) => path.join(snapDir, name)
+    /** 用 mtime+size 当 etag：够用且不引入额外状态文件 */
+    const etagOf = () => {
+      try { const st = fs.statSync(file); return `fs-${st.mtimeMs}-${st.size}` } catch { return null }
+    }
+    /** 不存在 → null；**解析失败原样抛**（与 kv provider 同一口径，也与 api/sites.js 对齐） */
+    const readJsonFile = (p) => {
+      if (!fs.existsSync(p)) return null
+      return JSON.parse(fs.readFileSync(p, 'utf8'))
     }
     return {
       async read() {
-        const data = readJson(file)
-        if (!data) return { data: null, etag: null }
-        // 用 mtime+size 当 etag：够用且不引入额外状态文件
-        let etag = null
-        try { const st = fs.statSync(file); etag = `fs-${st.mtimeMs}-${st.size}` } catch { etag = null }
-        return { data, etag }
+        const data = readJsonFile(file)
+        if (data == null) return { data: null, etag: null }
+        return { data, etag: etagOf() }
       },
-      async write(data, { ifMatch } = {}) {
-        if (ifMatch != null) {
-          let cur = null
-          try { const st = fs.statSync(file); cur = `fs-${st.mtimeMs}-${st.size}` } catch { cur = null }
-          if (cur !== ifMatch) throw new Error('PreconditionFailed（本地目录存储不支持安全并发写）')
+      async readAt(p) {
+        const name = String(p)
+        if (name === SITES_PATHNAME) return readJsonFile(file)
+        if (name.startsWith(SNAPSHOT_PREFIX)) {
+          const base = name.slice(SNAPSHOT_PREFIX.length)
+          // 只认裸文件名，挡住 `../../` 这类越界读取
+          if (!base || base.includes('/') || base.includes('\\') || base.includes('..')) return null
+          return readJsonFile(snapshotFile(base))
+        }
+        return null
+      },
+      async write(data, { ifMatch, createOnly } = {}) {
+        if (ifMatch != null && etagOf() !== ifMatch) {
+          throw new Error('PreconditionFailed（本地目录存储不支持安全并发写）')
+        }
+        // 只在不存在时创建：与 kv provider 的 createOnly 同义
+        if (createOnly && fs.existsSync(file)) {
+          throw new Error('This blob already exists')
         }
         fs.mkdirSync(dir, { recursive: true })
         const tmp = `${file}.tmp`
         fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + '\n', 'utf8')
         fs.renameSync(tmp, file)
-        let etag = null
-        try { const st = fs.statSync(file); etag = `fs-${st.mtimeMs}-${st.size}` } catch { etag = null }
-        return { etag }
+        return { etag: etagOf() }
       },
       async listSnapshots() {
         try {
           if (!fs.existsSync(snapDir)) return []
-          return fs.readdirSync(snapDir).sort().reverse().map(name => ({ pathname: `${SNAPSHOT_PREFIX}${name}` }))
+          return fs.readdirSync(snapDir).sort().reverse().map(name => {
+            let size = 0
+            let uploadedAt = null
+            try {
+              const st = fs.statSync(snapshotFile(name))
+              size = st.size
+              uploadedAt = new Date(st.mtimeMs).toISOString()
+            } catch { /* 单个文件 stat 失败不影响清单 */ }
+            return { pathname: `${SNAPSHOT_PREFIX}${name}`, size, uploadedAt }
+          })
         } catch { return [] }
       },
       async writeSnapshot(data) {
         try {
           fs.mkdirSync(snapDir, { recursive: true })
           const name = snapshotPathname(Number(data && data.version) || 0).slice(SNAPSHOT_PREFIX.length)
-          fs.writeFileSync(path.join(snapDir, name), JSON.stringify(data, null, 2) + '\n', 'utf8')
+          const target = snapshotFile(name)
+          // 与 kv provider 同一口径：快照撞名宁可报错，也不覆盖一份回滚兜底
+          if (fs.existsSync(target)) return { ok: false, pathname: `${SNAPSHOT_PREFIX}${name}`, error: '快照已存在' }
+          fs.writeFileSync(target, JSON.stringify(data, null, 2) + '\n', 'utf8')
           return { ok: true, pathname: `${SNAPSHOT_PREFIX}${name}` }
         } catch (e) {
           return { ok: false, error: String((e && e.message) || e) }
@@ -218,14 +274,16 @@ registerSiteStore({
       },
       async pruneSnapshots() {
         try {
-          if (!fs.existsSync(snapDir)) return { deleted: 0 }
+          if (!fs.existsSync(snapDir)) return { ok: true, deleted: 0 }
           const names = fs.readdirSync(snapDir).map(n => `${SNAPSHOT_PREFIX}${n}`)
           const doomed = prunableSnapshots(names, SNAPSHOT_KEEP)
           for (const p of doomed) {
-            try { fs.rmSync(path.join(snapDir, p.slice(SNAPSHOT_PREFIX.length)), { force: true }) } catch { /* 忽略单个失败 */ }
+            try { fs.rmSync(snapshotFile(p.slice(SNAPSHOT_PREFIX.length)), { force: true }) } catch { /* 忽略单个失败 */ }
           }
-          return { deleted: doomed.length }
-        } catch { return { deleted: 0 } }
+          return { ok: true, deleted: doomed.length }
+        } catch (e) {
+          return { ok: false, deleted: 0, error: String((e && e.message) || e) }
+        }
       },
     }
   },

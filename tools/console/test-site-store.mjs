@@ -119,6 +119,21 @@ async function exercise(store, label) {
   const frozen = { version: 7, sites: [] }
   await store.write(frozen, {})
   assert.equal(frozen.version, 7, `${label}: provider 不该改动传入的 data`)
+
+  /* ---- 契约加固：与 api/sites.js 生产语义逐条对齐 ---- */
+
+  // createOnly：对象已存在时必须抛。这是「首次部署」的并发保护 ——
+  // 两个冷启动同时读到「没有数据」，只有一个能创建成功，另一个必须失败而不是互相覆盖。
+  await assert.rejects(
+    () => store.write({ version: 99, sites: [] }, { createOnly: true }),
+    null, `${label}: createOnly 在已存在对象上必须抛`
+  )
+
+  // readAt：读任意 pathname（快照内容读取用）；不存在时返回 null
+  assert.equal(
+    await store.readAt(`${SNAPSHOT_PREFIX}missing-${label}.json`),
+    null, `${label}: readAt 不存在应返回 null`
+  )
 }
 
 async function main() {
@@ -137,6 +152,12 @@ async function main() {
     // 只给 dir（没有 kv）→ 应落到 fs
     const st = resolveSiteStore({ ctx: { dir: os.tmpdir(), fs, path } })
     assert.equal(st.id, 'fs')
+  })
+  check('显式 id 但 ctx 不满足 → 回落到可用的（不返回一个建不出来的 provider）', () => {
+    // 显式要 fs，却只给了 kv：fs 的 available(ctx) 为假，此时不能硬返回 fs ——
+    // create(ctx) 会崩在 path.join(undefined)。回落的目标只会是 ctx 真正支持的那个。
+    const st = resolveSiteStore({ explicit: 'fs', ctx: { kv: makeFakeKv() } })
+    assert.equal(st.id, 'kv')
   })
   check('capabilities 如实合并进实例', () => {
     const kv = resolveSiteStore({ explicit: 'kv', ctx: { kv: makeFakeKv() } })
@@ -165,6 +186,80 @@ async function main() {
     } finally {
       try { fs.rmSync(dir, { recursive: true, force: true }) } catch { /* 忽略 */ }
     }
+  })
+
+  console.log('\n契约加固（与 api/sites.js 生产语义对齐）')
+
+  /** 记录底层 put 收到的 opts —— 用来断言 provider 真的把语义传下去了，而不只是自己「看起来对」 */
+  function spyKv() {
+    const kv = makeFakeKv()
+    const seen = []
+    return {
+      seen,
+      kv: {
+        ...kv,
+        put: async (pathname, body, opts = {}) => {
+          seen.push({ pathname: String(pathname), opts })
+          return kv.put(pathname, body, opts)
+        },
+      },
+    }
+  }
+
+  await checkAsync('read：坏 JSON 必须抛错（静默返回 null 会被当成「没存过」→ 种子覆盖线上数据）', async () => {
+    const kv = makeFakeKv()
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv } })
+    await kv.put('sites.json', '{ 这不是 JSON', { allowOverwrite: true })
+    await assert.rejects(() => st.read(), null, '解析失败必须抛，绝不能返回 data:null')
+  })
+
+  await checkAsync('write：createOnly 落到 allowOverwrite:false，空库成功、已存在抛错', async () => {
+    const s = spyKv()
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv: s.kv } })
+    await st.write({ version: 1, sites: [] }, { createOnly: true })
+    assert.equal(s.seen[0].opts.allowOverwrite, false, 'createOnly 必须落到 allowOverwrite:false')
+    await assert.rejects(
+      () => st.write({ version: 2, sites: [] }, { createOnly: true }),
+      null, '已存在时 createOnly 必须抛'
+    )
+  })
+
+  await checkAsync('write：带 ifMatch 时 allowOverwrite 必须为 true（否则条件写不生效）', async () => {
+    const s = spyKv()
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv: s.kv } })
+    await st.write({ version: 1, sites: [] }, {})
+    const { etag } = await st.read()
+    s.seen.length = 0
+    await st.write({ version: 2, sites: [] }, { ifMatch: etag })
+    assert.equal(s.seen[0].opts.ifMatch, etag, 'ifMatch 必须原样传给底层')
+    assert.equal(s.seen[0].opts.allowOverwrite, true, '带 ifMatch 时 allowOverwrite 必须为 true')
+  })
+
+  await checkAsync('writeSnapshot：落盘必须 allowOverwrite:false（撞名宁可报错也不覆盖回滚兜底）', async () => {
+    const s = spyKv()
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv: s.kv } })
+    const snap = await st.writeSnapshot({ version: 3, sites: [] })
+    assert.equal(snap.ok, true)
+    const put = s.seen.find(x => x.pathname.startsWith(SNAPSHOT_PREFIX))
+    assert.ok(put, '应落一份快照')
+    assert.equal(put.opts.allowOverwrite, false, '快照写入必须禁止覆盖')
+  })
+
+  await checkAsync('pruneSnapshots：返回 { ok, deleted }（响应字段不能丢）', async () => {
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv: makeFakeKv() } })
+    const pruned = await st.pruneSnapshots()
+    assert.equal(pruned.ok, true)
+    assert.equal(typeof pruned.deleted, 'number')
+  })
+
+  await checkAsync('readAt：读任意 pathname / 不存在返回 null / 坏 JSON 抛', async () => {
+    const kv = makeFakeKv()
+    const st = resolveSiteStore({ explicit: 'kv', ctx: { kv } })
+    assert.equal(await st.readAt(`${SNAPSHOT_PREFIX}missing.json`), null)
+    await kv.put(`${SNAPSHOT_PREFIX}ok.json`, JSON.stringify({ v: 7 }), { allowOverwrite: true })
+    assert.deepEqual(await st.readAt(`${SNAPSHOT_PREFIX}ok.json`), { v: 7 })
+    await kv.put(`${SNAPSHOT_PREFIX}bad.json`, 'nope{', { allowOverwrite: true })
+    await assert.rejects(() => st.readAt(`${SNAPSHOT_PREFIX}bad.json`), null)
   })
 
   console.log('\n清单')

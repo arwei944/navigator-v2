@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-// v9：Blob → 本地 SQLite 适配层（同名同签名，见 server/store.mjs）。仅改这一行 import，
-// 校验/CAS/快照逻辑不动 —— test-sites-cas 换 mock 目标后继续守护它们。
+// v9：Blob → 本地 SQLite 适配层（同名同签名，见 server/store.mjs）。
+// 存储语义（CAS / 快照 / 版本递增）已抽到 shared/site-store.mjs 的 kv provider；
+// 本文件只注入 ctx 并调用，HTTP 处理 / 校验 / 种子兜底 / 304 逻辑不动 ——
+// test-sites-cas 换 mock 目标后继续守护它们。
 import { get, put, list, del, BlobPreconditionFailedError } from '#store'
-import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, snapshotPathname, parseSnapshotName, prunableSnapshots, isSnapshotPathname } from '../shared/snapshots.mjs'
+import { resolveSiteStore } from '../shared/site-store.mjs'
+// snapshotPathname / prunableSnapshots 已随存储语义搬进 site-store provider，这里不再直接使用
+import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, parseSnapshotName, isSnapshotPathname } from '../shared/snapshots.mjs'
 import { sanitizeGroups } from '../shared/categories.mjs'
 import { sanitizeSites } from '../shared/sanitize.mjs'
 import { checkAuthHeader } from '../shared/auth.mjs'
@@ -18,81 +22,33 @@ const SEED_SITES = JSON.parse(
 const PATHNAME = 'sites.json'
 
 /**
- * 读取主数据，**连同 ETag** —— ETag 是写入时条件写（`ifMatch`）的前提。
+ * 站点存储 provider（`shared/site-store.mjs` 的 `kv` 实现）。
  *
- * 为什么要带上它：Blob 上的 sites.json 是 read-modify-write 模式（读 version → +1 → 写回），
- * 而 Blob 没有事务。两个并发 POST 各自读到同一份 version、各自写 +1，后写的把先写的整份
- * 内容覆盖掉 —— 一次静默的丢更新。带上 `ifMatch` 之后，后写的那次会因为 ETag 已变而被拒
- * （`BlobPreconditionFailedError`），调用方拿到 409 去重试，丢更新变成可观察的冲突。
+ * 原先长在本文件里的 6 个私有函数（读带 ETag / 条件写 / 读任意 pathname / 写快照 /
+ * 裁快照）已搬进 provider，本文件只负责注入与调用，HTTP 处理逻辑不变。
+ * 注入的 `ctx.kv` 就是自 v9 起的 `#store` 适配层（Blob / SQLite，同名同签名）。
+ *
+ * 为什么把 `explicit` 固定为 `'kv'`：存储是数据安全单点。若让 `NAV_SITE_STORE` 在本接口生效，
+ * 一次误设（如指到 `fs`）就会让生产读到另一个空目录，进而用种子覆盖线上真实数据。
+ * 换后端应在 provider 层显式切换，不该经由这个接口的环境变量。
  */
-async function readStoredWithEtag() {
-  // useCache:false 绕过 Blob CDN 缓存：发布后首次读取即拿到最新版本，
-  // 否则 publish.mjs 的一致性轮询要 1~4 次才收敛
-  const blob = await get(PATHNAME, { access: 'private', useCache: false })
-  if (!blob || !blob.stream) return { data: null, etag: null }
-  const text = await new Response(blob.stream).text()
-  return { data: JSON.parse(text), etag: (blob.blob && blob.blob.etag) || blob.etag || null }
-}
+const store = resolveSiteStore({ explicit: 'kv', ctx: { kv: { get, put, list, del }, pathname: PATHNAME } })
 
-async function readStored() {
-  return (await readStoredWithEtag()).data
-}
+// CAS 是并发安全的唯一闸门：provider 若不支持条件写，read-modify-write 就会静默丢更新。
+// kv provider 声明 cas: true；在这里断言一次，避免将来换 provider 时把这条保证悄悄丢掉。
+if (!store.cas) throw new Error('站点存储 provider 必须支持 CAS（条件写），否则并发写会静默丢更新')
 
 /**
- * 带条件写的 put：ETag 已知时必须走 ifMatch；不知道 ETag（对象本来就不存在）时
- * 用 `allowOverwrite: false` 拿「只在不存在时创建」的语义。
+ * 主数据的条件写。
+ *
+ *   - 知道 ETag（对象已存在）→ 走 `ifMatch`：ETag 已变说明读与写之间有另一次写入，
+ *     底层抛 `BlobPreconditionFailedError`，调用方回 409 重试 —— 丢更新变成可观察的冲突；
+ *   - 不知道 ETag（对象本来就不存在）→ 走 `createOnly`：只在不存在时创建，
+ *     并发的首次请求里只有一个能成功，避免两个冷启动互相覆盖。
  * 两条路径都是**失败宁可报错也不覆盖**，与 P0-1 定下的口径一致。
  */
-async function putGuarded(data, etag) {
-  const opts = {
-    access: 'private',
-    addRandomSuffix: false,
-    contentType: 'application/json',
-    ...(etag ? { ifMatch: etag, allowOverwrite: true } : { allowOverwrite: false }),
-  }
-  return put(PATHNAME, JSON.stringify(data), opts)
-}
-
-/** 读取任意 pathname 的 JSON 对象（快照读取用） */
-async function readJsonAt(pathname) {
-  const blob = await get(pathname, { access: 'private', useCache: false })
-  if (!blob || !blob.stream) return null
-  const text = await new Response(blob.stream).text()
-  return JSON.parse(text)
-}
-
-/**
- * 把「即将被覆盖的当前数据」另存为快照。
- * 失败不抛给调用方：快照是安全网，不该反过来阻断发布；但必须把结果回报给调用方，
- * 让控制台/CLI 能显式提醒「这次发布没有快照兜底」。
- */
-async function writeSnapshot(data) {
-  try {
-    const pathname = snapshotPathname(data.version)
-    await put(pathname, JSON.stringify(data), {
-      access: 'private',
-      addRandomSuffix: false,
-      // 名字里已带随机后缀（见 shared/snapshots.mjs），这里**不该**再允许覆盖：
-      // 万一真撞名，报错比「悄无声息地盖掉一份用于回滚的快照」安全得多。
-      allowOverwrite: false,
-      contentType: 'application/json',
-    })
-    return { ok: true, pathname }
-  } catch (e) {
-    return { ok: false, error: String(e?.message || e) }
-  }
-}
-
-/** 裁剪超出保留份数的旧快照；失败同样不阻断主流程 */
-async function pruneSnapshots() {
-  try {
-    const { blobs } = await list({ prefix: SNAPSHOT_PREFIX, limit: 1000 })
-    const doomed = prunableSnapshots(blobs.map(b => b.pathname), SNAPSHOT_KEEP)
-    if (doomed.length) await del(doomed)
-    return { ok: true, deleted: doomed.length }
-  } catch (e) {
-    return { ok: false, error: String(e?.message || e) }
-  }
+function writeMain(data, etag) {
+  return store.write(data, etag ? { ifMatch: etag } : { createOnly: true })
 }
 
 function readBody(req) {
@@ -151,13 +107,13 @@ export default async function handler(req, res) {
         if (singleQuery) {
           const pathname = String(singleQuery)
           if (!isSnapshotPathname(pathname)) { res.status(400).json({ error: '非法快照名称' }); return }
-          const data = await readJsonAt(pathname)
+          const data = await store.readAt(pathname)
           if (!data) { res.status(404).json({ error: '快照不存在' }); return }
           res.status(200).json({ ...data, snapshot: pathname })
           return
         }
-        const { blobs } = await list({ prefix: SNAPSHOT_PREFIX, limit: 1000 })
-        const snapshots = blobs
+        const items = await store.listSnapshots()
+        const snapshots = items
           .map(b => {
             const meta = parseSnapshotName(b.pathname)
             return meta ? { ...meta, size: b.size, uploadedAt: b.uploadedAt } : null
@@ -187,7 +143,7 @@ export default async function handler(req, res) {
      */
     let stored
     try {
-      stored = await readStored()
+      stored = (await store.read()).data
     } catch (e) {
       console.error('[sites] blob read failed:', String(e?.message || e))
       res.status(503).json({ error: 'Blob 读取失败', degraded: true })
@@ -215,13 +171,9 @@ export default async function handler(req, res) {
       updatedAt: new Date().toISOString()
     }
     try {
-      await put(PATHNAME, JSON.stringify(seeded), {
-        access: 'private',
-        addRandomSuffix: false,
-        // 不加 allowOverwrite：并发的首次请求里只有一个能写成功，其余自然失败，
-        // 避免两个冷启动互相覆盖（也避免覆盖掉刚刚可能已存在的数据）
-        allowOverwrite: false
-      })
+      // createOnly：并发的首次请求里只有一个能写成功，其余自然失败，
+      // 避免两个冷启动互相覆盖（也避免覆盖掉刚刚可能已存在的数据）
+      await store.write(seeded, { createOnly: true })
     } catch (e) {
       console.error('[sites] seed init failed:', String(e?.message || e))
     }
@@ -249,7 +201,7 @@ export default async function handler(req, res) {
     let prev = null
     let prevEtag = null
     try {
-      const r = await readStoredWithEtag()
+      const r = await store.read()
       prev = r.data
       prevEtag = r.etag
     } catch (e) {
@@ -265,7 +217,7 @@ export default async function handler(req, res) {
       if (!isSnapshotPathname(pathname)) { res.status(400).json({ error: '非法快照名称' }); return }
       let snapshot
       try {
-        snapshot = await readJsonAt(pathname)
+        snapshot = await store.readAt(pathname)
       } catch (e) {
         res.status(404).json({ error: `读取快照失败：${String(e?.message || e)}` })
         return
@@ -277,7 +229,7 @@ export default async function handler(req, res) {
         return
       }
       // 回滚本身也要可撤销：先把「回滚前的当前数据」存一份
-      const safety = prev ? await writeSnapshot(prev) : { ok: true, pathname: null }
+      const safety = prev ? await store.writeSnapshot(prev) : { ok: true, pathname: null }
       const data = {
         version: prevVersion + 1,
         sites: snapshot.sites,
@@ -292,7 +244,7 @@ export default async function handler(req, res) {
         : (prev && Array.isArray(prev.categories) ? prev.categories : null)
       if (rollbackCats) data.categories = rollbackCats
       try {
-        await putGuarded(data, prevEtag)
+        await writeMain(data, prevEtag)
       } catch (e) {
         if (e instanceof BlobPreconditionFailedError) {
           res.status(409).json({ error: '数据已被其他写入更新，请刷新后重试回滚', reason: 'precondition-failed' })
@@ -300,7 +252,7 @@ export default async function handler(req, res) {
         }
         throw e
       }
-      const pruned = await pruneSnapshots()
+      const pruned = await store.pruneSnapshots()
       res.status(200).json({
         ...data,
         snapshot: safety,
@@ -336,7 +288,7 @@ export default async function handler(req, res) {
     }
 
     const version = prevVersion + 1
-    const snapshot = prev ? await writeSnapshot(prev) : { ok: true, pathname: null, skipped: '无前值可快照' }
+    const snapshot = prev ? await store.writeSnapshot(prev) : { ok: true, pathname: null, skipped: '无前值可快照' }
     const data = {
       version,
       sites,
@@ -344,7 +296,7 @@ export default async function handler(req, res) {
     }
     if (nextCategories) data.categories = nextCategories
     try {
-      await putGuarded(data, prevEtag)
+      await writeMain(data, prevEtag)
     } catch (e) {
       if (e instanceof BlobPreconditionFailedError) {
         // 条件写失败 = 在我们读与写之间有另一次写入。这不是错误，是并发被正确拦下了 ——
@@ -354,7 +306,7 @@ export default async function handler(req, res) {
       }
       throw e
     }
-    const pruned = await pruneSnapshots()
+    const pruned = await store.pruneSnapshots()
     res.status(200).json({ ...data, snapshot, pruned })
     return
   }

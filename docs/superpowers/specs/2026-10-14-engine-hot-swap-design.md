@@ -1,6 +1,6 @@
 # 引擎热拔插重构：注册表形态 · 九个引擎模块 · 三条链的语义差别
 
-> 状态：**实施完成 → 收尾中（测试入口 / 设计文档 / 日志 / 提交）**
+> 状态：**实施完成（含 `site-store` 生产接线）**
 > 日期：2026-10-14
 
 ## 0. 需求与动机
@@ -105,6 +105,16 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 
 > `capabilities` 必须**如实声明**：`fs` provider 没有原子 CAS，就声明 `cas: false`。谎报 `true` 会让并发写悄悄丢更新，比不支持更糟。调用方据此降级。
 
+**接线时的契约加固**：把 `api/sites.js` 的存储语义搬进 provider 前，先逐条比对两者，发现 `kv` provider 有三处语义比生产实现「松」，会静默改行为。已全部对齐并写成断言：
+
+| 差异 | 原 provider | 生产语义（`api/sites.js`） | 加固后 |
+|---|---|---|---|
+| 读失败 | `JSON.parse` 失败**静默返回 `null`** | 直接抛 → 上层 503 | 解析失败**原样抛**（否则一次读故障会被当成「首次部署」，用种子覆盖线上数据） |
+| 写入覆盖 | `allowOverwrite: true` **硬编码** | 首次写 / 快照写都是 `false` | 新增 `createOnly` → `allowOverwrite: false`；`ifMatch` → `true`；都不给才 `true` |
+| 快照裁剪 | 只返回 `{ deleted }` | 调用方需要 `ok` | 返回 `{ ok, deleted }`，失败 `{ ok: false, error }` |
+
+> 另补两处能力：`readAt(pathname)`（读快照内容，供回滚预览）；`resolveSiteStore` 的**显式 id 也要满足 `available(ctx)`**（否则 `NAV_SITE_STORE` 误设为 `fs` 而 ctx 无 `dir` 时，会崩在 `path.join(undefined)`）。`fs` provider 同步对齐同一口径（`read` 抛错、`createOnly`、`readAt` 带越界防护、`writeSnapshot` 不覆盖、`listSnapshots` 补 `size` / `uploadedAt`）。
+
 **ext 契约：一律不带点**（`image-engine.mjs`）。`detectExt` 返回 `'png'` 而非 `'.png'`；拼接点号、决定落盘路径是调用方的事。两处约定不同曾导致 `siteId + ext` 拼出看似一样、实则来源不同的扩展名。
 
 **出网纪律由 ctx 注入**：provider 不自己抓网络，一律用调用方给的 `ctx`（`fetchBuf` / `fetchCapped` / `loadJson`…）。这样 SSRF 防护、超时、字节上限由调用方统一控制，provider 无法绕过。
@@ -124,6 +134,7 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 | `scripts/fetch-favicons.mjs` | `resolveImage`（kind=favicon） | 脚本只留批量调度与落盘 |
 | `shared/health-probe.mjs` | `runProbe` | 只保留定性：`verdictOf` / `STATUS_LABEL` / attempts 口径 |
 | `shared/translate.mjs` | `registerTranslator` / `translateWithChain` | 加载时注册 mymemory(100) 与 google(200) |
+| `api/sites.js` | `resolveSiteStore`（显式 `kv`） | 版本递增 / CAS / 快照语义搬进 provider；HTTP 处理 / 校验 / 种子兜底 / 304 逻辑不动 |
 
 ## 3. 配置与存储
 
@@ -162,10 +173,11 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 | `test-publisher.mjs` | 13 | ✅ |
 | `test-image-engine.mjs` | 35 | ✅ |
 | `test-llm-engine.mjs` | 15 | ✅ |
-| `test-site-store.mjs` | 9 | ✅ |
+| `test-site-store.mjs` | 16 | ✅ |
 | `test-category-source.mjs` | 18 | ✅ |
 | `test-pipeline-trace.mjs`（同日另一块工作） | 31 | ✅ |
-| **合计** | **171** | **0 失败** |
+| `test-sites-cas.mjs`（既有 CAS / 门禁守卫，接线后继续生效） | 19 | ✅ |
+| **合计** | **197** | **0 失败** |
 
 ### 4.2 行为等价
 
@@ -184,9 +196,11 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 
 ### 4.4 本轮范围
 
-- **只做机制与接线，不替换 `api/sites.js` 的生产写路径**。`site-store` 的接口、provider、契约测试就位，但生产写入仍走原路径。这是刻意保守：存储是数据安全的单点，先让契约被测住，再谈切换。
-- 未跑全量 `console:test:all`（45 个文件、耗时长），本次只逐一验证新挂的 8 个引擎测试 + 既有 `test-pipeline-trace.mjs`。
-- **补充**：收尾时已补跑全量 —— 45 个脚本**全部通过**，耗时 82 秒（05:17:21 → 05:18:43）。引擎接线未打破任何既有测试（含受影响的 `test-glossary` / `test-browser-translate` / `test-meta-fast` / `test-cron` / `test-health` 等）。
+- **`api/sites.js` 生产写路径已完成接线**（本轮最后一步）。原文件内 6 个私有存储函数（读带 ETag / 条件写 / 读任意 pathname / 写快照 / 裁快照 / 列快照）已删除，改为注入 `resolveSiteStore({ explicit: 'kv', ctx: { kv, pathname } })` 并调用 provider；HTTP 处理 / 校验 / 种子兜底 / 304 可重验证缓存 / 409 判定全部不动，行为逐字等价。
+- **接线前先做了一轮契约加固**：原 `kv` provider 有三处语义比生产实现更「松」（读故障静默返回 `null`、`allowOverwrite` 硬编码 `true`、`pruneSnapshots` 缺 `ok`），都会静默改变生产行为，已全部对齐并写成失败即红的断言（详见 2.5）。
+- **为什么 `explicit` 固定为 `'kv'`**：存储是数据安全单点。若让 `NAV_SITE_STORE` 在此接口生效，一次误设（如指到 `fs`）就会让生产读到另一个空目录、进而用种子覆盖线上真实数据。换后端应在 provider 层显式切换，不经由这个接口的环境变量。
+- **双护栏**：`test-site-store.mjs`（16 条契约断言）+ `test-sites-cas.mjs`（19 条既有 CAS / 门禁断言，`mock.module('#store')` 在 provider 注入下依然生效）两者全绿，确认接线零行为变化。
+- 全量 `console:test:all` 已跑 —— 45 个脚本**全部通过**（含受影响的 `test-glossary` / `test-browser-translate` / `test-meta-fast` / `test-cron` / `test-health` 等），存储接线与引擎接线均未打破任何既有测试。
 
 ## 5. 不做的事
 
@@ -194,6 +208,5 @@ resolveXxx(...)        跑链，按各自语义决定回退还是停
 |---|---|
 | 合并 `llm-engine` 的 `openai` 与 `translate-engine` 的 `llm` | 用途与调参面不同，合并会互相改坏 |
 | 给 `cover-source.mjs` 加注册表 | 机制已在 `image-engine.mjs`，重复注册表只会分叉 |
-| 替换 `api/sites.js` 生产写路径 | 存储是数据安全单点，先立契约再切换 |
 | 改 `publish.mjs` 流水线的前四步（备份/校验/构建） | 它们与厂商无关，本次只动后三步 |
 | 为「重复的探测实现」抽公共函数 | 两处是不同运行环境的适配，注册表比共用函数更合适 |
