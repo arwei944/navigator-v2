@@ -1,7 +1,9 @@
 # Navigator V2 项目交接文档
 
-> 最后更新：2026-10-07
-> 线上地址：https://navigator-v2-two.vercel.app
+> 最后更新：2026-10-14
+> 线上地址：https://nav-dashboard-19166.app.workbuddy.host/（WorkBuddy 云端 Node 服务，部署目录 `dist/`）
+> 旧地址 `navigator-v2-two.vercel.app` 已于 2026-10-11 被 Vercel 停用（全站 402 DEPLOYMENT_DISABLED），**不要再访问**。
+> 发布通道见 `shared/publisher.mjs` 注册表（默认 `workbuddy`）；发布前跑 `node scripts/deploy-cloud.mjs` 做产物门禁。
 > 仓库本地路径：`c:\work\solo work\new\nav-v2`
 
 ---

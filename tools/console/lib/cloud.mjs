@@ -8,10 +8,18 @@ import { writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, getAdminKey } from './env.mjs'
 import { resolveProxyUrl } from '../../../shared/proxy.mjs'
+import { resolvePublisher } from '../../../shared/publisher.mjs'
 
 const pExecFile = promisify(execFile)
 
-export const SITE_URL = 'https://navigator-v2-two.vercel.app'
+/**
+ * 云端地址**由发布通道给出**，不再写死某个域名。
+ *
+ * 写死的代价在 2026-10-11 一次性付清：Vercel 团队被停用后全站 402，
+ * 而这个常量仍指向它 —— 控制台的同步 / 快照 / 发布门禁全部打到一具尸体上，
+ * 报出来的错还长得像"网络问题"。换平台只改通道（或 `NAV_SITE_URL`），这里零改动。
+ */
+export const SITE_URL = resolvePublisher().siteUrl
 
 /** 解析代理并转成 curl 参数：探测不到则返回空数组（直连） */
 async function proxyArgs() {

@@ -96,6 +96,33 @@ export function resolvePublisher(explicit) {
 
 /* ---------------- 内建通道 ---------------- */
 
+/**
+ * WorkBuddy 云端（Node 服务）—— **当前默认通道**。
+ *
+ * 为什么换默认：Vercel Hobby 团队在 2026-10-11 因 fair-use 被平台停用，全站（含静态资源
+ * 与所有 `/api/*`）返回 `402 DEPLOYMENT_DISABLED`，前端因此读不到云端数据、补全抓取也全部
+ * 拿到 402 正文。线上已迁到 WorkBuddy 云端（部署目录 `dist/`，同目录重发即覆盖同一链接），
+ * 这里把默认通道切过去，控制台 / 发布脚本 / 校验脚本才会打到真正活着的站点。
+ *
+ * 上传这一步**不在本进程完成**：云端发布工具是外部工具（`.genie` 里的 appId），
+ * `deployCommand` 交给 `scripts/deploy-cloud.mjs` —— 它只做**产物门禁**（完整性 +
+ * 新鲜度），不假装自己上传了。新鲜度校验正是这次事故的守卫：线上跑了 19 小时的旧产物，
+ * 期间修的缺陷"看起来没修"。
+ */
+registerPublisher({
+  id: 'workbuddy',
+  label: 'WorkBuddy 云端',
+  order: 50,
+  capabilities: { hotUpdate: true, verify: true },
+  available: () => true,
+  deployCommand: 'node scripts/deploy-cloud.mjs',
+  siteUrl: () => String(process.env.NAV_SITE_URL || 'https://nav-dashboard-19166.app.workbuddy.host').replace(/\/+$/, ''),
+})
+
+/**
+ * Vercel —— 保留但已不是默认（见上方说明）。命令与站点地址与迁移前**逐字一致**，
+ * 显式 `NAV_PUBLISHER=vercel` 仍可回到这条通道。
+ */
 registerPublisher({
   id: 'vercel',
   label: 'Vercel',

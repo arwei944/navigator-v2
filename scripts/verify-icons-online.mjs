@@ -1,10 +1,12 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { resolvePublisher } from '../shared/publisher.mjs'
 
 const sites = JSON.parse(readFileSync(new URL('../api/sites-data.json', import.meta.url), 'utf-8'))
 const icons = [...new Set(sites.filter(s => s.icon).map(s => s.icon))]
 
-const BASE = 'https://navigator-v2-two.vercel.app/'
+// 站点地址由发布通道给出：Vercel 停用后硬编码域名会让这个校验脚本静默地"全部不通"。
+const BASE = resolvePublisher().siteUrl + '/'
 let bad = []
 let idx = 0
 const CONC = 10

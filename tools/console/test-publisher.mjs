@@ -19,6 +19,8 @@ import { registerPublisher, listPublishers, resolvePublisher } from '../../share
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const PUBLISH_SCRIPT = path.join(HERE, '..', '..', 'scripts', 'publish.mjs')
+const GATE_SCRIPT = path.join(HERE, '..', '..', 'scripts', 'deploy-cloud.mjs')
+const CLOUD_LIB = path.join(HERE, 'lib', 'cloud.mjs')
 
 let pass = 0
 let fail = 0
@@ -45,28 +47,38 @@ function main() {
   check('缺 id 抛错', () => { assert.throws(() => registerPublisher({ deployCommand: 'x' })) })
   check('缺 deployCommand 抛错', () => { assert.throws(() => registerPublisher({ id: 'x-nocmd' })) })
 
-  console.log('\n默认通道（vercel）—— 行为零变化')
-  check('默认解析到 vercel', () => {
+  console.log('\n默认通道（workbuddy）—— Vercel 停用后的新默认')
+  check('默认解析到 workbuddy', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_DEPLOY_TARGET: undefined }, () => {
-      assert.equal(resolvePublisher().id, 'vercel')
+      assert.equal(resolvePublisher().id, 'workbuddy')
     })
   })
-  check('部署命令与改动前逐字一致', () => {
-    withEnv({ NAV_PUBLISHER: undefined }, () => {
-      assert.equal(resolvePublisher().deployCommand, 'npx vercel deploy --prod --yes')
-    })
-  })
-  check('站点地址默认值与改动前一致', () => {
+  check('站点地址指向 WorkBuddy 云端服务', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_SITE_URL: undefined }, () => {
-      assert.equal(resolvePublisher().siteUrl, 'https://navigator-v2-two.vercel.app')
+      assert.equal(resolvePublisher().siteUrl, 'https://nav-dashboard-19166.app.workbuddy.host')
     })
+  })
+  check('部署步骤是产物门禁，不是「假装上传」', () => {
+    withEnv({ NAV_PUBLISHER: undefined }, () => {
+      assert.equal(resolvePublisher().deployCommand, 'node scripts/deploy-cloud.mjs')
+    })
+  })
+  /**
+   * 这条钉的是 2026-10-14 的事故：线上跑着 19 小时前的旧产物，期间修好的缺陷
+   * 在用户面前仍是坏的。产物门禁必须真的会比对源码与产物的时间，否则等于没有。
+   */
+  check('产物门禁脚本存在，且真的比对源码/产物时间', () => {
+    const src = fs.readFileSync(GATE_SCRIPT, 'utf8')
+    assert.ok(src.includes('newestSourceMtime'), '应有源码最新时间计算')
+    assert.ok(src.includes('newest > oldest'), '产物落后源码时必须判定为不可发')
+    assert.ok(src.includes('process.exit(1)'), '不可发时必须非零退出（中止发布）')
   })
   check('NAV_SITE_URL 覆盖站点地址，并去掉尾斜杠', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_SITE_URL: 'https://preview.example.com/' }, () => {
       assert.equal(resolvePublisher().siteUrl, 'https://preview.example.com')
     })
   })
-  check('vercel 支持热更新与收敛验证', () => {
+  check('workbuddy 支持热更新与收敛验证', () => {
     withEnv({ NAV_PUBLISHER: undefined }, () => {
       const p = resolvePublisher()
       assert.equal(p.hotUpdate, true)
@@ -74,10 +86,22 @@ function main() {
     })
   })
 
+  console.log('\n保留通道（vercel）—— 换默认不改它的行为')
+  check('显式 vercel 的部署命令与迁移前逐字一致', () => {
+    withEnv({ NAV_PUBLISHER: 'vercel' }, () => {
+      assert.equal(resolvePublisher().deployCommand, 'npx vercel deploy --prod --yes')
+    })
+  })
+  check('显式 vercel 的站点地址与迁移前逐字一致', () => {
+    withEnv({ NAV_PUBLISHER: 'vercel', NAV_SITE_URL: undefined }, () => {
+      assert.equal(resolvePublisher().siteUrl, 'https://navigator-v2-two.vercel.app')
+    })
+  })
+
   console.log('\n静态通道（rsync-static）')
   check('未配 NAV_DEPLOY_TARGET 时不可用（解析时不选它）', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_DEPLOY_TARGET: undefined }, () => {
-      assert.equal(resolvePublisher().id, 'vercel')
+      assert.equal(resolvePublisher().id, 'workbuddy')
       const rsync = listPublishers({ check: true }).find(p => p.id === 'rsync-static')
       assert.equal(rsync.available, false)
     })
@@ -103,9 +127,18 @@ function main() {
   })
 
   console.log('\n清单与接入')
-  check('listPublishers 列出两通道并按 order 排序', () => {
+  check('listPublishers 列出三通道并按 order 排序', () => {
     const ids = listPublishers({ check: false }).map(p => p.id)
-    assert.deepEqual(ids, ['vercel', 'rsync-static'])
+    assert.deepEqual(ids, ['workbuddy', 'vercel', 'rsync-static'])
+  })
+  /**
+   * 2026-10-11 的教训：控制台所有云端操作打的都是这个硬编码域名，平台一停，
+   * 同步/快照/门禁全部打到一具尸体上，报错还长得像网络问题。地址必须走通道。
+   */
+  check('cloud.mjs 经注册表取站点地址（不再硬编码域名）', () => {
+    const src = fs.readFileSync(CLOUD_LIB, 'utf8')
+    assert.ok(src.includes('resolvePublisher'), '应 import 并调用 resolvePublisher')
+    assert.ok(!src.includes("'https://navigator-v2-two.vercel.app'"), '不应再硬编码站点地址')
   })
   check('publish.mjs 确实改为经注册表取通道（防止「加了抽象但没接」）', () => {
     const src = fs.readFileSync(PUBLISH_SCRIPT, 'utf8')

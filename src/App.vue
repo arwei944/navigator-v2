@@ -675,7 +675,7 @@ const cloudNotice = computed(() => {
    * 这种状态重试不会好，所以要直接告诉用户去哪儿处理，否则只会一直点「重试」。
    */
   if (e === 'http-402') {
-    return { tone: 'bad', retry: true, text: '云端部署已被平台暂停（402 · 多为用量超限），展示的是本机数据；请到 Vercel 面板查看用量' }
+    return { tone: 'bad', retry: true, text: '云端部署已被平台暂停（402 · 多为用量超限），展示的是本机数据；请到部署平台面板查看用量' }
   }
   if (String(e).startsWith('http-')) return { tone: 'bad', retry: true, text: `云端数据读取失败（${e.slice(5)}），当前展示的是本机数据` }
   return { tone: 'warn', retry: true, text: '云端数据暂时不可用，当前展示的是本机数据' }

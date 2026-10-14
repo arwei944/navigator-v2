@@ -2,8 +2,11 @@
 
 现代化网站导航中心，聚合 290+ 优质站点，覆盖 AI 工具、加密货币、开发者工具、基础服务等领域。
 
-线上地址：https://navigator-v2-two.vercel.app
+线上地址：https://nav-dashboard-19166.app.workbuddy.host/（WorkBuddy 云端 Node 服务，部署目录 `dist/`）
 GitHub 仓库：https://github.com/arwei944/navigator-v2
+
+> 旧地址 `navigator-v2-two.vercel.app` 已于 2026-10-11 被 Vercel 停用（全站 402 DEPLOYMENT_DISABLED），不要再访问。
+> 发布通道由 `shared/publisher.mjs` 注册表决定（默认 `workbuddy`，可用 `NAV_PUBLISHER` / `NAV_SITE_URL` 覆盖）。
 
 ## 技术栈
 
