@@ -35,17 +35,40 @@ export default defineConfig({
       },
       workbox: {
         /**
-         * 只预缓存「应用外壳」：构建产物（js/css）、index.html、favicon、两个 PWA 图标。
+         * 只预缓存「应用外壳」：构建产物（js/css）、favicon、两个 PWA 图标。
+         *
+         * **`*.html` 刻意不在其中**（2026-10-14 白屏事故）。html 进了预缓存清单，SW 就会
+         * 用 CacheFirst 把**旧版 index.html** 直接回给浏览器 —— 而它引用的 `assets/index-*.js`
+         * 已被新版本换掉并从磁盘上删掉，请求全部 404，模块脚本一次都没执行，`#app` 永远是空的：
+         * 白屏，且**不会自愈**（新 SW 装好了也只是 waiting；页面 JS 没跑起来，没人能提示刷新）。
+         * HTML 改走下方 `nav-html` 的 NetworkFirst：有网永远拿最新，离线才回缓存。
          *
          * 绝不能把 `icons/**` 放进来 —— 实测它会让预缓存清单从 16 条涨到 294 条 / 7.17 MB
          * （其中图标 6.11 MB / 278 个），SW 安装期就得在后台把这 7 MB 全下完，而其中
          * 绝大多数图标用户一辈子不会看到（首访实测多传约 4.6 MB）。
          * 图标改走下方 runtimeCaching：谁被渲染到就缓存谁，仍是离线可用的。
          */
-        globPatterns: ['**/*.{js,css,html}', 'favicon.svg', 'pwa-*.png'],
+        globPatterns: ['**/*.{js,css}', 'favicon.svg', 'pwa-*.png'],
         // sw.js / workbox-*.js 由 workbox 自行管理，绝不进预缓存清单
-        globIgnores: ['icons/**', 'sw.js', 'workbox-*.js'],
+        globIgnores: ['icons/**', 'sw.js', 'workbox-*.js', '**/*.html'],
         runtimeCaching: [
+          {
+            /**
+             * 导航请求（HTML）：**NetworkFirst** —— 有网必须先拿服务器上的最新版。
+             *
+             * 这是「HTML 不进预缓存」的另一半：光把 html 从 precache 里拿掉，离线时就完全
+             * 打不开了；这条规则把每次成功的导航响应存进 `nav-html`，离线时才有得回退。
+             * `networkTimeoutSeconds` 给 3 秒：弱网下不要让用户对着白屏干等一整个超时周期。
+             */
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'nav-html',
+              networkTimeoutSeconds: 3,
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 7 },
+            },
+          },
           {
             // 站点图标：命中即长期缓存（文件名带 id、内容不会变，适合 CacheFirst）。
             // 补上 jpg/webp —— 旧的 glob 只认 png/svg/ico，这两种格式的图标在离线时是裂图。

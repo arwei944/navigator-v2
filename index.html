@@ -21,6 +21,54 @@
 </head>
 <body>
   <div id="app"></div>
+  <!--
+    白屏自救（2026-10-14）。
+
+    场景：Service Worker 缓存了旧版 index.html，它引用的 `assets/index-*.js` 已被新版本
+    替换并从磁盘删掉 → 请求全部 404 → 模块脚本一次都没执行 → `#app` 永远是空的。
+    此时页面**无法自愈**：新 SW 装好了也只是 waiting，而提示刷新的代码在没跑起来的
+    那个模块里。用户只会看到一片白，且刷新多少次都一样。
+
+    所以这里放一段**不依赖任何构建产物**的内联脚本：发现入口脚本没加载成功就注销全部 SW
+    并重载一次，让浏览器回到网络拿最新 HTML。用 sessionStorage 做一次性标记，只救一次。
+
+    **判据必须是「资源加载失败」，不能是「几秒内没渲染完」**（这条是实测踩出来的）：
+    本地冷启动到 300 张卡片要 ~8 秒，5 秒阈值会在 Vue 挂载途中触发 reload，把正在进行的
+    挂载打断 —— Vue 抛 `Cannot read properties of null (reading 'nextSibling')`，`#app`
+    反而被清空，变成「自愈脚本自己造出的白屏」。所以这里改成两条：
+      ① 捕获阶段的资源 error（SCRIPT/LINK 加载不出来）→ 立即自愈；
+      ② 15 秒仍未挂载的兜底（远大于实测的 ~8 秒冷启动）→ 自愈。
+  -->
+  <script>
+    (function () {
+      var KEY = 'nav:sw-selfheal'
+      try { if (sessionStorage.getItem(KEY)) return } catch (e) { return }
+      var done = false
+      function heal(reason) {
+        if (done) return
+        done = true
+        try { sessionStorage.setItem(KEY, '1') } catch (e) {}
+        console.warn('[nav] 白屏自救：' + reason)
+        var go = function () { location.reload() }
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+          navigator.serviceWorker.getRegistrations()
+            .then(function (list) { return Promise.all(list.map(function (r) { return r.unregister() })) })
+            .then(go, go)
+        } else { go() }
+      }
+      // ① 入口脚本/CSS 加载不出来（旧 SW 引用了已被替换掉的 chunk）—— 捕获阶段才能收到资源错误
+      window.addEventListener('error', function (e) {
+        var t = e && e.target
+        if (t && (t.tagName === 'SCRIPT' || t.tagName === 'LINK')) heal('资源加载失败 ' + (t.src || t.href || ''))
+      }, true)
+      // ② 兜底：15 秒还没挂载上 —— 冷启动实测 ~8 秒，留足一倍余量，绝不打断正在进行的挂载
+      setTimeout(function () {
+        var app = document.getElementById('app')
+        if (app && app.children.length) return
+        heal('15 秒未挂载')
+      }, 15000)
+    })()
+  </script>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

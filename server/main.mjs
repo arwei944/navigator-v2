@@ -183,6 +183,22 @@ function sendFile(req, res, abs) {
   createReadStream(abs).pipe(res)
 }
 
+/** 见下方「旧产物自愈通道」：作为模块被浏览器执行，注销 SW 后重载一次 */
+const SELF_HEAL_JS = `(() => {
+  try {
+    const key = 'nav:sw-selfheal'
+    if (sessionStorage.getItem(key)) return
+    sessionStorage.setItem(key, '1')
+  } catch (e) {}
+  const go = () => location.reload()
+  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+    navigator.serviceWorker.getRegistrations()
+      .then(list => Promise.all(list.map(r => r.unregister())))
+      .then(go, go)
+  } else { go() }
+})()
+`
+
 function sendJson(res, code, obj) {
   res.statusCode = code
   res.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -292,6 +308,29 @@ const server = http.createServer(async (req, res) => {
     if (existsSync(abs) && statSync(abs).isDirectory()) abs = join(abs, 'index.html')
 
     if (existsSync(abs) && statSync(abs).isFile()) { sendFile(req, res, abs); return }
+
+    /**
+     * 旧产物自愈通道（2026-10-14 白屏事故）。
+     *
+     * Service Worker 缓存了**旧版 index.html**，它引用的 `assets/index-<旧 hash>.js`
+     * 已被新版本换掉并从磁盘删掉 → 请求 404 → 模块脚本一次都没执行 → `#app` 永远空着。
+     * 这时页面**无法自愈**：新 SW 装好了也只是 waiting；提示刷新的代码正躺在那个
+     * 没跑起来的模块里。用户只会看到一片白，刷新多少次都一样。
+     *
+     * 所以这里对「assets 下不存在的 .js」不回 404，而回一段自愈脚本 —— 浏览器会把它
+     * 当模块执行，于是注销全部 SW 并重载一次，用户什么都不用做就回到最新版本。
+     *
+     * 代价：这类请求的 404 变成了 200。范围刻意收在 `/assets/*.js`（带哈希的构建产物，
+     * 正常情况下不会有人去请求一个不存在的 chunk），其它路径的 404 语义一字未动。
+     * `sessionStorage` 标记保证只重载一次，不会因为某个 chunk 真的缺失而刷成死循环。
+     */
+    if (/^\/assets\/.*\.js$/i.test(pathname)) {
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(SELF_HEAL_JS)
+      return
+    }
 
     // SPA 兜底：无扩展名的路径（如 /archived）回壳文件；带扩展名却不存在的是真 404
     if (!extname(pathname)) {
