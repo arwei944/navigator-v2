@@ -36,7 +36,8 @@ import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
-const PORT = Number(process.env.PORT) || 3000
+// HIVE 平台约定不一：Vercel / WorkBuddy 沙箱注入 PORT，BotKeep 注入 SERVER_PORT —— 两个都认。
+const PORT = Number(process.env.PORT || process.env.SERVER_PORT) || 3000
 const HOST = process.env.HOST || '0.0.0.0'
 
 /**
