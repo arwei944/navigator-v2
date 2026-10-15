@@ -39,6 +39,25 @@ const SLICE_NAMES = 'abcdefghijklmnopqrstuvwxyz'.split('').map(c => `a.pa${c}`)
 const SLICE_BYTES = Math.floor(3.5 * 1024 * 1024)
 const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
 
+/**
+ * 幂等键自校验。**必须区分「长度不对」与「字符不对」** ——
+ * 早先只回一句「不合规（18 位）」，而 18 位明明在 16–64 区间里：
+ * 真正的原因是分片名 `a.paa` 里的那个点。错误信息指错方向比不报还费时间。
+ */
+function idemProblem(idem) {
+  if (idem.length < 16 || idem.length > 64) return `长度 ${idem.length} 不在 16–64 之间`
+  if (!/^[A-Za-z0-9_-]+$/.test(idem)) return '含非法字符（只允许字母、数字、- 与 _）'
+  return ''
+}
+
+/** 分片名里的点等字符要换掉才能进幂等键（`a.paa` → `a-paa`） */
+function idemFor(parts) {
+  return ['nav', ...parts]
+    .map(p => String(p).replace(/[^A-Za-z0-9_-]/g, '-'))
+    .join('-')
+    .slice(0, 64)
+}
+
 /* ---------------- 凭据 ---------------- */
 
 export function credentials() {
@@ -201,6 +220,9 @@ function runStep(log, label, command, args, opts = {}) {
   } catch (e) {
     const out = String(e.stdout || '') + String(e.stderr || '')
     if (out.trim()) log(out.trim().split('\n').slice(-40).join('\n'))
+    // 连 stdout/stderr 都没有时（spawn 层面就失败了，比如 Windows 上跑 .cmd），
+    // 至少把退出码与原因说出来 —— 否则日志里只剩一句「构建失败」，无从下手
+    if (!out.trim()) log(`  （无输出：${e.message}${e.status != null ? ` / exit ${e.status}` : ''}）`)
     return { ok: false, error: e.message, out }
   }
 }
@@ -234,7 +256,12 @@ async function packSlices(log) {
 
   const tarName = 'app.tar'
   const tarPath = join(work, tarName)
-  const packed = runStep(log, 'tar -cf app.tar .', 'tar', ['-cf', tarPath, '-C', staged, '.'])
+  /**
+   * 用**相对路径**（cwd 设在 work，tar 写 `app.tar`、从 `stage` 取内容）：
+   * GNU tar 会把 `C:\...` 里的 `C:` 当成 rsh 的远程主机语法（"Cannot connect to C:"）。
+   * 传绝对 Windows 路径必挂，`--force-local` 也不是所有版本都有 —— 相对路径最稳。
+   */
+  const packed = runStep(log, 'tar -cf app.tar -C stage .', 'tar', ['-cf', tarName, '-C', 'stage', '.'], { cwd: work })
   if (!packed.ok) throw new Error('打包失败：' + packed.error)
 
   const buf = readFileSync(tarPath)
@@ -255,39 +282,133 @@ async function packSlices(log) {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
 /**
+ * 单片的重试上限。平台在忙的时候会连续拒（422/503/超时都是同一件事的不同马甲），
+ * 4 次不够用（实测连续五六次都见过）；每片之间还要排队，所以给到 6 次。
+ */
+const MAX_ATTEMPTS = 6
+
+/**
  * 上传单片，带重试。
  *
  * 重试策略来自实测：429 要排队 40–80 秒才返回（所以间隔取 45 秒，比它长），
  * 422 与 503 都出现过「同一份 body 重试就成功」的情况，也一并重试。
  * **唯独幂等键不合规不能重试** —— 那不是瞬时故障，重试只是白等。
  */
-async function uploadSlice(log, slice, attempt = 0) {
-  const idem = `nav-${slice.name}-${Date.now().toString(36)}`
-  if (!IDEM_RE.test(idem)) throw new Error(`幂等键不合规（${idem.length} 位）：${idem}`)
+async function uploadSlice(log, slice, attempt = 0, retryKey) {
+  // 重试**复用同一个键**：那才是「幂等」的本意（否则服务端看到的是一次新上传）
+  const idem = retryKey || idemFor([slice.name, Date.now().toString(36)])
+  const bad = idemProblem(idem)
+  if (bad) throw new Error(`幂等键不合规（${bad}）：${idem}`)
   try {
     const r = await bk('/files/upload', {
       method: 'POST',
-      body: { path: `/${slice.name}`, content: slice.base64 },
+      // 字段名是 `data`（不是 content）：写错时服务端回**422**，
+      // 而 422 看起来像瞬时故障，会被重试逻辑吞掉六轮 —— 白等好几分钟才失败
+      body: { path: `/${slice.name}`, data: slice.base64 },
       idem,
+      // 上传 3.5 MiB 分片（base64 后约 4.7 MB）在平台要排队，实测会超过 120 秒。
+      // 超时过短会让「上传中的请求」被本地掐断，然后无谓地重头再来一遍。
+      timeout: 300000,
     })
     if (r.ok) { log(`  ✓ ${slice.name}`); return true }
+    const detail = JSON.stringify(r.json || {}).slice(0, 220)
     if (r.status === 413) throw new Error('单片过大，平台 nginx 拒绝（需调小 SLICE_BYTES）')
-    if (attempt >= 4) throw new Error(`上传 ${slice.name} 失败：HTTP ${r.status} ${JSON.stringify(r.json).slice(0, 160)}`)
-    const wait = r.status === 429 ? 45000 : 8000
-    log(`  · ${slice.name} HTTP ${r.status}，${Math.round(wait / 1000)}s 后重试（${attempt + 1}/4）`)
+
+    /**
+     * 目标位置已有同名文件时平台回 409（要显式确认替换）。重试没有意义 ——
+     * 得先把它删掉再传。这一步很常见：上一次发布的同名分片就留在那儿。
+     * 不计入 attempt：这不是一次失败，只是需要先清理。
+     */
+    if (r.status === 409 && /already exists/i.test(detail)) {
+      log(`  · ${slice.name} 已存在，先删除再上传`)
+      try {
+        await deleteFiles([`/${slice.name}`])
+      } catch { /* 删不掉就让下一次 409 再试 */ }
+      await sleep(5000)
+      // 必须换**新的幂等键**：这个键刚才已经用过了，平台会按幂等语义回放那次 409
+      return uploadSlice(log, slice, attempt + 1)
+    }
+
+    /**
+     * 请求体**字段**不对时不要重试：服务端会把哪个字段多了、哪个少了列出来
+     * （`extra_forbidden` / `missing`），这是代码问题不是负载问题，重试一万次也一样。
+     * 早先这类 422 被当成瞬时故障，六轮各等 30 秒后才失败，日志里还只有「HTTP 422」。
+     */
+    const fields = r.json?.fields
+    if (r.status === 422 && Array.isArray(fields) && fields.some(f => /missing|extra_forbidden|invalid/i.test(String(f?.type)))) {
+      throw new Error(`请求体字段不合规（不可重试）：${detail}`)
+    }
+
+    if (attempt >= MAX_ATTEMPTS) throw new Error(`上传 ${slice.name} 失败：HTTP ${r.status} ${detail}`)
+    /**
+     * 非 429 的错误也等 30 秒：平台对写操作是**统一排队**的，422/503 这类
+     * 看起来像瞬时故障的响应，实测也是「等一轮再发就好了」。
+     * 早先只等 8 秒，等于在队列里原地反复插队，既慢又更容易再被拒。
+     */
+    const wait = r.status === 429 ? 45000 : 30000
+    // 重试日志必须带上响应体：不然「HTTP 422」这五个字什么信息都没有
+    log(`  · ${slice.name} HTTP ${r.status} ${detail}，${Math.round(wait / 1000)}s 后重试（${attempt + 1}/${MAX_ATTEMPTS}）`)
     await sleep(wait)
-    return uploadSlice(log, slice, attempt + 1)
+    return uploadSlice(log, slice, attempt + 1, idem)
   } catch (e) {
-    if (/过.*大|幂等键不合规/.test(e.message)) throw e
-    if (attempt >= 4) throw e
-    log(`  · ${slice.name} ${e.message}，8s 后重试（${attempt + 1}/4）`)
-    await sleep(8000)
-    return uploadSlice(log, slice, attempt + 1)
+    if (/过.*大|幂等键不合规|不可重试/.test(e.message)) throw e
+    if (attempt >= MAX_ATTEMPTS) throw e
+    // 超时/网络类错误也要等够：平台的写入通道是**排队**的，立刻重试只会再排一次队
+    log(`  · ${slice.name} ${e.message}，30s 后重试（${attempt + 1}/${MAX_ATTEMPTS}）`)
+    await sleep(30000)
+    return uploadSlice(log, slice, attempt + 1, idem)
+  }
+}
+
+/**
+ * 删除容器里的文件（可批量）。
+ *
+ * 端点与字段都**不是**凭直觉能猜对的那几个，这里把踩过的全记下来：
+ *   · `POST /files/delete {path}`       → 404（这个端点不存在）
+ *   · `POST /file-action {path,name}`   → 那是**重命名**，`name` 是新文件名；
+ *                                          当成删除用时服务端回 409「A file already exists
+ *                                          at the destination」——因为目标就是它自己
+ *   · `POST /files/batch {action,paths}` → ✅ `{action:'delete', paths:[...]}`，一次可删多个
+ *
+ * 这类「端点猜错」的代价特别大：404/409 很容易被当成「本来就没有」吞掉，
+ * 于是「删了」这个动作一次都没发生，而后续每一步都还照常往下走 ——
+ * 最终表现为「发布全绿、线上还是旧版本」。
+ */
+async function deleteFiles(paths) {
+  const list = (Array.isArray(paths) ? paths : [paths]).filter(Boolean)
+  if (!list.length) return { ok: true, status: 200, json: { skipped: true } }
+  const r = await bk('/files/batch', {
+    method: 'POST',
+    body: { action: 'delete', paths: list },
+    idem: idemFor(['batch', Date.now().toString(36)]),
+  })
+  /**
+   * 平台对「要删的东西不在」回 **404 `The file or folder no longer exists`** ——
+   * 注意这不是「端点不存在」，而是**意图已经达成**。把它当失败处理会引发一连串误判：
+   * 清理步骤报错 → 上传撞 409 → 重试 → 白等。
+   * 另外这条 404 是**整批**返回的：一批里混了一个不存在的路径，整批都不执行。
+   * 所以调用方要先按真实文件列表过滤（见 publish 里的清理步骤）。
+   */
+  if (r.status === 404 && /no longer exists/i.test(JSON.stringify(r.json || {}))) {
+    return { ...r, ok: true, alreadyGone: true }
+  }
+  return r
+}
+
+/** 根目录下的实际文件名集合（用于「只删存在的」，避免整批 404） */
+async function listRoot() {
+  try {
+    const r = await bk('/files?path=/')
+    if (!r.ok) return null
+    const list = Array.isArray(r.json) ? r.json : []
+    return new Set(list.map(x => String(x.path || x.name || '')))
+  } catch {
+    return null
   }
 }
 
 async function action(log, name, attempt = 0) {
-  const idem = `nav-${name}-${Date.now().toString(36)}`
+  const idem = idemFor([name, Date.now().toString(36)])
   try {
     const r = await bk('/actions', { method: 'POST', body: { action: name }, idem })
     if (r.ok || r.status === 202) { log(`  ✓ ${name} 已入队`); return r }
@@ -329,8 +450,18 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       steps.push({ key: 'build', ok: true, skipped: true })
     } else {
       log('· 构建产物')
-      const b = runStep(log, 'npm run build', process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'])
-      if (!b.ok) throw Object.assign(new Error('构建失败'), { step: 'build' })
+      /**
+       * Windows 上必须走 shell：`npm` 是 `npm.cmd`（批处理），而 Node 从 v18.20/20.12 起
+       * 出于安全考虑**禁止** execFile 直接执行 .cmd/.bat（会抛 EINVAL，且不带任何输出）。
+       * 参数是这里写死的（'run','build'），没有拼接外部输入，所以 shell 不引入注入面。
+       */
+      const win = process.platform === 'win32'
+      // 整条命令作为 command、args 留空：`shell:true` 配 args 会触发 DEP0190
+      // （Node 警告参数不会转义、只是拼接），而这里本来就只需要一条固定命令
+      const b = win
+        ? runStep(log, 'npm run build', 'npm run build', [], { shell: true })
+        : runStep(log, 'npm run build', 'npm', ['run', 'build'])
+      if (!b.ok) throw Object.assign(new Error(`构建失败：${b.error}`), { step: 'build' })
       steps.push({ key: 'build', ok: true })
     }
 
@@ -350,16 +481,58 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
     try {
       /* 4. 上传 */
       log('\n· 上传分片')
+      /**
+       * 上传前把**这一批分片名 + 几个可能的残留**一次性删干净，再统一上传。
+       *
+       * 两个理由：
+       *  1. 平台的上传遇到同名文件回 409「already exists」，得先删再传；
+       *     而删除有生效延迟（实测紧随其后的上传仍可能撞 409），所以批量删完再等一会儿。
+       *  2. 容器启动命令用通配 `cat a.pa?` 合并分片 —— 上次若切得更多，残留片会被
+       *     一起合进包里，包直接损坏，表现为「解压完还是跑旧版本」。
+       *
+       * 用 batch 端点一次删完：写操作在这个平台是要排队的，能少一次是一次。
+       */
+      const staleList = SLICE_NAMES.slice(slices.length, slices.length + 3)
+      const wantPaths = [...slices.map(s => `/${s.name}`), ...staleList.map(n => `/${n}`)]
+      // 只删**实际存在**的：批量删除是整批语义，混进一个不存在的路径会让整批都不执行
+      const present = await listRoot()
+      const clearList = present ? wantPaths.filter(p => present.has(p)) : wantPaths
+      if (clearList.length) {
+        try {
+          const r = await deleteFiles(clearList)
+          log(`  · 清理分片位 ${clearList.join('、')}（HTTP ${r.status}）`)
+        } catch (e) {
+          log(`  · 清理分片失败（${e.message}），继续尝试上传`)
+        }
+        await sleep(5000)
+      } else {
+        log('  · 没有需要清理的旧分片')
+      }
       for (const s of slices) await uploadSlice(log, s)
       steps.push({ key: 'upload', ok: true, note: `${slices.length} 片` })
 
       /* 5. 触发解压：容器启动命令里有「server.js 不存在才解压」的守卫 */
       log('\n· 触发容器解压')
-      const del = await bk('/files/delete', {
-        method: 'POST', body: { path: '/server.js' },
-        idem: `nav-del-${Date.now().toString(36)}`,
-      })
-      log(del.ok || del.status === 404 ? '  ✓ server.js 已移除（触发器就绪）' : `  · 删除返回 ${del.status}（继续）`)
+
+      /**
+       * 先确认容器的启动命令认得出**这一批**分片。
+       *
+       * 这里踩过一次大坑：启动命令里把分片名一个个写死（`cat a.paa a.pab a.pac a.pad`），
+       * 而某次产物变小只切了 3 片 —— `cat` 因为第 4 个文件不存在而失败，
+       * `&&` 后面的解压整条不执行，容器**若无其事地继续跑旧版本**。
+       * 现象是「发布全绿、线上还是旧的」，而且没有任何报错。通配 `a.pa?` 就没有这个问题。
+       */
+      try {
+        const wl = await bk('')
+        const cmd = String(wl.json?.startCommand || '')
+        if (cmd && !/a\.pa\?/.test(cmd)) {
+          log('  ⚠ 容器的启动命令没有用通配 a.pa?，分片数一变就会解压失败（且不报错）')
+          log('    建议改为：test -f server.js || (cat a.pa? > a.tar && tar -xf a.tar && rm -f a.pa? a.tar); node server.js')
+        }
+      } catch { /* 读不到详情不影响发布 */ }
+
+      const del = await deleteFiles(['/server.js'])
+      log(del.ok ? '  ✓ server.js 已移除（解压触发器就绪）' : `  ⚠ 没能移除 server.js（HTTP ${del.status}）—— 容器会继续跑旧版本`)
       await action(log, 'restart')
       steps.push({ key: 'restart', ok: true })
 

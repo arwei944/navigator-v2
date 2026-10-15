@@ -22,7 +22,12 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
 const PORT = process.argv[2] || '9394'
 const CONSOLE_BASE = 'http://127.0.0.1:5176'
-const SITE_BASE = 'http://127.0.0.1:4214'
+/**
+ * 站点地址默认打本地 dist；设 `SITE_BASE=https://...` 就打线上。
+ * 打线上时**跳过控制台那一段**：控制台是本地工具，线上没有它。
+ */
+const SITE_BASE = (process.env.SITE_BASE || 'http://127.0.0.1:4214').replace(/\/+$/, '')
+const LIVE = !/^https?:\/\/127\.0\.0\.1/.test(SITE_BASE)
 
 let pass = 0
 const failures = []
@@ -63,15 +68,16 @@ const spawnSvc = (label, script, args, env) => {
   return p
 }
 
-if (!(await alive(CONSOLE_BASE + '/'))) {
+if (!LIVE && !(await alive(CONSOLE_BASE + '/'))) {
   spawnSvc('本地控制台', join(ROOT, 'tools', 'console', 'server.mjs'), ['--port', '5176'], {})
   if (!(await waitForAlive(CONSOLE_BASE + '/', 20000))) { console.error('控制台没起来'); process.exit(2) }
 }
-if (!(await alive(SITE_BASE + '/api/health'))) {
+if (!LIVE && !(await alive(SITE_BASE + '/api/health'))) {
   if (!existsSync(join(ROOT, 'dist', 'server.js'))) { console.error('没有 dist/server.js，先跑 npm run build'); process.exit(2) }
   spawnSvc('站点服务', join(ROOT, 'dist', 'server.js'), [], { PORT: '4214' })
   if (!(await waitForAlive(SITE_BASE + '/api/health', 20000))) { console.error('站点服务没起来'); process.exit(2) }
 }
+if (LIVE) console.log(`  （线上模式：${SITE_BASE} —— 跳过控制台段）`)
 
 const CHROME = process.env.CHROME_PATH || 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 let chromeProc = null
@@ -174,6 +180,7 @@ async function shot(name) {
 /* ---------------- A. 控制台的「发布」面板 ---------------- */
 
 console.log('\n── A. 本地控制台 · 发布面板 ──')
+if (!LIVE) {
 await evalJs(`location.href = ${JSON.stringify(CONSOLE_BASE + '/')}`)
 // 导航会换掉执行上下文，异常/console 的订阅要重新建立，否则新文档里的错误收不到
 await send('Runtime.enable')
@@ -262,6 +269,8 @@ await evalJs(`(() => { document.querySelector('#btn-deploy-refresh').click(); re
 await sleep(2500)
 ok(consoleErrors.length === errBefore, '点「刷新」不产生控制台错误', consoleErrors.slice(errBefore).join(' | ').slice(0, 100))
 
+} // ← A 段结束（线上模式跳过）
+
 /* ---------------- B. 站内后台的「部署」面板 ---------------- */
 
 console.log('\n── B. 站点后台 · 部署面板 ──')
@@ -306,6 +315,15 @@ if (adminKey) {
 
 const authed = await evalJs(`!!document.querySelector('.admin-tabs')`)
 if (!authed) {
+  // 登录失败要能自证原因：把页面上的按钮、表单、提示文案都摊出来
+  const diag = await jsonOf(`({
+    buttons: [...document.querySelectorAll('button')].map(b => b.textContent.trim()).slice(0, 12),
+    hasLoginForm: !!document.querySelector('.login-form'),
+    inputs: [...document.querySelectorAll('input')].map(i => i.type + ':' + (i.placeholder || i.name || '')).slice(0, 8),
+    notice: document.querySelector('.admin-body')?.textContent?.trim()?.slice(0, 200) || '(空)',
+    hasKey: ${JSON.stringify(Boolean(adminKey))},
+  })`)
+  console.log(`  （登录诊断：${JSON.stringify(diag)}）`)
   ok(false, '能进入后台（登录成功）', '登录未完成，后续断言跳过')
 } else {
   // 点「部署」tab
