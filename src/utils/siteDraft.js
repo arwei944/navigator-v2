@@ -60,18 +60,19 @@ export function findDuplicate(sites, url) {
 }
 
 /**
- * 草稿 → 站点对象。三条规则与既有弹窗完全一致，不得改动：
- * 1) url 存去协议去路径的主机名（保留大小写与 www）；
+ * 草稿 → 站点对象：
+ * 1) url 存**裸域名**（去协议、去路径、去 www、转小写）—— 与 `hostOf` / `normalizeUrl` /
+ *    `scripts/normalize-www.mjs` 同一口径。这里曾经保留 www 与大小写，于是「秒加」进来的站带前缀、
+ *    手工添加的不带，同一站在库里出现两条不同字符串的记录（这正是「智能去重」要修的那一类）。
  * 2) initial 取站名首字符大写；
  * 3) 图标只在「抓取来源域名 === 本站去重域名」时写入，宁可回落字母块也不挂错图。
  */
 export function buildSiteFromDraft({ form, faviconUrl = '', faviconHost = '' }) {
-  const rawDomain = rawHostOf(form.url)
   const domain = domainOf(form.url)
 
   const site = {
     name: form.name,
-    url: rawDomain,
+    url: domain,
     desc: form.desc,
     categoryId: form.categoryId,
     color: form.color,
@@ -112,8 +113,8 @@ export function fallbackDraftFromMeta({ url, meta = null, categoryId = '' }) {
 
   return {
     form: {
-      name: nameReliable ? rawName : rawHostOf(url),
-      url: String(m.domain || '').trim() || rawHostOf(url),
+      name: nameReliable ? rawName : domainOf(url),
+      url: String(m.domain || '').trim() || domainOf(url),
       desc: m.desc || '',
       categoryId,
       color: m.color || colorFromHost(domainOf(url)),

@@ -49,8 +49,10 @@ export function tally(results) {
 export function buildHealthPayload({ prev = null, incoming = {}, knownIds = null, actor = 'unknown', proxy = '' } = {}) {
   const prevResults = prev && prev.results && typeof prev.results === 'object' ? prev.results : {}
   const merged = {}
-  for (const [id, r] of Object.entries({ ...prevResults, ...incoming })) {
-    if (!knownIds || knownIds.has(id)) merged[id] = r
+  const ids = new Set([...Object.keys(prevResults), ...Object.keys(incoming)])
+  for (const id of ids) {
+    if (knownIds && !knownIds.has(id)) continue
+    merged[id] = nextResult(prevResults[id], incoming[id])
   }
   return {
     version: ((prev && Number(prev.version)) || 0) + 1,
@@ -60,6 +62,36 @@ export function buildHealthPayload({ prev = null, incoming = {}, knownIds = null
     counts: { total: Object.keys(merged).length, ...tally(Object.values(merged)) },
     results: merged,
   }
+}
+
+/**
+ * 合并单条判定，并维护 `fails`（**连续**不可达次数）。
+ *
+ * 为什么需要它：告警规则与「失效站点自动归档」都要区分「一直坏」与「刚坏」——
+ * 只看最新一次的 `status` 分不出这两者（`down` 既可能是首探，也可能是第 20 次连续失败）。
+ *
+ * 口径：本次探到 `down` → 在旧计数上 +1；探到其它（ok / limited）→ **归零**；
+ * 本次没探到（只有旧值）→ 原样保留（不把「没探」误当成「好了」而清零）。
+ * 旧数据没有 `fails` 字段时从 0 起算，向后兼容。
+ */
+export function nextResult(old, inc) {
+  if (!inc) return old || { code: '', status: 'unknown', ms: null, fails: 0 }
+  const prevFails = Number(old && old.fails) || 0
+  return { ...inc, fails: inc.status === 'down' ? prevFails + 1 : 0 }
+}
+
+/**
+ * 从判定表里挑出「连续不可达达到阈值」的站点 id —— 自动归档的判据。
+ * 纯函数、零 I/O，可被直接断言：`threshold <= 0` 表示关闭，返回空。
+ */
+export function pickAutoArchive(results, threshold) {
+  const n = Number(threshold)
+  if (!(n > 0) || !results || typeof results !== 'object') return []
+  const out = []
+  for (const [id, r] of Object.entries(results)) {
+    if (r && r.status === 'down' && (Number(r.fails) || 0) >= n) out.push(id)
+  }
+  return out
 }
 
 /** 探活结果数组 → incoming 映射（巡检与接口共用同一归一：code → verdict） */

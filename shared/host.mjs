@@ -24,3 +24,25 @@ export function hostOf(raw) {
     return ''
   }
 }
+
+/**
+ * 取注册域（eTLD+1 的最简近似）：去协议 / 路径 / `www.`，保留最后两段。
+ *
+ * 与 `hostOf` 的分工：hostOf 回答「这是不是同一个站」（`docs.google.com` 与 `google.com`
+ * 是**不同**的 host），registrableDomain 回答「这属不属于同一家」（两者同族）。
+ * 去重、近重复检测、关联图谱的「同族」判据都取后者。
+ *
+ * 两段式后缀（`co.uk` / `com.cn`）多留一段，避免把 `foo.co.uk` 与 `bar.co.uk` 当成同族。
+ * 这是**刻意不引公共后缀库**的近似 —— 覆盖本仓库实际出现的域名，够用且零依赖。
+ *
+ * 唯一实现：`shared/affinity.mjs` 原来自己写了一份（它是被搬过来的第四份 host 实现），
+ * 现在两边都从这里取，口径不会再分叉。
+ */
+export function registrableDomain(raw) {
+  const host = hostOf(raw)
+  const parts = host.split('.').filter(Boolean)
+  if (parts.length <= 2) return host
+  const lastTwo = parts.slice(-2).join('.')
+  if (/^(co|com|org|net|gov|edu)\.[a-z]{2}$/.test(lastTwo)) return parts.slice(-3).join('.')
+  return lastTwo
+}

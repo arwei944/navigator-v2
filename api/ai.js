@@ -203,7 +203,12 @@ async function categorize(body) {
     if (!r) return { ...base, kind: 'keep' }
     if (r.new) return { ...base, kind: 'new', label: clip(r.new, 16) }
     const known = existing.some(x => x.split('=')[0] === String(r.id))
-    return known ? { ...base, kind: 'use', id: String(r.id), label: clip(r.label, 16) } : { ...base, kind: 'new', label: clip(r.label || r.id, 16) }
+    // ⚠️ 分类 id 必须放 `categoryId`，**不能**覆盖 `id` —— `id` 是站点 id。
+    // 早先这里写成 `id: String(r.id)`，把站点 id 覆盖成了分类 id，
+    // 于是前端「应用」时拿分类 id 去 updateSiteField，写进一个不存在的站点（静默无效）。
+    return known
+      ? { ...base, kind: 'use', categoryId: String(r.id), label: clip(r.label, 16) }
+      : { ...base, kind: 'new', label: clip(r.label || r.id, 16) }
   })
   return { ok: true, suggestions }
 }
@@ -223,6 +228,50 @@ async function summarize(body) {
   return { ok: true, summary: clip(text, 600) }
 }
 
+/**
+ * 批量生成 / 改写站点描述（#13）。
+ *
+ * 只依据**站名、域名、分类**推断，并明确要求模型不要编造具体功能、价格、数据 ——
+ * 描述会被写进导航库，编造的「支持 XX 协议」比空描述更糟。拿不准就写得通用一点。
+ * 已有的、看起来不空的描述也一并交给模型判断「要不要重写」：它比人工一条条看快得多，
+ * 但仍**只出建议**，写库由用户在面板上确认后触发（与 categorize 同一纪律）。
+ */
+async function describe(body) {
+  const items = Array.isArray(body.sites) ? body.sites.slice(0, MAX_BATCH) : []
+  if (!items.length) return { ok: false, error: '没有待生成描述的站点' }
+  const list = items
+    .map((s, i) => `${i + 1}. ${clip(s.name, 40)} | ${clip(s.url, 60)} | 分类：${clip(s.categoryLabel || s.categoryId, 20)} | 现有描述：${clip(s.desc, 60) || '（空）'}`)
+    .join('\n')
+
+  const text = await chat(
+    aiConfig(),
+    '你是网址导航的文案编辑。为每个站点写一句中文简介（30~60 字），说明它是做什么的、对什么人有帮助。'
+      + '只依据给出的站名 / 域名 / 分类推断，不要编造具体功能、价格、数字与版本号；拿不准就写得通用一点。'
+      + '已有描述已经清楚准确的，原样返回；空泛或错误的才重写。'
+      + '输出严格 JSON 数组：[{"i":1,"desc":"..."}]',
+    list,
+    { maxTokens: 900 },
+  )
+  const parsed = parseJsonLoose(text)
+  if (!Array.isArray(parsed)) return { ok: false, error: '模型没有给出可用描述', raw: text.slice(0, 200) }
+  const byIndex = new Map()
+  for (const r of parsed) {
+    const i = Number(r && r.i)
+    if (Number.isFinite(i) && i >= 1 && i <= items.length) byIndex.set(i, r)
+  }
+  const results = items.map((s, idx) => {
+    const r = byIndex.get(idx + 1)
+    const desc = r ? clip(r.desc, 120) : ''
+    return {
+      id: s.id,
+      name: clip(s.name, 40),
+      desc,
+      changed: Boolean(desc) && desc !== String(s.desc || '').trim(),
+    }
+  })
+  return { ok: true, results }
+}
+
 /** 模型偶尔会给 JSON 裹上 ```json 或加一句废话，做一次宽松提取 */
 function parseJsonLoose(text) {
   const s = String(text || '').trim()
@@ -239,7 +288,7 @@ function parseJsonLoose(text) {
   try { return JSON.parse(body.slice(start, stop + 1)) } catch { return null }
 }
 
-const ACTIONS = { polish, categorize, summarize }
+const ACTIONS = { polish, categorize, summarize, describe }
 
 export default async function handler(req, res) {
   noStore(res)

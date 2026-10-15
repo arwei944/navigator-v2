@@ -33,6 +33,11 @@ const DEFAULTS = {
   attempts: 2,
   lastRunAt: null,
   lastRun: null,
+  // 定时发布（与巡检共用同一个配置文件与调度器）
+  publishEnabled: false,
+  publishAt: '03:00',
+  publishAuto: false,
+  lastPublishDate: null,
 }
 
 let timer = null
@@ -59,6 +64,10 @@ export function saveConfig(patch = {}) {
   const next = { ...config(), ...patch }
   next.intervalMs = Math.max(5 * 60e3, Number(next.intervalMs) || DEFAULTS.intervalMs)
   next.enabled = Boolean(next.enabled)
+  // 定时发布：时间归一 + 布尔化（其余字段原样透传）
+  if (patch.publishAt !== undefined) next.publishAt = normalizeHm(patch.publishAt)
+  if (patch.publishEnabled !== undefined) next.publishEnabled = Boolean(patch.publishEnabled)
+  if (patch.publishAuto !== undefined) next.publishAuto = Boolean(patch.publishAuto)
   persist(next)
   if (next.enabled) startScheduler()
   else stopScheduler()
@@ -72,6 +81,60 @@ export function status() {
     running: timer !== null,
     nextRunAt: c.enabled && c.lastRunAt ? new Date(Date.parse(c.lastRunAt) + c.intervalMs).toISOString() : null,
     intervalLabel: c.intervalMs >= 3600e3 ? `${(c.intervalMs / 3600e3).toFixed(1)} 小时` : `${Math.round(c.intervalMs / 60e3)} 分钟`,
+  }
+}
+
+/* ---------------- 定时发布 ---------------- */
+
+/** 'H:M' / 'HH:MM' → 'HH:MM'；非法值退回 fallback（默认为默认时间） */
+export function normalizeHm(v, fallback = DEFAULTS.publishAt) {
+  const m = String(v || '').match(/^(\d{1,2}):(\d{1,2})$/)
+  if (!m) return fallback
+  const h = Number(m[1]); const min = Number(m[2])
+  if (h > 23 || min > 59) return fallback
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`
+}
+
+function todayStr(now = new Date()) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * 「定时发布是否到点」——纯函数、可测。
+ *
+ * 判据：已启用 且 当前时刻已过 publishAt 且 **今天还没触发过**。
+ * `lastPublishDate` 记的是**日期**而不是时间戳：这样「今天 03:05 才打开控制台」只会补触发一次，
+ * 不会因为迟到而在这一分钟里反复触发。跨天自然重置。
+ */
+export function isPublishDue(cfg, now = new Date()) {
+  if (!cfg || !cfg.publishEnabled) return false
+  const at = normalizeHm(cfg.publishAt, '')
+  if (!at) return false
+  if (cfg.lastPublishDate === todayStr(now)) return false
+  const [h, m] = at.split(':').map(Number)
+  return (now.getHours() * 60 + now.getMinutes()) >= h * 60 + m
+}
+
+/**
+ * 定时发布的到点处理（每分钟 tick 调用一次）。
+ *
+ * **默认只提醒、不自动执行**：发布会提交、推送、重新部署线上 —— 无人监督地自动做这些，
+ * 一旦本地有半成品改动就会直接发到线上。要「到点自动跑」必须显式打开 `publishAuto`，
+ * 届时走的仍是同一条 `startRelease` 流水线，日志与中止方式完全一致（能在「流水线」面板看到）。
+ */
+async function checkScheduledPublish(cur) {
+  if (!isPublishDue(cur)) return
+  persist({ ...cur, lastPublishDate: todayStr() })
+  if (cur.publishAuto) {
+    const { startRelease, RELEASE_JOB_TITLE } = await import('./release.mjs')
+    if (jobs.listJobs().some(j => j.title === RELEASE_JOB_TITLE && j.status === 'running')) return
+    startRelease({ trigger: 'schedule', actor: 'schedule' })
+    notify.push({ kind: 'publish.scheduled', title: '定时发布已启动', body: `按配置自动执行流水线（${cur.publishAt}）` })
+  } else {
+    notify.push({
+      kind: 'publish.due', title: '定时发布到点（仅提醒）',
+      body: `已到 ${cur.publishAt}。当前设置只提醒、不自动执行 —— 去「流水线」面板点「立即发布」即可。`,
+    })
   }
 }
 
@@ -181,12 +244,14 @@ export function startScheduler() {
   const c = config()
   if (!c.enabled) return false
   // 每分钟对一次表：间隔可能是小时级，用细粒度 tick 才能支持运行中改配置
-  timer = setInterval(() => {
+  timer = setInterval(async () => {
     const cur = config()
-    if (!cur.enabled) return
-    if (jobs.listJobs().some(j => j.title === JOB_TITLE && j.status === 'running')) return
-    const due = !cur.lastRunAt || Date.now() - Date.parse(cur.lastRunAt) >= cur.intervalMs
-    if (due) startInspection({ trigger: 'schedule' })
+    if (cur.enabled) {
+      const busy = jobs.listJobs().some(j => j.title === JOB_TITLE && j.status === 'running')
+      const due = !cur.lastRunAt || Date.now() - Date.parse(cur.lastRunAt) >= cur.intervalMs
+      if (due && !busy) startInspection({ trigger: 'schedule' })
+    }
+    try { await checkScheduledPublish(cur) } catch { /* 定时发布的异常不能拖垮调度器 */ }
   }, 60e3)
   timer.unref?.()
   return true

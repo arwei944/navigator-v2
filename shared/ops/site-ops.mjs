@@ -21,6 +21,7 @@ export const SITE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'icon', 'color'
 export const FIELD_LABEL = {
   name: '名称', url: '链接', desc: '描述', categoryId: '分类', icon: '图标',
   color: '配色', initial: '首字母', sortOrder: '排序', aliases: '别名', purposes: '用途',
+  pinned: '置顶', archived: '归档',
 }
 
 /** 允许被编辑 / 批量写入的字段 */
@@ -30,10 +31,18 @@ export const EDITABLE_FIELDS = ['name', 'url', 'desc', 'categoryId', 'color', 'i
 
 // 唯一实现在 shared/host.mjs（本文件原来是四份之一）。
 // 既要 re-export（保持既有 import 路径），也要 import（本模块内部有使用）。
-export { hostOf } from '../host.mjs'
-import { hostOf } from '../host.mjs'
+export { hostOf, registrableDomain } from '../host.mjs'
+import { hostOf, registrableDomain } from '../host.mjs'
 
-/** 落库口径：只保留域名，去协议 / 查询串 / 尾斜杠 */
+/**
+ * 落库口径：只保留域名，去协议 / 查询串 / 尾斜杠 —— 以及 `www.` 前缀。
+ *
+ * 去 `www.` 是与 `shared/host.mjs#hostOf` 对齐的**修正**，不是顺手加的行为：
+ * hostOf 早就把 `www.github.com` 与 `github.com` 判为同一个站（它做「已收录」判定），
+ * 而落库这一侧原来原样保留了 www —— 于是同一站在库里留下两条不同字符串的记录，
+ * 卡片、去重、同域缓存全线对不上（`validateSite` 说「已收录」，用户却在列表里看到两条）。
+ * 判重口径与落库口径必须同源。
+ */
 export function normalizeUrl(input) {
   let raw = String(input || '').trim()
   if (!raw) throw new Error('请填写站点地址')
@@ -47,7 +56,7 @@ export function normalizeUrl(input) {
   let u
   try { u = new URL(raw) } catch { throw new Error(`站点地址无法解析：${input}`) }
   if (!['http:', 'https:'].includes(u.protocol)) throw new Error('仅支持 http/https 地址')
-  return u.hostname
+  return u.hostname.replace(/^www\./, '')
 }
 
 /**
@@ -58,6 +67,26 @@ export function toTarget(input) {
   const raw = String(input || '').trim()
   if (!raw) throw new Error('请填写站点地址')
   return /^https?:\/\//i.test(raw) ? raw : 'https://' + raw
+}
+
+/* ---------------- 去重 ---------------- */
+
+/** 判重键：与落库口径同源的裸域名（去协议、路径、`www.`、大小写） */
+export function dedupeKey(input) {
+  return hostOf(input)
+}
+
+/**
+ * 找出与候选同域的**已收录**站点。`excludeId` 用于编辑场景（与自己比不算重复）。
+ *
+ * 为什么用 hostOf 而不是 registrableDomain：`gist.github.com` 与 `github.com`
+ * 是两个可独立收录的入口（用户在导航里想分别点到），判重只认完全同域；
+ * 「同族但不同入口」属于**近重复**，由 `findNearDuplicates` 另作提示，不在这里拦。
+ */
+export function findDupe(candidate, sites = [], { excludeId = '' } = {}) {
+  const key = dedupeKey(candidate && candidate.url != null ? candidate.url : candidate)
+  if (!key) return null
+  return (sites || []).find(s => s && s.id !== excludeId && dedupeKey(s.url) === key) || null
 }
 
 /* ---------------- 别名 ---------------- */
@@ -195,17 +224,30 @@ export function nextSortOrder(sites = []) {
  * `patchKeys` 声明该操作会写哪些字段，供前端表单与影响面预览共用。
  */
 export const BATCH_OPS = {
+  fieldset: { id: 'fieldset', label: '多字段编辑', patchKeys: EDITABLE_FIELDS, hint: '同时修改多个字段：只写填了的那几项，留空的保持原样 —— 点「预演影响面」可先看会改哪些字段' },
   category: { id: 'category', label: '改分类', patchKeys: ['categoryId'], requires: ['categoryId'], hint: '把所选站点整体迁移到另一个分类' },
   color: { id: 'color', label: '改配色', patchKeys: ['color'], requires: ['color'], hint: '统一所选站点的主题色' },
+  desc: { id: 'desc', label: '改描述', patchKeys: ['desc'], requires: ['desc'], hint: '用同一段文字覆盖所选站点的描述' },
   aliasAdd: { id: 'aliasAdd', label: '追加别名', patchKeys: ['aliases'], requires: ['aliases'], hint: '在既有别名基础上追加（不覆盖）' },
   aliasSet: { id: 'aliasSet', label: '替换别名', patchKeys: ['aliases'], requires: ['aliases'], hint: '整体替换所选站点的别名列表' },
   purposeAdd: { id: 'purposeAdd', label: '追加用途', patchKeys: ['purposes'], requires: ['purposes'], hint: '在既有用途基础上追加（不覆盖，最多 4 个）' },
   purposeSet: { id: 'purposeSet', label: '替换用途', patchKeys: ['purposes'], requires: ['purposes'], hint: '整体替换所选站点的用途标签' },
+  pin: { id: 'pin', label: '置顶', patchKeys: ['pinned', 'archived'], hint: '把所选站点置顶（置顶与归档互斥，会一并取消归档）' },
+  unpin: { id: 'unpin', label: '取消置顶', patchKeys: ['pinned'], hint: '取消所选站点的置顶' },
+  archive: { id: 'archive', label: '归档', patchKeys: ['archived', 'pinned'], hint: '把所选站点移入归档（会一并取消置顶），随时可从归档取回' },
+  unarchive: { id: 'unarchive', label: '取消归档', patchKeys: ['archived'], hint: '把所选站点从归档取回' },
   icon: { id: 'icon', label: '清空图标', patchKeys: ['icon'], hint: '清空图标引用，交给前端回落分类色块 + 首字母' },
   remove: { id: 'remove', label: '删除站点', patchKeys: [], destructive: true, hint: '从站点库中整体移除，不可撤销' },
 }
 
 export const BATCH_OP_LIST = Object.values(BATCH_OPS)
+
+/**
+ * 批量操作参与「有没有变化」比较的字段：比 SITE_FIELDS 多两个布尔开关。
+ * `pinned` / `archived` 不参与站点数据的语义 diff（云端同步不该因为置顶就报「更新」），
+ * 但批量置顶 / 归档时必须能被识别成「真的改了」，否则会被当成「无变化」而跳过。
+ */
+const BATCH_COMPARE_FIELDS = [...SITE_FIELDS, 'pinned', 'archived']
 
 /**
  * 计算「批量操作会把数据变成什么样」—— 纯函数，不落盘，dry-run 与实写共用同一条路径，
@@ -272,7 +314,21 @@ export function applyBatch(sites, { ids = [], op, patch = {}, categoryMeta = {} 
       else delete next.purposes
     }
 
-    const fields = SITE_FIELDS.filter(k => JSON.stringify(site[k]) !== JSON.stringify(next[k]))
+    if (op === 'desc') next.desc = String(patch.desc)
+
+    if (op === 'fieldset') applyFieldset(next, patch)
+
+    // 置顶与归档互斥（与站点卡片上的 togglePin / toggleArchive 同一口径）：
+    // 两者同时为真时，取消归档会让这条站突然弹到最前，看起来像凭空冒出来。
+    //
+    // 只在**确实需要变更**时才写那半个布尔：`archived: undefined` 与 `false` 语义相同，
+    // 若一律写 false，一条原本没归档的站也会被 diff 成「有变化」，白白计入影响面。
+    if (op === 'pin') { next.pinned = true; if (next.archived) next.archived = false }
+    if (op === 'unpin' && next.pinned) next.pinned = false
+    if (op === 'archive') { next.archived = true; if (next.pinned) next.pinned = false }
+    if (op === 'unarchive' && next.archived) next.archived = false
+
+    const fields = BATCH_COMPARE_FIELDS.filter(k => JSON.stringify(site[k]) !== JSON.stringify(next[k]))
     if (!fields.length) { skipped.push({ id: site.id, name: site.name, reason: '无变化' }); continue }
 
     next.updatedAt = now
@@ -299,6 +355,81 @@ export function applyBatch(sites, { ids = [], op, patch = {}, categoryMeta = {} 
 
 function toList(input) {
   return Array.isArray(input) ? input : String(input ?? '').split(/[,，、\n]/)
+}
+
+/**
+ * 多字段编辑：只写 patch 里**明确给了值**的字段，其余保持原样。
+ *
+ * 空字符串代表「这一栏不动」，不是「清空」—— 前端表单上留空的输入框就是「不改这项」，
+ * 若把空串当清空，用户想只改分类就会顺手把描述、别名一起清没。要清空请用专门的
+ * `icon`（清图标）或把字段填一个空格这类显式动作，不做隐式清空。
+ */
+function applyFieldset(next, patch) {
+  for (const key of EDITABLE_FIELDS) {
+    const v = patch[key]
+    if (v === undefined || v === null || v === '') continue
+    if (key === 'aliases') {
+      const aliases = normalizeAliases(v, { name: next.name, url: next.url })
+      if (aliases.length) next.aliases = aliases
+      else delete next.aliases
+      continue
+    }
+    if (key === 'purposes') {
+      const purposes = normalizePurposes(toList(v))
+      if (purposes.length) next.purposes = purposes
+      else delete next.purposes
+      continue
+    }
+    next[key] = v
+  }
+}
+
+/**
+ * 扫描「疑似重复 / 近似」站点分组。
+ *
+ * 抓两类：
+ *   - **同族**：同一注册域下的不同入口（`github.com` 与 `gist.github.com`）——
+ *     完全同 host 的重复应该在一开始入库时就被 `findDupe` 拦住，这里要抓的是
+ *     「拦不住、但看起来是同一家」的那一类，所以放宽到注册域。
+ *   - **同名**：注册域不同但站名完全相同（忽略大小写与首尾空白）。
+ *
+ * @returns {{ key: string, kind: 'family'|'name', label: string, sites: object[] }[]} 只含 ≥2 条的组
+ */
+export function findNearDuplicates(sites, { minNameLen = 4 } = {}) {
+  const list = Array.isArray(sites) ? sites : []
+  const groups = []
+  const seenRoots = new Set()
+
+  const byRoot = new Map()
+  for (const s of list) {
+    const root = registrableDomain(s && s.url)
+    if (!root) continue
+    if (!byRoot.has(root)) byRoot.set(root, [])
+    byRoot.get(root).push(s)
+  }
+  for (const [root, arr] of byRoot) {
+    if (arr.length < 2) continue
+    seenRoots.add(root)
+    groups.push({ key: 'root:' + root, kind: 'family', label: root, sites: arr })
+  }
+
+  const byName = new Map()
+  for (const s of list) {
+    const name = String((s && s.name) || '').trim()
+    if (name.length < minNameLen) continue
+    const k = name.toLowerCase()
+    if (!byName.has(k)) byName.set(k, [])
+    byName.get(k).push(s)
+  }
+  for (const [, arr] of byName) {
+    if (arr.length < 2) continue
+    // 已作为「同族」报过的组不重复报（同名 + 同域是同一条线索）
+    const roots = new Set(arr.map(s => registrableDomain(s.url)))
+    if (roots.size === 1 && seenRoots.has([...roots][0])) continue
+    groups.push({ key: 'name:' + arr[0].name, kind: 'name', label: arr[0].name, sites: arr })
+  }
+
+  return groups
 }
 
 /** 批量结果的一句话摘要（日志 / 提交消息 / 通知共用） */

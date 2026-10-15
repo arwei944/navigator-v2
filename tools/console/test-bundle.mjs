@@ -134,7 +134,11 @@ const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
 // defineAsyncComponent，回落到 608.1。AdminView 与 AdminAside 都独立成 chunk，
 // 已在 index chunk 里按符号名 grep 验证为 0 命中（TAB_META / admin-aside / aa-link /
 // 「站点库与分类体系的总览」等）。抬的是入口，不是功能体积。
-const BUDGET_RAW = 610 * 1024
+// 2026-10-16：610 → 612。#16 自然语言运维给命令面板加了「归档所有失效站点 / 恢复全部归档」
+// 两条命令，且 useOmniBox 为此引入 health store（判断哪些站「需处理」）—— 命令面板（Ctrl+K）
+// 是首屏组件，这部分必然计入。新增的 0.7 KiB 全部来自这里；后台专属模块（快捷键表 /
+// 全局搜索索引 / 告警规则接口 / 事件历史接口）已逐一 grep 确认为 0 命中首屏。
+const BUDGET_RAW = 612 * 1024
 const BUDGET_GZ = 215 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)

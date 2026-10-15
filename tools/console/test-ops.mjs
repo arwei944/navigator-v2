@@ -76,7 +76,9 @@ const sample = () => ([
 /* ---------------- site-ops ---------------- */
 
 test('normalizeUrl 只保留域名（去协议/路径/查询/尾斜杠）', () => {
-  assert.equal(normalizeUrl('https://www.binance.com/zh-CN/trade?ref=1'), 'www.binance.com')
+  // www 前缀一并去掉：与 hostOf / site-edit#toDomain / scripts/normalize-www.mjs 同一口径
+  //（全站约定「只存主域名」，库里 300 条实测 0 条带 www —— 保留前缀会让同一站在库里出现两条）
+  assert.equal(normalizeUrl('https://www.binance.com/zh-CN/trade?ref=1'), 'binance.com')
   assert.equal(normalizeUrl('binance.com'), 'binance.com')
   assert.equal(normalizeUrl('  http://okx.com/  '), 'okx.com')
 })

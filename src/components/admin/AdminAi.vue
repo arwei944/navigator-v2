@@ -62,6 +62,22 @@ async function runCategorize() {
   } finally { busy.value = '' }
 }
 
+/**
+ * 应用全部「复用已有分类」的建议（#14 的自动应用规则）。
+ *
+ * 为什么只自动应用这一类：`use` 表示模型在**已有分类里**挑了一个，即使挑得不完美也只是归错类，
+ * 撤销成本低；而 `new` 会**新建分类**，那是结构性改动、要人去判断该不该建 —— 留给人点。
+ * 这条界线就是「自动应用规则」的全部内容，不做置信度打分（LLM 不吐可靠的分数，编一个只会误导）。
+ */
+function applyAllConfident() {
+  const usable = suggestions.value.filter(s => s.kind === 'use' && s.categoryId)
+  if (!usable.length) { say('没有可自动应用的「复用已有分类」建议', 'ok'); return }
+  for (const row of usable) sitesStore.updateSiteField(row.id, 'categoryId', row.categoryId)
+  const applied = new Set(usable.map(s => s.id))
+  suggestions.value = suggestions.value.filter(s => !applied.has(s.id))
+  say(`已自动应用 ${usable.length} 条（归入已有分类）；建议新建的仍留给你决定`, 'ok')
+}
+
 async function runSummarize() {
   busy.value = 'sum'; say('AI 正在读巡检结果…')
   try {
@@ -81,7 +97,8 @@ async function runSummarize() {
 async function applySuggestion(row) {
   if (!row || row.kind === 'keep') return
   if (row.kind === 'use') {
-    sitesStore.updateSiteField(row.id, 'categoryId', row.id === row.id ? row.id : row.id)
+    // row.id 是**站点 id**，row.categoryId 才是分类 id（早先两者混在一个字段里，见 api/ai.js 的注释）
+    sitesStore.updateSiteField(row.id, 'categoryId', row.categoryId)
     return
   }
   if (row.kind === 'new' && row.label) {
@@ -105,6 +122,13 @@ async function applySuggestion(row) {
       <p class="ops-note">对「未分类 / 分类未识别」的站点跑一轮，最多 20 个。已有分类会优先复用，确实没有合适的才建议新建。</p>
       <button class="mini-btn primary" :disabled="busy === 'cat' || !candidates.length" @click="runCategorize">
         {{ busy === 'cat' ? '分析中…' : `分析 ${candidates.length} 个待分类站点` }}
+      </button>
+      <button
+        v-if="suggestions.some(s => s.kind === 'use')"
+        class="mini-btn"
+        @click="applyAllConfident"
+      >
+        一键应用「复用已有分类」{{ suggestions.filter(s => s.kind === 'use').length }} 条
       </button>
       <ul v-if="suggestions.length" class="list">
         <li v-for="row in suggestions" :key="row.id" class="row">
@@ -147,11 +171,11 @@ async function applySuggestion(row) {
 .row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--border-light); }
 .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tag { font-size: 12px; color: var(--text-secondary); }
-.tag.new { color: #059669; }
+.tag.new { color: var(--ok-fg); }
 .summary { margin: 12px 0 0; padding: 10px; border-radius: 8px; background: var(--border-light); font-size: 13px; line-height: 1.7; }
 .ops-msg { font-size: 13px; }
-.ops-msg.ok { color: #059669; }
-.ops-msg.err { color: #dc2626; }
+.ops-msg.ok { color: var(--ok-fg); }
+.ops-msg.err { color: var(--danger-fg); }
 .mini-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; }
 .mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }

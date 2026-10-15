@@ -145,13 +145,13 @@ watch(() => props.adminKey, load)
 .ops-msg {
   margin-top: 12px; padding: 9px 12px; border-radius: var(--radius-sm);
   font-size: 12.5px; font-weight: 500;
-  background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;
+  background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border);
 }
-.ops-msg.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.ops-msg.bad { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
 .notify-summary { display: flex; gap: 16px; margin-bottom: 12px; font-size: 12.5px; color: var(--text-secondary); }
 .ns-item b { font-size: 14px; }
-.ns-item.bad b { color: #dc2626; }
-.ns-item.warn b { color: #b45309; }
+.ns-item.bad b { color: var(--danger-fg); }
+.ns-item.warn b { color: var(--warn-fg); }
 .ns-item.info b { color: var(--accent); }
 .notify-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .mini-input {

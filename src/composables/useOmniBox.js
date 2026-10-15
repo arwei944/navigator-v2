@@ -30,6 +30,7 @@ import { openInNewTab } from '@/utils/open'
 import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useClicksStore } from '@/stores/clicks'
+import { useHealthStore } from '@/stores/health'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
 /** 分组顺序：inline 站点优先，palette 命令优先；网址预览两边都在最前 */
@@ -123,9 +124,30 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     history.addRecord(site.id)
   }
 
+  /* ── 运维动作（#16 自然语言运维）──
+   * 只提供**可撤销**的动作：归档能一键取回、取消归档本身就是反向操作。
+   * 删除 / 清空这类不可逆的动作不给自然语言入口 —— 一句话误触的代价太高。 */
+  const health = useHealthStore()
+
+  /** 把探活判定为「需处理」的站点批量移入归档；返回处理条数 */
+  function archiveDownSites() {
+    const ids = sites.sites
+      .filter(s => !s.archived && health.getStatus(s.id).status === 'down')
+      .map(s => s.id)
+    if (ids.length) sites.batchUpdate(ids, { archived: true, pinned: false })
+    return ids.length
+  }
+
+  /** 把所有归档站点取回默认列表；返回恢复条数 */
+  function unarchiveAllSites() {
+    const ids = sites.sites.filter(s => s.archived).map(s => s.id)
+    if (ids.length) sites.batchUpdate(ids, { archived: false })
+    return ids.length
+  }
+
   const ctx = {
     router, sites, categories, preferences, favorites, history, sidebar, omni, toast, openSite,
-    notes, siteNotes, undo: undoLast
+    notes, siteNotes, undo: undoLast, health, archiveDownSites, unarchiveAllSites
   }
 
   const commands = computed(() => buildCommands(ctx))

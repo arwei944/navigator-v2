@@ -16,6 +16,12 @@
 
     <p v-if="error" class="dp-error">{{ error }}</p>
 
+    <!-- 一致性摘要：把「构建 / 上游 / 线上」三方是否对齐用一句话说清，不必逐卡片去读 -->
+    <div v-if="status" class="dp-consistency" :class="consistency.level">
+      <span class="dp-dot" :class="consistency.level" aria-hidden="true"></span>
+      <span>{{ consistency.text }}</span>
+    </div>
+
     <template v-if="status">
       <!-- 版本 -->
       <section class="dp-card">
@@ -110,7 +116,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { fetchStatus, checkUpstream } from '@/services/deployApi'
 
 /**
@@ -128,6 +134,23 @@ const error = ref('')
 const checking = ref(false)
 const upstream = ref(null)
 const upstreamError = ref('')
+
+/**
+ * 一致性摘要（本地源码 / 上次构建 / 线上 三方对齐）。
+ *
+ * 后台这台机器本身就是「线上」，拿不到开发机的源码 —— 所以它比对的是
+ * **「这个产物构建时对应的提交」↔「运行中的自己」↔「上游 GitHub」**：
+ * 三者一致 = 线上正跑着上游最新、且构建自干净工作区；不一致就明说哪里不一致。
+ */
+const consistency = computed(() => {
+  const v = status.value?.version
+  if (!v || !v.available) return { level: 'info', text: '这次部署没有带构建信息（本地开发，或发布包早于本功能）' }
+  if (v.dirty) return { level: 'warn', text: '构建时工作区有未提交改动 —— 这个版本号不对应任何一次提交，无法追溯到源头' }
+  if (upstream.value && upstream.value.behind > 0) return { level: 'warn', text: `落后上游 master ${upstream.value.behind}${upstream.value.more ? '+' : ''} 个提交，可以把本地最新提交发上来` }
+  if (upstream.value && upstream.value.behind === 0) return { level: 'ok', text: '与上游 master 一致，且构建自干净的工作区' }
+  if (upstreamError.value) return { level: 'info', text: `上游比对失败：${upstreamError.value}` }
+  return { level: 'info', text: '点「检查更新」比对上游 Git 仓库，确认线上是不是最新' }
+})
 
 async function load() {
   loading.value = true
@@ -204,6 +227,17 @@ onMounted(load)
 .dp-error { margin: 0 0 12px; font-size: 12px; color: #b91c1c; }
 .dp-error.sm { margin-top: 8px; font-size: 11px; }
 
+.dp-consistency {
+  display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; padding: 10px 12px;
+  border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.6;
+  background: var(--border-light); color: var(--text-secondary); border: 1px solid var(--border);
+}
+.dp-consistency.ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-fg); }
+.dp-consistency.warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-fg); }
+.dp-dot.ok { background: #16a34a; }
+.dp-dot.warn { background: #d97706; }
+.dp-dot.info { background: #94a3b8; }
+
 .dp-card {
   border: 1px solid var(--border); border-radius: var(--radius-md);
   background: var(--bg-white); padding: 16px 18px; margin-bottom: 14px;
@@ -220,16 +254,16 @@ onMounted(load)
 }
 .dp-branch { font-size: 11px; color: var(--text-secondary); }
 .dp-tag { font-size: 10px; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
-.dp-tag.warn { color: #b45309; }
+.dp-tag.warn { color: var(--warn-fg); }
 .dp-subject { margin: 10px 0 4px; font-size: 13px; color: var(--text-primary); }
 .dp-muted { margin: 6px 0 0; font-size: 11px; color: var(--text-secondary); opacity: .8; }
 
 .dp-upstream {
   margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
-  background: #fffbeb; border: 1px solid #fde68a; font-size: 12px; color: #92400e;
+  background: var(--warn-bg); border: 1px solid var(--warn-border); font-size: 12px; color: var(--warn-fg);
   display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap;
 }
-.dp-upstream.good { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+.dp-upstream.good { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-fg); }
 .dp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; background: currentColor; }
 .dp-dot.ok { background: #16a34a; }
 .dp-dot.warn { background: #d97706; }

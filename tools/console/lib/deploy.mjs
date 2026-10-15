@@ -38,6 +38,8 @@ const SLICE_NAMES = 'abcdefghijklmnopqrstuvwxyz'.split('').map(c => `a.pa${c}`)
 /** 单片的 base64 上限约 5,333,336 字符 ≈ 3.81 MiB 原始字节。留余量按 3.5 MiB 切 */
 const SLICE_BYTES = Math.floor(3.5 * 1024 * 1024)
 const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
+/** 断点续传：记录「这一轮分片是否已传完」，让失败重跑时跳过已完成的阶段 */
+const CHECKPOINT_FILE = join(ROOT, 'tools', 'console', '.deploy-checkpoint.json')
 
 /**
  * 幂等键自校验。**必须区分「长度不对」与「字符不对」** ——
@@ -438,6 +440,39 @@ async function action(log, name, attempt = 0) {
   }
 }
 
+/* ---------------- 断点续传 ---------------- */
+
+/**
+ * 上传是这个流程里**最慢也最容易被打断**的一段：平台上写操作要排队，429 实测
+ * 40–80 秒才返回，4 片排下来好几分钟；中途某片失败（平台抽风、网络抖动、手动中断）
+ * 前面的就白传了 —— 实测踩过一次白等 9 分钟。
+ *
+ * 所以把「这一轮的分片指纹 + 是否传完」落盘。重跑同一份 dist 时若指纹一致，
+ * 直接跳到触发解压那一步。指纹用「分片名 + 字节数」：产物一变指纹就变，
+ * 绝不会拿旧断点去跳过一次**内容已经变了**的新构建（那会导致线上跑的是半新半旧的包）。
+ */
+export function sliceFingerprint(slices) {
+  return (slices || []).map(s => `${s.name}:${s.bytes}`).join(',')
+}
+
+/** 只有「指纹一致 + 上一轮确实传完 + 是同一个 workload」三者都满足才允许跳过上传 */
+export function shouldResumeUpload(checkpoint, fingerprint, workloadId) {
+  if (!checkpoint || !checkpoint.uploaded) return false
+  if (!fingerprint || checkpoint.fingerprint !== fingerprint) return false
+  if (workloadId && checkpoint.workloadId && checkpoint.workloadId !== workloadId) return false
+  return true
+}
+
+function readCheckpoint() {
+  try { return JSON.parse(readFileSync(CHECKPOINT_FILE, 'utf-8')) } catch { return null }
+}
+function writeCheckpoint(obj) {
+  try { writeFileSync(CHECKPOINT_FILE, JSON.stringify(obj, null, 2), 'utf-8') } catch { /* 断点记录失败不阻塞发布 */ }
+}
+function clearCheckpoint() {
+  try { rmSync(CHECKPOINT_FILE, { force: true }) } catch { /* 同上 */ }
+}
+
 /* ---------------- 主流程 ---------------- */
 
 /**
@@ -506,6 +541,12 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
        *
        * 用 batch 端点一次删完：写操作在这个平台是要排队的，能少一次是一次。
        */
+      const ck = readCheckpoint()
+      const fingerprint = sliceFingerprint(slices)
+      if (shouldResumeUpload(ck, fingerprint, credentials().workloadId)) {
+        log(`  · 断点续传：这 ${slices.length} 片上一轮已传完且指纹一致，跳过上传`)
+        steps.push({ key: 'upload', ok: true, skipped: true, note: '断点续传' })
+      } else {
       const staleList = SLICE_NAMES.slice(slices.length, slices.length + 3)
       const wantPaths = [...slices.map(s => `/${s.name}`), ...staleList.map(n => `/${n}`)]
       // 只删**实际存在**的：批量删除是整批语义，混进一个不存在的路径会让整批都不执行
@@ -523,7 +564,15 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
         log('  · 没有需要清理的旧分片')
       }
       for (const s of slices) await uploadSlice(log, s)
+      writeCheckpoint({
+        fingerprint,
+        workloadId: credentials().workloadId,
+        slices: slices.map(s => s.name),
+        uploaded: true,
+        ts: Date.now(),
+      })
       steps.push({ key: 'upload', ok: true, note: `${slices.length} 片` })
+      }
 
       /* 5. 触发解压：容器启动命令里有「server.js 不存在才解压」的守卫 */
       log('\n· 触发容器解压')
@@ -548,6 +597,8 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       const del = await deleteFiles(['/server.js'])
       log(del.ok ? '  ✓ server.js 已移除（解压触发器就绪）' : `  ⚠ 没能移除 server.js（HTTP ${del.status}）—— 容器会继续跑旧版本`)
       await action(log, 'restart')
+      // 解压触发已发出 → 这一轮的分片不再需要，断点记录清掉（避免下次误用它跳过上传）
+      clearCheckpoint()
       steps.push({ key: 'restart', ok: true })
 
       /* 6. 线上验证：等到线上自述的 sha 与新构建一致 */

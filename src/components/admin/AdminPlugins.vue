@@ -237,11 +237,11 @@ onMounted(load)
 .pl-error { margin: 0 0 12px; font-size: 12px; color: #b91c1c; }
 .pl-empty {
   margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius-sm);
-  background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
   font-size: 12px; line-height: 1.7;
 }
 .pl-notice { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-sm);
-  background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 12px; }
+  background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-fg); font-size: 12px; }
 
 .pl-card {
   border: 1px solid var(--border); border-radius: var(--radius-md);
@@ -255,7 +255,7 @@ onMounted(load)
 }
 .pl-badge.chain { color: #2563eb; opacity: .9; }
 .pl-badge.pick { color: #7c3aed; opacity: .9; }
-.pl-badge.locked { color: #b45309; opacity: .9; }
+.pl-badge.locked { color: var(--warn-fg); opacity: .9; }
 
 .pl-role { margin: 0 0 8px; font-size: 12px; color: var(--text-secondary); }
 .pl-current { margin: 0 0 12px; font-size: 12px; color: var(--text-primary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -273,11 +273,11 @@ onMounted(load)
 .pl-opt-id { font-family: ui-monospace, monospace; font-size: 10px; color: var(--text-secondary); opacity: .75; }
 .pl-tag { font-size: 10px; padding: 0 6px; border-radius: 999px; border: 1px solid currentColor; }
 .pl-tag.on { color: #16a34a; }
-.pl-tag.off { color: #b45309; }
+.pl-tag.off { color: var(--warn-fg); }
 .pl-quick { display: flex; gap: 14px; margin: 6px 0 0; padding: 0 8px; }
 
-.pl-locked { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: #fffbeb;
-  border: 1px solid #fde68a; color: #92400e; font-size: 11px; line-height: 1.7; }
+.pl-locked { margin: 0; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--warn-bg);
+  border: 1px solid var(--warn-border); color: var(--warn-fg); font-size: 11px; line-height: 1.7; }
 .pl-lock { margin-right: 6px; }
 .pl-note { margin: 10px 0 0; font-size: 11px; color: var(--text-secondary); opacity: .75; line-height: 1.7; }
 
@@ -285,5 +285,5 @@ onMounted(load)
   position: sticky; bottom: 0; display: flex; align-items: center; gap: 12px;
   padding: 12px 0; margin-top: 4px; background: var(--bg-white); border-top: 1px solid var(--border);
 }
-.pl-dirty { flex: 1; font-size: 12px; color: #b45309; }
+.pl-dirty { flex: 1; font-size: 12px; color: var(--warn-fg); }
 </style>

@@ -228,3 +228,20 @@ button { font-family: inherit; }
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* ── 语义色令牌（#17 暗色主题适配核查）────────────────────────────
+ * 后台组件里散落着 `background: #fffbeb` / `color: #dc2626` 这类成对的「浅底 + 深字」，
+ * 在暗色主题下浅底会刺眼、深字几乎不可读（`[data-theme="dark"]` 只覆盖了结构性令牌，
+ * 覆盖不到这些硬编码值）。这里把它们收成语义令牌，暗色下整体换成半透明底 + 亮字。 */
+:root {
+  --ok-fg: #059669; --ok-bg: #ecfdf5; --ok-border: #a7f3d0;
+  --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-border: #fde68a;
+  --danger-fg: #dc2626; --danger-bg: #fef2f2; --danger-border: #fecaca;
+  --info-fg: #1d4ed8; --info-bg: #dbeafe;
+}
+[data-theme="dark"] {
+  --ok-fg: #4ade80; --ok-bg: rgba(34, 197, 94, 0.14); --ok-border: rgba(34, 197, 94, 0.32);
+  --warn-fg: #fbbf24; --warn-bg: rgba(245, 158, 11, 0.14); --warn-border: rgba(245, 158, 11, 0.32);
+  --danger-fg: #f87171; --danger-bg: rgba(239, 68, 68, 0.14); --danger-border: rgba(239, 68, 68, 0.32);
+  --info-fg: #93c5fd; --info-bg: rgba(59, 130, 246, 0.16);
+}

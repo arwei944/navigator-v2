@@ -242,6 +242,41 @@ export function buildCommands(ctx) {
     }
   })
 
+  /* ── 运维动作（#16 自然语言运维）────
+   * 说一句话就能做的整理动作。**只收可撤销的**：
+   *   · 归档「需处理」的站点 —— 归档可一键取回（下面的「恢复全部归档」就是反向操作）；
+   *   · 恢复全部归档。
+   * 删除 / 清空这类不可逆动作刻意不给入口：一句话误触的代价太高，
+   * 它们仍只在后台面板里、并且带二次确认。 */
+  if (ctx.health && typeof ctx.archiveDownSites === 'function') {
+    cmds.push({
+      id: 'ops.archiveDown',
+      title: '归档所有失效站点',
+      subtitle: '把探活判定为「需处理」的站点移入归档，可随时取消归档取回',
+      section: 'action',
+      icon: 'archive',
+      keywords: ['guidang', 'gd', 'shixiao', 'sw', 'qingli', 'ql', 'archive-down', 'guidangshixiao', 'shixiaoguidang'],
+      run: () => {
+        const n = ctx.archiveDownSites()
+        toast.push({ message: n ? `已归档 ${n} 个失效站点` : '没有失效站点需要归档', tone: n ? 'ok' : 'info', duration: 2600 })
+      }
+    })
+  }
+  if (typeof ctx.unarchiveAllSites === 'function') {
+    cmds.push({
+      id: 'ops.unarchiveAll',
+      title: '恢复全部归档站点',
+      subtitle: '把所有归档站点一次性取回默认列表',
+      section: 'action',
+      icon: 'archive',
+      keywords: ['quxiaoguidang', 'qxgd', 'huifu', 'hf', 'unarchive', 'huifuguidang', 'quanbufuchu'],
+      run: () => {
+        const n = ctx.unarchiveAllSites()
+        toast.push({ message: n ? `已恢复 ${n} 个归档站点` : '当前没有归档站点', tone: n ? 'ok' : 'info', duration: 2400 })
+      }
+    })
+  }
+
   cmds.push({
     id: 'action.card',
     title: '卡片设置',

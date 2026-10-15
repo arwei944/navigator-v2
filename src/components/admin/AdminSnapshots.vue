@@ -137,11 +137,11 @@ watch(() => props.adminKey, load)
   border-radius: var(--radius-sm);
   font-size: 12.5px;
   font-weight: 500;
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  border: 1px solid var(--ok-border);
 }
-.ops-msg.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.ops-msg.bad { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
 .snap-list { display: flex; flex-direction: column; max-height: 320px; overflow-y: auto; }
 .snap-row {
   display: flex;

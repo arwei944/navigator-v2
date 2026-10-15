@@ -71,5 +71,8 @@ export const categorize = (sites, categories) => post({ action: 'categorize', si
 
 /** 巡检异常摘要：down 传 [{name,url}]，返回一段人话 */
 export const summarize = (down) => post({ action: 'summarize', down })
+
+/** 批量生成/改写描述：sites = [{ id, name, url, desc, categoryId, categoryLabel }] */
+export const describe = (sites) => post({ action: 'describe', sites })
 /** 与 opsApi 同样的对象式导出（调用点统一 `aiApi.xxx()`） */
-export const aiApi = { probe, polish, categorize, summarize }
+export const aiApi = { probe, polish, categorize, summarize, describe }

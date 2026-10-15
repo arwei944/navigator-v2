@@ -120,13 +120,13 @@ watch(() => props.adminKey, load)
 .ops-msg {
   margin-top: 12px; padding: 9px 12px; border-radius: var(--radius-sm);
   font-size: 12.5px; font-weight: 500;
-  background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;
+  background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border);
 }
-.ops-msg.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.ops-msg.bad { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
 .hist-summary { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; font-size: 12.5px; color: var(--text-secondary); }
 .hs-item b { color: var(--text-primary); font-size: 14px; }
-.hs-item.ok b { color: #059669; }
-.hs-item.bad b { color: #dc2626; }
+.hs-item.ok b { color: var(--ok-fg); }
+.hs-item.bad b { color: var(--danger-fg); }
 .hist-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .mini-input {
   padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm);
@@ -145,14 +145,14 @@ watch(() => props.adminKey, load)
 .hist-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-light); }
 .hist-row:last-child { border-bottom: none; }
 .hist-mark { width: 18px; flex-shrink: 0; font-weight: 700; }
-.hist-mark.ok { color: #059669; }
-.hist-mark.bad { color: #dc2626; }
+.hist-mark.ok { color: var(--ok-fg); }
+.hist-mark.bad { color: var(--danger-fg); }
 .hist-main { flex: 1; min-width: 0; }
 .hist-line1 { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; font-size: 13px; }
 .hist-ts { color: var(--text-secondary); }
 .hist-trigger { font-size: 11px; font-weight: 600; color: var(--accent); background: var(--accent-light); padding: 1px 8px; border-radius: 10px; }
 .hist-cloud { font-size: 12px; color: var(--text-primary); font-weight: 600; }
 .hist-dur { font-size: 12px; color: var(--text-secondary); }
-.hist-reason { margin-top: 3px; font-size: 12px; color: #dc2626; }
+.hist-reason { margin-top: 3px; font-size: 12px; color: var(--danger-fg); }
 .hist-note { margin-top: 3px; font-size: 12px; color: var(--text-secondary); word-break: break-all; }
 </style>

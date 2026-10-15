@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>管理后台 · 布局方案与功能扩展清单</title>
+<style>
+  :root{
+    --bg:#f5f5f7; --card:#fff; --line:#e5e5e7; --line-soft:#f0f0f2;
+    --text:#1d1d1f; --dim:#6e6e73; --dim2:#86868b; --accent:#0a84ff;
+    --ok:#059669; --warn:#b45309; --danger:#dc2626; --purple:#7c3aed;
+    --radius:12px; --radius-sm:8px;
+    --shadow:0 1px 3px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.04);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:36px 24px 96px}
+
+  /* ---------- 头部 ---------- */
+  header.top{margin-bottom:32px}
+  header.top h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.4px}
+  header.top p{margin:10px 0 0;color:var(--dim);max-width:76ch;line-height:1.75}
+  .meta-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 12px;border-radius:999px;background:var(--card);
+    border:1px solid var(--line);font-size:12.5px;color:var(--dim);
+  }
+  .pill b{color:var(--text);font-weight:600}
+
+  /* ---------- 分区 ---------- */
+  section{margin-top:52px}
+  .sec-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px}
+  .sec-head h2{margin:0;font-size:19px;font-weight:700}
+  .sec-head p{margin:6px 0 0;color:var(--dim);font-size:13px;max-width:70ch}
+
+  /* ---------- 布局方案卡 ---------- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .plan{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;
+    transition:border-color .15s ease,transform .15s ease;
+  }
+  .plan:hover{border-color:var(--accent)}
+  .plan.picked{border-color:var(--accent);box-shadow:0 0 0 2px rgba(10,132,255,.18),var(--shadow)}
+  .plan-head{display:flex;align-items:center;gap:10px}
+  .plan-idx{
+    width:26px;height:26px;border-radius:8px;background:var(--accent);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;
+  }
+  .plan-name{font-size:14.5px;font-weight:600}
+  .plan-tag{margin-left:auto;font-size:11px;color:var(--dim2);border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+  .plan-desc{font-size:12.5px;color:var(--dim);line-height:1.7;margin:0}
+
+  /* 线框图 */
+  .wire{
+    border:1px solid var(--line);border-radius:var(--radius-sm);overflow:hidden;
+    background:#fbfbfd;height:150px;display:flex;
+  }
+  .wire.small{padding:0}
+  .wbox{background:#fff;border:1px solid var(--line);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--dim2)}
+  .wbar{background:var(--line-soft);border:1px solid var(--line);border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:var(--dim2)}
+  .naccent{background:rgba(10,132,255,.10);border-color:rgba(10,132,255,.35);color:var(--accent)}
+
+  .pros,.cons{font-size:12px;line-height:1.8;margin:0;padding-left:0;list-style:none}
+  .pros li::before{content:"＋ ";color:var(--ok);font-weight:700}
+  .cons li::before{content:"− ";color:var(--warn);font-weight:700}
+  .fit{font-size:12px;color:var(--dim);background:var(--line-soft);border-radius:var(--radius-sm);padding:8px 10px;line-height:1.7}
+  .fit b{color:var(--text)}
+  .pick-btn{
+    margin-top:auto;padding:8px 14px;border-radius:var(--radius-sm);border:1px solid var(--line);
+    background:#fff;font-size:12.5px;cursor:pointer;font-family:inherit;color:var(--text);
+    transition:all .15s ease;
+  }
+  .pick-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .plan.picked .pick-btn{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+
+  /* ---------- 功能清单 ---------- */
+  .feat-group{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;overflow:hidden}
+  .fg-head{
+    display:flex;align-items:center;gap:10px;padding:13px 16px;background:var(--line-soft);
+    border-bottom:1px solid var(--line);cursor:pointer;user-select:none;
+  }
+  .fg-head h3{margin:0;font-size:13.5px;font-weight:600}
+  .fg-count{margin-left:auto;font-size:11.5px;color:var(--dim2)}
+  .fg-body{padding:4px 0}
+  table{width:100%;border-collapse:collapse}
+  th{
+    text-align:left;font-size:11px;font-weight:600;color:var(--dim2);
+    text-transform:uppercase;letter-spacing:.5px;padding:8px 16px;
+  }
+  td{padding:11px 16px;border-top:1px solid var(--line-soft);font-size:12.5px;vertical-align:top;line-height:1.65}
+  tr:hover td{background:#fafafc}
+  .feat-name{font-weight:600;color:var(--text)}
+  .feat-why{color:var(--dim)}
+  .chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+  .chip{font-size:10.5px;padding:1px 8px;border-radius:999px;border:1px solid var(--line);color:var(--dim2);white-space:nowrap}
+  .chip.easy{color:var(--ok);border-color:rgba(5,150,105,.35)}
+  .chip.mid{color:var(--warn);border-color:rgba(180,83,9,.35)}
+  .chip.hard{color:var(--danger);border-color:rgba(220,38,38,.3)}
+  .chip.touch{color:var(--purple);border-color:rgba(124,58,237,.3);font-family:ui-monospace,Menlo,monospace}
+  td.files{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim2);line-height:1.75;word-break:break-all}
+
+  /* ---------- 汇总栏 ---------- */
+  .summary{
+    position:fixed;left:0;right:0;bottom:0;background:rgba(255,255,255,.92);
+    backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:12px 24px;
+    display:flex;align-items:center;gap:14px;font-size:12.5px;z-index:50;
+  }
+  .summary .inner{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:14px;width:100%;flex-wrap:wrap}
+  .summary b{color:var(--accent)}
+  .summary .hint{color:var(--dim2)}
+  .copy-btn{
+    margin-left:auto;padding:7px 16px;border-radius:var(--radius-sm);border:1px solid var(--accent);
+    background:var(--accent);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;
+  }
+  .copy-btn:disabled{opacity:.45;cursor:not-allowed}
+
+  @media (max-width:640px){
+    .wrap{padding:20px 14px 110px}
+    .grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>管理后台 · 布局方案与功能扩展清单</h1>
+  <p>
+    第一部分是 <b>10 种后台布局方案</b>，每种配线框示意图、优势与代价——点「选这个」标记你的偏好。
+    第二部分是 <b>功能扩展清单</b>，按领域分组，每条给出收益与<b>实际改动面</b>（要动哪些文件）。
+    选完点右下角「复制我的选择」，把结果发我即可。
+  </p>
+  <div class="meta-row">
+    <span class="pill">现有模块 <b>13</b> 个</span>
+    <span class="pill">当前布局 <b>经典三栏</b>（刚落地）</span>
+    <span class="pill">技术栈 <b>Vue 3 + Vite</b></span>
+    <span class="pill">线上 <b>自有服务器（BotKeep）</b></span>
+  </div>
+</header>
+
+<!-- ==================== 一、布局方案 ==================== -->
+<section>
+  <div class="sec-head">
+    <div>
+      <h2>一、十种布局方案</h2>
+      <p>缩略图里 <span style="color:var(--accent);font-weight:600">蓝色块</span> 是导航/操作区，灰色块是内容区。十种不是十个变体——它们代表不同的<b>信息优先级</b>。</p>
+    </div>
+  </div>
+  <div class="grid" id="plans"></div>
+</section>
+
+<!-- ==================== 二、功能扩展 ==================== -->
+<section>
+  <div class="sec-head">
+    <div>
+      <h2>二、功能扩展清单</h2>
+      <p>按领域分组。「改动面」列的是<b>真正要碰的文件</b>，不是笼统的工作量——你可以据此判断值不值得做。点组标题可折叠。</p>
+    </div>
+  </div>
+  <div id="feats"></div>
+</section>
+
+</div>
+
+<div class="summary">
+  <div class="inner">
+    <span>已选布局：<b id="selPlan">未选择</b></span>
+    <span class="hint" id="selFeat">已勾选 0 项功能</span>
+    <button class="copy-btn" id="copyBtn" disabled>复制我的选择</button>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   布局方案：十种。wire 是线框图的 HTML（用 flex 拼出来）
+   ============================================================ */
+const PLANS = [
+  {
+    id: 'A', name: '经典三栏（现状改进）', tag: '最稳',
+    desc: '左导航 + 中内容 + 右信息栏。后台与主站共用同一套骨架，认知成本最低。',
+    wire: `<div style="display:flex;gap:6px;padding:10px;width:100%">
+      <div class="wbar" style="flex:0 0 24%;height:100%">模块导航</div>
+      <div class="wbox naccent" style="flex:1">内容区</div>
+      <div class="wbar" style="flex:0 0 24%;height:100%">信息栏</div>
+    </div>`,
+    pros: ['与主站一致，不需要重新学', '模块切换零跳转，右栏可常驻说明'],
+    cons: ['横向空间被吃掉两块，13 个模块时左栏偏长'],
+    fit: '适合：<b>以「读数据 + 改配置」为主</b>，且你希望后台与主站观感完全统一。',
+  },
+  {
+    id: 'B', name: '分组手风琴侧栏', tag: '模块多时最清晰',
+    desc: '左栏把 13 个模块按「内容 / 数据 / 运维 / 系统」四组折叠收纳，展开后是二级导航。',
+    wire: `<div style="display:flex;gap:6px;padding:10px;width:100%">
+      <div style="flex:0 0 30%;display:flex;flex-direction:column;gap:4px">
+        <div class="wbar" style="height:22px">▾ 内容管理</div>
+        <div class="wbar" style="height:16px;opacity:.7">　站点 / 分类</div>
+        <div class="wbar" style="height:22px">▸ 数据发布</div>
+        <div class="wbar" style="height:22px">▸ 运维监控</div>
+        <div class="wbar" style="height:22px">▸ 系统设置</div>
+      </div>
+      <div class="wbox naccent" style="flex:1">内容区</div>
+    </div>`,
+    pros: ['13 个模块不再是平铺的一长串', '分组本身说明了模块之间的关系'],
+    cons: ['多一层点击才能到深层模块', '需要给每个模块定义归属组'],
+    fit: '适合：<b>模块还会继续增加</b>，或你常忘记某个功能在哪一组。',
+  },
+  {
+    id: 'C', name: '顶部标签 + 全宽内容', tag: '内容最大化',
+    desc: '去掉左右两栏，模块横向 tab 排在顶部，内容吃满整个宽度。',
+    wire: `<div style="display:flex;flex-direction:column;gap:6px;padding:10px;width:100%">
+      <div style="display:flex;gap:4px">
+        <div class="wbar naccent" style="height:20px;flex:1">概览</div>
+        <div class="wbar" style="height:20px;flex:1">站点</div>
+        <div class="wbar" style="height:20px;flex:1">发布</div>
+        <div class="wbar" style="height:20px;flex:1">插件</div>
+      </div>
+      <div class="wbox naccent" style="flex:1">内容区（全宽）</div>
+    </div>`,
+    pros: ['表格/图表能铺开，不用横向滚动', '实现最简单，与现有 tab 结构最接近'],
+    cons: ['离开主站三栏骨架，进出后台有割裂感', '失去右栏的信息位'],
+    fit: '适合：<b>后台主要用来处理宽表格</b>（站点列表、审计日志）。',
+  },
+  {
+    id: 'D', name: '仪表盘网格首页', tag: '一屏总览',
+    desc: '进后台先看到模块卡片墙——每张卡直接显示该模块的关键指标，点进去才是明细。',
+    wire: `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;grid-auto-rows:1fr;gap:6px;padding:10px;width:100%;height:130px">
+      <div class="wbox naccent">站点 300</div><div class="wbox">发布 v1</div><div class="wbox">健康 7/8</div>
+      <div class="wbox">插件 9</div><div class="wbox">通知 2</div><div class="wbox">审计</div>
+    </div>`,
+    pros: ['一屏看完所有模块的状态', '异常模块能靠数字自己「跳出来」'],
+    cons: ['每个模块要定义「一个关键指标」', '多一层跳转才能到具体操作'],
+    fit: '适合：<b>你打开后台主要是「看看有没有事」</b>，而不是直奔某个功能。',
+  },
+  {
+    id: 'E', name: '主从双列（Master-Detail）', tag: '批量编辑最快',
+    desc: '左列窄（列表/站点），右列宽（详情/编辑）。选中即编辑，不弹窗、不跳页。',
+    wire: `<div style="display:flex;gap:6px;padding:10px;width:100%">
+      <div style="flex:0 0 34%;display:flex;flex-direction:column;gap:3px">
+        <div class="wbar naccent" style="height:16px">github.com</div>
+        <div class="wbar" style="height:16px">figma.com</div>
+        <div class="wbar" style="height:16px">notion.so</div>
+        <div class="wbar" style="height:16px">…</div>
+      </div>
+      <div class="wbox naccent" style="flex:1">选中项的详情与编辑表单</div>
+    </div>`,
+    pros: ['连续处理多个站点时不用来回收起弹窗', '列表与详情始终可见，不会丢失上下文'],
+    cons: ['窄屏几乎无法使用（要退化成单列）', '不适合「一个模块 = 一整页」的场景'],
+    fit: '适合：<b>站点管理是你最高频的操作</b>，常需要逐条核对与修改。',
+  },
+  {
+    id: 'F', name: '命令面板优先（Command-first）', tag: '键盘流',
+    desc: '后台入口是一个搜索框：输入即搜站点、找功能、执行动作。列表退居其次。',
+    wire: `<div style="display:flex;flex-direction:column;gap:6px;padding:10px;width:100%">
+      <div class="wbox naccent" style="height:30px">⌘K　搜索站点 / 执行操作…</div>
+      <div class="wbar" style="height:16px">→ 打开 github.com</div>
+      <div class="wbar" style="height:16px">→ 重新获取 figma.com 的信息</div>
+      <div class="wbar" style="height:16px">→ 发布到云端</div>
+    </div>`,
+    pros: ['手不离键盘，操作路径最短', '已有 Ctrl+K 内核，复用成本低'],
+    cons: ['不熟悉命令的人找不到入口', '「看状态」类需求（图表/列表）它不擅长'],
+    fit: '适合：<b>你自己高频使用</b>，且偏好键盘而非鼠标。',
+  },
+  {
+    id: 'G', name: '抽屉式（主区不跳转）', tag: '最少切换',
+    desc: '主区始终是站点列表，模块从右侧滑出抽屉叠加——关掉抽屉就回到原处。',
+    wire: `<div style="display:flex;gap:6px;padding:10px;width:100%;position:relative">
+      <div class="wbox" style="flex:1">主区（始终是站点）</div>
+      <div class="wbox naccent" style="flex:0 0 44%;box-shadow:-6px 0 14px rgba(0,0,0,.08)">抽屉：发布 / 插件 / 审计</div>
+    </div>`,
+    pros: ['永远不会「离开当前页面」', '适合边看列表边改配置'],
+    cons: ['抽屉里的表格会偏窄', '多层抽屉会让人迷路'],
+    fit: '适合：<b>你常常「看着站点改设置」</b>，讨厌跳页后找不回位置。',
+  },
+  {
+    id: 'H', name: '工作台式（常驻状态条）', tag: '运维视角',
+    desc: '上半是模块内容，下半常驻一条状态/日志带——发布进度、巡检结果、最近操作滚动显示。',
+    wire: `<div style="display:flex;flex-direction:column;gap:6px;padding:10px;width:100%;height:130px">
+      <div class="wbox naccent" style="flex:1">模块内容</div>
+      <div class="wbar" style="height:34px;font-family:monospace">12:04 发布完成 · 12:31 巡检 7/8 通过 · 12:40 新增 2 站点</div>
+    </div>`,
+    pros: ['长任务（发布/巡检）不用守着看', '异常会自己滚到眼前'],
+    cons: ['占掉约 1/5 垂直空间', '状态条的信息密度要克制，否则变噪音'],
+    fit: '适合：<b>你常发起长任务并想随时知道进展</b>。',
+  },
+  {
+    id: 'I', name: '分屏对照式', tag: '改前改后一眼看清',
+    desc: '左右分屏展示两组数据：本地 vs 线上、发布前 vs 发布后、旧值 vs 新值。',
+    wire: `<div style="display:flex;gap:6px;padding:10px;width:100%">
+      <div class="wbox" style="flex:1">本地 / 改前<br><span style="font-size:9.5px">298 站点</span></div>
+      <div class="wbar" style="flex:0 0 26px">⇄</div>
+      <div class="wbox naccent" style="flex:1">线上 / 改后<br><span style="font-size:9.5px">300 站点</span></div>
+    </div>`,
+    pros: ['差异自己显现，不用脑补', '发布/回滚这类高风险动作更安心'],
+    cons: ['只适合「成对」的数据，多数模块用不上', '窄屏要退化成上下排列'],
+    fit: '适合：<b>把它用在发布、快照、回滚这几个模块</b>，全后台套用则不划算。',
+  },
+  {
+    id: 'J', name: '向导流程式', tag: '防错',
+    desc: '把运维动作串成步骤条：改数据 → 预检 → 发布 → 验证，每步只露出这一步该做的事。',
+    wire: `<div style="display:flex;flex-direction:column;gap:6px;padding:10px;width:100%">
+      <div style="display:flex;gap:4px">
+        <div class="wbar naccent" style="height:20px;flex:1">① 改数据</div>
+        <div class="wbar" style="height:20px;flex:1">② 预检</div>
+        <div class="wbar" style="height:20px;flex:1">③ 发布</div>
+        <div class="wbar" style="height:20px;flex:1">④ 验证</div>
+      </div>
+      <div class="wbox naccent" style="flex:1">当前步骤的内容（其余步骤收起）</div>
+    </div>`,
+    pros: ['每一步都有明确的前置条件，难漏步', '新手也能安全执行发布'],
+    cons: ['熟练用户会觉得「被按住」', '不适合探索性操作（随便点点看看）'],
+    fit: '适合：<b>用在发布与回滚</b>——那里错一步代价最大。',
+  },
+];
+
+/* ============================================================
+   功能扩展清单
+   ============================================================ */
+const FEATS = [
+  {
+    group: 'A · 站点数据',
+    items: [
+      {
+        name: '浏览器书签 / HTML 导入',
+        why: '把 Chrome 导出的书签整批迁进来，省去手动一条条加。',
+        files: 'api/sites.js（批量写入）· src/components/admin/AdminSitesPanel.vue · 新增书签解析纯函数 + 单测',
+        chips: [['mid','工作量中'],['touch','新增解析器']],
+      },
+      {
+        name: '批量编辑多字段',
+        why: '现在批量只做「加标签/改分类」，改成能同时改多个字段并预览 diff。',
+        files: 'src/components/admin/AdminBatchBar.vue（重做）· shared/site-edit.mjs（加批量 patch）· test-batch-edit.mjs（新）',
+        chips: [['mid','工作量中'],['touch','改动 3 处']],
+      },
+      {
+        name: '智能去重（同站不同 URL）',
+        why: 'github.com 与 www.github.com、带 utm 的链接目前会重复入库。',
+        files: 'shared/site-infer.mjs（规范化 URL）· api/sites.js（入库前查重）· 新增 test-dedupe.mjs',
+        chips: [['easy','工作量小'],['touch','复用已有 normalizeHost']],
+      },
+      {
+        name: '失效站点自动归档',
+        why: '巡检发现连续 N 次不可达的站点自动移到归档，列表不再被死链占着。',
+        files: 'server/cron.mjs（巡检后处理）· shared/health-rules.mjs（加规则）· AdminSitesPanel 加「已自动归档」筛选',
+        chips: [['easy','工作量小'],['touch','改动 3 处']],
+      },
+      {
+        name: '站点分组拖拽排序',
+        why: '当前排序要靠上下移动按钮，几十条时很累。',
+        files: 'AdminSitesPanel.vue（引入拖拽）· api/sites.js（批量 sortOrder 写入）· 新增 test-reorder.mjs',
+        chips: [['mid','工作量中'],['touch','需要新依赖或手写拖拽']],
+      },
+    ],
+  },
+  {
+    group: 'B · 发布与部署',
+    items: [
+      {
+        name: '定时发布',
+        why: '把「攒了几天的改动」约定在半夜自动发布，白天不打扰。',
+        files: 'tools/console/lib/schedule.mjs（已有骨架）· server/cron.mjs · AdminPublishHistory.vue 加「定时」筛选',
+        chips: [['mid','工作量中'],['touch','已有 schedule.mjs 可复用']],
+      },
+      {
+        name: '发布前 diff 预览（分屏对照）',
+        why: '现在只报「+3 / -1 / ~5」的数字，看不到具体改了哪几条。',
+        files: 'AdminPublishPreflight.vue（加对照视图）· api/ops.js（返回明细）· 新增共享 diff 组件',
+        chips: [['mid','工作量中'],['touch','配合布局方案 I']],
+      },
+      {
+        name: '一键回滚到任意历史版本',
+        why: '现在回滚只针对「上一份快照」，想退回到三天前的那一版要手动翻。',
+        files: 'AdminSnapshots.vue（版本时间线）· api/backup.js（按版本恢复）· test-snapshot-restore.mjs（新）',
+        chips: [['hard','工作量较大'],['touch','涉及数据安全，需完整测试']],
+      },
+      {
+        name: '发布失败自动重试 + 断点续传',
+        why: '平台偶发 503/429 时，现在要整个人工重来一遍。',
+        files: 'tools/console/lib/deploy.mjs（已有重试，补断点）· 新增分片状态记录',
+        chips: [['mid','工作量中'],['touch','改动 1 处核心']],
+      },
+      {
+        name: '部署对比（本地 / 上次构建 / 线上）',
+        why: '现在只在控制台能看到三方对照，后台看不到。',
+        files: 'AdminDeploy.vue（加对照）· api/deploy-status.js（补构建信息）',
+        chips: [['easy','工作量小'],['touch','接口已有一半数据']],
+      },
+    ],
+  },
+  {
+    group: 'C · 监控与告警',
+    items: [
+      {
+        name: '告警规则自定义',
+        why: '现在是「连续 N 次不可达」写死的，想按分类/标签设不同阈值。',
+        files: 'shared/health-rules.mjs（规则引擎化）· AdminPreferences.vue 加规则编辑 · test-health-rules.mjs（新）',
+        chips: [['mid','工作量中'],['touch','纯函数，好测']],
+      },
+      {
+        name: '可用性历史曲线',
+        why: '现在只有「当前状态」，看不出某个站是「一直坏」还是「刚坏」。',
+        files: 'server/cron.mjs（记录历史点）· 新增 api/health-history.js · InsightView 加曲线（chartkit 已有）',
+        chips: [['mid','工作量中'],['touch','需要新的数据积累']],
+      },
+      {
+        name: '通知渠道扩展（邮件 / IM）',
+        why: '现在只有 Webhook，出问题时不一定看得到。',
+        files: 'shared/ops/notify-core.mjs（渠道抽象）· 新增 email/wecom 渠道 · AdminNotifications.vue 配置',
+        chips: [['mid','工作量中'],['touch','涉及外部凭据']],
+      },
+      {
+        name: '站点响应时间趋势',
+        why: '抓取时已经有耗时数据，但没留存——「最近变慢了」这类问题现在发现不了。',
+        files: 'shared/health-probe.mjs（回传耗时）· server/cron.mjs（存储）· 洞察页加趋势图',
+        chips: [['easy','工作量小'],['touch','复用现有探针']],
+      },
+    ],
+  },
+  {
+    group: 'D · 安全与权限',
+    items: [
+      {
+        name: '多用户与角色',
+        why: '现在只有一个 admin。若要让别人帮忙维护，只能把管理密钥给他。',
+        files: 'shared/auth.mjs（多用户）· api/auth.js（登录/鉴权）· 新增 data/users.json · AdminView 加用户管理',
+        chips: [['hard','工作量较大'],['touch','触及鉴权核心，需谨慎']],
+      },
+      {
+        name: '操作审计导出（CSV / JSON）',
+        why: '审计现在只能在页面翻，想留档或做分析要手动复制。',
+        files: 'AdminAuditLog.vue（加导出按钮）· api/ops.js（导出端点）',
+        chips: [['easy','工作量小'],['touch','改动 2 处']],
+      },
+      {
+        name: '危险操作二次确认（输入名称）',
+        why: '回滚、清空通知、批量删除现在是一键执行。',
+        files: 'AdminSnapshots.vue / AdminNotifications.vue / AdminBatchBar.vue（加确认弹窗）· 新增共享 ConfirmDialog',
+        chips: [['easy','工作量小'],['touch','改动 3 处 UI']],
+      },
+      {
+        name: '登录设备与活跃会话查看',
+        why: '会话现在是无状态的，你不知道有多少设备还存着有效 token。',
+        files: 'shared/auth.mjs（签发记录）· 新增 data/sessions.json · AdminView 加会话列表与「全部登出」',
+        chips: [['mid','工作量中'],['touch','改动鉴权链路']],
+      },
+    ],
+  },
+  {
+    group: 'E · 智能与自动化',
+    items: [
+      {
+        name: '批量生成站点描述',
+        why: '很多站点描述为空，一个个手写不现实。',
+        files: 'api/ai.js（批量接口）· AdminSitesPanel.vue（批量操作接入）· 复用现有 LLM 引擎链',
+        chips: [['easy','工作量小'],['touch','依赖已配的 LLM']],
+      },
+      {
+        name: '分类建议的自动应用规则',
+        why: '现在 AI 给建议后要逐条点「应用」。',
+        files: 'AdminAi.vue（加「全部应用高置信度」）· shared/auto-category.mjs（置信度阈值）',
+        chips: [['easy','工作量小'],['touch','改动 2 处']],
+      },
+      {
+        name: '重复/近似站点检测',
+        why: '同一产品的不同入口（如 github.com 与 gist.github.com）值得归并提示。',
+        files: 'shared/affinity.mjs（已有相似度）· 新增检测任务 · AdminSitesPanel 加「疑似重复」筛选',
+        chips: [['mid','工作量中'],['touch','复用 affinity 引擎']],
+      },
+      {
+        name: '自然语言运维（"把失效的归档"）',
+        why: '把高频运维动作变成一句话。',
+        files: '复用 Ctrl+K 命令内核 + LLM 意图识别 · tools/cli/commands/*.mjs（动作白名单）',
+        chips: [['hard','工作量较大'],['touch','需严格限动作范围，避免误操作']],
+      },
+    ],
+  },
+  {
+    group: 'F · 平台与体验',
+    items: [
+      {
+        name: '后台全局搜索（跨站点/配置/日志）',
+        why: '现在搜索只在站点列表内，想找「哪个开关控制 X」要翻代码。',
+        files: '新增 shared/admin-search.mjs（索引）· AdminView 加搜索框 · 复用 Ctrl+K 组件',
+        chips: [['mid','工作量中'],['touch','新增索引层']],
+      },
+      {
+        name: '布局方案可切换（本次选的方案 + 保留经典三栏）',
+        why: '布局偏好进设置，随时切换，不用改代码。',
+        files: 'AdminView.vue（布局分支）· stores/preferences（持久化）· 新增布局组件目录',
+        chips: [['mid','工作量中'],['touch','与本次决策直接相关']],
+      },
+      {
+        name: '键盘快捷键体系',
+        why: 'g+s 跳站点、g+p 跳发布这类，纯键盘操作后台。',
+        files: 'AdminView.vue（快捷键注册）· 新增 shared/admin-shortcuts.mjs · 复用现有快捷键面板',
+        chips: [['easy','工作量小'],['touch','改动 1 处 + 新增映射表']],
+      },
+      {
+        name: '移动端后台适配',
+        why: '现在后台在手机上是「能打开但难用」。',
+        files: 'AdminView.vue 及各面板（响应式）· 移动端底部 tab 复用 MobileTabBar',
+        chips: [['hard','工作量较大'],['touch','涉及全部 13 个面板']],
+      },
+      {
+        name: '暗色主题适配核查',
+        why: '后台部分硬编码色值（如 #fffbeb）在暗色下对比度不足。',
+        files: '各 admin 组件（把硬编码色换成令牌）· 新增令牌 --warn-bg / --warn-border',
+        chips: [['easy','工作量小'],['touch','机械替换 + 回归']],
+      },
+    ],
+  },
+];
+
+/* ============================================================ 渲染 ============================================================ */
+const picked = new Set();
+const checked = new Set();
+
+function renderPlans(){
+  document.getElementById('plans').innerHTML = PLANS.map(p => `
+    <article class="plan" data-plan="${p.id}">
+      <div class="plan-head">
+        <span class="plan-idx">${p.id}</span>
+        <span class="plan-name">${p.name}</span>
+        <span class="plan-tag">${p.tag}</span>
+      </div>
+      <div class="wire">${p.wire}</div>
+      <p class="plan-desc">${p.desc}</p>
+      <ul class="pros">${p.pros.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <ul class="cons">${p.cons.map(x=>`<li>${x}</li>`).join('')}</ul>
+      <div class="fit">${p.fit}</div>
+      <button class="pick-btn" data-pick="${p.id}">选这个</button>
+    </article>`).join('');
+}
+
+function renderFeats(){
+  document.getElementById('feats').innerHTML = FEATS.map((g,gi) => `
+    <div class="feat-group" data-g="${gi}">
+      <div class="fg-head" data-toggle="${gi}">
+        <h3>${g.group}</h3>
+        <span class="fg-count">${g.items.length} 项</span>
+      </div>
+      <div class="fg-body">
+        <table>
+          <thead><tr><th style="width:38px"></th><th style="width:26%">功能</th><th style="width:28%">收益</th><th>改动面</th></tr></thead>
+          <tbody>
+            ${g.items.map((it,ii)=>`
+              <tr>
+                <td><input type="checkbox" data-feat="${gi}:${ii}" style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer"></td>
+                <td><div class="feat-name">${it.name}</div><div class="chips">${it.chips.map(([c,t])=>`<span class="chip ${c}">${t}</span>`).join('')}</div></td>
+                <td class="feat-why">${it.why}</td>
+                <td class="files">${it.files}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
+function refreshSummary(){
+  const p = PLANS.find(x => picked.has(x.id));
+  document.getElementById('selPlan').textContent = p ? `${p.id} · ${p.name}` : '未选择';
+  document.getElementById('selFeat').textContent = `已勾选 ${checked.size} 项功能`;
+  document.getElementById('copyBtn').disabled = !p && checked.size === 0;
+}
+function refreshCopy(){
+  const p = PLANS.find(x => picked.has(x.id));
+  const feats = [...checked].map(k => { const [g,i] = k.split(':').map(Number); return FEATS[g].items[i].name; });
+  const lines = [
+    '【后台改造决策】',
+    `布局：${p ? p.id + ' · ' + p.name : '（未选）'}`,
+    `功能扩展（${feats.length} 项）：`,
+    ...feats.map((f,i)=>`  ${i+1}. ${f}`),
+  ];
+  return lines.join('\n');
+}
+
+document.addEventListener('click', e => {
+  const pick = e.target.closest('[data-pick]');
+  if (pick){
+    const id = pick.dataset.pick;
+    if (picked.has(id)) picked.delete(id); else { picked.clear(); picked.add(id); }
+    document.querySelectorAll('.plan').forEach(el => el.classList.toggle('picked', picked.has(el.dataset.plan)));
+    document.querySelectorAll('[data-pick]').forEach(b => { b.textContent = picked.has(b.dataset.pick) ? '✓ 已选' : '选这个'; });
+    refreshSummary(); refreshCopy();
+    return;
+  }
+  const tg = e.target.closest('[data-toggle]');
+  if (tg){
+    const body = tg.parentElement.querySelector('.fg-body');
+    body.style.display = body.style.display === 'none' ? '' : 'none';
+  }
+});
+document.addEventListener('change', e => {
+  const cb = e.target.closest('[data-feat]');
+  if (!cb) return;
+  if (cb.checked) checked.add(cb.dataset.feat); else checked.delete(cb.dataset.feat);
+  refreshSummary();
+});
+
+document.getElementById('copyBtn').addEventListener('click', async () => {
+  const text = refreshCopy();
+  const btn = document.getElementById('copyBtn');
+  try { await navigator.clipboard.writeText(text); btn.textContent = '已复制 ✓'; }
+  catch { btn.textContent = '复制失败，请手动选取'; }
+  setTimeout(() => { btn.textContent = '复制我的选择'; }, 1800);
+});
+
+renderPlans();
+renderFeats();
+refreshSummary();
+</script>
+</body>
+</html>

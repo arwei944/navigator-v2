@@ -295,6 +295,34 @@ function rebuild() {
     return created
   }
 
+  /**
+   * 批量新增（书签导入用）：一次写完再 rebuild 一次 —— 逐条调 addSite 会触发 N 次
+   * 全量 rebuild + saveOverlay，导入几百条书签就是几百次重算 + 几百次 localStorage 写。
+   * 返回新建的记录数组，调用方据此做审计与撤销。
+   */
+  function addSites(list) {
+    const created = []
+    for (const site of list || []) {
+      const now = Date.now()
+      const rec = {
+        id: now.toString(36) + Math.random().toString(36).slice(2, 6) + created.length.toString(36),
+        sortOrder: cloudSites.value.length + localAdds.value.length + created.length,
+        visitCount: 0,
+        createdAt: now,
+        updatedAt: now,
+        ...site
+      }
+      localAdds.value.push(rec)
+      created.push(rec)
+    }
+    if (!created.length) return created
+    // 与 addSite 同一口径：新收录的排最前，且保持导入文件里的相对顺序
+    localOrder.value = [...created.map(c => c.id), ...localOrder.value]
+    rebuild()
+    saveOverlay()
+    return created
+  }
+
   function updateSite(id, data) {
     const patch = { ...data, updatedAt: Date.now() }
     const idx = localAdds.value.findIndex(s => s.id === id)
@@ -495,6 +523,39 @@ function rebuild() {
     localOrder.value = next
     rebuild()
     saveOverlay()
+  }
+
+  /**
+   * 按给定顺序重写这批站点的 `sortOrder`（后台拖拽排序用）。
+   *
+   * 只改**被拖动的这批**：把它们的 sortOrder 按新顺序连续编号，起点沿用其中最小的原值，
+   * 未参与拖拽的站点一律不动。为什么不整体重排 —— 拖一次就把全库 300 条的 sortOrder
+   * 全改，会产生一次巨大的数据 diff（云端同步、发布预演、审计都被它淹没）。
+   *
+   * 与 `reorderSites` 的分工：那个改的是**本机视角**的相对顺序（localOrder，不同步），
+   * 这个写的是**落库的 sortOrder**（会随数据发布同步给所有人）。
+   */
+  function applySortOrder(orderedIds) {
+    const ids = [...(orderedIds || [])]
+    if (!ids.length) return 0
+    const byId = new Map(sites.value.map(s => [s.id, s]))
+    const base = Math.min(...ids.map(id => Number(byId.get(id)?.sortOrder) || 0))
+    const now = Date.now()
+    let touched = 0
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i]
+      const s = byId.get(id)
+      if (!s) continue
+      const want = base + i
+      if (Number(s.sortOrder) === want) continue
+      const patch = { sortOrder: want, updatedAt: now }
+      const idx = localAdds.value.findIndex(x => x.id === id)
+      if (idx !== -1) localAdds.value[idx] = { ...localAdds.value[idx], ...patch }
+      else localEdits.value[id] = { ...(localEdits.value[id] || {}), ...patch }
+      touched++
+    }
+    if (touched) { rebuild(); saveOverlay() }
+    return touched
   }
 
   /**
@@ -885,7 +946,7 @@ function fetchCloud() {
     highlightSiteId, highlightSite, clearHighlight,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded, cloudError,
-    addSite, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites,
+    addSite, addSites, updateSite, updateSiteField, undoAdd, deleteSite, recordVisit, reorderSites, applySortOrder,
     batchUpdate, batchPatch, batchSetCategory, batchAddPurpose,
     batchPin, batchArchive, invertSelection,
     togglePin, toggleArchive, setArchivedScope,

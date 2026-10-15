@@ -131,10 +131,10 @@ async function restore() {
 .ops-note { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin: 6px 0 10px; }
 .diff { margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--border-light); font-size: 13px; }
 .ops-msg { font-size: 13px; line-height: 1.6; }
-.ops-msg.ok { color: #059669; }
-.ops-msg.err { color: #dc2626; }
+.ops-msg.ok { color: var(--ok-fg); }
+.ops-msg.err { color: var(--danger-fg); }
 .mini-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 13px; }
 .mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
-.mini-btn.danger { background: #dc2626; color: #fff; border-color: transparent; }
+.mini-btn.danger { background: var(--danger-fg); color: #fff; border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }
 </style>

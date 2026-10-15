@@ -6,6 +6,40 @@
       <span v-if="version" class="admin-version" :title="versionTitle">{{ version }}</span>
 
       <template v-if="authed">
+        <!-- 全局搜索：模块 / 设置项 / 站点 / 分类一次搜到（#21） -->
+        <div class="admin-search">
+          <input
+            v-model="query"
+            class="admin-search-input"
+            type="search"
+            placeholder="搜索：模块 / 设置项 / 站点…（↑↓ 选择，回车进入）"
+            @keydown.down.prevent="moveResult(1)"
+            @keydown.up.prevent="moveResult(-1)"
+            @keydown.enter.prevent="goResult(results[activeIdx])"
+            @keydown.esc="query = ''"
+          >
+          <div v-if="query.trim()" class="admin-search-panel">
+            <button
+              v-for="(r, i) in results"
+              :key="r.id"
+              type="button"
+              class="admin-search-item"
+              :class="{ active: i === activeIdx }"
+              @click="goResult(r)"
+            >
+              <span class="as-kind" :class="r.kind">{{ KIND_LABEL[r.kind] || r.kind }}</span>
+              <span class="as-title">{{ r.title }}</span>
+              <span class="as-sub">{{ r.subtitle }}</span>
+            </button>
+            <div v-if="!results.length" class="admin-search-empty">没有匹配的模块、设置项或站点。</div>
+          </div>
+        </div>
+
+        <!-- 布局切换（#20）：当前只有两种 tab 排布，偏好存本机 -->
+        <button class="admin-btn ghost admin-layout-btn" :title="layout === 'top' ? '切换为左侧竖排导航' : '切换为顶部横向导航'" @click="toggleLayout">
+          {{ layout === 'top' ? '≡ 横排' : '☰ 竖排' }}
+        </button>
+
         <button class="admin-btn admin-publish-btn" @click="selectTab('publish')" title="前往云端发布">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           发布到云端
@@ -26,7 +60,7 @@
     <AdminLogin v-else-if="!authed" class="admin-body" :notice="loginNotice" @success="onLogin" />
 
     <template v-else>
-      <nav class="admin-tabs" role="tablist" aria-label="管理后台模块">
+      <nav class="admin-tabs" :class="{ vertical: layout === 'side' }" role="tablist" aria-label="管理后台模块">
         <button
           v-for="t in TABS"
           :key="t.id"
@@ -174,6 +208,8 @@ import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { authApi } from '@/services/authApi'
 import { recordAudit, setAuditActor } from '@/services/auditLog'
+import { ADMIN_SHORTCUTS, SHORTCUT_PREFIX, PREFIX_TTL_MS, matchShortcut, shouldIgnoreKey } from '../../shared/admin-shortcuts.mjs'
+import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -233,6 +269,61 @@ function selectTab(id) {
   if (id === DEFAULT_TAB) delete query.tab
   else query.tab = id
   router.replace({ path: route.path, query })
+}
+
+/* ---------------- 全局搜索（#21） ---------------- */
+
+const KIND_LABEL = { tab: '模块', setting: '设置', site: '站点', category: '分类', plugin: '插件' }
+
+const query = ref('')
+const activeIdx = ref(0)
+
+const adminIndex = computed(() => buildAdminIndex({
+  tabs: TABS,
+  sites: sitesStore.sites,
+  categories: categoriesStore.categories,
+}))
+const results = computed(() => searchAdminIndex(adminIndex.value, query.value, 12))
+
+watch(results, () => { activeIdx.value = 0 })
+
+function moveResult(delta) {
+  const n = results.value.length
+  if (!n) return
+  activeIdx.value = (activeIdx.value + delta + n) % n
+}
+
+function goResult(r) {
+  if (!r) return
+  selectTab(r.target)
+  query.value = ''
+}
+
+/* ---------------- 布局切换（#20） ---------------- */
+
+const layout = ref(localStorage.getItem('nav_admin_layout') || 'top')
+function toggleLayout() {
+  layout.value = layout.value === 'top' ? 'side' : 'top'
+  try { localStorage.setItem('nav_admin_layout', layout.value) } catch { /* 隐私模式下写不了，忽略 */ }
+}
+
+/* ---------------- 快捷键（#19）：g 前缀序列 ---------------- */
+
+let prefixAt = 0
+function onShortcutKey(e) {
+  // 输入框里 / 带修饰键时一律不响应 —— 否则在搜索框打「gs」就会跳面板
+  if (shouldIgnoreKey(e)) { prefixAt = 0; return }
+  const k = String(e.key || '').toLowerCase()
+  const now = Date.now()
+  if (k === SHORTCUT_PREFIX) { prefixAt = now; return }
+  if (prefixAt && now - prefixAt < PREFIX_TTL_MS) {
+    const hit = matchShortcut(SHORTCUT_PREFIX, k)
+    prefixAt = 0
+    if (hit) {
+      e.preventDefault()
+      selectTab(hit.tab)
+    }
+  }
 }
 
 // 地址栏改动（含浏览器前进/后退）也要跟着切
@@ -340,6 +431,7 @@ function onAuthExpired() {
 
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
+  window.addEventListener('keydown', onShortcutKey)
   loadVersion()
   const key = adminKey.value.trim()
   if (!key) {
@@ -368,6 +460,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onShortcutKey)
   window.removeEventListener('nav-auth-expired', onAuthExpired)
 })
 
@@ -625,11 +718,11 @@ async function notifyWebhook(version, count) {
 .admin-publish-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6; }
 .admin-publish-desc b { color: var(--accent); }
 .admin-publish-warn {
-  font-size: 12.5px; color: #b45309; background: #fffbeb; border: 1px solid #fde68a;
+  font-size: 12.5px; color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border);
   border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;
 }
 .admin-publish-block {
-  font-size: 12.5px; color: #dc2626; background: #fef2f2; border: 1px solid #fecaca;
+  font-size: 12.5px; color: var(--danger-fg); background: var(--danger-bg); border: 1px solid var(--danger-border);
   border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px; line-height: 1.6;
 }
 .admin-publish-row { display: flex; gap: 10px; align-items: center; }
@@ -661,6 +754,58 @@ async function notifyWebhook(version, count) {
   font-size: 12.5px;
   font-weight: 500;
 }
-.admin-publish-msg.success { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
-.admin-publish-msg.error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+.admin-publish-msg.success { background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border); }
+.admin-publish-msg.error { background: var(--danger-bg); color: var(--danger-fg); border: 1px solid var(--danger-border); }
+/* 全局搜索（#21） */
+.admin-search { position: relative; flex: 1; max-width: 380px; margin: 0 12px; min-width: 160px; }
+.admin-search-input {
+  width: 100%; padding: 6px 12px; font-size: 13px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--bg-white); color: var(--text-primary); outline: none;
+}
+.admin-search-input:focus { border-color: var(--accent); }
+.admin-search-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+  background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .12); max-height: 320px; overflow-y: auto; padding: 4px;
+}
+.admin-search-item {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+  padding: 7px 10px; border: none; background: none; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px; color: var(--text-primary);
+}
+.admin-search-item:hover, .admin-search-item.active { background: var(--accent-light); }
+.as-kind { flex-shrink: 0; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 999px; background: var(--border-light); color: var(--text-secondary); }
+.as-kind.setting { background: var(--info-bg); color: var(--info-fg); }
+.as-kind.tab { background: var(--ok-bg); color: var(--ok-fg); }
+.as-kind.site { background: var(--warn-bg); color: var(--warn-fg); }
+.as-title { flex-shrink: 0; font-weight: 600; }
+.as-sub { color: var(--text-secondary); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-search-empty { padding: 10px; font-size: 12.5px; color: var(--text-secondary); }
+
+/* 布局切换（#20）：竖排 tab */
+.admin-tabs.vertical { flex-direction: column; align-items: stretch; }
+.admin-tabs.vertical .admin-tab { text-align: left; }
+.admin-layout-btn {
+  padding: 6px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-white); color: var(--text-secondary); cursor: pointer;
+}
+.admin-layout-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── 移动端适配（#18）──────────────────────────────
+ * 后台原本是给宽屏设计的，窄屏上有三个具体毛病：
+ *   ① 搜索框与标题挤在一行，标题被压到换行；
+ *   ② 12 个 tab 撑破容器（横向溢出被裁掉，后面的模块点不到）；
+ *   ③ 各面板自带的 `padding: 0 32px` 在手机上把内容压成一条。
+ * 用 :deep() 覆盖子组件的 scoped padding —— 那是唯一能跨组件命中它们的写法。 */
+@media (max-width: 820px) {
+  .admin-header { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
+  .admin-header h1 { font-size: 15px; }
+  .admin-search { order: 10; flex-basis: 100%; max-width: none; margin: 4px 0 0; }
+  .admin-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+  .admin-tab { flex-shrink: 0; white-space: nowrap; }
+  /* 窄屏下竖排 tab 会占掉半屏宽度，强制回到横排（横滚可及） */
+  .admin-tabs.vertical { flex-direction: row; align-items: center; }
+  .admin-view :deep(.admin-section) { padding: 0 14px 24px; }
+  .admin-view :deep(.admin-stats) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 </style>

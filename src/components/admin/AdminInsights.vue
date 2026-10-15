@@ -41,6 +41,36 @@
         </div>
       </div>
     </div>
+    <!-- 可用性与响应时间趋势（#11 / #12）：数据来自服务端巡检逐轮追加的历史点 -->
+    <div class="insight-card trend-card">
+      <h3 class="insight-title">
+        可用性与响应时间趋势
+        <span class="dead-note">（服务端每跑完一轮巡检追加一个采样点）</span>
+      </h3>
+      <div v-if="!histLoaded" class="trend-empty">加载中…</div>
+      <div v-else-if="histPoints.length < 2" class="trend-empty warn">
+        还没有足够的历史点（当前 {{ histPoints.length }} 个）。这条曲线要靠时间积累 ——
+        服务端巡检每跑完一轮才会追加一个点，不会凭空造数据。
+      </div>
+      <template v-else>
+        <div class="trend-row">
+          <div class="trend-metric">
+            <span class="trend-label">不可用比例</span>
+            <span class="trend-value">{{ downPctText }}</span>
+          </div>
+          <div class="trend-spark" v-html="downSpark"></div>
+        </div>
+        <div class="trend-row">
+          <div class="trend-metric">
+            <span class="trend-label">平均响应</span>
+            <span class="trend-value">{{ avgMsText }}</span>
+          </div>
+          <div class="trend-spark" v-html="msSpark"></div>
+        </div>
+        <div class="trend-foot">{{ histPoints.length }} 个采样点 · {{ trendRange }}</div>
+      </template>
+    </div>
+
     <div class="insight-card dead-card">
       <h3 class="insight-title">失效站点清单
         <span class="dead-note">（判定来自本机代理环境探活，非浏览器直连；删除前仍建议人工复核 WAF / 限流误判）</span>
@@ -64,12 +94,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../../shared/clicks-core.mjs'
+import { sparkline } from '@/utils/chartkit'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -80,6 +111,7 @@ const clicksStore = useClicksStore()
 onMounted(() => {
   healthStore.refresh()
   clicksStore.refresh()
+  loadHistory()
 })
 
 /** 判定产出时间（本机探活那一刻，非页面打开时间） */
@@ -124,6 +156,51 @@ const deadSites = computed(() =>
     })
     .filter(Boolean),
 )
+
+/* ---------------- 可用性 / 响应时间趋势 ---------------- */
+
+const histPoints = ref([])
+const histLoaded = ref(false)
+
+/**
+ * 历史点来自服务端 `/api/health-history`（公开只读，只有聚合计数与耗时）。
+ * 拿不到就当作「还没有历史」，不报错、不造数据 —— 这是要靠时间积累的东西。
+ */
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/health-history')
+    const j = await res.json().catch(() => ({}))
+    if (res.ok && j.ok) histPoints.value = j.points || []
+  } catch { /* 忽略：无历史时面板照常显示其余卡片 */ }
+  histLoaded.value = true
+}
+
+const lastPoint = computed(() => histPoints.value[histPoints.value.length - 1] || null)
+
+/** 画「不可用比例」而不是「可用率」：可用率常年在 98%~100% 之间，画出来是一条贴顶的直线，看不出波动 */
+const downSpark = computed(() => sparkline(
+  histPoints.value.map(p => (p.total ? p.down / p.total : 0)),
+  { width: 240, height: 42, stroke: 'var(--danger-fg)', area: 'rgba(220,38,38,.10)' },
+))
+const msSpark = computed(() => sparkline(
+  histPoints.value.map(p => p.avgMs || 0),
+  { width: 240, height: 42, stroke: '#2563eb', area: 'rgba(37,99,235,.10)' },
+))
+const downPctText = computed(() => {
+  const p = lastPoint.value
+  if (!p || !p.total) return '—'
+  return `${Math.round((p.down / p.total) * 1000) / 10}%（${p.down}/${p.total}）`
+})
+const avgMsText = computed(() => (lastPoint.value && lastPoint.value.avgMs ? `${lastPoint.value.avgMs} ms` : '—'))
+const trendRange = computed(() => {
+  const pts = histPoints.value
+  if (pts.length < 2) return ''
+  const fmt = (iso) => {
+    const d = new Date(iso)
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  }
+  return `${fmt(pts[0].t)} → ${fmt(pts[pts.length - 1].t)}`
+})
 </script>
 
 <style scoped>
@@ -145,7 +222,7 @@ const deadSites = computed(() =>
 .top-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-light); }
 .top-list li:last-child { border-bottom: none; }
 .top-rank { width: 20px; height: 20px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: 5px; background: var(--border-light); color: var(--text-secondary); font-size: 11px; font-weight: 700; }
-.top-rank.hot { background: #fef3c7; color: #b45309; }
+.top-rank.hot { background: var(--warn-bg); color: var(--warn-fg); }
 .top-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .top-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .top-url { font-size: 11px; color: var(--text-secondary); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -153,15 +230,28 @@ const deadSites = computed(() =>
 .top-empty { font-size: 13px; color: var(--text-secondary); padding: 6px 0; line-height: 1.6; }
 .top-empty strong { color: var(--text-primary); font-weight: 600; }
 .dead-note { font-size: 11px; font-weight: 400; color: var(--text-secondary); }
-.dead-empty { font-size: 13px; color: #059669; padding: 6px 0; }
+.dead-empty { font-size: 13px; color: var(--ok-fg); padding: 6px 0; }
 .dead-list { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
 .dead-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-light); font-size: 13px; }
 .dead-item:last-child { border-bottom: none; }
 .dead-name { font-weight: 600; color: var(--text-primary); min-width: 120px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dead-url { flex: 1; color: var(--text-secondary); font-family: monospace; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dead-code { flex-shrink: 0; font-size: 11px; font-weight: 700; color: #dc2626; background: #fef2f2; padding: 2px 8px; border-radius: 10px; }
-.dead-code.warn { color: #b45309; background: #fffbeb; }
+.dead-code { flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--danger-fg); background: var(--danger-bg); padding: 2px 8px; border-radius: 10px; }
+.dead-code.warn { color: var(--warn-fg); background: var(--warn-bg); }
 @media (max-width: 900px) {
   .insight-grid { grid-template-columns: 1fr; }
 }
+
+/* 趋势卡 */
+.trend-card { margin-bottom: 16px; }
+.trend-empty { font-size: 13px; color: var(--text-secondary); padding: 6px 0; line-height: 1.6; }
+.trend-empty.warn { color: var(--warn-fg); }
+.trend-row { display: flex; align-items: center; gap: 16px; padding: 8px 0; border-bottom: 1px solid var(--border-light); }
+.trend-row:last-of-type { border-bottom: none; }
+.trend-metric { width: 130px; flex-shrink: 0; display: flex; flex-direction: column; gap: 2px; }
+.trend-label { font-size: 11px; color: var(--text-secondary); }
+.trend-value { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.trend-spark { flex: 1; min-width: 0; display: flex; align-items: center; }
+.trend-spark svg { max-width: 100%; height: auto; }
+.trend-foot { margin-top: 10px; font-size: 11.5px; color: var(--text-disabled); }
 </style>

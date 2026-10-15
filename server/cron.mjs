@@ -28,6 +28,7 @@
  */
 import { get, put } from '#store'
 import { buildHealthPayload, toIncoming } from '#shared/health-rules.mjs'
+import { evaluateAlerts } from '#shared/alert-rules.mjs'
 import { probeChain, runProbe } from '#shared/probe-engine.mjs'
 
 const PATHNAME = 'ops/health.json'
@@ -61,7 +62,8 @@ async function readSites() {
       if (!s || !s.id || s.archived) continue
       const raw = typeof s.url === 'string' ? s.url.trim() : ''
       if (!raw) continue
-      sites.push({ id: s.id, name: s.name, url: /^https?:\/\//i.test(raw) ? raw : `https://${raw}` })
+      // 带上 categoryId：告警/归档规则的「按分类设阈值」要靠它匹配
+      sites.push({ id: s.id, name: s.name, categoryId: s.categoryId || '', url: /^https?:\/\//i.test(raw) ? raw : `https://${raw}` })
     }
     return { sites, knownIds: new Set(data.sites.map(s => s.id)) }
   } catch {
@@ -256,5 +258,119 @@ export async function tickOnDemand({ budget = DEFAULT_BUDGET } = {}) {
   status.lastPhase = `分片巡检 ${cursor}/${sites.length}`
   status.lastCount = base.counts.total
   console.log(`[cron] 分片巡检：${cursor}/${sites.length} 站 → ${JSON.stringify(base.counts)}`)
+
+  // 巡检顺带做一次「连续失效 → 自动归档」：巡检本就持有最新判定，顺手判定最省事，
+  // 也不引入新的定时器（沙箱里进程内定时器根本不触发）。异常一律吞掉，不影响巡检本身。
+  try { await autoArchiveFailing(base, snapshot.sites) } catch (e) { console.warn('[cron] 自动归档跳过：', String((e && e.message) || e)) }
+
+  // 一轮跑完时记一个历史点：可用性曲线（ok/limited/down 计数）与响应时间趋势的**唯一数据来源**
+  if (cursor >= sites.length) {
+    try { await appendHistoryPoint(base) } catch (e) { console.warn('[cron] 历史点写入跳过：', String((e && e.message) || e)) }
+  }
+
   return base
+}
+
+/* ══════════════════════ 可用性 / 响应时间历史 ══════════════════════ */
+
+const HISTORY_PATHNAME = 'ops/health-history.json'
+/** 保留最近 336 个点：一轮按 6h 算约等于 12 周；更早的曲线本来也没人看，留着只是拖慢读写 */
+const HISTORY_MAX = 336
+
+/** 全部已知判定里的平均耗时（毫秒）；没有有效样本时返回 null（曲线要能画出「断点」） */
+function avgMsOf(results) {
+  const list = Object.values(results || {})
+    .map(r => Number(r && r.ms))
+    .filter(n => Number.isFinite(n) && n > 0)
+  if (!list.length) return null
+  return Math.round(list.reduce((a, b) => a + b, 0) / list.length)
+}
+
+/**
+ * 追加一个历史点。
+ *
+ * 为什么用**独立文件**而不是塞进 `ops/health.json`：那个文件是「当前判定」（每次读都只要最新状态），
+ * 而这是**时间序列**（每次追加一行、读的时候要整段）—— 两种访问模式混在一个文件里，
+ * 会让「读当前状态」每次都拖着几百个历史点走。
+ */
+async function appendHistoryPoint(payload) {
+  let hist = null
+  try { hist = await readJson(HISTORY_PATHNAME) } catch { /* 首次没有 */ }
+  const points = Array.isArray(hist && hist.points) ? hist.points : []
+  const counts = (payload && payload.counts) || {}
+  points.push({
+    t: new Date().toISOString(),
+    total: counts.total || 0,
+    ok: counts.ok || 0,
+    limited: counts.limited || 0,
+    down: counts.down || 0,
+    avgMs: avgMsOf(payload && payload.results),
+  })
+  const trimmed = points.slice(-HISTORY_MAX)
+  await put(HISTORY_PATHNAME, JSON.stringify({ version: 1, points: trimmed }), {
+    allowOverwrite: true, contentType: 'application/json',
+  })
+  return trimmed.length
+}
+
+/* ══════════════════════ 失效站点自动归档 ══════════════════════
+ *
+ * 口径：`ops/health.json` 里 `fails`（连续不可达次数，见 health-rules.mjs#nextResult）
+ * 达到阈值的站点，自动移入归档。
+ *
+ * 三个安全约束（这是会**自动改数据**的动作，必须收得住）：
+ *   ① **只归档、不删除** —— 归档是完全可逆的（后台「取消归档」一键取回，主站也有归档 scope），
+ *      误判的代价只是「一条站暂时从默认列表消失」，不是数据丢失；
+ *   ② **CAS 写** —— 改 sites.json 前先读 etag，写入带 `ifMatch`；与前端 / 控制台的并发写
+ *      不会互相覆盖（冲突时抛错 → 本次放弃，下一轮巡检再看）；
+ *   ③ **可关可调** —— `NAV_AUTO_ARCHIVE_FAILS=0` 完全关闭；阈值默认 5（约等于连续 5 轮巡检不可达）。
+ */
+const AUTO_ARCHIVE_FAILS = (() => {
+  const v = Number(process.env.NAV_AUTO_ARCHIVE_FAILS)
+  return Number.isFinite(v) ? v : 5
+})()
+
+/** 告警规则表（后台「偏好设置」里配的；`api/alert-rules.js` 写的就是这个路径） */
+const ALERT_RULES_PATHNAME = 'alert-rules.json'
+
+async function readAlertConfig() {
+  try { return await readJson(ALERT_RULES_PATHNAME) } catch { return null }
+}
+
+/** @returns {Promise<number>} 实际归档的站点数（0 表示什么都没做） */
+export async function autoArchiveFailing(health, sites = []) {
+  /**
+   * 阈值来自**告警规则表**（后台「偏好设置」可配，按 host / 分类给不同阈值）；
+   * 没配过就退回环境变量默认值 —— 保证「不配也照旧工作」，配了才改变行为。
+   * 与告警共用同一套阈值：若两处各写一套，会出现「提醒说没事、后台却已经把它归档了」。
+   */
+  const stored = await readAlertConfig()
+  const config = stored || { rules: [], fallback: { downThreshold: AUTO_ARCHIVE_FAILS } }
+  const failing = new Set(evaluateAlerts({ results: health && health.results, sites, config }).map(a => a.id))
+  if (!failing.size) return 0
+
+  const blob = await get(SITES_PATHNAME, { access: 'private' })
+  if (!blob || !blob.stream) return 0
+  const etag = (blob.blob && blob.blob.etag) || blob.etag || null
+  let data
+  try { data = JSON.parse(await new Response(blob.stream).text()) } catch { return 0 }
+  if (!data || !Array.isArray(data.sites)) return 0
+
+  const now = Date.now()
+  let changed = 0
+  // 注意变量名：参数已叫 `sites`（站点表快照），这里的产物必须另起一个名字
+  const nextSites = data.sites.map(s => {
+    if (!s || !failing.has(s.id) || s.archived) return s
+    changed++
+    // 与前端 toggleArchive 同一口径：归档即取消置顶（两者互斥）
+    return { ...s, archived: true, pinned: false, updatedAt: now }
+  })
+  if (!changed) return 0
+
+  await put(SITES_PATHNAME, JSON.stringify({ ...data, sites: nextSites }), {
+    access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json',
+    ifMatch: etag,
+  })
+  console.log(`[cron] 自动归档：${changed} 个站点连续 ${AUTO_ARCHIVE_FAILS} 轮不可达 → 移入归档（可一键取回）`)
+  return changed
 }

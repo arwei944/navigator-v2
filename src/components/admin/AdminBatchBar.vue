@@ -18,6 +18,18 @@
 
       <input v-if="needsColor" v-model="patch.color" type="color" class="mini-color" title="统一主题色">
 
+      <!-- 多字段编辑：一次填多个字段，**留空 = 这项不改**（不是清空）—— 与内核 applyFieldset 同一约定 -->
+      <template v-if="isFieldset">
+        <input v-model="patch.name" class="mini-input" placeholder="名称（留空不改）">
+        <input v-model="patch.desc" class="mini-input grow" placeholder="描述（留空不改）">
+        <select v-model="patch.categoryId" class="mini-input">
+          <option value="">分类（不改）</option>
+          <option v-for="c in categoriesStore.categories" :key="c.id" :value="c.id">{{ c.label }}</option>
+        </select>
+        <input v-model="patch.aliases" class="mini-input" placeholder="别名，逗号分隔（留空不改）">
+        <input v-model="patch.purposes" class="mini-input" placeholder="用途 id 或中文标签，逗号分隔（留空不改）">
+      </template>
+
       <input
         v-if="needsAliases"
         v-model="patch.aliases"
@@ -33,6 +45,10 @@
            所以独立成按钮、独立给进度，不塞进 BATCH_OPS 那张同步操作表 -->
       <button class="mini-btn" :disabled="!selectedIds.size || refreshing" @click="refreshSelected">
         {{ refreshing ? `获取中 ${doneCount}/${totalCount}` : '重新获取信息' }}
+      </button>
+      <!-- AI 生成描述：与「重新获取信息」一样是逐个联网的动作，同样独立成按钮、独立给进度 -->
+      <button class="mini-btn" :disabled="!selectedIds.size || genDescBusy || refreshing" @click="generateDescriptions">
+        {{ genDescBusy ? `AI 生成中 ${genDescProgress}` : 'AI 生成描述' }}
       </button>
     </div>
 
@@ -55,13 +71,15 @@ const categoriesStore = useCategoriesStore()
 
 const ops = BATCH_OP_LIST
 const op = ref(BATCH_OP_LIST[0].id)
-const patch = reactive({ categoryId: '', color: '#3b82f6', aliases: '' })
+const patch = reactive({ categoryId: '', color: '#3b82f6', aliases: '', name: '', desc: '', purposes: '' })
 
 const selectedIds = computed(() => sitesStore.selectedIds)
 const def = computed(() => BATCH_OPS[op.value])
 const needsCategory = computed(() => (def.value.requires || []).includes('categoryId'))
 const needsColor = computed(() => (def.value.requires || []).includes('color'))
 const needsAliases = computed(() => (def.value.requires || []).includes('aliases'))
+/** 多字段编辑走单独一组输入，不按 requires 逐项显隐 */
+const isFieldset = computed(() => op.value === 'fieldset')
 
 /** 分类元信息（供内核在改分类时跟随主题色） */
 const categoryMeta = computed(() => Object.fromEntries(
@@ -120,6 +138,54 @@ async function refreshSelected() {
     + (failCount ? `，${failCount} 个失败 —— ${failed.slice(0, 3).join('；')}${failed.length > 3 ? ' …' : ''}` : '')
 }
 
+/* ---- AI 生成 / 改写描述（#13） ---- */
+
+const genDescBusy = ref(false)
+const genDescProgress = ref('')
+
+/**
+ * 分批调用服务端 `describe`（服务端单次上限 MAX_BATCH）。
+ * 只把**真的有变化**的描述写回去：模型常把已经不错的描述原样返回，那不该产生一次无意义的更新。
+ */
+async function generateDescriptions() {
+  if (genDescBusy.value || refreshing.value || !selectedIds.value.size) return
+  genDescBusy.value = true
+  previewText.value = ''
+  try {
+    const { aiApi } = await import('@/services/aiApi')
+    const targets = sitesStore.sites.filter(s => selectedIds.value.has(s.id))
+    const CHUNK = 12
+    let changed = 0
+    let failed = 0
+    for (let i = 0; i < targets.length; i += CHUNK) {
+      genDescProgress.value = `${Math.min(i + CHUNK, targets.length)}/${targets.length}`
+      const batch = targets.slice(i, i + CHUNK)
+      const r = await aiApi.describe(batch.map(s => ({
+        id: s.id,
+        name: s.name,
+        url: s.url,
+        desc: s.desc,
+        categoryId: s.categoryId,
+        categoryLabel: categoriesStore.getCategoryLabel(s.categoryId),
+      })))
+      if (!r.ok) { failed += batch.length; continue }
+      for (const it of r.results || []) {
+        if (it.changed && it.desc) { sitesStore.updateSite(it.id, { desc: it.desc }); changed++ }
+      }
+    }
+    previewOk.value = failed === 0
+    previewText.value = `AI 生成完成：${changed} 个描述有更新`
+      + (failed ? `，${failed} 个失败（AI 未配置或调用出错）` : '')
+    if (changed) emit('done', { changes: [], removed: [], skipped: [] })
+  } catch (e) {
+    previewOk.value = false
+    previewText.value = 'AI 生成失败：' + String((e && e.message) || e)
+  } finally {
+    genDescBusy.value = false
+    genDescProgress.value = ''
+  }
+}
+
 // 换操作即清空上一次的预演结论，避免用旧结果误导用户
 watch(op, () => { previewText.value = '' })
 
@@ -128,6 +194,11 @@ function buildPatch() {
   if (needsCategory.value) p.categoryId = patch.categoryId
   if (needsColor.value) p.color = patch.color
   if (needsAliases.value) p.aliases = patch.aliases
+  // 多字段编辑：只把**填了值**的字段带上；留空的字段不进 patch，内核也就不会碰它们
+  if (isFieldset.value) {
+    const fs = { name: patch.name, desc: patch.desc, categoryId: patch.categoryId, aliases: patch.aliases, purposes: patch.purposes }
+    for (const [k, v] of Object.entries(fs)) if (v !== undefined && v !== null && v !== '') p[k] = v
+  }
   return p
 }
 
@@ -227,9 +298,9 @@ function apply() {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   font-size: 12.5px;
-  background: #ecfdf5;
-  color: #059669;
-  border: 1px solid #a7f3d0;
+  background: var(--ok-bg);
+  color: var(--ok-fg);
+  border: 1px solid var(--ok-border);
 }
-.batch-preview.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.batch-preview.bad { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
 </style>

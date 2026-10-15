@@ -3,6 +3,16 @@
     <div class="admin-section-header">
       <h2>站点管理</h2>
       <div class="admin-head-actions">
+        <button v-if="dupGroups.length" class="admin-btn ghost warn" @click="dupOpen = !dupOpen">
+          疑似重复 {{ dupGroups.length }} 组
+        </button>
+        <button class="admin-btn ghost" :class="{ active: manualSort }" @click="toggleManualSort">
+          {{ manualSort ? '结束排序' : '手动排序' }}
+        </button>
+        <button class="admin-btn ghost" :disabled="importing" @click="triggerImport">
+          {{ importing ? '解析中…' : '导入书签' }}
+        </button>
+        <input ref="fileInput" type="file" accept=".html,.htm,.json,text/html,application/json" hidden @change="onImportFile">
         <button class="admin-btn ghost" @click="sitesStore.toggleBatchMode()">
           {{ sitesStore.batchMode ? '退出批量' : '批量操作' }}
         </button>
@@ -51,6 +61,43 @@
       <button v-if="isFiltering" class="mini-btn" @click="resetFilters">重置</button>
     </div>
 
+    <!-- 书签导入结果：先给「能导入几个 / 跳过几个 / 为什么」，确认后才写库 -->
+    <div v-if="importResult" class="import-panel">
+      <div class="import-head">
+        <b>书签解析完成</b>
+        <span>{{ importSummary }}</span>
+      </div>
+      <div class="import-actions">
+        <button v-if="importResult.toAdd.length" class="mini-btn primary" @click="confirmImport">
+          导入 {{ importResult.toAdd.length }} 个站点
+        </button>
+        <button class="mini-btn" @click="importResult = null">取消</button>
+      </div>
+      <details v-if="importResult.duplicates.length || importResult.invalid.length" class="import-detail">
+        <summary>查看被跳过的 {{ importResult.duplicates.length + importResult.invalid.length }} 条</summary>
+        <ul>
+          <li v-for="(d, i) in importResult.duplicates" :key="'d' + i">重复：{{ d.url }} —— {{ d.reason }}</li>
+          <li v-for="(v, i) in importResult.invalid" :key="'v' + i">无效：{{ v.url || '(空)' }} —— {{ v.reason }}</li>
+        </ul>
+      </details>
+    </div>
+
+    <!-- 疑似重复：只提示分组，不自动改动任何数据 -->
+    <div v-if="dupOpen && dupGroups.length" class="dup-panel">
+      <div class="dup-head">
+        <b>疑似重复 / 近似站点</b>
+        <span>「同族」= 同一注册域下的不同入口；「同名」= 站名相同但域名不同。点一条可直接编辑，合并或归档由你决定。</span>
+      </div>
+      <div v-for="g in dupGroups" :key="g.key" class="dup-group">
+        <span class="dup-label" :class="g.kind">{{ g.kind === 'family' ? '同族' : '同名' }} · {{ g.label }}</span>
+        <div class="dup-items">
+          <button v-for="s in g.sites" :key="s.id" class="dup-chip" @click="editingSite = { ...s }">
+            {{ s.name }} <span class="dup-host">{{ s.url }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="site-meta">
       <label v-if="sitesStore.batchMode" class="meta-check">
         <input type="checkbox" :checked="allSelected" @change="toggleAll">
@@ -66,9 +113,15 @@
         v-for="site in paged"
         :key="site.id"
         class="site-card"
-        :class="{ 'is-selected': sitesStore.batchMode && sitesStore.selectedIds.has(site.id) }"
+        :class="{ 'is-selected': sitesStore.batchMode && sitesStore.selectedIds.has(site.id), 'is-dragging': dragId === site.id, 'drag-on': manualSort }"
+        :draggable="manualSort ? 'true' : 'false'"
+        @dragstart="onDragStart(site)"
+        @dragover.prevent
+        @drop.prevent="onDrop(site)"
+        @dragend="onDragEnd"
       >
         <div class="card-top">
+          <span v-if="manualSort" class="drag-handle" title="拖动调整顺序">⠿</span>
           <label v-if="sitesStore.batchMode" class="card-check">
             <input
               type="checkbox"
@@ -145,6 +198,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankSites } from '@/utils/search'
+import { findNearDuplicates } from '../../../shared/ops/site-ops.mjs'
 import { recordAudit } from '@/services/auditLog'
 import AdminBatchBar from '@/components/admin/AdminBatchBar.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -265,6 +319,105 @@ function doDelete() {
   recordAudit('sites.remove', { target: site.name, detail: `${site.url}（移入回收站）` })
   deletingSite.value = null
 }
+
+/* ---------------- 手动排序（拖拽） ---------------- */
+
+const manualSort = ref(false)
+const dragId = ref('')
+
+/**
+ * 只重排**当前页**：拖一次就重写全库 300 条的 sortOrder 会产生一次巨大的数据 diff，
+ * 把云端同步 / 发布预演 / 审计全淹没。跨页调序靠分页 + 页内拖动组合完成。
+ */
+function toggleManualSort() {
+  manualSort.value = !manualSort.value
+  if (manualSort.value) {
+    resetFilters()
+    if (sitesStore.batchMode) sitesStore.toggleBatchMode()
+    if (pageSize.value < 50) pageSize.value = 50
+  }
+}
+function onDragStart(site) {
+  if (manualSort.value) dragId.value = site.id
+}
+function onDragEnd() { dragId.value = '' }
+function onDrop(target) {
+  const id = dragId.value
+  dragId.value = ''
+  if (!manualSort.value || !id || !target || id === target.id) return
+  const list = [...paged.value]
+  const from = list.findIndex(s => s.id === id)
+  const to = list.findIndex(s => s.id === target.id)
+  if (from < 0 || to < 0) return
+  const [moved] = list.splice(from, 1)
+  list.splice(to, 0, moved)
+  // 两条都写：reorderSites 改本机视角（立刻看到新顺序，不同步），applySortOrder 落库（发布后所有人可见）
+  sitesStore.reorderSites(list)
+  sitesStore.applySortOrder(list.map(s => s.id))
+  recordAudit('sites.reorder', { target: `${list.length} 个站点`, detail: '手动排序（当前页）' })
+}
+
+/* ---------------- 疑似重复 ---------------- */
+
+const dupOpen = ref(false)
+const dupGroups = computed(() => findNearDuplicates(sitesStore.sites))
+
+/* ---------------- 书签导入 ---------------- */
+
+const fileInput = ref(null)
+const importing = ref(false)
+const importResult = ref(null)
+const importSummary = ref('')
+
+function triggerImport() {
+  if (importing.value) return
+  fileInput.value?.click()
+}
+
+/**
+ * 解析在浏览器侧（`src/utils/bookmarks.js` 用 DOMParser），判断在共享内核
+ * （`shared/bookmark-import.mjs`）—— 两者都**动态加载**：本面板只有点「导入书签」时才用到它们，
+ * 静态引入会把解析器与整个分类推断引擎拖进后台 chunk。
+ */
+async function onImportFile(e) {
+  const input = e.target
+  const file = input.files && input.files[0]
+  if (input) input.value = ''   // 清空以便同一个文件能再选一次
+  if (!file) return
+  importing.value = true
+  importResult.value = null
+  try {
+    const [{ parseBookmarkFile }, mod] = await Promise.all([
+      import('@/utils/bookmarks'),
+      import('../../../shared/bookmark-import.mjs'),
+    ])
+    const parsed = await new Promise((resolve) => parseBookmarkFile(file, resolve))
+    if (parsed && parsed.error) { importSummary.value = parsed.error; return }
+    const result = mod.prepareBookmarkImport(parsed.items || [], {
+      existingSites: sitesStore.sites,
+      categoryMeta: Object.fromEntries(categoriesStore.categories.map(c => [c.id, { label: c.label, color: c.dotColor }])),
+      fallbackCategory: categoriesStore.categories[0]?.id || '',
+    })
+    importResult.value = result
+    importSummary.value = mod.summarizeImport(result)
+  } catch (err) {
+    importSummary.value = '解析失败：' + String((err && err.message) || err)
+  } finally {
+    importing.value = false
+  }
+}
+
+function confirmImport() {
+  const r = importResult.value
+  if (!r || !r.toAdd.length) return
+  const created = sitesStore.addSites(r.toAdd)
+  recordAudit('sites.import', {
+    target: `${created.length} 个站点`,
+    detail: `书签导入（跳过重复 ${r.duplicates.length} / 无效 ${r.invalid.length}）（本地草稿，待发布）`,
+  })
+  importResult.value = null
+  dupOpen.value = false
+}
 </script>
 
 <style scoped>
@@ -279,6 +432,48 @@ function doDelete() {
 .admin-btn:hover { filter: brightness(1.1); }
 .admin-btn.ghost { background: var(--bg-white); color: var(--text-primary); border: 1px solid var(--border); }
 .admin-btn.ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
+.admin-btn.ghost.warn { border-color: #f59e0b; color: var(--warn-fg); }
+.admin-btn.ghost.active { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
+.admin-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* 书签导入结果条 */
+.import-panel {
+  margin-bottom: 12px; padding: 12px 14px; border: 1px solid var(--accent);
+  border-radius: var(--radius); background: var(--accent-light);
+}
+.import-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.import-head b { font-size: 13.5px; }
+.import-head span { font-size: 12.5px; color: var(--text-secondary); }
+.import-actions { display: flex; gap: 8px; }
+.import-detail { margin-top: 10px; font-size: 12.5px; color: var(--text-secondary); }
+.import-detail ul { margin: 8px 0 0; padding-left: 18px; max-height: 200px; overflow: auto; }
+.import-detail li { line-height: 1.6; word-break: break-all; }
+
+/* 疑似重复面板 */
+.dup-panel {
+  margin-bottom: 12px; padding: 12px 14px; border: 1px solid #fcd34d;
+  border-radius: var(--radius); background: var(--warn-bg);
+}
+.dup-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+.dup-head b { font-size: 13.5px; }
+.dup-head span { font-size: 12.5px; color: var(--text-secondary); }
+.dup-group { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.dup-label { flex-shrink: 0; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; background: var(--warn-border); color: var(--warn-fg); }
+.dup-label.name { background: #e0e7ff; color: #3730a3; }
+.dup-items { display: flex; flex-wrap: wrap; gap: 6px; }
+.dup-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-white);
+  color: var(--text-primary); cursor: pointer;
+}
+.dup-chip:hover { border-color: var(--accent); color: var(--accent); }
+.dup-host { font-family: monospace; font-size: 11px; color: var(--text-secondary); }
+
+/* 手动排序：拖动手柄与拖动态 */
+.drag-handle { flex-shrink: 0; cursor: grab; color: var(--text-secondary); font-size: 15px; line-height: 1; padding-top: 6px; user-select: none; }
+.site-card.drag-on { cursor: grab; }
+.site-card.is-dragging { opacity: .45; border-style: dashed; }
+.site-card.drag-on:hover { border-color: var(--accent); }
 
 .site-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .mini-input {
@@ -339,9 +534,9 @@ function doDelete() {
 .card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: auto; }
 .site-tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
 .site-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: var(--border-light); color: var(--text-secondary); }
-.site-status.ok { background: #ecfdf5; color: #059669; }
-.site-status.limited { background: #fffbeb; color: #b45309; }
-.site-status.down { background: #fef2f2; color: #dc2626; }
+.site-status.ok { background: var(--ok-bg); color: var(--ok-fg); }
+.site-status.limited { background: var(--warn-bg); color: var(--warn-fg); }
+.site-status.down { background: var(--danger-bg); color: var(--danger-fg); }
 .card-clicks { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
 .card-clicks svg { width: 13px; height: 13px; }
 .site-actions { display: flex; gap: 4px; flex-shrink: 0; }

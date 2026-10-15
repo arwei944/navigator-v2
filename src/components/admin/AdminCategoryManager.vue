@@ -201,7 +201,7 @@ function doReset() {
 .admin-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .admin-section-header h2 { font-size: 16px; font-weight: 600; }
 .cat-head-actions { display: flex; align-items: center; gap: 10px; }
-.cat-dirty { font-size: 12px; font-weight: 600; color: #b45309; background: #fffbeb; border: 1px solid #fde68a; padding: 2px 10px; border-radius: 10px; }
+.cat-dirty { font-size: 12px; font-weight: 600; color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border); padding: 2px 10px; border-radius: 10px; }
 .admin-btn {
   padding: 7px 16px; border: none; border-radius: var(--radius-sm);
   background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
@@ -212,12 +212,12 @@ function doReset() {
 .cat-desc b { color: var(--text-primary); }
 .cat-msg {
   margin-bottom: 12px; padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12.5px;
-  background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;
+  background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border);
 }
-.cat-msg.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.cat-msg.bad { background: var(--danger-bg); color: var(--danger-fg); border-color: var(--danger-border); }
 .cat-empty {
   margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius-sm);
-  background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-fg);
   font-size: 12px; line-height: 1.7;
 }
 .cat-groups { display: flex; flex-direction: column; gap: 14px; }

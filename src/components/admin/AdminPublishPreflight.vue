@@ -85,6 +85,27 @@
       </div>
     </div>
 
+    <!-- 分屏对照：把「线上有什么 / 发布后会变成什么」并排摆出来，而不是只报改了哪些字段名 -->
+    <div v-if="modifiedRows.length" class="pf-diff">
+      <div class="pf-diff-head">
+        <h4>字段级对照</h4>
+        <span class="pf-diff-hint">{{ modifiedRows.length }} 个站点有改动 · 左＝线上现状，右＝发布后</span>
+      </div>
+      <div v-for="d in modifiedRows" :key="d.id" class="pf-diff-item">
+        <div class="pf-diff-name"><code>{{ d.id }}</code> {{ d.name }}</div>
+        <table class="pf-diff-table">
+          <thead><tr><th>字段</th><th>线上</th><th>发布后</th></tr></thead>
+          <tbody>
+            <tr v-for="row in d.rows" :key="row.field" :class="{ hot: row.changed }">
+              <td class="pf-diff-field">{{ row.label }}</td>
+              <td class="pf-diff-before">{{ row.before }}</td>
+              <td class="pf-diff-after">{{ row.after }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div v-if="lastRunAt" class="pf-ran">最近预检 {{ fmt(lastRunAt) }}</div>
   </div>
 </template>
@@ -92,6 +113,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { preflightPublish } from '../../../shared/ops/preflight.mjs'
+import { FIELD_LABEL } from '../../../shared/ops/site-ops.mjs'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { recordAudit } from '@/services/auditLog'
@@ -122,6 +144,39 @@ const siteChanged = computed(() =>
 )
 
 const planText = computed(() => result.value.plan.map(s => s.label).join(' → '))
+
+/** 值的可读化：数组按顿号连、布尔给「是/否」、空值给破折号 */
+function fmtVal(v) {
+  if (v === undefined || v === null || v === '') return '—'
+  if (Array.isArray(v)) return v.length ? v.join('、') : '—'
+  if (typeof v === 'boolean') return v ? '是' : '否'
+  return String(v)
+}
+
+/**
+ * 字段级对照行：`preflightPublish` 只给出「改了哪些字段」，具体新旧值要在这里
+ * 从 `cloudSites`（线上）与 `sites`（本地待发布）两处取 —— 只有拿出来并排看，
+ * 「更新 3 个（描述/分类）」才有意义。
+ */
+const modifiedRows = computed(() => {
+  const before = new Map((sitesStore.cloudSites || []).map(s => [s.id, s]))
+  const after = new Map((sitesStore.sites || []).map(s => [s.id, s]))
+  return result.value.sites.modified.map(m => {
+    const b = before.get(m.id) || {}
+    const a = after.get(m.id) || {}
+    return {
+      id: m.id,
+      name: m.name,
+      rows: (m.fields || []).map(f => ({
+        field: f,
+        label: FIELD_LABEL[f] || f,
+        before: fmtVal(b[f]),
+        after: fmtVal(a[f]),
+        changed: JSON.stringify(b[f]) !== JSON.stringify(a[f]),
+      })),
+    }
+  })
+})
 
 function fmt(ts) {
   return new Date(ts).toLocaleString('zh-CN')
@@ -161,8 +216,8 @@ defineExpose({ run: runPreflight })
 .ops-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pf-cloud { font-size: 12px; color: var(--text-secondary); }
 .pf-summary { font-size: 12.5px; font-weight: 600; }
-.pf-summary.ok { color: #059669; }
-.pf-summary.bad { color: #dc2626; }
+.pf-summary.ok { color: var(--ok-fg); }
+.pf-summary.bad { color: var(--danger-fg); }
 .mini-btn {
   padding: 6px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-white);
   font-size: 13px; color: var(--text-primary); cursor: pointer;
@@ -170,20 +225,41 @@ defineExpose({ run: runPreflight })
 .mini-btn:hover { border-color: var(--accent); color: var(--accent); }
 .pf-block { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .pf-item { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; padding: 8px 12px; border-radius: var(--radius-sm); line-height: 1.6; }
-.pf-item.bad { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.pf-item.warn { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
-.pf-item.ok { background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; }
+.pf-item.bad { background: var(--danger-bg); color: var(--danger-fg); border: 1px solid var(--danger-border); }
+.pf-item.warn { background: var(--warn-bg); color: var(--warn-fg); border: 1px solid var(--warn-border); }
+.pf-item.ok { background: var(--ok-bg); color: var(--ok-fg); border: 1px solid var(--ok-border); }
 .pf-tag { flex-shrink: 0; font-weight: 700; }
 .pf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .pf-col h4 { font-size: 13px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
 .pf-none { font-size: 12.5px; color: var(--text-secondary); }
 .pf-line { display: flex; gap: 8px; font-size: 12.5px; line-height: 1.8; align-items: baseline; }
 .pf-key { flex-shrink: 0; font-weight: 600; }
-.pf-key.add { color: #059669; }
-.pf-key.del { color: #dc2626; }
-.pf-key.mod { color: #b45309; }
+.pf-key.add { color: var(--ok-fg); }
+.pf-key.del { color: var(--danger-fg); }
+.pf-key.mod { color: var(--warn-fg); }
 .pf-vals { color: var(--text-secondary); word-break: break-all; }
 .pf-foot { margin-top: 8px; font-size: 12px; color: var(--text-disabled); }
 .pf-ran { margin-top: 12px; font-size: 12px; color: var(--text-disabled); }
+
+/* 分屏对照 */
+.pf-diff { margin-top: 16px; border-top: 1px solid var(--border-light); padding-top: 14px; }
+.pf-diff-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.pf-diff-head h4 { font-size: 13px; font-weight: 600; margin: 0; }
+.pf-diff-hint { font-size: 11.5px; color: var(--text-secondary); }
+.pf-diff-item { margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
+.pf-diff-name { padding: 7px 10px; background: var(--border-light); font-size: 12.5px; font-weight: 600; }
+.pf-diff-name code { font-family: ui-monospace, monospace; font-size: 11px; color: var(--text-secondary); margin-right: 4px; }
+.pf-diff-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pf-diff-table th { text-align: left; padding: 6px 10px; font-weight: 600; color: var(--text-secondary); font-size: 11px;
+  border-bottom: 1px solid var(--border-light); background: var(--bg-white); }
+.pf-diff-table td { padding: 6px 10px; vertical-align: top; border-bottom: 1px solid var(--border-light); word-break: break-word; }
+.pf-diff-table tr:last-child td { border-bottom: none; }
+.pf-diff-field { width: 88px; color: var(--text-secondary); flex-shrink: 0; }
+.pf-diff-before { color: var(--text-secondary); }
+.pf-diff-after { color: var(--text-primary); }
+/* 分屏布局：两列并排，字段名固定在左 */
+.pf-diff-table th:nth-child(2), .pf-diff-table td:nth-child(2) { width: 45%; border-right: 1px solid var(--border-light); }
+.pf-diff-table tr.hot { background: var(--warn-bg); }
+.pf-diff-table tr.hot .pf-diff-after { color: var(--warn-fg); font-weight: 600; }
 @media (max-width: 900px) { .pf-cols { grid-template-columns: 1fr; } }
 </style>

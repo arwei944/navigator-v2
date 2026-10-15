@@ -43,7 +43,7 @@ const draft = {
   faviconHost: 'github.com',
 }
 const built = buildSiteFromDraft(draft)
-eq(built.site.url, 'www.github.com', 'buildSiteFromDraft url 保留 www 与大小写、去协议去路径')
+eq(built.site.url, 'github.com', 'buildSiteFromDraft url 归一为裸域名（去协议/路径/www/大小写）')
 eq(built.domain, 'github.com', 'buildSiteFromDraft 返回去重域名')
 eq(built.site.initial, 'G', 'buildSiteFromDraft initial 取首字符大写')
 eq(built.site.iconUrl, 'https://github.com/favicon.ico', 'buildSiteFromDraft 图标域名一致时写入 iconUrl')
@@ -80,8 +80,8 @@ eq(okMeta.faviconHost, 'github.com', 'fallbackDraftFromMeta 记录图标来源�
 
 /* ---- 抓取失败 → 域名兜底照常出草稿 ---- */
 const noMeta = fallbackDraftFromMeta({ url: 'https://www.GitHub.com/x', meta: null })
-eq(noMeta.form.name, 'www.GitHub.com', '抓取失败用域名兜底命名')
-eq(noMeta.form.url, 'www.GitHub.com', '抓取失败仍存主机名')
+eq(noMeta.form.name, 'github.com', '抓取失败用裸域名兜底命名')
+eq(noMeta.form.url, 'github.com', '抓取失败仍存裸域名')
 eq(noMeta.form.desc, '', '抓取失败描述为空')
 eq(noMeta.form.categoryId, '', '抓取失败分类由决策层决定，此处不写')
 eq(noMeta.faviconUrl, '', '抓取失败不挂图标来源')
@@ -116,7 +116,7 @@ const scrapedName = fallbackDraftFromMeta({
   url: 'https://www.figma.com',
   meta: { name: '可疑堂', domain: 'figma.com', confidence: { name: 'low' }, sources: { name: 'title' } },
 })
-eq(scrapedName.form.name, 'www.figma.com', '页面刮来的低置信站名仍退回域名（旧规则不变）')
+eq(scrapedName.form.name, 'figma.com', '页面刮来的低置信站名仍退回裸域名（判据不变，兜底值已归一）')
 const highName = fallbackDraftFromMeta({
   url: 'https://www.figma.com',
   meta: { name: 'Figma', domain: 'figma.com', confidence: { name: 'high' }, sources: { name: 'og:site_name' } },

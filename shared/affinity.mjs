@@ -63,16 +63,13 @@ export const WEIGHTS = {
 /** 默认阈值：低于它的边不进图 —— 宁可少连，不要连出一堆噪音 */
 export const DEFAULT_THRESHOLD = 35
 
-/** 取注册域（去协议、去路径、去 www，保留最后两段；够用且不引公共后缀库） */
-export function registrableDomain(url) {
-  const host = String(url || '').toLowerCase().replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '')
-  const parts = host.split('.').filter(Boolean)
-  if (parts.length <= 2) return host
-  // 两段式后缀（co.uk / com.cn）多留一段，避免把 foo.co.uk 和 bar.co.uk 当成同族
-  const lastTwo = parts.slice(-2).join('.')
-  if (/^(co|com|org|net|gov|edu)\.[a-z]{2}$/.test(lastTwo)) return parts.slice(-3).join('.')
-  return lastTwo
-}
+/**
+ * 取注册域（去协议、去路径、去 www，保留最后两段）。
+ * 实现已收敛到 `shared/host.mjs`（与 `hostOf` 同处）—— 去重与近重复检测也要用它，
+ * 不该为了一个域名函数把整张概念词表拖过去。这里 re-export，既有导入路径不变。
+ */
+export { registrableDomain } from './host.mjs'
+import { registrableDomain } from './host.mjs'
 
 /** 一个站点在哪些概念上「有话说」 */
 export function conceptsOf(site) {
