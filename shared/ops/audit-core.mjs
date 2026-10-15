@@ -48,6 +48,7 @@ export const AUDIT_ACTIONS = {
   'notify.webhook': '通知 Webhook 配置',
   'notify.read': '通知已读',
   'notify.clear': '通知清空',
+  'plugins.save': '插件配置变更',
 }
 
 export const AUDIT_RESULTS = { ok: '成功', fail: '失败', rejected: '已拒绝' }

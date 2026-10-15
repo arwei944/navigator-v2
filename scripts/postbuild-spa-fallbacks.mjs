@@ -80,7 +80,7 @@ copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
 // v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
 // 本轮：translate 独立成接口（翻译不再串在抓取响应里，见 api/translate.js 的注释）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js']) {
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js', 'plugins.js']) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))

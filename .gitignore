@@ -36,3 +36,6 @@ server/data/
 
 # 一次性代理探测产物（本机状态，不入库）
 tools/proxy-ports.txt
+
+# 本机控制台的插件配置（引擎链选择，属本机状态，不改线上）
+plugins.local.json

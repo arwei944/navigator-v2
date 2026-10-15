@@ -18,6 +18,7 @@ import * as health from './health.mjs'
 import * as notify from './notify.mjs'
 import * as schedule from './schedule.mjs'
 import * as deploy from './deploy.mjs'
+import * as pluginsCfg from './plugins.mjs'
 import { record } from './audit.mjs'
 
 export function sendJson(res, code, obj) {
@@ -306,6 +307,17 @@ export async function handleApi(req, res, path, url) {
   /* ---- 发布到自有服务器（BotKeep）----
      状态里带线上探测（一次出网请求），所以单独成端点、不塞进 /api/health 的轮询里。 */
 
+  /* ---- 插件管理：九个引擎注册表的聚合视图（与站内 /api/plugins 同源）---- */
+
+  if (method === 'GET' && path === '/api/plugins') {
+    try {
+      sendJson(res, 200, await pluginsCfg.status())
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
   if (method === 'GET' && path === '/api/deploy/status') {
     try {
       sendJson(res, 200, {
@@ -320,6 +332,26 @@ export async function handleApi(req, res, path, url) {
   }
 
   if (method === 'POST') {
+    /* ---- 插件配置（本机）---- */
+
+    if (path === '/api/plugins') {
+      const body = await readJsonBody(req)
+      try {
+        const r = pluginsCfg.save(body.overrides || {})
+        // 审计只记「改了哪几项」，绝不记值 —— 与凭据那条一个口径
+        record({
+          action: 'plugins.save',
+          target: 'local',
+          detail: (r.applied || []).join('+') || '(无变化)',
+        })
+        sendJson(res, 200, { ok: true, ...r, groups: (await pluginsCfg.status()).groups })
+      } catch (e) {
+        record({ action: 'plugins.save', result: 'fail', target: 'local', detail: e.message })
+        sendJson(res, 400, { error: e.message })
+      }
+      return true
+    }
+
     /* ---- 发布到自有服务器 ---- */
 
     if (path === '/api/deploy/credentials') {

@@ -70,6 +70,9 @@ const coverHandler = (await import('./api/cover.js')).default
 const aiHandler = (await import('./api/ai.js')).default
 // 部署状态：公开只读，后台「部署」面板与页面角标都读它（见 api/deploy-status.js 头部的边界说明）
 const deployStatusHandler = (await import('./api/deploy-status.js')).default
+// 插件管理：9 个引擎注册表的聚合视图 + 运行期配置（后台「插件」面板）
+const pluginsMod = await import('./api/plugins.js')
+const pluginsHandler = pluginsMod.default
 const { etagOf } = await import('./store.mjs')
 const cronMod = await import('./cron.mjs')
 const { startHealthCron } = cronMod
@@ -88,6 +91,7 @@ const API_ROUTES = {
   '/api/cover': coverHandler,
   '/api/ai': aiHandler,
   '/api/deploy-status': deployStatusHandler,
+  '/api/plugins': pluginsHandler,
 }
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */
@@ -369,6 +373,18 @@ process.on('uncaughtException', (e) => {
 process.on('unhandledRejection', (e) => {
   console.error('[nav-server] 未处理的 Promise 拒绝（进程继续运行）：', e)
 })
+
+/**
+ * 启动时应用持久化的插件配置（白名单内的 NAV_* 覆盖）。
+ *
+ * 放在 listen **之前**：让第一个请求就带正确的引擎配置，而不是「先按默认跑一会儿」。
+ * 失败不阻塞启动 —— 读不到配置就按环境变量默认值运行，这比站点起不来好得多。
+ */
+try {
+  await pluginsMod.ensureApplied()
+} catch (e) {
+  console.error('[nav-server] 应用插件配置失败（按默认配置运行）：', e.message)
+}
 
 server.listen(PORT, HOST, () => {
   console.log(`[nav-server] listening on http://${HOST}:${PORT}  root=${ROOT}`)

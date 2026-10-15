@@ -59,6 +59,7 @@
     <button class="tab" data-panel="health">可用性</button>
     <button class="tab" data-panel="audit">审计</button>
     <button class="tab" data-panel="deploy">发布</button>
+    <button class="tab" data-panel="plugins">插件</button>
     <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
@@ -407,6 +408,39 @@
       <div class="card">
         <h3>发布历史</h3>
         <div class="result" id="deploy-history"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-plugins">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="plugins-summary"></div>
+          <div class="row-actions">
+            <button class="btn ghost" id="btn-plugins-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>引擎模块</h3>
+        <p class="hint">
+          站点重构后抽出的九个引擎模块在这里统一查看与切换。改动**只影响本机控制台**
+          （控制台自己做抓取 / 翻译 / 探活时用的链），与线上那台的配置互不覆盖 ——
+          想改线上，去站点后台的「插件」面板。
+        </p>
+        <div id="plugins-groups"></div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3 style="margin:0">本机配置</h3>
+          <div class="row-actions">
+            <button class="btn primary" id="btn-plugins-save" disabled>保存更改</button>
+            <button class="btn ghost" id="btn-plugins-reset" disabled>放弃</button>
+          </div>
+        </div>
+        <div class="result" id="plugins-notice"></div>
+        <p class="hint" id="plugins-file"></p>
       </div>
     </section>
 

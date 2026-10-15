@@ -142,6 +142,10 @@
           <div v-else-if="activeTab === 'deploy'" class="admin-section">
             <AdminDeploy />
           </div>
+
+          <div v-else-if="activeTab === 'plugins'" class="admin-section">
+            <AdminPlugins />
+          </div>
         </div>
       </div>
     </template>
@@ -167,6 +171,7 @@ import AdminNotifications from '@/components/admin/AdminNotifications.vue'
 import AdminBackup from '@/components/admin/AdminBackup.vue'
 import AdminAi from '@/components/admin/AdminAi.vue'
 import AdminDeploy from '@/components/admin/AdminDeploy.vue'
+import AdminPlugins from '@/components/admin/AdminPlugins.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { authApi } from '@/services/authApi'
@@ -198,6 +203,7 @@ const publishMsg = ref('')
 const TABS = [
   { id: 'overview', label: '概览' },
   { id: 'deploy', label: '部署' },
+  { id: 'plugins', label: '插件' },
   { id: 'preferences', label: '偏好设置' },
   { id: 'sites', label: '站点管理' },
   { id: 'categories', label: '分类体系' },
