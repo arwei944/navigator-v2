@@ -26,6 +26,9 @@ eq(shouldPreview('github', {}), false, '普通词不出预览')
 eq(shouldPreview('', {}), false, '空输入不出预览')
 eq(shouldPreview('https://github.com', { prefix: '>' }), false, '带命令前缀时不出预览')
 eq(shouldPreview('https://github.com', { hasPage: true }), false, '二级页里不出预览')
+// 整段粘贴（从文章 / 聊天记录里复制的「标题 + 网址」）也要出预览
+eq(shouldPreview('Figma - 设计工具 https://figma.com', {}), true, '文本里含网址也出预览')
+eq(shouldPreview('某某工具 很好用', {}), false, '纯中文仍不出预览')
 
 /* ---- 缓存键：同一域名只抓一次 ---- */
 eq(previewKeyOf('https://www.GitHub.com/a/b'), 'github.com', '缓存键忽略 www 与大小写')
@@ -67,6 +70,31 @@ eq(offsiteIcon.iconUrl, '', 'cardFromMeta 图标来自第三方域名时不显�
 eq(cardFromMeta(null, 'https://example.com').title, 'example.com', 'cardFromMeta 空响应回落到主机名')
 eq(cardFromMeta({ name: 'X', domain: 'x.com' }, 'https://x.com').color !== '', true, 'cardFromMeta 无配色时派生一个')
 
+/* ---- 已收录卡片的「收在哪 / 去过没有」 ---- */
+const richCard = cardFromSite(
+  { id: 'x', name: 'GitHub', url: 'github.com', desc: 'd', visitCount: 7 },
+  { categoryLabel: '编程开发', categoryColor: '#3b82f6', purposes: ['代码托管', '协作'] },
+)
+eq(richCard.categoryLabel, '编程开发', 'cardFromSite 带上分类标签')
+eq(richCard.categoryColor, '#3b82f6', 'cardFromSite 带上分类配色（渲染圆点用）')
+eq(richCard.purposes.length, 2, 'cardFromSite 带上用途名')
+eq(richCard.visitCount, 7, 'cardFromSite 带上访问次数')
+
+eq(cardFromSite({ url: 'a.com' }).visitCount, 0, '无访问记录时次数为 0')
+eq(cardFromSite({ url: 'a.com' }).categoryLabel, '', '不传选项时分类为空（调用方没算就不显示）')
+
+// 三种卡片的字段必须同形 —— 渲染层不该为「有没有这几个字段」分叉
+const shaped = [
+  richCard,
+  cardFromMeta({ name: 'X', domain: 'x.com' }, 'https://x.com'),
+  resolvePreviewState({ url: 'https://x.com', loading: true }).card, // 等网络时的占位卡
+]
+for (const [i, c] of shaped.entries()) {
+  ok('categoryLabel' in c && 'purposes' in c && 'visitCount' in c, `第 ${i + 1} 种卡片字段齐全`)
+}
+eq(shaped[1].categoryLabel, '', '未收录卡片分类为空')
+eq(shaped[2].visitCount, 0, '占位卡访问次数为 0')
+
 /* ---- 状态机 ---- */
 eq(resolvePreviewState({ url: '' }).kind, PREVIEW_KIND.IDLE, '无网址 → idle')
 
@@ -75,6 +103,14 @@ const found = resolvePreviewState({
 })
 eq(found.kind, PREVIEW_KIND.FOUND, '已收录 → found（用本地数据，不必联网）')
 eq(found.card.title, 'GitHub', 'found 态卡片来自本地站点')
+
+// «收在哪» 由调用方算好传进来（分类标签要 store，纯函数拿不到）
+const foundRich = resolvePreviewState({
+  url: 'https://github.com',
+  duplicate: { id: 'a', name: 'GitHub', url: 'github.com' },
+  siteCardOpts: { categoryLabel: '编程开发', visitCount: 3 },
+})
+eq(foundRich.card.categoryLabel, '编程开发', 'siteCardOpts 透传到已收录卡片')
 
 const loading = resolvePreviewState({ url: 'https://figma.com', loading: true })
 eq(loading.kind, PREVIEW_KIND.LOADING, '抓取中 → loading')

@@ -14,7 +14,7 @@
  *
  * 只允许相对路径导入：tools/console 下的纯 node 测试要直接加载本模块。
  */
-import { looksLikeUrl } from './url.js'
+import { extractUrl } from './url.js'
 import { domainOf, rawHostOf, colorFromHost } from './siteDraft.js'
 
 /** 预览卡片的状态 */
@@ -39,7 +39,8 @@ export const PREVIEW_KIND = {
 export function shouldPreview(raw, { prefix = '', hasPage = false } = {}) {
   if (hasPage) return false
   if (prefix) return false
-  return looksLikeUrl(raw)
+  // 用 extractUrl 而不是 looksLikeUrl：整段粘贴的文本里含网址也算（见 url.js#extractUrl）
+  return Boolean(extractUrl(raw))
 }
 
 /**
@@ -65,11 +66,16 @@ function hostCard(url) {
     color: colorFromHost(domainOf(url)),
     initial: initialOf(host),
     source: 'fallback',
+    // 与 cardFromSite 同形：渲染层不必为「有没有这几个字段」分叉
+    categoryLabel: '',
+    categoryColor: '',
+    purposes: [],
+    visitCount: 0,
   }
 }
 
 /** 已收录站点 → 卡片（全部字段本地可得，不联网、不等待） */
-export function cardFromSite(site) {
+export function cardFromSite(site, { categoryLabel = '', categoryColor = '', purposes = [] } = {}) {
   const s = site || {}
   return {
     host: s.url || '',
@@ -79,6 +85,12 @@ export function cardFromSite(site) {
     color: s.color || colorFromHost(domainOf(s.url)),
     initial: s.initial || initialOf(s.name || s.url),
     source: 'site',
+    // 「收在哪、用它干什么、去过没有」才是用户判断「要不要点进去」缺的那半句。
+    // 这三个值都由调用方算好传进来（分类标签与用途名要 store，纯函数拿不到）。
+    categoryLabel,
+    categoryColor,
+    purposes,
+    visitCount: Number(s.visitCount) || 0,
   }
 }
 
@@ -101,6 +113,11 @@ export function cardFromMeta(meta, url) {
     color: m.color || colorFromHost(domainOf(host)),
     initial: initialOf(title),
     source: 'meta',
+    // 未收录：没有分类归属、没有用途、也没访问过 —— 与 cardFromSite 同形即可
+    categoryLabel: '',
+    categoryColor: '',
+    purposes: [],
+    visitCount: 0,
   }
 }
 
@@ -113,12 +130,12 @@ export function cardFromMeta(meta, url) {
  *    这时报错比显示一份来路不明的数据诚实。
  */
 export function resolvePreviewState({
-  url = '', duplicate = null, loading = false, meta = null, error = '',
+  url = '', duplicate = null, loading = false, meta = null, error = '', siteCardOpts = {},
 } = {}) {
   if (!url) return { kind: PREVIEW_KIND.IDLE, card: null, message: '' }
 
   if (duplicate) {
-    return { kind: PREVIEW_KIND.FOUND, card: cardFromSite(duplicate), message: '' }
+    return { kind: PREVIEW_KIND.FOUND, card: cardFromSite(duplicate, siteCardOpts), message: '' }
   }
   if (error) {
     return { kind: PREVIEW_KIND.ERROR, card: hostCard(url), message: error }

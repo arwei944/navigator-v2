@@ -47,7 +47,15 @@
               v-else-if="item.preview.kind === 'error'" class="preview-badge error">抓取失败</span></span>
             <span v-if="item.preview.kind === 'error'" class="preview-desc">{{ item.preview.message }}</span>
             <span v-else-if="item.preview.card.desc" class="preview-desc">{{ item.preview.card.desc }}</span>
-            <span class="preview-host">{{ item.preview.card.host }}</span>
+            <!-- 「收在哪、用它干什么、去过没有」：已收录时才有的半句，未收录这几项为空 -->
+            <span class="preview-meta">
+              <span class="preview-host">{{ item.preview.card.host }}</span>
+              <span v-if="item.preview.card.categoryLabel" class="preview-cat">
+                <i class="preview-cat-dot" :style="{ background: item.preview.card.categoryColor }"></i>{{ item.preview.card.categoryLabel }}
+              </span>
+              <span v-for="p in item.preview.card.purposes" :key="p" class="preview-tag">{{ p }}</span>
+              <span v-if="item.preview.card.visitCount > 0" class="preview-visits">访问 {{ item.preview.card.visitCount }} 次</span>
+            </span>
           </div>
           <div v-else class="omni-item-info">
             <span class="omni-item-title"><template
@@ -272,14 +280,46 @@ watch(() => props.selectedIndex, async (v) => {
   overflow: hidden;
   white-space: normal;
 }
-.preview-host {
+.preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
   font-size: 11px;
   color: var(--text-secondary);
+  min-width: 0;
+}
+.preview-host {
+  flex: 0 1 auto;
+  min-width: 0;
   opacity: .7;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.preview-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--border-light);
+  white-space: nowrap;
+}
+.preview-cat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-secondary);
+}
+.preview-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--border-light);
+  white-space: nowrap;
+}
+.preview-visits { opacity: .7; white-space: nowrap; }
 .preview-badge {
   margin-left: 6px;
   font-size: 10px;

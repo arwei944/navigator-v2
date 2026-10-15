@@ -23,7 +23,7 @@
  */
 import { hostOf } from '../utils/url.js'
 import { domainOf } from '../utils/siteDraft.js'
-import { fetchSiteMeta, META_TIMEOUT_MS } from './meta.js'
+import { fetchSiteMetaShared, META_TIMEOUT_MS } from './meta.js'
 
 /** 按站名生成首字符（与 `buildSiteFromDraft` 同一条规则，改名必须同步改） */
 function initialOf(name) {
@@ -116,7 +116,7 @@ async function defaultTranslate(fields) {
  *   `reason` ∈ `'' | 'fetch-failed' | 'gone' | 'edited' | 'same' | 'error'`。
  */
 export async function runMetaUpgrade({
-  store, url, created, fetchMeta = fetchSiteMeta, translate = defaultTranslate,
+  store, url, created, fetchMeta = fetchSiteMetaShared, translate = defaultTranslate,
   timeoutMs = META_TIMEOUT_MS, warn = console.warn, trace = null,
 }) {
   const base = { changed: false, real: false, reason: '', name: created?.name || '', patch: null, message: '' }

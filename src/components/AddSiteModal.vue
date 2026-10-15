@@ -16,8 +16,8 @@
           <label>网址 <span class="hint">（粘贴后自动补全下方全部信息）</span></label>
           <div class="url-row">
             <input type="url" v-model="form.url" required placeholder="chat.openai.com" class="form-input"
-                   @input="onUrlInput" @blur="onUrlBlur" @keyup.enter.prevent="fetchMeta">
-            <button type="button" class="btn btn-small" :disabled="fetching || !form.url.trim()" @click="fetchMeta">
+                   @input="onUrlInput" @blur="onUrlBlur" @keyup.enter.prevent="fetchMeta(true)">
+            <button type="button" class="btn btn-small" :disabled="fetching || !form.url.trim()" @click="fetchMeta(true)">
               {{ fetching ? '补全中…' : meta ? '重新补全' : '自动补全' }}
             </button>
           </div>
@@ -130,7 +130,7 @@ import PurposePicker from '@/components/PurposePicker.vue'
 import { normalizeUrl, hostOf } from '@/utils/url'
 import { normalizePurposes, MAX_PURPOSES } from '../../shared/purposes.mjs'
 import { findDuplicate, buildSiteFromDraft } from '@/utils/siteDraft'
-import { fetchSiteMeta, metaFailureText } from '@/services/meta'
+import { fetchSiteMetaShared, metaFailureText } from '@/services/meta'
 import { localSiteMeta, localMetaNotice } from '@/services/localMeta'
 import { loadSuggestCategory } from '@/services/autoAdd'
 import { aiApi } from '@/services/aiApi'
@@ -377,7 +377,13 @@ function summarize(data) {
   return `已补全：${parts.join(' · ')}`
 }
 
-async function fetchMeta() {
+/**
+ * @param {boolean} [force] 用户**主动要求重抓**（点「重新补全」/ 回车）时传 true —— 绕过会话缓存；
+ *   自动触发（粘贴后的防抖、失焦、带 prefillUrl 挂载）不传，于是搜索框预览刚抓过同一域名时
+ *   直接复用结果，不再重新联网。**注意模板里必须写成 `fetchMeta(true)`**：
+ *   `@click="fetchMeta"` 会把事件对象当第一参数传进来，那是个真值，等于永远绕过缓存。
+ */
+async function fetchMeta(force = false) {
   const url = normalizeUrl(form.url)
   if (!url) return
   form.url = url
@@ -432,7 +438,9 @@ async function fetchMeta() {
    */
   const sFetch = run.stage('fetch', '抓取站点真实信息')
   const t0 = Date.now()
-  const r = await fetchSiteMeta(url)
+  // 走 Shared 版：搜索框预览刚抓过同一域名时直接复用，不再重新联网 ——
+  // 用户刚在卡片上看到站名和描述，弹窗不该再转一次圈。force 时绕过缓存（见签名）。
+  const r = await fetchSiteMetaShared(url, { skipCache: force })
   if (seq !== reqSeq) return
   if (!r.ok) {
     // 传输层已经给了具体原因（限流 / 内网地址被拒 / 接口不存在 / 网络不可达…），

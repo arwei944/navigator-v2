@@ -308,6 +308,40 @@ if (enterOk) {
   ok(after.input === aSite.host, '输入保留（站点项语义不变）', after.input)
 }
 
+console.log('\n── 5. 会话缓存：同域名再输入不闪「抓取中」 ──')
+// 第 2 组已经完整抓过 probeHost，缓存里有了；再输一次必须**同步**出结果。
+// 这是 P0 的用户可见证据：预览抓到的结果被下游复用，而不是每次都从头联网。
+await type('')
+await sleep(300)
+await type('https://' + probeHost)
+const cacheHit = await jsonOf(`(() => {
+  const item = document.querySelector('.unified-search .omni-item.is-preview')
+  if (!item) return null
+  const b = item.querySelector('.preview-badge')
+  return { loading: b ? b.classList.contains('loading') : false, host: item.querySelector('.preview-host')?.textContent?.trim() || '' }
+})()`)
+ok(cacheHit && !cacheHit.loading, '缓存命中时不进「抓取中」（同步出结果）', cacheHit ? `loading=${cacheHit.loading}` : '卡片未出现')
+ok(cacheHit?.host === probeHost, '卡片仍是该域名', cacheHit?.host || '')
+
+console.log('\n── 6. 已收录卡片带上「收在哪」 ──')
+await type(aSite.host)
+const catOk = await waitFor(`document.querySelector('.unified-search .omni-item.is-preview')`, 4000, '已收录卡片出现')
+if (catOk) {
+  const cat = await jsonOf(`({
+    hasCat: !!document.querySelector('.unified-search .omni-item.is-preview .preview-cat'),
+    catText: document.querySelector('.unified-search .omni-item.is-preview .preview-cat')?.textContent?.trim() || '',
+  })`)
+  ok(cat.hasCat && Boolean(cat.catText), '已收录卡片显示分类标签', cat.catText || '(无)')
+}
+
+console.log('\n── 7. 整段粘贴：从文本里认出网址 ──')
+await type('Gitlab - 代码托管 https://' + probeHost)
+const mixedOk = await waitFor(`document.querySelector('.unified-search .omni-item.is-preview')`, 5000, '混合文本也出卡')
+if (mixedOk) {
+  const mixedHost = await jsonOf(`document.querySelector('.unified-search .omni-item.is-preview .preview-host')?.textContent?.trim() || ''`)
+  ok(mixedHost === probeHost, '从「标题 + 网址」里认出网址（不带前后文）', mixedHost || '(空)')
+}
+
 clearTimeout(watchdog)
 ws.close()
 console.log(`\n${failures.length ? `❌ 网址预览真机验证失败 ${failures.length} 项：\n  - ` + failures.join('\n  - ') : `✅ 网址预览真机验证全部通过：${pass} 条断言`}`)

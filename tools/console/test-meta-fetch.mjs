@@ -11,7 +11,8 @@
  *
  * 运行：node tools/console/test-meta-fetch.mjs
  */
-import { META_TIMEOUT_MS, fetchSiteMeta, httpFailureText, metaFailureText } from '../../src/services/meta.js'
+import { META_TIMEOUT_MS, fetchSiteMeta, fetchSiteMetaShared, httpFailureText, metaFailureText } from '../../src/services/meta.js'
+import { clearMetaCache, peekCachedMeta } from '../../src/utils/metaCache.js'
 
 let pass = 0
 const failures = []
@@ -166,6 +167,54 @@ for (const [status, message] of [
   eq(metaFailureText({ message: '抓取超时（超过 12 秒未响应）' }), '抓取失败：抓取超时（超过 12 秒未响应）（可手动填写）', '句式统一')
   eq(metaFailureText(null), '抓取失败：未知原因（可手动填写）', '极端输入不炸')
   ok(META_TIMEOUT_MS >= 5000, '默认超时给足抓外站的时间', `${META_TIMEOUT_MS}ms`)
+}
+
+/* ---------------- 会话缓存：同一条网址在一次操作里只真抓一次 ----------------
+   这是「搜索框预览抓过 → 秒加补全 / 添加弹窗又抓一遍」那个重复的来源。
+   这里守的是三件事：命中即不联网、键按域名归一、失败不入缓存。 */
+
+{
+  clearMetaCache()
+  calls = []
+  nextResponse = () => jsonReply(200, { name: 'Figma', domain: 'figma.com' })
+
+  const r1 = await fetchSiteMetaShared('https://figma.com')
+  eq(r1.ok, true, '首次抓取成功')
+  eq(r1.cached, false, '首次不是缓存命中')
+  eq(calls.length, 1, '首次真的发了请求')
+
+  const r2 = await fetchSiteMetaShared('https://www.figma.com/design')
+  eq(r2.ok, true, '同域名第二次也成功')
+  eq(r2.cached, true, '第二次命中缓存')
+  eq(calls.length, 1, '第二次没有联网（www 与路径都被归一）')
+  eq(r2.data.name, 'Figma', '缓存回放的内容与首次一致')
+
+  // 预览要**同步**判断「要不要进抓取中」—— peek 就是给它用的
+  eq(peekCachedMeta('https://figma.com')?.name, 'Figma', 'peek 能同步拿到刚缓存的结果')
+  eq(peekCachedMeta('https://never-fetched.com'), null, '没抓过的域名 peek 返回 null')
+
+  // fetchSiteMeta 本身不碰缓存：它是纯抓取，别的调用方不该被缓存悄悄改行为
+  calls = []
+  await fetchSiteMeta('https://figma.com')
+  eq(calls.length, 1, 'fetchSiteMeta 不走缓存（仍会真发请求）')
+
+  // 失败不缓存：缓存住会让一次抖动变成「这个域名再也刷不出来」
+  clearMetaCache()
+  calls = []
+  nextResponse = () => reply(500, 'boom')
+  const f1 = await fetchSiteMetaShared('https://flaky.com')
+  eq(f1.ok, false, '失败时返回 ok:false')
+  nextResponse = () => jsonReply(200, { name: 'Flaky', domain: 'flaky.com' })
+  const f2 = await fetchSiteMetaShared('https://flaky.com')
+  eq(f2.ok, true, '失败之后再试能成功')
+  eq(f2.cached, false, '重试不是缓存命中')
+  eq(calls.length, 2, '失败与重试各发了一次请求（失败没被记下）')
+
+  // 用户主动点「重新补全」时走 skipCache —— 否则按钮点下去什么也不会发生
+  calls = []
+  const forced = await fetchSiteMetaShared('https://flaky.com', { skipCache: true })
+  eq(forced.cached, false, 'skipCache 时不读缓存')
+  eq(calls.length, 1, 'skipCache 时确实重新联网')
 }
 
 globalThis.fetch = realFetch

@@ -12,7 +12,7 @@
  * 状态判定本身在 `utils/urlPreview.js` 的纯函数里，这里只负责「把数据取回来」。
  */
 import { ref, onUnmounted } from 'vue'
-import { previewKeyOf } from '@/utils/urlPreview'
+import { peekCachedMeta } from '@/utils/metaCache'
 
 /** 防抖窗口：够覆盖连续敲键，又不至于让人觉得卡 */
 export const PREVIEW_DEBOUNCE_MS = 350
@@ -23,8 +23,6 @@ export function useUrlPreview() {
   const meta = ref(null)
   const error = ref('')
 
-  /** 域名 → 抓取结果。只存成功结果：失败可能是瞬时故障，缓存住会让重试永远失败 */
-  const cache = new Map()
   let timer = null
   let seq = 0
   let ctrl = null
@@ -57,13 +55,15 @@ export function useUrlPreview() {
   function request(nextUrl, { delay = PREVIEW_DEBOUNCE_MS } = {}) {
     if (!nextUrl) { idle(); return }
 
-    const key = previewKeyOf(nextUrl)
     cancelInFlight()
     url.value = nextUrl
 
-    // 缓存命中：同步出结果，不经过 loading —— 本地已有事实，不必让用户等一个转圈
-    if (key && cache.has(key)) {
-      meta.value = cache.get(key)
+    // 会话缓存命中：同步出结果，不经过 loading ——
+    // 本地（或刚抓到的）已有事实，不必让用户等一个转圈。
+    // 这份缓存与下游补全共用（utils/metaCache.js），所以「预览抓过的」下游也拿得到。
+    const hit = peekCachedMeta(nextUrl)
+    if (hit) {
+      meta.value = hit
       error.value = ''
       loading.value = false
       return
@@ -72,24 +72,24 @@ export function useUrlPreview() {
     meta.value = null
     error.value = ''
     loading.value = true
-    timer = setTimeout(() => { timer = null; run(nextUrl, key) }, delay)
+    timer = setTimeout(() => { timer = null; run(nextUrl) }, delay)
   }
 
-  async function run(targetUrl, key) {
+  async function run(targetUrl) {
     const my = ++seq
     ctrl = new AbortController()
     // 动态取 services/meta（先例：autoAdd.js 里 suggestCategory 同样动态取）：
     // 这条抓取链路只在「输入像网址」时才用得到，静态 import 会把它拖回首屏 ——
     // test-bundle.mjs 第 7 节点名了这条链路，与 autoAdd 共用同一个理由。
-    const { fetchSiteMeta } = await import('@/services/meta')
-    const res = await fetchSiteMeta(targetUrl, { signal: ctrl.signal })
+    // 取 Shared 版：抓到的结果写进共享缓存，下游（秒加补全 / 添加弹窗）直接复用。
+    const { fetchSiteMetaShared } = await import('@/services/meta')
+    const res = await fetchSiteMetaShared(targetUrl, { signal: ctrl.signal })
     // 拿到结果时若已经换了输入，这次响应就是废的 —— 直接丢，别覆盖新卡片
     if (my !== seq) return
 
     if (res.ok) {
       meta.value = res.data
       error.value = ''
-      if (key) cache.set(key, res.data)
     } else {
       meta.value = null
       error.value = res.message

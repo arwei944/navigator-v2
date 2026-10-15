@@ -19,9 +19,23 @@
  * 返回结构固定为 `{ ok: true, data }` 或 `{ ok: false, status, reason, message }`，
  * `reason` ∈ `'http' | 'non-json' | 'timeout' | 'network'`（机器可读），`message` 给人看。
  */
+import { peekCachedMeta, rememberMeta } from '../utils/metaCache.js'
 
 /** 默认超时：抓外站要留够时间，但不能久到用户以为卡死 */
 export const META_TIMEOUT_MS = 12000
+
+/**
+ * ## 为什么这里要读写共享缓存
+ *
+ * 同一条网址在一次操作里会被问**两到三遍**：搜索框预览一次、秒加的后台补全一次；
+ * 走弹窗那条路则是预览 + 弹窗各一次。问的是同一个接口、同一份数据，而抓一个慢站
+ * 要 1~10 秒 —— 用户刚在卡片上看到「Gitlab / 描述是……」，回车后弹窗又转圈重问一遍，
+ * 预览刚建立起来的确定性当场作废。
+ *
+ * 缓存本身放在 `utils/metaCache.js`：它是纯数据模块，首屏的预览需要**同步** peek
+ * （命中即出卡、不闪抓取中），不能为这一点把本文件静态拖回首屏（见 `test-bundle.mjs` 第 7 节）。
+ * 本文件只负责读与写。
+ */
 
 /** 平台暂停部署时的正文特征（用于把 message 说得更具体） */
 const PLATFORM_PAUSED_HINT = /DEPLOYMENT_DISABLED|Payment required/i
@@ -88,6 +102,25 @@ export async function fetchSiteMeta(url, { timeoutMs = META_TIMEOUT_MS, signal }
   } finally {
     clearTimeout(timer)
   }
+}
+
+/**
+ * 带会话缓存的抓取 —— **所有非「用户主动要求重抓」的调用方都该走这个**。
+ *
+ * 与 `fetchSiteMeta` 的区别只有一条：同域名在本次会话里抓过就直接回放，
+ * 不再联网。返回结构多一个 `cached` 标志供调用方区分（目前无人依赖它做分支，
+ * 留着是为了排查「这次到底联网没有」）。
+ *
+ * @param {{ skipCache?: boolean }} [opts] 用户点了「重新补全」这类**主动重抓**时传 true
+ */
+export async function fetchSiteMetaShared(url, { timeoutMs = META_TIMEOUT_MS, signal, skipCache = false } = {}) {
+  if (!skipCache) {
+    const hit = peekCachedMeta(url)
+    if (hit) return { ok: true, status: 200, data: hit, cached: true }
+  }
+  const res = await fetchSiteMeta(url, { timeoutMs, signal })
+  if (res.ok) rememberMeta(url, res.data)
+  return { ...res, cached: false }
 }
 
 /** 把失败结果拼成界面文案（统一「抓取失败：…（可手动填写）」的句式） */

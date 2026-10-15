@@ -23,7 +23,7 @@ import { buildCommands } from '@/utils/commands'
 import { matchPhrase, describePhrase, PHRASE_MIN } from '@/utils/commandPhrases'
 import { useUndoActions } from '@/composables/useUndoActions'
 import { rankSites, matchAny, scoreText, scoreSite, clickTier } from '@/utils/search'
-import { looksLikeUrl, hostOf } from '@/utils/url'
+import { extractUrl, hostOf } from '@/utils/url'
 import { shouldPreview, resolvePreviewState } from '@/utils/urlPreview'
 import { useUrlPreview } from '@/composables/useUrlPreview'
 import { openInNewTab } from '@/utils/open'
@@ -154,9 +154,13 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
 
   const domainCandidate = computed(() => {
     const q = trimmed.value
-    if (!q || !looksLikeUrl(q)) return null
-    const host = hostOf(q)
-    return host ? { host, url: q } : null
+    if (!q) return null
+    // 整串是网址、或整段文本里含网址 —— 取其中那一个（`Figma - 设计工具 https://figma.com`）。
+    // url 用抽出的那一段而不是原串：后面抓取与添加都只要网址本身，不该把「设计工具」也带上。
+    const found = extractUrl(q)
+    if (!found) return null
+    const host = hostOf(found)
+    return host ? { host, url: found } : null
   })
 
   const collected = computed(() => {
@@ -170,6 +174,25 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const urlPreview = useUrlPreview()
 
   /**
+   * 已收录卡片的附加信息（收在哪 / 用它干什么 / 去过没有）。
+   * 分类标签与用途名都要按 id 查表 —— 纯函数拿不到 store，所以在这里算好再传下去。
+   * 访问次数直接用 `site.visitCount`：`recordVisit` 会同步维护它（卡片角标就靠这个字段），
+   * 不必再去够没有导出的 `visitCounts`。
+   */
+  const previewCardOpts = computed(() => {
+    const col = collected.value
+    if (!col) return {}
+    return {
+      categoryLabel: col.categoryId ? categories.getCategoryLabel(col.categoryId) : '',
+      categoryColor: col.categoryId ? categories.getCategoryColor(col.categoryId) : '',
+      purposes: (col.purposes || [])
+        .slice(0, 2)
+        .map(id => PURPOSE_TAGS.find(p => p.id === id)?.label || '')
+        .filter(Boolean),
+    }
+  })
+
+  /**
    * 卡片状态。`url` 取**网址候选**而非 `urlPreview.url`：已收录时不发抓取请求，
    * 后者会一直是空的 —— 那样连本地就有数据的卡片都会被判成 idle、整张卡消失。
    */
@@ -179,6 +202,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     loading: urlPreview.loading.value,
     meta: urlPreview.meta.value,
     error: urlPreview.error.value,
+    siteCardOpts: previewCardOpts.value,
   }))
 
   /**

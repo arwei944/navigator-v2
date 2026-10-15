@@ -6,7 +6,7 @@
  * 点进去却被弹窗拦下来说「该域名已收录」。
  * 运行：node tools/console/test-url.mjs
  */
-import { normalizeUrl, hostOf, looksLikeUrl } from '../../src/utils/url.js'
+import { normalizeUrl, hostOf, looksLikeUrl, extractUrl } from '../../src/utils/url.js'
 
 let pass = 0
 const failures = []
@@ -90,6 +90,32 @@ eq(looksLikeUrl(123), false, '非字符串返回 false（不抛错）')
 
 // 识别为网址的输入，必须能取出 host —— 否则「添加站点」会带着一个取不到域名的值打开弹窗
 for (const s of yes) ok(hostOf(s) !== '', `识别为网址的输入都能取出 host：${s}`)
+
+/* ---------------- extractUrl ---------------- */
+
+// 整串就是网址：必须与改动前逐字一致（这条路径覆盖了绝大多数输入）
+eq(extractUrl('https://figma.com'), 'https://figma.com', '整串是网址时原样返回')
+eq(extractUrl('figma.com'), 'figma.com', '裸域名原样返回')
+eq(extractUrl('  https://figma.com  '), 'https://figma.com', '首尾空白被裁掉')
+
+// 混合文本：从文章 / 聊天记录里整段复制的场景
+eq(extractUrl('Figma - 设计工具 https://figma.com'),
+  'https://figma.com', '从「标题 + 网址」里抽出网址')
+eq(extractUrl('看这个 figma.com 很好用'), 'figma.com', '从中文句子里抽出裸域名')
+eq(extractUrl('（https://figma.com），推荐'), 'https://figma.com', '中文标点紧贴且后面还有文字')
+eq(extractUrl('详见 https://figma.com/a?b=1。'), 'https://figma.com/a?b=1', '削掉尾部句号、保留路径与查询串')
+eq(extractUrl('https://figma.com.'), 'https://figma.com', '削掉尾部英文句号')
+eq(extractUrl('www.figma.com'), 'www.figma.com', 'www 形式保留')
+eq(extractUrl('A https://a.com B https://b.com'), 'https://a.com', '取第一个（顺序即优先级）')
+
+// 抽不出来时返回空串 —— 调用方据此不出预览卡、不弹添加入口
+eq(extractUrl('chatgpt'), '', '普通词抽不出网址')
+eq(extractUrl('某某工具 很好用'), '', '纯中文抽不出网址')
+eq(extractUrl('图1.2 版本'), '', '数字点号不误判（TLD 需字母）')
+eq(extractUrl(''), '', '空串返回空串')
+eq(extractUrl('   '), '', '纯空白返回空串')
+eq(extractUrl(null), '', 'null 返回空串（不抛错）')
+eq(extractUrl(undefined), '', 'undefined 返回空串（不抛错）')
 
 /* ---------------- 结果 ---------------- */
 
