@@ -33,6 +33,9 @@ probe/_*/
 .workbuddy/
 # SQLite 数据目录（本机 console 调试用，线上在沙箱 data/，均不入库）
 server/data/
+# 仓库根的 data/：管理凭据回填文件（admin-key.txt / admin-password-hash.txt 等）。
+# **绝不能入库** —— 哈希虽然反推不出口令，但它是口令的离线爆破目标。
+/data/
 
 # 一次性代理探测产物（本机状态，不入库）
 tools/proxy-ports.txt
