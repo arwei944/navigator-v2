@@ -49,7 +49,7 @@ const statusCmd = {
 
 const runCmd = {
   path: 'publish run',
-  summary: '一键发布流水线：检查改动 → 提交 → 推送 → 备份 → 数据门禁 → 构建 → 部署 → 热更新 → 一致性验证',
+  summary: '【已废弃】旧的端到端发布：部署环节走 Vercel —— 线上已迁自有服务器，改用 nav release run',
   usage: 'nav publish run (--gate <放行凭证> | --no-gate) [--message <提交消息>] [--skip-build] [--no-push] [--dry-run]',
   mutating: true,
   flags: {
@@ -173,7 +173,7 @@ const syncDataCmd = {
 
 const deploymentsCmd = {
   path: 'publish deployments',
-  summary: '最近的 Vercel 部署（状态机 / 目标环境 / 关联提交），需 VERCEL_TOKEN',
+  summary: '【已废弃】最近的 Vercel 部署记录（需 VERCEL_TOKEN）—— 线上已迁自有服务器',
   usage: 'nav publish deployments [--limit <n>]',
   flags: { limit: { desc: '条数，默认 8' } },
   async run(argv) {

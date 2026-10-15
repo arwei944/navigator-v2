@@ -11,6 +11,7 @@ import { initHealthPanel, refresh as refreshHealth } from './healthpanel.js'
 import { initNotifyPanel, refresh as refreshNotify, refreshBadge } from './notifypanel.js'
 import { initDeployPanel, refresh as refreshDeploy } from './deploypanel.js'
 import { initPluginPanel, refresh as refreshPlugins } from './pluginpanel.js'
+import { initPipelinePanel, refresh as refreshRelease } from './pipelinepanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -28,6 +29,7 @@ $('#tabs').addEventListener('click', e => {
   if (btn.dataset.panel === 'notify') refreshNotify()
   if (btn.dataset.panel === 'deploy') refreshDeploy()
   if (btn.dataset.panel === 'plugins') refreshPlugins()
+  if (btn.dataset.panel === 'release') refreshRelease()
 })
 
 /* ---------- 概览 ---------- */
@@ -83,6 +85,7 @@ initHealthPanel()
 initNotifyPanel()
 initDeployPanel()
 initPluginPanel()
+initPipelinePanel()
 loadHealth()
 loadEnv()
 refreshBadge()

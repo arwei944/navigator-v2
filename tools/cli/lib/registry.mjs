@@ -9,6 +9,7 @@
  * 由 tools/cli/commands/*.mjs 提供，业务逻辑仍复用 tools/console/lib/*。
  */
 import { commands as siteCommands } from '../commands/sites.mjs'
+import { commands as releaseCommands } from '../commands/release.mjs'
 import { commands as publishCommands } from '../commands/publish.mjs'
 import { commands as snapshotCommands } from '../commands/snapshots.mjs'
 import { commands as gitCommands } from '../commands/git.mjs'
@@ -16,6 +17,7 @@ import { commands as dataCommands } from '../commands/data.mjs'
 import { commands as opsCommands } from '../commands/ops.mjs'
 
 export const GROUPS = [
+  { id: 'release', label: '开发流水线', desc: '一条命令跑完：测试门禁 → 提交 → 推送 → 构建 → 产物门禁 → 打包 → 上传 → 重启 → 线上验证', commands: releaseCommands },
   { id: 'sites', label: '站点管理', desc: '站点数据增删改查、分类、元信息抓取、图标、批量操作、批量探活', commands: siteCommands },
   { id: 'publish', label: '发布与云端', desc: '预检放行、一键发布、云端快照与回滚、数据同步、部署记录', commands: [...publishCommands, ...snapshotCommands] },
   { id: 'ops', label: '运维事件与通知', desc: '发布历史、通知中心（未读 / Webhook）、可用性巡检', commands: opsCommands },

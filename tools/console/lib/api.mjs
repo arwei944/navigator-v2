@@ -19,6 +19,7 @@ import * as notify from './notify.mjs'
 import * as schedule from './schedule.mjs'
 import * as deploy from './deploy.mjs'
 import * as pluginsCfg from './plugins.mjs'
+import * as release from './release.mjs'
 import { record } from './audit.mjs'
 
 export function sendJson(res, code, obj) {
@@ -307,6 +308,19 @@ export async function handleApi(req, res, path, url) {
   /* ---- 发布到自有服务器（BotKeep）----
      状态里带线上探测（一次出网请求），所以单独成端点、不塞进 /api/health 的轮询里。 */
 
+  /* ---- 开发流水线：预检（只读）---- */
+
+  if (method === 'GET' && path === '/api/release') {
+    try {
+      // requireMessage:false —— 面板打开时只是「看看状态」，此刻没填提交消息不算阻塞
+      const p = await release.preflight({ requireMessage: false })
+      sendJson(res, 200, { ok: true, ...p, last: release.lastRelease() })
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
   /* ---- 插件管理：九个引擎注册表的聚合视图（与站内 /api/plugins 同源）---- */
 
   if (method === 'GET' && path === '/api/plugins') {
@@ -332,6 +346,37 @@ export async function handleApi(req, res, path, url) {
   }
 
   if (method === 'POST') {
+    /* ---- 开发流水线：启动（长任务，前端拿 jobId 走 SSE 看实时日志与时间线）---- */
+
+    if (path === '/api/release') {
+      const body = await readJsonBody(req)
+      const opts = {
+        message: String(body.message || ''),
+        skipTest: body.skipTest === true,
+        noPush: body.noPush === true,
+        skipBuild: body.skipBuild === true,
+      }
+      const p = await release.preflight(opts)
+      if (p.blockers.length && body.force !== true) {
+        sendJson(res, 409, { error: p.blockers[0], blockers: p.blockers })
+        return true
+      }
+      try {
+        const job = release.startRelease(opts)
+        // 审计只记「跑了什么、跳了什么」，不记提交消息正文（那是用户的业务内容）
+        record({
+          action: 'release.start',
+          target: 'botkeep',
+          detail: [`job ${job.id}`, opts.skipTest ? '跳过测试' : '', opts.noPush ? '不推送' : '', opts.skipBuild ? '跳过构建' : ''].filter(Boolean).join(' · '),
+        })
+        sendJson(res, 200, { ok: true, jobId: job.id })
+      } catch (e) {
+        record({ action: 'release.start', result: 'fail', detail: e.message })
+        sendJson(res, 409, { error: e.message })
+      }
+      return true
+    }
+
     /* ---- 插件配置（本机）---- */
 
     if (path === '/api/plugins') {

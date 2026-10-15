@@ -50,6 +50,7 @@
 
   <nav class="tabs" id="tabs">
     <button class="tab active" data-panel="overview">概览</button>
+    <button class="tab" data-panel="release">流水线</button>
     <button class="tab" data-panel="sites">站点</button>
     <button class="tab" data-panel="changes">改动</button>
     <button class="tab" data-panel="commit">提交</button>
@@ -84,6 +85,48 @@
         <h3>控制台自检</h3>
         <p class="hint">验证 SSE 实时通道与子进程日志管道是否正常。</p>
         <button class="btn primary" id="btn-selfcheck">运行自检</button>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-release">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="release-summary"></div>
+          <div class="row-actions">
+            <button class="btn ghost" id="btn-release-preflight">预检</button>
+            <button class="btn primary" id="btn-release-run">开始流水线</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>流水线选项</h3>
+        <div class="row-actions" style="flex-wrap:wrap;gap:12px;align-items:center">
+          <input class="msg-input" id="release-message" autocomplete="off"
+                 placeholder="提交消息（工作区有改动时必填）" style="flex:1 1 320px">
+          <label class="hint" style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="release-skip-test"> 跳过测试门禁
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="release-no-push"> 不推送
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:6px">
+            <input type="checkbox" id="release-skip-build"> 跳过构建
+          </label>
+        </div>
+        <p class="hint">
+          十个步骤一条闭环：<strong>检查工作区 → 测试门禁 → 提交 → 推送 → 构建 → 产物门禁 → 打包 → 上传 → 重启容器 → 线上验证</strong>。
+          部署走自有服务器（BotKeep），与「发布」面板同一套逻辑；上面的开关只会把对应步骤标成「已跳过」并留痕，不会静默改变别的行为。
+        </p>
+        <div class="result" id="release-blockers"></div>
+      </div>
+
+      <div class="card">
+        <div class="row-between">
+          <h3 style="margin:0">时间线</h3>
+          <span class="hint" id="release-progress"></span>
+        </div>
+        <div id="release-steps"></div>
       </div>
     </section>
 

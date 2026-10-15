@@ -49,6 +49,7 @@ export const AUDIT_ACTIONS = {
   'notify.read': '通知已读',
   'notify.clear': '通知清空',
   'plugins.save': '插件配置变更',
+  'release.start': '开发流水线启动',
 }
 
 export const AUDIT_RESULTS = { ok: '成功', fail: '失败', rejected: '已拒绝' }

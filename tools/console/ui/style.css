@@ -883,3 +883,33 @@ select.msg-input { cursor: pointer; }
   background: rgba(251, 191, 36, .08); border: 1px solid rgba(251, 191, 36, .25);
   color: var(--warn); font-size: 11.5px; line-height: 1.7;
 }
+
+/* ---------- 开发流水线 ---------- */
+
+.rel-step {
+  display: grid;
+  grid-template-columns: 14px 26px 92px minmax(0, 1fr) auto;
+  align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 6px; font-size: 12.5px;
+}
+.rel-step + .rel-step { border-top: 1px solid var(--border); }
+.rel-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-dim); }
+.rel-step.running .rel-dot { background: var(--accent); box-shadow: 0 0 0 3px var(--sel); }
+.rel-step.ok .rel-dot { background: var(--ok); }
+.rel-step.skipped .rel-dot { background: var(--warn); }
+.rel-step.failed .rel-dot { background: var(--err); }
+.rel-idx { color: var(--text-dim); font-family: var(--mono); font-size: 11px; }
+.rel-label { color: var(--text); }
+.rel-step.skipped .rel-label { color: var(--text-dim); }
+.rel-role {
+  color: var(--text-dim); font-size: 11.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rel-status { color: var(--text-dim); font-size: 11.5px; white-space: nowrap; }
+.rel-step.ok .rel-status { color: var(--ok); }
+.rel-step.running .rel-status { color: var(--accent); }
+.rel-step.failed .rel-status { color: var(--err); }
+.rel-step.skipped .rel-status { color: var(--warn); }
+.rel-note { color: var(--text-dim); }
+.rel-block-title { font-size: 12px; color: var(--warn); margin: 10px 0 4px; }
+.rel-block { font-size: 12px; color: var(--err); padding: 2px 0; }

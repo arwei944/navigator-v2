@@ -99,6 +99,13 @@ export function run(job, command, cmdArgs, opts = {}) {
     cwd: opts.cwd,
     env: { ...process.env, ...(opts.env || {}) },
     windowsHide: true,
+    /**
+     * Windows 上执行 `npm` 必须走 shell —— 它是 `npm.cmd`（批处理），
+     * 而 Node 从 v18.20/20.12 起禁止 spawn/execFile 直接执行 .cmd（ENOENT/EINVAL）。
+     * 调用方用 shell 时要把整条命令放进 command、args 留空：
+     * `shell:true` 配 args 会触发 DEP0190（参数不转义、只是拼接）。
+     */
+    ...(opts.shell ? { shell: true } : {}),
   })
   job.proc = child
   job.timer = null
