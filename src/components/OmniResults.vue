@@ -14,13 +14,24 @@
           v-for="(item, i) in group.items"
           :key="item.key"
           class="omni-item"
-          :class="{ active: flatIndex(group.type, i) === selectedIndex, danger: item.danger }"
+          :class="{ active: flatIndex(group.type, i) === selectedIndex, danger: item.danger, 'is-preview': Boolean(item.preview) }"
           :data-idx="flatIndex(group.type, i)"
           @click="emit('select', item)"
           @mouseenter="emit('hover', flatIndex(group.type, i))"
         >
+          <!-- 网址预览卡片：图标 + 站名 + 描述 + 域名，一张卡说清这个网址是什么。
+               数据与状态判定都在 utils/urlPreview.js，这里只渲染。
+               图标区与文本区各自成链 —— 文本区若用无条件 div，卡片会和下面的通用文本
+               同时渲染，标题与副标题各出现两次（真机截图逮到的）。 -->
+          <span v-if="item.preview && item.preview.card" class="preview-icon"
+                :style="{ background: item.preview.card.color }">
+            <img v-if="item.preview.card.iconUrl" :src="item.preview.card.iconUrl"
+                 :alt="item.preview.card.title || item.preview.card.host"
+                 class="preview-favicon" loading="lazy" @error="$event.target.remove()">
+            <span v-else class="preview-initial">{{ item.preview.card.initial || '·' }}</span>
+          </span>
           <!-- 站点：用站点自己的图标 -->
-          <span v-if="item.site" class="omni-site-icon" :style="{ background: item.site.color }">
+          <span v-else-if="item.site" class="omni-site-icon" :style="{ background: item.site.color }">
             <span class="omni-favicon-fallback">{{ item.site.initial }}</span>
             <img v-if="item.site.icon" :src="'/' + item.site.icon" :alt="item.site.name"
                  class="omni-favicon-img" loading="lazy" @error="$event.target.remove()">
@@ -29,7 +40,16 @@
           <span v-else-if="item.icon === 'dot'" class="omni-dot" :style="item.dotColor ? { background: item.dotColor } : {}"></span>
           <OmniIcon v-else :name="item.icon" />
 
-          <div class="omni-item-info">
+          <div v-if="item.preview && item.preview.card" class="omni-item-info">
+            <span class="omni-item-title">{{ item.preview.card.title }}<span
+              v-if="item.preview.kind === 'found'" class="preview-badge found">已收录</span><span
+              v-else-if="item.preview.kind === 'loading'" class="preview-badge loading">抓取中</span><span
+              v-else-if="item.preview.kind === 'error'" class="preview-badge error">抓取失败</span></span>
+            <span v-if="item.preview.kind === 'error'" class="preview-desc">{{ item.preview.message }}</span>
+            <span v-else-if="item.preview.card.desc" class="preview-desc">{{ item.preview.card.desc }}</span>
+            <span class="preview-host">{{ item.preview.card.host }}</span>
+          </div>
+          <div v-else class="omni-item-info">
             <span class="omni-item-title"><template
               v-for="(seg, si) in splitHighlight(item.title, query)" :key="'t' + si"
             ><mark v-if="seg.hit">{{ seg.text }}</mark><template v-else>{{ seg.text }}</template></template><span
@@ -212,6 +232,80 @@ watch(() => props.selectedIndex, async (v) => {
   background: #fff;
   box-sizing: border-box;
 }
+
+/* ---- 网址预览卡片 ----
+   比普通结果行高一档：它是「这个网址是什么」，不是一条匹配结果，
+   所以图标更大、多了描述与域名，用户不点也能判断要不要收录。 */
+.omni-item.is-preview { padding: 10px 14px; gap: 12px; align-items: flex-start; }
+.preview-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+.preview-initial { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.preview-favicon {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 3px;
+  background: #fff;
+  box-sizing: border-box;
+}
+.preview-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+.preview-host {
+  font-size: 11px;
+  color: var(--text-secondary);
+  opacity: .7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-badge {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.preview-badge.found { color: var(--color-ok, #16a34a); background: rgba(22, 163, 74, .12); }
+.preview-badge.loading { color: var(--accent); background: var(--accent-light); }
+.preview-badge.error { color: var(--color-danger); background: rgba(220, 38, 38, .1); }
+/* 抓取中的转圈：只动 transform，动画时钟不推进时也只是不转，不会定格成透明 */
+.preview-badge.loading::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 4px;
+  vertical-align: 1px;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: preview-spin .8s linear infinite;
+}
+@keyframes preview-spin { to { transform: rotate(360deg); } }
 
 .omni-empty {
   text-align: center;

@@ -24,19 +24,22 @@ import { matchPhrase, describePhrase, PHRASE_MIN } from '@/utils/commandPhrases'
 import { useUndoActions } from '@/composables/useUndoActions'
 import { rankSites, matchAny, scoreText, scoreSite, clickTier } from '@/utils/search'
 import { looksLikeUrl, hostOf } from '@/utils/url'
+import { shouldPreview, resolvePreviewState } from '@/utils/urlPreview'
+import { useUrlPreview } from '@/composables/useUrlPreview'
 import { openInNewTab } from '@/utils/open'
 import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useClicksStore } from '@/stores/clicks'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
 
-/** 分组顺序：inline 站点优先，palette 命令优先 */
+/** 分组顺序：inline 站点优先，palette 命令优先；网址预览两边都在最前 */
 const ORDER = {
-  inline: ['site', 'page', 'view', 'action', 'domain', 'category', 'purpose', 'external'],
-  palette: ['page', 'view', 'action', 'site', 'domain', 'category', 'purpose', 'external']
+  inline: ['preview', 'site', 'page', 'view', 'action', 'domain', 'category', 'purpose', 'external'],
+  palette: ['preview', 'page', 'view', 'action', 'site', 'domain', 'category', 'purpose', 'external']
 }
 
 const GROUP_LABEL = {
+  preview: '网址预览',
   page: '页面',
   view: '视图',
   action: '操作',
@@ -162,6 +165,36 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     return sites.sites.find(s => hostOf(s.url) === c.host) || null
   })
 
+  /* ---------- 网址预览（下拉里的那张卡片） ---------- */
+
+  const urlPreview = useUrlPreview()
+
+  /**
+   * 卡片状态。`url` 取**网址候选**而非 `urlPreview.url`：已收录时不发抓取请求，
+   * 后者会一直是空的 —— 那样连本地就有数据的卡片都会被判成 idle、整张卡消失。
+   */
+  const previewState = computed(() => resolvePreviewState({
+    url: domainCandidate.value?.url || '',
+    duplicate: collected.value,
+    loading: urlPreview.loading.value,
+    meta: urlPreview.meta.value,
+    error: urlPreview.error.value,
+  }))
+
+  /**
+   * 预取的触发条件，与卡片「该不该出现」共用同一把尺子（`shouldPreview`），
+   * 否则会出现「抓了却不显示」或「显示了却没抓」两种对不上的情况。
+   * 已收录时不抓：本地就有全部字段，联网纯属多余，还会让卡片白等一次往返。
+   */
+  watch(
+    () => {
+      if (!shouldPreview(trimmed.value, { prefix: prefix.value, hasPage: Boolean(page.value) })) return ''
+      if (collected.value) return ''
+      return domainCandidate.value?.url || ''
+    },
+    (target) => urlPreview.request(target)
+  )
+
   /* ---------- root 页结果 ---------- */
 
   const commandResults = computed(() => {
@@ -279,34 +312,35 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     }]
   })
 
-  /** 输入像网址时置顶的「添加 / 已收录」行 */
-  const urlItems = computed(() => {
+  /**
+   * 输入像网址时置顶的**预览卡片**：一张卡说清「这个网址是什么」，并给出唯一的下一步。
+   *
+   * 卡片本身就是那条可执行项 —— 回车=打开（已收录）或添加（未收录），
+   * 不额外长一条操作行：同一件事给两个入口，用户还得判断该点哪个。
+   */
+  const previewItems = computed(() => {
     const q = trimmed.value
     if (!q || prefix.value) return []
-    const col = collected.value
     const cand = domainCandidate.value
-    if (col) {
-      return [{
-        key: `site:${col.id}`,
-        type: 'site',
-        title: col.name,
-        subtitle: '该域名已收录',
-        site: col,
-        icon: '',
-        run: () => openSite(col)
-      }]
-    }
-    if (cand) {
-      return [{
-        key: 'add:url',
-        type: 'add',
-        title: `添加站点 ${cand.host}`,
-        subtitle: '按此网址自动抓取名称、描述与图标',
-        icon: 'plus',
-        run: () => omni.requestAdd(cand.url)
-      }]
-    }
-    return []
+    if (!cand) return []
+
+    const col = collected.value
+    const state = previewState.value
+    return [{
+      key: col ? `site:${col.id}` : 'preview:url',
+      // type 说的是「这是什么条目」，不是「在哪个组」：已收录是一条站点项，
+      // 未收录是一条添加项 —— 外壳据此决定回车后要不要保留搜索词（见 UnifiedSearchBox#done），
+      // 换成 'preview' 会让「打开站点」变成「清空搜索框」。
+      type: col ? 'site' : 'add',
+      title: state.card?.title || cand.host,
+      subtitle: col ? '该域名已收录' : '按此网址自动抓取名称、描述与图标',
+      icon: col ? '' : 'plus',
+      // 渲染成卡片而不是单行，全靠这个字段；数据与状态判定都在 utils/urlPreview.js
+      preview: state,
+      // 已收录才有站点可操作（⇥ 进操作页），未收录时不留空的 site
+      ...(col ? { site: col } : {}),
+      run: () => (col ? openSite(col) : omni.requestAdd(cand.url))
+    }]
   })
 
   /* ---------- 默认视图（palette 空输入） ---------- */
@@ -415,7 +449,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const groupOrder = computed(() => {
     if (mode !== 'inline') return ORDER.palette
     if (topCmdScore.value >= 700 && topCmdScore.value > topSiteScore.value) {
-      return ['page', 'view', 'action', 'site', 'domain', 'category', 'purpose', 'external']
+      return ['preview', 'page', 'view', 'action', 'site', 'domain', 'category', 'purpose', 'external']
     }
     return ORDER.inline
   })
@@ -431,7 +465,9 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     if (!q) return mode === 'palette' ? defaultGroups.value : []
 
     const byType = {
-      site: [...urlItems.value, ...siteResults.value.filter(s => !urlItems.value.some(u => u.key === s.key))],
+      preview: previewItems.value,
+      // 已收录的站点已在预览卡片里出现过，站点组里不再重复列一遍（同一 key 会让键盘序号错位）
+      site: siteResults.value.filter(s => !previewItems.value.some(u => u.key === s.key)),
       page: commandResults.value.filter(c => c.type === 'page'),
       view: commandResults.value.filter(c => c.type === 'view'),
       action: commandResults.value.filter(c => c.type === 'action'),

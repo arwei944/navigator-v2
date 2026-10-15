@@ -115,8 +115,12 @@ if (vendorChunk) {
 
 const initRaw = initialJs.reduce((n, f) => n + sizeOf(f), 0)
 const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
-const BUDGET_RAW = 600 * 1024
-const BUDGET_GZ = 230 * 1024
+// 2026-10-15：600 → 604。搜索框「网址预览卡片」功能有意带入 +5.6 KiB raw
+// （utils/urlPreview.js + composables/useUrlPreview.js + OmniResults 卡片渲染），
+// 基线 596.1 KiB 的余量本就只剩 3.9。抓取链路已按第 7 节的规矩走动态 import，
+// 没把 services/meta 拖回首屏 —— 这里抬的是功能增量，不是给悄悄变胖开口子。
+const BUDGET_RAW = 604 * 1024
+const BUDGET_GZ = 214 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)
 
