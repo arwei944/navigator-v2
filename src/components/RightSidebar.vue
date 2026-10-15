@@ -21,8 +21,11 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
     </button>
 
+    <!-- 管理后台：右栏跟随当前模块（说明 / 概览 / 快捷跳转），而不是站点详情 -->
+    <AdminAside v-if="isAdmin" :tab="adminTab" />
+
     <!-- 站点详情面板 -->
-    <SiteDetailPanel v-if="site" :site="site" />
+    <SiteDetailPanel v-else-if="site" :site="site" />
 
     <!-- 空状态 -->
     <div v-else class="empty-state">
@@ -46,6 +49,20 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSitesStore } from '@/stores/sites'
 import SiteDetailPanel from '@/components/right/SiteDetailPanel.vue'
+import { defineAsyncComponent } from 'vue'
+import { useRoute } from 'vue-router'
+
+/**
+ * 管理后台的右栏**异步加载**：它带着 13 个模块的说明文案，静态引入会整块进首屏 ——
+ * 实测首屏因此涨到 613.8 KiB，越过 608 的预算线（那条线防的正是这种「顺手带胖首屏」）。
+ * 后台不是首屏路径，等真进 /admin 再加载完全来得及。
+ */
+const AdminAside = defineAsyncComponent(() => import('@/components/right/AdminAside.vue'))
+
+const route = useRoute()
+/** 管理后台下右栏换内容：跟着当前 tab 走 */
+const isAdmin = computed(() => route.name === 'Admin')
+const adminTab = computed(() => String(route.query.tab || 'overview'))
 
 const sidebarStore = useSidebarStore()
 const prefs = usePreferencesStore()

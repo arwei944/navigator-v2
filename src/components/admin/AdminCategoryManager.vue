@@ -16,6 +16,12 @@
     <div v-if="msg" class="cat-msg" :class="{ bad: msgBad }">{{ msg }}</div>
 
     <div class="cat-groups">
+      <!-- 空兜底：分类表是内置默认表，正常永不为空 —— 所以看到这一行就说明数据源出了问题，
+           直接把这层意思写出来，好过留一片空白让人以为「分类没了」 -->
+      <p v-if="!categoriesStore.groups.length" class="cat-empty">
+        分类表没有加载出来。它是内置的默认表，正常不会为空 —— 如果看到这一行，说明数据源有问题，
+        可以先去「概览」看看站点数据是否正常。
+      </p>
       <div v-for="group in categoriesStore.groups" :key="group.id" class="cat-group">
         <div class="cat-group-head">
           <span class="cat-group-id">{{ group.id }}</span>
@@ -209,6 +215,11 @@ function doReset() {
   background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0;
 }
 .cat-msg.bad { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.cat-empty {
+  margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  font-size: 12px; line-height: 1.7;
+}
 .cat-groups { display: flex; flex-direction: column; gap: 14px; }
 .cat-group { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; }
 .cat-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }

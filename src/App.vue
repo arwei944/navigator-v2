@@ -43,6 +43,11 @@
         <AboutView />
       </template>
 
+      <!-- 管理后台：套壳渲染（保持三栏），不再是整页独立的 /admin -->
+      <template v-else-if="scope === 'admin'">
+        <AdminView />
+      </template>
+
       <!-- 常规视图 -->
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
@@ -194,6 +199,7 @@ const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue
 // 关联图谱：同理必须异步 —— 它带着 affinity 引擎与力导向布局，进首屏必超预算
 const GraphView = defineAsyncComponent(() => import('@/views/GraphView.vue'))
 const AboutView = defineAsyncComponent(() => import('@/views/AboutView.vue'))
+const AdminView = defineAsyncComponent(() => import('@/views/AdminView.vue'))
 /**
  * 管线日志：排查「多跳异步链路到底停在哪」用的 Observability 浮层。
  *
@@ -537,7 +543,8 @@ const SCOPE_BY_ROUTE = {
   Archived: 'archived',
   Insights: 'insights',
   Graph: 'graph',
-  About: 'about'
+  About: 'about',
+  Admin: 'admin'
 }
 const SCOPE_LABEL = {
   favorites: '收藏',
@@ -551,8 +558,12 @@ const SCOPE_LABEL = {
 
 const scope = computed(() => SCOPE_BY_ROUTE[route.name] || 'discover')
 
-// 不走导航壳的独立页面（自带整页布局）
-const STANDALONE_ROUTES = new Set(['Admin', 'NotFound'])
+/**
+ * 不走导航壳的独立页面（自带整页布局）。
+ * 2026-10-16：**Admin 从这一组移走** —— 管理后台改成套壳渲染，保持三栏
+ * （左导航 / 中内容 / 右信息栏），不再是整页切换。只剩 404 是真·独立页。
+ */
+const STANDALONE_ROUTES = new Set(['NotFound'])
 const isStandalone = computed(() => STANDALONE_ROUTES.has(route.name))
 
 // 分类（Axis 3）：与范围正交，放 query 才能和 /favorites、/recent 组合

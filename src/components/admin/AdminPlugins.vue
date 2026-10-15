@@ -16,6 +16,13 @@
     <p v-if="error" class="pl-error">{{ error }}</p>
     <p v-if="notice" class="pl-notice">{{ notice }}</p>
 
+    <!-- 空兜底：接口通了但一个引擎组都没有时，原先整页只剩标题 —— 那看起来像坏了，
+         而实际上多半是服务端还没把注册链加载起来（点「刷新」即可） -->
+    <p v-if="!loading && !groups.length && !error" class="pl-empty">
+      没有读到任何引擎模块。正常情况下一定有 9 个 —— 点右上角「刷新」重试；
+      若仍为空，说明服务端的插件目录没加载起来。
+    </p>
+
     <section v-for="g in groups" :key="g.id" class="pl-card">
       <div class="pl-card-head">
         <h3>{{ g.label }}</h3>
@@ -228,6 +235,11 @@ onMounted(load)
 .pl-link { border: none; background: none; padding: 0; font-size: 11px; color: var(--accent); cursor: pointer; }
 
 .pl-error { margin: 0 0 12px; font-size: 12px; color: #b91c1c; }
+.pl-empty {
+  margin: 0 0 12px; padding: 12px 14px; border-radius: var(--radius-sm);
+  background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  font-size: 12px; line-height: 1.7;
+}
 .pl-notice { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--radius-sm);
   background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 12px; }
 

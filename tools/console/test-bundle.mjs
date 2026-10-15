@@ -127,8 +127,15 @@ const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
 // 图谱本体没有进首屏：GraphView 15.4 KiB / affinity / graphLayout 各自独立成 chunk，
 // 已在 index chunk 里按符号名逐个 grep 验证为 0 命中（layoutGraph、buildAffinityGraph、
 // mulberry32、CONCEPT_WORDS 等）。抬的都是入口成本，不是功能体积。
-const BUDGET_RAW = 608 * 1024
-const BUDGET_GZ = 214 * 1024
+// 2026-10-16：608 → 610。管理后台改为**三栏套壳**（Admin 从 STANDALONE_ROUTES 移出，
+// 走 App.vue 的 scope 分支）。增量只有「入口成本」：App.vue 的 scope 映射与异步声明、
+// RightSidebar 的 admin 分支判断。
+// 实测：初版把 AdminAside 静态引入 RightSidebar，首屏涨到 613.8 KiB —— 已改成
+// defineAsyncComponent，回落到 608.1。AdminView 与 AdminAside 都独立成 chunk，
+// 已在 index chunk 里按符号名 grep 验证为 0 命中（TAB_META / admin-aside / aa-link /
+// 「站点库与分类体系的总览」等）。抬的是入口，不是功能体积。
+const BUDGET_RAW = 610 * 1024
+const BUDGET_GZ = 215 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)
 

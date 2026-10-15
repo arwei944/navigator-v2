@@ -115,6 +115,11 @@ async function applySuggestion(row) {
           <button v-if="row.kind !== 'keep'" class="mini-btn" @click="applySuggestion(row)">应用</button>
         </li>
       </ul>
+      <!-- 空兜底：没有它时，「还没跑」与「跑完没建议」两种情况都是一片空白，
+           用户分不清是坏了还是没事可做 -->
+      <p v-else class="ops-note">
+        {{ busy === 'cat' ? '正在分析…' : '还没有建议。点上面的按钮开始分析；若分析后仍为空，说明现有分类已经够用。' }}
+      </p>
     </section>
 
     <section class="panel">
@@ -124,6 +129,9 @@ async function applySuggestion(row) {
         {{ busy === 'sum' ? '分析中…' : '生成摘要' }}
       </button>
       <p v-if="summary" class="summary">{{ summary }}</p>
+      <p v-else class="ops-note">
+        {{ busy === 'sum' ? '正在生成…' : '还没有摘要。点上面的按钮生成；若无异常，摘要会明确说明无需处理。' }}
+      </p>
     </section>
 
     <p v-if="message" class="ops-msg" :class="tone">{{ message }}</p>
@@ -132,19 +140,19 @@ async function applySuggestion(row) {
 
 <style scoped>
 .ai-panel { display: flex; flex-direction: column; gap: 18px; }
-.panel { border: 1px solid var(--color-border); border-radius: 10px; padding: 14px 16px; }
+.panel { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
-.ops-hint, .ops-note { color: var(--color-muted); font-size: 12px; line-height: 1.6; }
+.ops-hint, .ops-note { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
 .list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--color-bg-subtle); }
+.row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--border-light); }
 .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tag { font-size: 12px; color: var(--color-muted); }
-.tag.new { color: var(--color-ok); }
-.summary { margin: 12px 0 0; padding: 10px; border-radius: 8px; background: var(--color-bg-subtle); font-size: 13px; line-height: 1.7; }
+.tag { font-size: 12px; color: var(--text-secondary); }
+.tag.new { color: #059669; }
+.summary { margin: 12px 0 0; padding: 10px; border-radius: 8px; background: var(--border-light); font-size: 13px; line-height: 1.7; }
 .ops-msg { font-size: 13px; }
-.ops-msg.ok { color: var(--color-ok); }
-.ops-msg.err { color: var(--color-danger); }
-.mini-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--color-border); background: transparent; cursor: pointer; font-size: 12px; }
-.mini-btn.primary { background: var(--accent); color: var(--color-on-solid); border-color: transparent; }
+.ops-msg.ok { color: #059669; }
+.ops-msg.err { color: #dc2626; }
+.mini-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; }
+.mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }
 </style>

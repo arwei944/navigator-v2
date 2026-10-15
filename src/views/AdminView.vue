@@ -1,10 +1,6 @@
 <template>
   <div class="admin-view">
     <header class="admin-header">
-      <router-link to="/" class="admin-back">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        返回首页
-      </router-link>
       <h1>管理后台</h1>
       <!-- 版本标识：未登录也显示 —— 报问题时第一句就是「你跑的是哪一版」 -->
       <span v-if="version" class="admin-version" :title="versionTitle">{{ version }}</span>
@@ -469,21 +465,23 @@ async function notifyWebhook(version, count) {
 /* /admin 是 standalone 路由，不套 .app-layout，而全局 html,body 为了主壳固定分栏
    设了 overflow:hidden —— 视口滚动被关掉。这里自己搭「固定头部 + 固定 Tab 栏 + 滚动内容区」，
    滚动下沉到 .admin-body，头部与 Tab 栏始终可见。 */
+/* 三栏化后它渲染在 .main 里（.main 已是 flex:1 的列容器），所以填满父级即可，
+   不再是整页 100vh —— 那样会把侧边栏与右栏挤掉 */
 .admin-view {
-  height: 100vh;
-  height: 100dvh;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: var(--bg);
+  background: transparent; /* 主区背景透过来，和洞察 / 图谱 / 关于一致 */
   padding: 0;
 }
 .admin-header {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 20px 32px;
-  background: var(--bg-white);
+  gap: 12px;
+  padding: 18px 28px;
+  /* 跟主站一致：透明底 + 细分割线，不用实色卡片头，免得与侧边栏形成两层「顶栏」 */
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
