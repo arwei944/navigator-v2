@@ -62,6 +62,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
         <span v-show="!iconOnly">管理后台</span>
       </div>
+
+      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'about' }"
+           @click="navigate('About')" @keydown.enter="navigate('About')" :title="iconOnly ? '关于' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <span v-show="!iconOnly">关于</span>
+      </div>
     </nav>
 
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。

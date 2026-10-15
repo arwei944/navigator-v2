@@ -6,6 +6,8 @@
         返回首页
       </router-link>
       <h1>管理后台</h1>
+      <!-- 版本标识：未登录也显示 —— 报问题时第一句就是「你跑的是哪一版」 -->
+      <span v-if="version" class="admin-version" :title="versionTitle">{{ version }}</span>
 
       <template v-if="authed">
         <button class="admin-btn admin-publish-btn" @click="selectTab('publish')" title="前往云端发布">
@@ -15,7 +17,7 @@
         <div class="admin-user">
           <span class="admin-user-dot"></span>
           <span class="admin-user-name">{{ authUser }}</span>
-          <span class="admin-user-via">{{ authVia === 'key' ? '密钥直连' : '登录态' }}</span>
+          <span class="admin-user-via">{{ authAuto === 'local' ? '本机自动登录' : (authVia === 'key' ? '密钥直连' : '登录态') }}</span>
           <button class="admin-link-btn" @click="logout">退出登录</button>
         </div>
       </template>
@@ -249,6 +251,11 @@ const authed = ref(false)
 const authChecking = ref(true)
 const authUser = ref('')
 const authVia = ref('')
+/** 'local' = 本机自动登录（服务端回环端点给的密钥），空 = 人工登录 */
+const authAuto = ref('')
+/** 版本标识：读 /api/deploy-status（公开只读），未登录时也显示 */
+const version = ref('')
+const versionTitle = ref('')
 const authExpiresAt = ref(0)
 const loginNotice = ref('')
 
@@ -279,17 +286,37 @@ async function loadUnread() {
   }
 }
 
-function onLogin({ token, username, via, expiresAt }) {
+function onLogin({ token, username, via, expiresAt, auto }) {
   adminKey.value = token
   // expiresAt 一并存下：前端据此在过期时就地清掉凭据，不必等一次 401 往返
   setAdminKey(token, expiresAt)
   authUser.value = username || 'admin'
   authVia.value = via || 'session'
+  authAuto.value = auto || ''
   authExpiresAt.value = expiresAt || 0
   setAuditActor(username || '')
   loginNotice.value = ''
   authed.value = true
   loadUnread()
+}
+
+/**
+ * 版本标识：读线上自述的构建信息。
+ * 失败就留空（旧部署包没有 build-info.json），**绝不编一个假的出来** —— 版本号编错比不显示更糟。
+ */
+async function loadVersion() {
+  try {
+    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
+    const j = await res.json()
+    if (j && j.version && j.version.available && j.version.shortSha) {
+      version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
+      versionTitle.value = [
+        `${j.version.branch || ''} ${j.version.shortSha}`,
+        j.version.subject || '',
+        j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+      ].filter(Boolean).join('\n')
+    }
+  } catch { /* 读不到就不显示，不打扰 */ }
 }
 
 function logout() {
@@ -317,6 +344,7 @@ function onAuthExpired() {
 
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
+  loadVersion()
   const key = adminKey.value.trim()
   if (!key) {
     authChecking.value = false
@@ -470,6 +498,18 @@ async function notifyWebhook(version, count) {
 }
 .admin-back svg { width: 16px; height: 16px; }
 .admin-header h1 { font-size: 20px; font-weight: 700; }
+/* 版本徽标：贴在标题右侧，悬停显示完整信息（分支 / 提交说明 / 构建时间） */
+.admin-version {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  background: var(--border-light);
+  border: 1px solid var(--border);
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  cursor: default;
+}
 
 /* Tab 栏：窄屏横向滚动而非换行，保持始终一行 */
 .admin-tabs {

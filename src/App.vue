@@ -38,6 +38,11 @@
         <GraphView />
       </template>
 
+      <!-- 关于：整页信息，同样不走搜索工具栏与卡片网格 -->
+      <template v-else-if="scope === 'about'">
+        <AboutView />
+      </template>
+
       <!-- 常规视图 -->
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
@@ -188,6 +193,7 @@ const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteMo
 const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
 // 关联图谱：同理必须异步 —— 它带着 affinity 引擎与力导向布局，进首屏必超预算
 const GraphView = defineAsyncComponent(() => import('@/views/GraphView.vue'))
+const AboutView = defineAsyncComponent(() => import('@/views/AboutView.vue'))
 /**
  * 管线日志：排查「多跳异步链路到底停在哪」用的 Observability 浮层。
  *
@@ -530,7 +536,8 @@ const SCOPE_BY_ROUTE = {
   Trash: 'trash',
   Archived: 'archived',
   Insights: 'insights',
-  Graph: 'graph'
+  Graph: 'graph',
+  About: 'about'
 }
 const SCOPE_LABEL = {
   favorites: '收藏',

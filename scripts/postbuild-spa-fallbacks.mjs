@@ -80,7 +80,7 @@ copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
 // v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
 // 本轮：translate 独立成接口（翻译不再串在抓取响应里，见 api/translate.js 的注释）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js', 'plugins.js']) {
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js', 'plugins.js', '_local-key.js']) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
@@ -180,5 +180,7 @@ const buildInfo = {
 }
 writeFileSync(join(DIST, 'build-info.json'), JSON.stringify(buildInfo, null, 2) + '\n')
 
-console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×12 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI/翻译/部署状态 齐备`)
+// 数量从产物**实际**数出来，不写死 —— 写死的那个数已经错过一次（加了接口没改它）
+const apiCount = readdirSync(join(DIST, 'api')).filter(f => f.endsWith('.js')).length
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×${apiCount} + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI/翻译/部署状态 齐备`)
 console.log(`✅ 构建信息：${buildInfo.shortSha || '(无 git)'}${buildInfo.dirty ? ' + 未提交改动' : ''} @ ${buildInfo.builtAt}`)

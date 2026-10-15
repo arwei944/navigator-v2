@@ -73,6 +73,8 @@ const deployStatusHandler = (await import('./api/deploy-status.js')).default
 // 插件管理：9 个引擎注册表的聚合视图 + 运行期配置（后台「插件」面板）
 const pluginsMod = await import('./api/plugins.js')
 const pluginsHandler = pluginsMod.default
+// 本机自动登录端点：只在请求确实来自回环时才返回密钥（线上域名一律 404，见文件头说明）
+const localKeyHandler = (await import('./api/_local-key.js')).default
 const { etagOf } = await import('./store.mjs')
 const cronMod = await import('./cron.mjs')
 const { startHealthCron } = cronMod
@@ -92,6 +94,7 @@ const API_ROUTES = {
   '/api/ai': aiHandler,
   '/api/deploy-status': deployStatusHandler,
   '/api/plugins': pluginsHandler,
+  '/api/_local-key': localKeyHandler,
 }
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */

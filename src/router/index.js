@@ -17,6 +17,8 @@ const routes = [
   { path: '/insights', name: 'Insights', component: () => import('@/views/InsightsView.vue') },
   // 关联图谱：懒加载 —— 布局与建图只在真的打开这一页时才跑
   { path: '/graph', name: 'Graph', component: () => import('@/views/GraphView.vue') },
+  // 关于：同样套壳（带侧边栏），懒加载
+  { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue') },
   // 旧链接兼容：分类曾在路径里，统一重定向到 query 形式（保留范围与其余 query）
   {
     path: '/c/:id',

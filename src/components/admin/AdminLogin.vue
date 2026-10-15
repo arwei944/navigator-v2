@@ -64,6 +64,9 @@
           返回账号登录
         </button>
       </form>
+
+      <!-- 版本标识：登录页也要能一眼看出跑的是哪一版 -->
+      <p v-if="version" class="login-version" :title="versionTitle">版本 {{ version }}</p>
     </div>
   </div>
 </template>
@@ -88,6 +91,24 @@ const keyInput = ref('')
 const loading = ref(false)
 const error = ref('')
 const remember = ref(true)
+/** 版本标识：读 /api/deploy-status（公开只读）。读不到就留空，绝不编一个假的 */
+const version = ref('')
+const versionTitle = ref('')
+
+async function loadVersion() {
+  try {
+    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
+    const j = await res.json()
+    if (j && j.version && j.version.available && j.version.shortSha) {
+      version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
+      versionTitle.value = [
+        `${j.version.branch || ''} ${j.version.shortSha}`,
+        j.version.subject || '',
+        j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+      ].filter(Boolean).join('\n')
+    }
+  } catch { /* 读不到就不显示 */ }
+}
 
 /**
  * 密钥直连只在两种情况下出现：
@@ -172,7 +193,44 @@ async function submitKey() {
   }
 }
 
+/* ---------------- 本机自动登录 ----------------
+ * 只在**页面本身就跑在回环地址上**时尝试（127.0.0.1 / localhost）。
+ * 密钥由服务端 `/api/_local-key` 提供，而那个端点自己也会再校验一次来源 ——
+ * 双重条件都成立才可能拿到，线上公开域名一次都不会命中。
+ */
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+function isLoopbackHost() {
+  try { return LOOPBACK_HOSTS.has(String(window.location.hostname).toLowerCase()) } catch { return false }
+}
+
+async function tryLocalAutoLogin() {
+  if (!isLoopbackHost()) return false
+  try {
+    const res = await fetch('/api/_local-key', { headers: { Accept: 'application/json' } })
+    if (!res.ok) return false
+    const j = await res.json().catch(() => null)
+    const key = String((j && j.key) || '').trim()
+    if (!key) return false
+    const r = await authApi.verify(key)
+    if (!r.valid) return false
+    emit('success', {
+      token: key,
+      username: r.username || 'key',
+      expiresAt: r.expiresAt || null,
+      via: 'key',
+      auto: 'local', // 界面据此说明「本机自动登录」，而不是假装刚才是人工输入的
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 onMounted(async () => {
+  loadVersion()
+  // 先试本机自动登录：成功就直接进后台，连表单都不闪一下
+  if (await tryLocalAutoLogin()) return
+
   try {
     const s = await authApi.status()
     loginReady.value = s.loginReady
@@ -197,7 +255,16 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.login-wrap { display: flex; justify-content: center; padding: 48px 0; }
+/* 卡片在可用高度里垂直+水平居中。
+   原先只有 justify-content、没有 align-items —— flex 默认 stretch 会把卡片拉满整屏高度，
+   内容却只占上半截，看着就是「卡片贴顶、下面一大片空」。
+   父级 .admin-body 已是 flex:1，高度确定，所以在这里居中即可。 */
+.login-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
 .ops-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
 .login-card { width: 100%; max-width: 420px; }
 .login-card h3 { font-size: 16px; font-weight: 600; }
@@ -232,4 +299,22 @@ onMounted(async () => {
   cursor: pointer; text-decoration: underline;
 }
 .link-btn:hover { color: var(--accent); }
+
+/* 版本标识：卡片底部，低调但不隐身 */
+.login-version {
+  margin: 16px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  text-align: center;
+  cursor: default;
+}
+
+/* 窄屏：卡片吃满可用宽度，内边距收一收，别让 420px 的固定值撑出横向滚动 */
+@media (max-width: 520px) {
+  .login-wrap { padding: 24px 16px; }
+  .login-card { max-width: 100%; }
+}
 </style>

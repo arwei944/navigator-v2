@@ -7,16 +7,21 @@
  *
  * ## 凭据存哪里（改这块前必读）
  *
- * 用 **sessionStorage**，不用 localStorage，也不再接受共享密钥：
+ * 用 **localStorage**（2026-10-16 起从 sessionStorage 改过来，见下方权衡）。
  *
- *   - 共享密钥（`SITES_ADMIN_KEY`）是**永久**凭据，一旦落在浏览器里就等于长期泄露；
- *     XSS 或恶意扩展拿到之后只能靠轮换密钥 + 重新部署才能止损。所以它不再进浏览器，
- *     登录改为「用户名 + 口令 → 有期限的会话 token」（`api/auth.js`）。
- *   - 会话 token 用 sessionStorage 而不是 localStorage：**关掉标签页即失效**。
- *     浏览器里没有能挡住 XSS 的加密（密钥本身也在 XSS 可达范围内），
- *     真正有效的只有「缩短有效期 + 缩短暴露窗口」，而这两条 sessionStorage 天然满足后者。
+ *   - **绝不存共享密钥**：`SITES_ADMIN_KEY` 是**永久**凭据，落在浏览器里等于长期泄露，
+ *     XSS 或恶意扩展拿到之后只能靠轮换密钥 + 重新部署才能止损。所以它不进代码、不进产物，
+ *     登录走「用户名 + 口令 → 有期限的会话 token」（`api/auth.js`）。
+ *   - **为什么从 sessionStorage 改成 localStorage**：原先关掉标签页就得重登，实际使用中
+ *     一天要输好几次；「记住此设备」承诺的 90 天有效期被 sessionStorage 直接抹掉了 ——
+ *     服务端签了 90 天的 token，客户端却存不过一次关标签页，这个承诺是假的。
+ *     现在存 localStorage，**服务端签发的有效期成为真正的上限**。
+ *   - **代价（如实记录）**：暴露窗口从「一次标签页」变成「直到过期」。缓解手段是
+ *     `getAdminKey()` 里**每次读取都校验 exp，过期就地清除**，以及退出登录立即删除。
+ *     浏览器里没有能挡住 XSS 的加密（token 本身就在 XSS 可达范围内），
+ *     真正有效的只有「缩短有效期」，所以配口令登录时不要填一个很长的 TTL。
  *   - 旧版存在 localStorage 的 `nav_admin_key`（共享密钥明文）在这里**主动清除**，
- *     不做迁移 —— 把它搬进 sessionStorage 只是把同一个问题换个位置。
+ *     不做迁移 —— 那和现在的 token 不是一回事。
  */
 
 const TOKEN_STORE = 'nav_admin_token'
@@ -32,9 +37,24 @@ export function getAdminKey() {
     }
   } catch { /* 无痕模式下 localStorage 可能抛，忽略 */ }
   let token = ''
-  try { token = sessionStorage.getItem(TOKEN_STORE) || '' } catch { return '' }
+  try {
+    token = localStorage.getItem(TOKEN_STORE) || ''
+    // 旧版存过 sessionStorage：读得到就搬过来（迁移一次），随后清掉，避免两处不一致
+    if (!token) {
+      const legacy = sessionStorage.getItem(TOKEN_STORE) || ''
+      if (legacy) {
+        localStorage.setItem(TOKEN_STORE, legacy)
+        const legacyExp = sessionStorage.getItem(EXPIRES_STORE)
+        if (legacyExp) localStorage.setItem(EXPIRES_STORE, legacyExp)
+        sessionStorage.removeItem(TOKEN_STORE)
+        sessionStorage.removeItem(EXPIRES_STORE)
+        token = legacy
+      }
+    }
+  } catch { return '' }
   if (!token) return ''
-  const exp = Number(sessionStorage.getItem(EXPIRES_STORE) || 0)
+  let exp = 0
+  try { exp = Number(localStorage.getItem(EXPIRES_STORE) || 0) } catch { exp = 0 }
   // exp 为 0 表示服务端没给有效期（如密钥直连的兜底路径），交给服务端判
   if (exp && Date.now() > exp) { clearAdminKey(); return '' }
   return token
@@ -43,15 +63,20 @@ export function getAdminKey() {
 /** 写入凭据（登录签发的会话 token，或未配置口令登录时的密钥兜底） */
 export function setAdminKey(key, expiresAt) {
   try {
-    if (key) sessionStorage.setItem(TOKEN_STORE, key)
-    else sessionStorage.removeItem(TOKEN_STORE)
-    if (key && expiresAt) sessionStorage.setItem(EXPIRES_STORE, String(expiresAt))
-    else sessionStorage.removeItem(EXPIRES_STORE)
+    if (key) localStorage.setItem(TOKEN_STORE, key)
+    else localStorage.removeItem(TOKEN_STORE)
+    if (key && expiresAt) localStorage.setItem(EXPIRES_STORE, String(expiresAt))
+    else localStorage.removeItem(EXPIRES_STORE)
+    // 顺带清掉旧位置，别在两处各留一份
+    sessionStorage.removeItem(TOKEN_STORE)
+    sessionStorage.removeItem(EXPIRES_STORE)
   } catch { /* 存储不可用时退化为「本页内存中的 ref」，不阻断后台使用 */ }
 }
 
 export function clearAdminKey() {
   try {
+    localStorage.removeItem(TOKEN_STORE)
+    localStorage.removeItem(EXPIRES_STORE)
     sessionStorage.removeItem(TOKEN_STORE)
     sessionStorage.removeItem(EXPIRES_STORE)
   } catch { /* 同上 */ }
