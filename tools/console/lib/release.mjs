@@ -71,6 +71,19 @@ export function markerKeyOf(line) {
   return m ? { key: m.key, skip: Boolean(m.skip) } : null
 }
 
+/**
+ * 该步骤是否**还能被标记推进** —— 已走过（ok/skipped）或已终结（failed）的不再改。
+ *
+ * 为什么需要：`deploy.publish` 的同一段日志里 `· 打包` 出现过两次，而标记是纯文本匹配的。
+ * 没有这道守卫，一个迟到的重复标记会把**已经完成**的 upload 标成 ok、又把 pack 打回 running，
+ * 时间线就会显示成「越跑越回去」。纯函数，便于单测。
+ */
+export function shouldAdvance(steps, key) {
+  const s = (steps || []).find(x => x.key === key)
+  if (!s) return false
+  return s.status === 'pending' || s.status === 'running'
+}
+
 /** 该步骤是否被选项显式跳过 */
 export function isSkipped(key, opts = {}) {
   const def = STEP_DEFS.find(s => s.key === key)
@@ -215,7 +228,8 @@ async function runRelease(job, steps, opts) {
         const line = raw.trim()
         if (!line) continue
         const m = markerKeyOf(line)
-        if (m) {
+        // 只前进：迟到的重复标记不能让时间线回退（见 shouldAdvance 的说明）
+        if (m && shouldAdvance(steps, m.key)) {
           // 上一个部署步收尾 —— 只收敛仍在 running 的，别把 skipped 覆盖成 ok
           if (cur && cur !== m.key) {
             const prev = steps.find(x => x.key === cur)

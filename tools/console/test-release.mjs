@@ -11,7 +11,7 @@
  *   ⑤ preflight 的形状与阻塞项
  */
 import assert from 'node:assert/strict'
-import { planSteps, isSkipped, markerKeyOf, STEP_DEFS, preflight } from './lib/release.mjs'
+import { planSteps, isSkipped, markerKeyOf, shouldAdvance, STEP_DEFS, preflight } from './lib/release.mjs'
 
 let pass = 0
 let fail = 0
@@ -112,6 +112,34 @@ async function main() {
       { build: '· 构建产物', gate: '· 发布门禁', pack: '· 打包', upload: '· 上传分片', restart: '· 触发容器解压', verify: '· 等待线上就绪并验证版本' }[k],
     )?.key))
     assert.deepEqual([...covered].sort(), ['build', 'gate', 'pack', 'restart', 'upload', 'verify'])
+  })
+
+  console.log('\n时间线只前进（防重复标记让状态回退）')
+  check('pending / running 允许推进', () => {
+    const steps = planSteps()
+    assert.equal(shouldAdvance(steps, 'pack'), true)
+    steps.find(s => s.key === 'pack').status = 'running'
+    assert.equal(shouldAdvance(steps, 'pack'), true)
+  })
+  check('ok / skipped / failed 不再改（这是关键）', () => {
+    for (const st of ['ok', 'skipped', 'failed']) {
+      const steps = planSteps()
+      steps.find(s => s.key === 'pack').status = st
+      assert.equal(shouldAdvance(steps, 'pack'), false, `${st} 不该还能被推进`)
+    }
+  })
+  check('未知步骤名不推进（拼错的标记不该凭空造出状态）', () => {
+    assert.equal(shouldAdvance(planSteps(), '不存在的步骤'), false)
+    assert.equal(shouldAdvance(null, 'pack'), false)
+  })
+  check('场景复现：pack 已 ok 后来了一条迟到的 pack 标记 —— 不该把它打回 running', () => {
+    const steps = planSteps()
+    steps.find(s => s.key === 'pack').status = 'ok'
+    steps.find(s => s.key === 'upload').status = 'running'
+    // 迟到的 '· 打包'
+    assert.equal(shouldAdvance(steps, markerKeyOf('· 打包').key), false)
+    // 但正常的下一步仍然推进
+    assert.equal(shouldAdvance(steps, markerKeyOf('· 触发容器解压').key), true)
   })
 
   console.log('\n预检（preflight）')
