@@ -345,6 +345,28 @@ const server = http.createServer(async (req, res) => {
   }
 })
 
+/**
+ * 进程级兜底：**常驻进程不能因为一次异步异常就整个消失**。
+ *
+ * 请求路径已经有 try/catch（见上面那句「单请求异常不能带走整个进程」），
+ * 但那只覆盖请求内；**定时器与后台任务**里的未捕获异常走的是另一条路 ——
+ * 没有这两个监听器时 Node 直接终止进程，站点整体变 503。
+ *
+ * 部署到常驻容器后实测踩过：平台上报 `botCrashed: true`，而日志只剩启动那几行、
+ * 一条错误栈都没有（进程是「消失」而非「报错退出」）。健康巡检按 6 小时一轮、
+ * 每轮要真实抓 300 个站，任何一次未被捕获的拒绝都会命中这条路。
+ *
+ * 这里**只记录、不退出**：本服务是无状态的（静态资源 + 只读站点库 + 巡检写状态文件），
+ * 「这轮巡检没跑完」远好于「整站下线」。Node 官方对 uncaughtException 的建议是
+ * 「清理后退出」，那是针对持有不一致状态的有状态服务；这里不适用。
+ */
+process.on('uncaughtException', (e) => {
+  console.error('[nav-server] 未捕获异常（进程继续运行）：', e)
+})
+process.on('unhandledRejection', (e) => {
+  console.error('[nav-server] 未处理的 Promise 拒绝（进程继续运行）：', e)
+})
+
 server.listen(PORT, HOST, () => {
   console.log(`[nav-server] listening on http://${HOST}:${PORT}  root=${ROOT}`)
 })
