@@ -52,10 +52,21 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="7" y1="7" x2="10.5" y2="16"/><line x1="17" y1="7" x2="13.5" y2="16"/><line x1="7.5" y1="6" x2="16.5" y2="6"/></svg>
         <span v-show="!iconOnly">关联图谱</span>
       </div>
+
+      <!-- 管理类入口与上面的「浏览范围」不是同一个轴，用一条细线隔开：
+           上面是「看站点」，这里是「管站点」。 -->
+      <div class="sidebar-nav-divider" aria-hidden="true"></div>
+
+      <div class="sidebar-nav-item sidebar-nav-admin" :class="{ active: sidebarStore.activeNav === 'admin' }"
+           @click="navigate('Admin')" @keydown.enter="navigate('Admin')" :title="iconOnly ? '管理后台' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+        <span v-show="!iconOnly">管理后台</span>
+      </div>
     </nav>
 
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。
-         折叠后按钮常驻，保证还能展开。「添加网站」在右上角工具栏，「管理后台」在「设置」面板内 -->
+         折叠后按钮常驻，保证还能展开。「添加网站」在右上角工具栏；
+         「管理后台」给了一级入口（原先只在「设置」面板内 —— 插件 / 部署这些 tab 因此很难找到） -->
     <button class="sidebar-collapse-toggle" type="button"
             @click="sidebarStore.toggleCollapse()"
             :title="isCollapsed ? '展开侧边栏' : '折叠侧边栏'"
@@ -278,6 +289,14 @@ onUnmounted(() => {
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
 .sidebar-nav-item.active svg { opacity: 1; }
 .badge { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
+
+/* 分隔「看站点」与「管站点」两类入口 */
+.sidebar-nav-divider {
+  height: 1px;
+  margin: 10px 12px;
+  background: var(--border);
+}
+.sidebar.icon-only .sidebar-nav-divider { margin: 10px 14px; }
 
 /* 折叠/展开把手：贴中间内容区的左侧 —— 即本侧栏的右边缘、垂直居中、窄长竖条。
    默认极淡（无边框、无底色、30% 不透明度），只在悬停时显形，避免抢视觉焦点。
