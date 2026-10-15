@@ -42,6 +42,11 @@ const SHARED_DIR = join(ROOT, 'shared')
 const MIME = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
+  // `.mjs` 必须有 JS MIME：前端有 `import { hostOf } from '/shared/host.mjs'`，
+  // 而浏览器对 `<script type="module">` 及其静态依赖**强制校验** JavaScript MIME。
+  // 缺了这一条（落到默认的 application/octet-stream）不会报 404，只会让整个
+  // 模块图静默地加载失败 —— 页面看着好好的，按钮全都没接上。
+  '.mjs': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',

@@ -14,7 +14,17 @@
         </div>
         <div class="form-group">
           <label>网址</label>
-          <input type="url" v-model="form.url" required placeholder="例如: https://chat.openai.com" class="form-input" @blur="autoCompleteUrl">
+          <div class="url-row">
+            <input type="url" v-model="form.url" required placeholder="例如: https://chat.openai.com" class="form-input" @blur="autoCompleteUrl">
+            <button type="button" class="btn btn-small" :disabled="refreshing" @click="refreshAll">
+              {{ refreshing ? '获取中…' : '重新获取信息' }}
+            </button>
+          </div>
+          <div v-if="refreshNote" class="status-line" :class="refreshKind">
+            <span class="status-dot"></span>
+            <span>{{ refreshNote }}</span>
+          </div>
+          <div class="field-note">按网址重新抓取名称、描述与图标；别名、用途、分类不会被改动</div>
         </div>
         <div class="form-group">
           <label>描述</label>
@@ -118,6 +128,46 @@ function submit() {
   emit('saved', { name: patch.name, url: patch.url })
   emit('close')
 }
+
+/* ---- 重新获取信息 ---- */
+
+const refreshing = ref(false)
+const refreshNote = ref('')
+const refreshKind = ref('')
+
+async function refreshAll() {
+  if (refreshing.value) return
+  refreshing.value = true
+  refreshNote.value = ''
+  try {
+    // 动态取：这条链路只在用户点按钮时才走得到，静态引入会让它常驻首屏图
+    const { refreshSiteMeta } = await import('@/services/siteRefresh')
+    const r = await refreshSiteMeta({
+      site: props.site,
+      update: (p) => sitesStore.updateSite(props.site.id, p),
+    })
+    if (!r.ok) {
+      refreshKind.value = 'warn'
+      refreshNote.value = `获取失败：${r.message}`
+      return
+    }
+    if (!r.changed) {
+      refreshKind.value = 'ok'
+      refreshNote.value = '已是最新，无需更新'
+      return
+    }
+    /**
+     * 抓到的值已经写进库里，**表单必须跟着同步** —— 否则用户眼前还是旧名称，
+     * 一按「保存修改」就把刚抓到的东西原样覆盖回去（刷新等于白做）。
+     */
+    const fresh = sitesStore.sites.find(s => s.id === props.site.id)
+    if (fresh) Object.assign(form, siteToForm(fresh))
+    refreshKind.value = 'ok'
+    refreshNote.value = `已更新：${r.fields.join('、')}`
+  } finally {
+    refreshing.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -197,4 +247,26 @@ function submit() {
 .btn-cancel:hover { background: var(--border); }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { filter: brightness(1.1); }
+
+/* 「重新获取信息」这一组：取值对齐 AddSiteModal 的同类控件（那边有「自动补全」按钮），
+   两处观感必须一致 —— 它们做的是同一件事，只是入口不同。 */
+.url-row { display: flex; align-items: center; gap: 8px; }
+.url-row .form-input { flex: 1; min-width: 0; }
+.btn-small {
+  padding: 4px 12px;
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-white);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-small:hover { border-color: var(--accent); color: var(--accent); }
+.btn-small:disabled { opacity: .5; cursor: not-allowed; }
+.status-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
+.status-line.ok { color: #047857; }
+.status-line.warn { color: #b45309; }
+.status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.field-note { margin-top: 4px; font-size: 11px; color: var(--text-secondary); }
 </style>

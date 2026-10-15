@@ -52,6 +52,7 @@ export function buildCommands(ctx) {
     { id: 'feed', name: 'Feed', title: '内容聚合', icon: 'feed', keywords: ['juhe', 'jh', 'feed', 'neirong'] },
     { id: 'trash', name: 'Trash', title: '回收站', icon: 'trash', keywords: ['huishouzhan', 'hsz', 'trash', 'laji'] },
     { id: 'insights', name: 'Insights', title: '洞察面板', icon: 'feed', keywords: ['dongcha', 'dc', 'insights', 'tongji', 'tj', 'fenxi', 'fx', 'tubiao', 'tb'] },
+    { id: 'graph', name: 'Graph', title: '关联图谱', icon: 'graph', keywords: ['guanlian', 'graph', 'tupu', 'tp', 'guanxi', 'gx', 'xiangguan'] },
     { id: 'admin', name: 'Admin', title: '管理后台', icon: 'settings', keywords: ['guanli', 'gl', 'houtai', 'ht', 'admin'] }
   ]
   for (const p of pages) {
@@ -429,6 +430,30 @@ export function buildSiteActions(ctx) {
         icon: 'comment',
         keywords: ['beizhu', 'bz', 'note', 'pizhu', 'pz', 'jilu', 'jl'],
         run: () => sidebar.showDetail(site)
+      },
+      {
+        id: 'site.refresh',
+        title: '重新获取信息',
+        subtitle: '按网址重新抓取名称、描述与图标（别名、用途、分类不动）',
+        icon: 'refresh',
+        keywords: ['shuaxin', 'sx', 'refresh', 'chongxin', 'cx', 'gengxin', 'gx', 'zhuiqu'],
+        run: async () => {
+          toast.push({ message: `正在重新获取「${site.name}」…`, tone: 'info', duration: 2500 })
+          const { refreshSiteMeta } = await import('@/services/siteRefresh')
+          const r = await refreshSiteMeta({
+            site,
+            update: (p) => sites.updateSite(site.id, p),
+          })
+          if (!r.ok) {
+            toast.push({ message: `重新获取失败：${r.message}`, tone: 'error', duration: 4500 })
+            return
+          }
+          toast.push({
+            message: r.changed ? `「${site.name}」${r.message}` : `「${site.name}」已是最新`,
+            tone: r.changed ? 'ok' : 'info',
+            duration: 2500,
+          })
+        }
       },
       {
         id: 'site.edit',

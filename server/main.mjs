@@ -68,6 +68,8 @@ const healthHandler = (await import('./api/health.js')).default
 const backupHandler = (await import('./api/backup.js')).default
 const coverHandler = (await import('./api/cover.js')).default
 const aiHandler = (await import('./api/ai.js')).default
+// 部署状态：公开只读，后台「部署」面板与页面角标都读它（见 api/deploy-status.js 头部的边界说明）
+const deployStatusHandler = (await import('./api/deploy-status.js')).default
 const { etagOf } = await import('./store.mjs')
 const cronMod = await import('./cron.mjs')
 const { startHealthCron } = cronMod
@@ -85,6 +87,7 @@ const API_ROUTES = {
   '/api/backup': backupHandler,
   '/api/cover': coverHandler,
   '/api/ai': aiHandler,
+  '/api/deploy-status': deployStatusHandler,
 }
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */

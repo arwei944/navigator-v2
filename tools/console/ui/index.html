@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>nav-console · 本地运维控制台</title>
   <script>
+    /**
+     * 启动期错误留痕。
+     *
+     * 模块加载与模块求值阶段抛的错，**不会**进入任何面板自己的 try/catch ——
+     * 表现是「页面在，但什么都没接上」（按钮点了没反应、面板不填数），
+     * 而且常常连一条日志都没有。这是最难定位的一类故障，所以在这里兜住：
+     * 留一个可读的标记，页面上报错、探针也能读到。
+     */
+    window.__navBootError = '';
+    addEventListener('error', e => {
+      window.__navBootError = `${e.message || '资源加载失败'} @ ${String(e.filename || '').split('/').pop()}:${e.lineno || 0}`;
+    });
+    // 末尾分号不能省：下一行是 `(function(){})()`，少了它会被解析成
+    // `addEventListener(...)(...)`（ASI 不在这里补分号），整段脚本当场失效。
+    addEventListener('unhandledrejection', e => {
+      window.__navBootError = `未处理的 Promise：${e.reason?.message || e.reason}`;
+    });
+
     // 首屏防闪烁：在样式表解析前定下 data-theme（与 theme.js 取值规则一致）
     (() => {
       try {
@@ -40,6 +58,7 @@
     <button class="tab" data-panel="data">数据</button>
     <button class="tab" data-panel="health">可用性</button>
     <button class="tab" data-panel="audit">审计</button>
+    <button class="tab" data-panel="deploy">发布</button>
     <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
@@ -329,6 +348,65 @@
       <div class="card">
         <h3>探活轮次</h3>
         <div class="run-list" id="health-runs"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-deploy">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="deploy-summary"></div>
+          <div class="row-actions">
+            <label class="hint" style="display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="deploy-skip-build"> 跳过构建
+            </label>
+            <button class="btn ghost" id="btn-deploy-refresh">刷新</button>
+            <button class="btn primary" id="btn-deploy-publish">开始发布</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3>版本对照</h3>
+          <dl class="kv" id="deploy-versions"></dl>
+          <p class="hint" id="deploy-drift"></p>
+        </div>
+
+        <div class="card">
+          <h3>发布凭据</h3>
+          <dl class="kv" id="deploy-creds"></dl>
+          <!-- 三个输入框都要能换行：挤在一行时「保存」按钮会被压成竖排文字 -->
+          <div class="row-actions" style="margin-top:10px;flex-wrap:wrap;gap:8px">
+            <input class="msg-input" id="deploy-key" type="password" autocomplete="off"
+                   style="flex:1 1 220px" placeholder="BotKeep API key（bk_live_…）">
+            <input class="msg-input" id="deploy-wid" autocomplete="off"
+                   style="flex:1 1 200px" placeholder="Workload ID">
+            <input class="msg-input" id="deploy-site-url" autocomplete="off"
+                   style="flex:1 1 200px" placeholder="线上地址（可选）">
+            <button class="btn ghost" id="btn-deploy-save-creds" style="white-space:nowrap">保存凭据</button>
+          </div>
+          <p class="hint">
+            凭据只写进本机 <code>.env.local</code>（已被 gitignore）——不进前端产物、不进版本库。
+            站点自己能<strong>看</strong>版本，但不能发布自己（它没有源码与凭据）。
+          </p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>发布流程</h3>
+        <p class="hint" id="deploy-flow"></p>
+        <p class="hint">
+          <strong>构建</strong> → <strong>发布门禁</strong>（产物新鲜度与完整性）→ <strong>打包</strong>（tar，
+          排除 <code>data/</code>：那里有管理密钥与本机站点库，进包等于覆盖线上数据）→
+          <strong>切片上传</strong>（平台的 ZIP 通道不支持二进制且限制 5 MB，产物有 270 个图标，只能走 tar 分片）
+          → <strong>触发容器解压</strong>（移除 server.js 让启动命令重新解包并重启）→
+          <strong>线上验证</strong>（轮询线上自述版本，直到与新构建一致）。
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>发布历史</h3>
+        <div class="result" id="deploy-history"></div>
       </div>
     </section>
 

@@ -47,6 +47,11 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="3" x2="3" y2="21"/><line x1="3" y1="21" x2="21" y2="21"/><polyline points="7 15 11 10 14 13 19 6"/></svg>
         <span v-show="!iconOnly">洞察</span>
       </div>
+      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'graph' }"
+           @click="navigate('Graph')" @keydown.enter="navigate('Graph')" :title="iconOnly ? '关联图谱' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="7" y1="7" x2="10.5" y2="16"/><line x1="17" y1="7" x2="13.5" y2="16"/><line x1="7.5" y1="6" x2="16.5" y2="6"/></svg>
+        <span v-show="!iconOnly">关联图谱</span>
+      </div>
     </nav>
 
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。

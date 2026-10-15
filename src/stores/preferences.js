@@ -21,6 +21,7 @@ export const DEFAULT_RIGHT_SECTIONS = {
   note: true,
   stats: true,
   timeline: true,
+  related: true,
   actions: true,
 }
 

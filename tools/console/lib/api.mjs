@@ -17,6 +17,7 @@ import * as publishlog from './publishlog.mjs'
 import * as health from './health.mjs'
 import * as notify from './notify.mjs'
 import * as schedule from './schedule.mjs'
+import * as deploy from './deploy.mjs'
 import { record } from './audit.mjs'
 
 export function sendJson(res, code, obj) {
@@ -302,7 +303,54 @@ export async function handleApi(req, res, path, url) {
     return true
   }
 
+  /* ---- 发布到自有服务器（BotKeep）----
+     状态里带线上探测（一次出网请求），所以单独成端点、不塞进 /api/health 的轮询里。 */
+
+  if (method === 'GET' && path === '/api/deploy/status') {
+    try {
+      sendJson(res, 200, {
+        ...(await deploy.deployStatus({ url: url.searchParams.get('url') || '' })),
+        history: deploy.history(10),
+        dist: deploy.distSize(),
+      })
+    } catch (e) {
+      sendJson(res, 400, { error: e.message })
+    }
+    return true
+  }
+
   if (method === 'POST') {
+    /* ---- 发布到自有服务器 ---- */
+
+    if (path === '/api/deploy/credentials') {
+      const body = await readJsonBody(req)
+      const s = deploy.saveCredentials({ key: body.key, workloadId: body.workloadId })
+      // 审计只记「改了哪一项」，绝不记值
+      record({
+        action: 'deploy.credentials',
+        target: 'BOTKEEP_*',
+        detail: [body.key !== undefined ? 'key' : '', body.workloadId !== undefined ? 'workloadId' : ''].filter(Boolean).join('+') || '(无变化)',
+      })
+      sendJson(res, 200, { ok: true, ...s })
+      return true
+    }
+
+    if (path === '/api/deploy/publish') {
+      const body = await readJsonBody(req)
+      try {
+        const job = deploy.startPublish({
+          skipBuild: body.skipBuild === true,
+          url: String(body.url || ''),
+        })
+        record({ action: 'deploy.publish', target: 'botkeep', detail: `job ${job.id}` })
+        sendJson(res, 200, { jobId: job.id })
+      } catch (e) {
+        record({ action: 'deploy.publish', result: 'fail', target: 'botkeep', detail: e.message })
+        sendJson(res, 409, { error: e.message })
+      }
+      return true
+    }
+
     if (path === '/api/health/probe') {
       const body = await readJsonBody(req)
       if (jobs.listJobs().some(j => j.title.startsWith('可用性探活') && j.status === 'running')) {

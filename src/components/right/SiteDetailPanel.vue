@@ -158,6 +158,12 @@
         </div>
       </div>
 
+      <!-- 相关站点：与图谱页同一个关联度口径，可以从这里「顺着关系走」 -->
+      <div v-if="show.related" class="detail-section">
+        <div class="section-label">相关站点</div>
+        <RelatedSites :site="site" />
+      </div>
+
       <!-- 快速操作 -->
       <div v-if="show.actions" class="detail-actions">
         <a :href="fullUrl" target="_blank" rel="noopener noreferrer" class="action-btn primary" @click="onVisit">
@@ -196,6 +202,10 @@ import { siteToForm, buildSitePatch } from '../../../shared/site-edit.mjs'
 // 静态引入会把它拖进首屏（实测 589.3 → 603.8 KiB，直接越预算）——它原本只出现在
 // EditSiteModal 那个异步 chunk 里，正是靠这条边界省下的体积。
 const PurposePicker = defineAsyncComponent(() => import('@/components/PurposePicker.vue'))
+
+// 相关站点：带着关联度引擎（affinity），同样只有要显示它时才加载。
+// 引擎进首屏的代价比用途选择器更大 —— 图谱页整个 15 KiB chunk 就是它撑起来的。
+const RelatedSites = defineAsyncComponent(() => import('@/components/right/RelatedSites.vue'))
 
 const props = defineProps({
   site: { type: Object, default: null }

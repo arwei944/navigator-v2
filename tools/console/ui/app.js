@@ -9,6 +9,7 @@ import { initSitesPanel, refresh as refreshSites } from './sitespanel.js'
 import { initAuditPanel, refresh as refreshAudit } from './auditpanel.js'
 import { initHealthPanel, refresh as refreshHealth } from './healthpanel.js'
 import { initNotifyPanel, refresh as refreshNotify, refreshBadge } from './notifypanel.js'
+import { initDeployPanel, refresh as refreshDeploy } from './deploypanel.js'
 
 /* ---------- 标签切换 ---------- */
 $('#tabs').addEventListener('click', e => {
@@ -24,6 +25,7 @@ $('#tabs').addEventListener('click', e => {
   if (btn.dataset.panel === 'audit') refreshAudit()
   if (btn.dataset.panel === 'health') refreshHealth()
   if (btn.dataset.panel === 'notify') refreshNotify()
+  if (btn.dataset.panel === 'deploy') refreshDeploy()
 })
 
 /* ---------- 概览 ---------- */
@@ -77,6 +79,7 @@ initSitesPanel()
 initAuditPanel()
 initHealthPanel()
 initNotifyPanel()
+initDeployPanel()
 loadHealth()
 loadEnv()
 refreshBadge()

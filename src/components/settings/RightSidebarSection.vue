@@ -107,6 +107,7 @@ const sectionOptions = [
   { key: 'note', label: '备注' },
   { key: 'stats', label: '使用统计' },
   { key: 'timeline', label: '时间线' },
+  { key: 'related', label: '相关站点' },
   { key: 'actions', label: '快速操作' },
 ]
 

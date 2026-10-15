@@ -119,7 +119,15 @@ const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
 // （utils/urlPreview.js + composables/useUrlPreview.js + OmniResults 卡片渲染），
 // 基线 596.1 KiB 的余量本就只剩 3.9。抓取链路已按第 7 节的规矩走动态 import，
 // 没把 services/meta 拖回首屏 —— 这里抬的是功能增量，不是给悄悄变胖开口子。
-const BUDGET_RAW = 604 * 1024
+// 2026-10-15（第二次）：604 → 608。两处有意增量合计 +2.4 KiB raw：
+// ① 站点「重新获取信息」的 UI 接线（OmniIcon refresh 形状 + EditSiteModal 按钮区，
+//    后者本身在懒加载 chunk 里，进首屏的只有图标图元）；
+// ② 关联图谱的**入口**接线（commands.js 条目 + phraseAliases 别名 + graph 图标图元 +
+//    App.vue 的 scope 映射与异步声明）。
+// 图谱本体没有进首屏：GraphView 15.4 KiB / affinity / graphLayout 各自独立成 chunk，
+// 已在 index chunk 里按符号名逐个 grep 验证为 0 命中（layoutGraph、buildAffinityGraph、
+// mulberry32、CONCEPT_WORDS 等）。抬的都是入口成本，不是功能体积。
+const BUDGET_RAW = 608 * 1024
 const BUDGET_GZ = 214 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)

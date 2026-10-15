@@ -26,6 +26,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readdirSync, rmSync, cpSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { execSync } from 'node:child_process'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(root, 'dist')
@@ -79,7 +80,7 @@ copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
 // v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
 // 本轮：translate 独立成接口（翻译不再串在抓取响应里，见 api/translate.js 的注释）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js']) {
+for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js']) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))
@@ -103,7 +104,10 @@ writeFileSync(join(DIST, 'package.json'), JSON.stringify({
   name: 'nav-dist',
   private: true,
   type: 'module',
-  imports: { '#store': './store.mjs', '#shared/*': './shared/*' },
+  // `#cron` 与 `#store` 同理：api/*.js 在仓库里位于 api/、在部署包里位于 api/，
+  // 而 cron.mjs 在仓库里位于 server/、在部署包里位于根 —— 相对路径两边对不上，
+  // 所以统一走映射，让同一个源码文件在两处都能解析到同一个模块。
+  imports: { '#store': './store.mjs', '#shared/*': './shared/*', '#cron': './cron.mjs' },
   scripts: { start: 'node server.js' },
 }, null, 2) + '\n')
 // data/（SQLite + 管理密钥）绝不能随发布包上传：一是会把本机测试数据盖到线上，
@@ -140,4 +144,41 @@ try {
     writeFileSync(join(DIST, 'data', 'ai-config.json'), JSON.stringify({ baseURL, apiKey, model: model || 'gpt-4o-mini' }, null, 2))
   }
 } catch { /* 没配 AI 就没有这个文件，接口回 501、前端隐藏入口 */ }
-console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×11 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI/翻译 齐备`)
+/* ---------------- 构建信息（线上「部署」面板的版本依据） ----------------
+ *
+ * 刻意**不写进前端产物**，而是作为部署包根目录的一个数据文件由服务端读。
+ * 原因：它描述的是「这次构建」，而面板要回答的是「线上正在跑的是哪次构建」。
+ * 构建了新包但还没部署时，这两个是不同的**事实**；混在 JS 里会给出误导的结论
+ * （用户刚构建完，前端就说「已是最新」，而线上还是旧的那份）。
+ */
+function gitInfo() {
+  const run = (cmd) => execSync(cmd, { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  try {
+    const sha = run('git rev-parse HEAD')
+    return {
+      sha,
+      branch: run('git rev-parse --abbrev-ref HEAD'),
+      // 工作区有未提交改动时必须显式标出来：否则「版本号」会指向一个根本
+      // 不存在于历史里的状态（改了没提交，sha 却与提交一致）
+      dirty: run('git status --porcelain').length > 0,
+      subject: run('git log -1 --pretty=%s'),
+    }
+  } catch {
+    return { sha: '', branch: '', dirty: false, subject: '' }
+  }
+}
+
+const g = gitInfo()
+const buildInfo = {
+  schema: 1,
+  builtAt: new Date().toISOString(),
+  sha: g.sha,
+  shortSha: g.sha ? g.sha.slice(0, 7) : '',
+  branch: g.branch,
+  dirty: g.dirty,
+  subject: g.subject,
+}
+writeFileSync(join(DIST, 'build-info.json'), JSON.stringify(buildInfo, null, 2) + '\n')
+
+console.log(`✅ 已带上 Node 服务（server.js + store.mjs + cron.mjs + api ×12 + shared ×${sharedCount}）—— 后台/统计/巡检/备份/封面/AI/翻译/部署状态 齐备`)
+console.log(`✅ 构建信息：${buildInfo.shortSha || '(无 git)'}${buildInfo.dirty ? ' + 未提交改动' : ''} @ ${buildInfo.builtAt}`)

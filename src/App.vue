@@ -33,6 +33,11 @@
         <InsightsView />
       </template>
 
+      <!-- 关联图谱（v12）：整页画布，同样不走搜索工具栏与卡片网格 -->
+      <template v-else-if="scope === 'graph'">
+        <GraphView />
+      </template>
+
       <!-- 常规视图 -->
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
@@ -181,6 +186,8 @@ const AddSiteModal = defineAsyncComponent(() => import('@/components/AddSiteModa
 const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteModal.vue'))
 // 洞察面板：整页图表，只在点进 /insights 时才需要 —— 必须异步，否则图表原语会进首屏包
 const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
+// 关联图谱：同理必须异步 —— 它带着 affinity 引擎与力导向布局，进首屏必超预算
+const GraphView = defineAsyncComponent(() => import('@/views/GraphView.vue'))
 /**
  * 管线日志：排查「多跳异步链路到底停在哪」用的 Observability 浮层。
  *
@@ -522,7 +529,8 @@ const SCOPE_BY_ROUTE = {
   Feed: 'feed',
   Trash: 'trash',
   Archived: 'archived',
-  Insights: 'insights'
+  Insights: 'insights',
+  Graph: 'graph'
 }
 const SCOPE_LABEL = {
   favorites: '收藏',
@@ -530,7 +538,8 @@ const SCOPE_LABEL = {
   archived: '归档',
   feed: '内容聚合',
   trash: '回收站',
-  insights: '洞察'
+  insights: '洞察',
+  graph: '关联图谱'
 }
 
 const scope = computed(() => SCOPE_BY_ROUTE[route.name] || 'discover')
