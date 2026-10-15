@@ -1,5 +1,13 @@
 /**
  * 一键发布脚本：备份 → 构建 → 部署 → 热更新数据 → 验证
+ *
+ * ⚠️ **代码部署已废弃**：端到端请用 `nav release run`（含测试门禁 / 提交 / 推送），
+ * 只想重发代码用 `node scripts/deploy-botkeep.mjs`。本脚本保留的是**数据热更新**那段
+ * （部署后 POST `/api/sites`）—— `watch-deploy` 在数据变更时仍在用它。
+ *
+ * 站点地址与部署命令都来自当前发布通道（`shared/publisher.mjs`），
+ * 默认已是自有服务器（BotKeep），不再是 Vercel。
+ *
  * 用法: node scripts/publish.mjs [--skip-build] [--key xxx] [--webhook URL]
  * 管理密钥来源（按优先级）：--key=<xxx> > 环境变量 SITES_ADMIN_KEY
  * webhook 可选：发布成功后 POST 通知到指定 URL

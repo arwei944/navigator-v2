@@ -137,8 +137,10 @@ const doctorCmd = {
     const env = envSummary()
     add('envFile', '.env.local', env.envFileExists ? 'ok' : 'warn', env.envFileExists ? '已存在' : '缺失（密钥只能从环境变量读取）')
     const has = name => env.vars.find(v => v.name === name)?.configured
-    add('adminKey', 'SITES_ADMIN_KEY', has('SITES_ADMIN_KEY') ? 'ok' : 'warn', has('SITES_ADMIN_KEY') ? '已配置' : '未配置：publish run / sync-data 会以退出码 3 中止')
-    add('vercelToken', 'VERCEL_TOKEN', has('VERCEL_TOKEN') ? 'ok' : 'warn', has('VERCEL_TOKEN') ? '已配置' : '未配置：publish deployments 不可用')
+    add('adminKey', 'SITES_ADMIN_KEY', has('SITES_ADMIN_KEY') ? 'ok' : 'warn', has('SITES_ADMIN_KEY') ? '已配置' : '未配置：数据热更新与云端发布会中止')
+    add('botkeepKey', 'BOTKEEP_API_KEY', has('BOTKEEP_API_KEY') ? 'ok' : 'warn', has('BOTKEEP_API_KEY') ? '已配置' : '未配置：无法部署到自有服务器（deploy-botkeep / release run）')
+    // Vercel 只是保留的旧通道，缺它不影响任何主流程 —— 所以恒为 ok，别让 doctor 报无关的警告
+    add('vercelToken', 'VERCEL_TOKEN', 'ok', has('VERCEL_TOKEN') ? '已配置（旧 Vercel 通道用）' : '不需要（线上已迁自有服务器）')
 
     try {
       const sites = data.readSites()

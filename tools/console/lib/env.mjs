@@ -34,7 +34,11 @@ export function getAdminKey() {
 export function envSummary() {
   loadEnv()
   const names = [
-    'SITES_ADMIN_KEY',
+    // 当前主链路真正需要这两组 —— 缺了 doctor 会说「未配置」，必须如实列出来
+    'SITES_ADMIN_KEY', // 数据热更新 / 云端发布
+    'BOTKEEP_API_KEY', // 部署到自有服务器（release run / deploy-botkeep）
+    'BOTKEEP_WORKLOAD_ID',
+    // 保留的旧通道 / 旧平台凭据（缺失不影响主流程，doctor 里恒为 ok）
     'BLOB_READ_WRITE_TOKEN',
     'VERCEL_TOKEN',
     'VERCEL_ORG_ID',

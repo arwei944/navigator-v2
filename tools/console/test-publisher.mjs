@@ -5,8 +5,9 @@
  * 覆盖：
  *   ① 注册校验（缺 id / 缺 deployCommand 抛错）
  *   ② resolvePublisher 的选择优先级（显式 id → NAV_PUBLISHER → available）
- *   ③ **默认行为零变化**：vercel 的部署命令与站点地址与改动前逐字一致
- *   ④ capabilities：vercel 支持热更新与收敛验证；静态托管两者都不支持
+ *   ③ **默认通道 = 线上实际所在**：botkeep 排最前，站点地址与部署脚本都对得上
+ *      （防「默认落回旧平台 → 整条数据链路静默打到没人维护的站点」）
+ *   ④ capabilities：botkeep / workbuddy / vercel 支持热更新与收敛验证；静态托管两者都不支持
  *   ⑤ NAV_SITE_URL 覆盖站点地址（并去掉尾斜杠）
  *   ⑥ 静态通道的命令拼接（NAV_DEPLOY_TARGET 未配时不可用）
  *   ⑦ publish.mjs 确实已改为经注册表取通道（源码断言，防止「加了抽象但没接」）
@@ -47,20 +48,38 @@ function main() {
   check('缺 id 抛错', () => { assert.throws(() => registerPublisher({ deployCommand: 'x' })) })
   check('缺 deployCommand 抛错', () => { assert.throws(() => registerPublisher({ id: 'x-nocmd' })) })
 
-  console.log('\n默认通道（workbuddy）—— Vercel 停用后的新默认')
-  check('默认解析到 workbuddy', () => {
+  console.log('\n默认通道（botkeep）—— 线上实际所在的自有服务器')
+  check('默认解析到 botkeep', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_DEPLOY_TARGET: undefined }, () => {
-      assert.equal(resolvePublisher().id, 'workbuddy')
+      assert.equal(resolvePublisher().id, 'botkeep')
     })
   })
-  check('站点地址指向 WorkBuddy 云端服务', () => {
+  check('站点地址指向自有服务器', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_SITE_URL: undefined }, () => {
-      assert.equal(resolvePublisher().siteUrl, 'https://nav-dashboard-19166.app.workbuddy.host')
+      assert.equal(resolvePublisher().siteUrl, 'https://navigator-v2.bot-keep.xyz')
     })
   })
-  check('部署步骤是产物门禁，不是「假装上传」', () => {
+  check('部署命令指向 BotKeep 发布脚本', () => {
     withEnv({ NAV_PUBLISHER: undefined }, () => {
-      assert.equal(resolvePublisher().deployCommand, 'node scripts/deploy-cloud.mjs')
+      assert.equal(resolvePublisher().deployCommand, 'node scripts/deploy-botkeep.mjs')
+    })
+  })
+  /**
+   * 防漂移：默认通道决定 SITE_URL，而 SITE_URL 喂给云端读取 / 热更新 / 收敛验证。
+   * 一旦默认落回旧平台，**整条数据链路会静默地打到一个已经没人维护的站点上**
+   * （2026-10-16 之前就是这样：默认是 workbuddy，而线上早已迁到自有服务器）。
+   */
+  check('默认通道必须是线上实际所在的那一个（防「通道指到旧平台」复发）', () => {
+    withEnv({ NAV_PUBLISHER: undefined, NAV_SITE_URL: undefined, NAV_DEPLOY_TARGET: undefined }, () => {
+      const p = resolvePublisher()
+      assert.equal(p.id, 'botkeep', '默认通道不是线上实际所在的通道')
+      assert.match(p.siteUrl, /bot-keep\.xyz$/, '站点地址应指向自有服务器')
+    })
+  })
+  check('部署命令指向的脚本真实存在（防止通道写了个不存在的命令）', () => {
+    withEnv({ NAV_PUBLISHER: undefined }, () => {
+      const rel = resolvePublisher().deployCommand.replace(/^node\s+/, '')
+      assert.ok(fs.existsSync(path.join(HERE, '..', '..', rel)), `找不到 ${rel}`)
     })
   })
   /**
@@ -78,12 +97,21 @@ function main() {
       assert.equal(resolvePublisher().siteUrl, 'https://preview.example.com')
     })
   })
-  check('workbuddy 支持热更新与收敛验证', () => {
+  check('默认通道（botkeep）支持热更新与收敛验证', () => {
     withEnv({ NAV_PUBLISHER: undefined }, () => {
       const p = resolvePublisher()
       assert.equal(p.hotUpdate, true)
       assert.equal(p.verify, true)
     })
+  })
+  check('保留的 workbuddy / vercel 通道仍在，且都声称支持热更新', () => {
+    for (const id of ['workbuddy', 'vercel']) {
+      withEnv({ NAV_PUBLISHER: id }, () => {
+        const p = resolvePublisher()
+        assert.equal(p.id, id)
+        assert.equal(p.hotUpdate, true, `${id} 应支持热更新`)
+      })
+    }
   })
 
   console.log('\n保留通道（vercel）—— 换默认不改它的行为')
@@ -101,7 +129,7 @@ function main() {
   console.log('\n静态通道（rsync-static）')
   check('未配 NAV_DEPLOY_TARGET 时不可用（解析时不选它）', () => {
     withEnv({ NAV_PUBLISHER: undefined, NAV_DEPLOY_TARGET: undefined }, () => {
-      assert.equal(resolvePublisher().id, 'workbuddy')
+      assert.equal(resolvePublisher().id, 'botkeep')
       const rsync = listPublishers({ check: true }).find(p => p.id === 'rsync-static')
       assert.equal(rsync.available, false)
     })
@@ -127,9 +155,9 @@ function main() {
   })
 
   console.log('\n清单与接入')
-  check('listPublishers 列出三通道并按 order 排序', () => {
+  check('listPublishers 列出四通道并按 order 排序（botkeep 在最前）', () => {
     const ids = listPublishers({ check: false }).map(p => p.id)
-    assert.deepEqual(ids, ['workbuddy', 'vercel', 'rsync-static'])
+    assert.deepEqual(ids, ['botkeep', 'workbuddy', 'vercel', 'rsync-static'])
   })
   /**
    * 2026-10-11 的教训：控制台所有云端操作打的都是这个硬编码域名，平台一停，

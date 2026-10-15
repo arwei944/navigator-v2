@@ -39,7 +39,9 @@ const statusCmd = {
         `站点：本地 ${d.local.count} · 云端 ${d.cloud.ok ? d.cloud.count : '读取失败'}${d.converged ? ' ✅ 已收敛' : ' ⚠️ 未收敛'}`,
         `版本：本地 package v${d.local.version} · 云端 v${d.cloud.version ?? '-'}`,
         `分支：${d.local.branch || '(detached)'} · 领先 ${d.local.ahead} / 落后 ${d.local.behind} · 未提交改动 ${d.local.changes}`,
-        `热更新就绪：${d.hotUpdateReady ? '是' : '否（缺 SITES_ADMIN_KEY）'} · Vercel API：${d.vercel.apiAvailable ? '可用' : '不可用'}`,
+        `发布通道：${d.publisher?.label || '(未解析出)'}${d.publisher?.siteUrl ? ' → ' + d.publisher.siteUrl : ''}`,
+        `热更新就绪：${d.hotUpdateReady ? '是' : '否（缺 SITES_ADMIN_KEY）'}`,
+
         `最近提交：${d.local.head ? `${d.local.head.short} ${d.local.head.subject}` : '(无)'}`,
         d.cloud.error ? `云端读取：${d.cloud.error}` : '',
       ].filter(Boolean).join('\n'),
@@ -154,7 +156,7 @@ const syncDataCmd = {
         plan: [
           diff?.changed ? `提交站点数据（+${diff.diff.added.length} / -${diff.diff.removed.length} / ~${diff.diff.modified.length}）` : '提交（数据与 HEAD 一致，跳过）',
           values['no-push'] ? '推送（已按 --no-push 跳过）' : `推送 ${st?.ahead || 0} 个领先提交`,
-          '备份 → schema 门禁 → Blob 热更新 → 云端一致性验证',
+          '备份 → schema 门禁 → 热更新到站点 → 云端一致性验证',
         ],
       })
     }

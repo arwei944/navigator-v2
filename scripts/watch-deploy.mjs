@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 /**
  * 保存即部署：常驻监听本地源码 / 数据变更，停止编辑后防抖数秒，自动构建并发布到
- * Vercel **生产环境**。
+ * **自有服务器（BotKeep）生产环境**。
+ *
+ * ⚠️ **不推荐日常使用**：它会绕过测试门禁、提交与推送，直接把工作区状态推上线。
+ * 日常开发请用 `nav release run`（测试 → 提交 → 推送 → 构建 → 部署 → 验证）。
+ * 这个脚本保留给「不停机小改一轮看效果」这类场景 —— 代价是线上会跑一个
+ * 不对应任何提交的产物。
  *
  * 用法:
  *   node scripts/watch-deploy.mjs [--debounce=8000] [--no-data] [--dry-run]
@@ -125,7 +130,8 @@ function runDeploy() {
     if (task.data) {
       sh('node scripts/publish.mjs --skip-build', '② 发布（含构建产物部署 + 数据热更新 + 校验）')
     } else {
-      sh('npx --yes vercel deploy --prod --yes', '② 部署到 Vercel 生产')
+      // 线上在自有服务器（BotKeep）；dist 已在①构建过，这里只做「打包 → 上传 → 重启 → 验证」
+      sh('node scripts/deploy-botkeep.mjs --skip-build', '② 发布到自有服务器')
     }
 
     const secs = ((Date.now() - t0) / 1000).toFixed(1)

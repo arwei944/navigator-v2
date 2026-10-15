@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, getAdminKey } from './env.mjs'
 import { SITE_URL, fetchCloud } from './cloud.mjs'
+import { resolvePublisher } from '../../../shared/publisher.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as vercel from './vercel.mjs'
@@ -125,7 +126,6 @@ export async function status() {
   let st = null
   try { st = await git.getStatus() } catch { /* 非 git 仓库时忽略 */ }
   const [head, cloud] = await Promise.all([git.headCommit().catch(() => null), fetchCloud()])
-  const p = vercel.projectInfo()
   const localCount = localSitesCount()
   const lastPublish = jobs.listJobs().find(j => j.title === PUBLISH_JOB_TITLE) || null
 
@@ -143,13 +143,22 @@ export async function status() {
     },
     cloud,
     converged: cloud.ok && localCount !== null && cloud.count === localCount,
-    vercel: {
-      apiAvailable: vercel.available(),
-      tokenConfigured: Boolean(vercel.token()),
-      projectId: p?.projectId || '',
-      orgId: p?.orgId || '',
-      projectName: p?.projectName || '',
-    },
+    /**
+     * 当前生效的发布通道 —— 这里刻意**不写死 Vercel**：
+     * 站点地址与是否支持热更新由通道决定，换平台时面板自动跟着变，
+     * 不会出现「面板说 Vercel、实际打的是自有服务器」这种自相矛盾。
+     */
+    publisher: (() => {
+      try {
+        const pub = resolvePublisher()
+        return {
+          id: pub.id, label: pub.label, siteUrl: pub.siteUrl,
+          hotUpdate: Boolean(pub.hotUpdate), verify: Boolean(pub.verify),
+        }
+      } catch (e) {
+        return { id: '', label: '', siteUrl: '', hotUpdate: false, verify: false, error: e.message }
+      }
+    })(),
     hotUpdateReady: Boolean(getAdminKey()),
     lastPublish,
   }

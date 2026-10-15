@@ -97,7 +97,31 @@ export function resolvePublisher(explicit) {
 /* ---------------- 内建通道 ---------------- */
 
 /**
- * WorkBuddy 云端（Node 服务）—— **当前默认通道**。
+ * 自有服务器（BotKeep）—— **当前默认通道**（order 最小，排在 workbuddy / vercel 之前）。
+ *
+ * 为什么是它：整站（静态资源 + 全部 `/api/*`）已经跑在这台自有服务器上，
+ * 而 `SITE_URL` 由本注册表解析 —— 把它排在最前，`cloud.mjs` 的云端读取、
+ * `scripts/publish.mjs` 的热更新与收敛验证、`verify-icons-online` 才会打到**真正活着的站点**。
+ * （此前默认落在 workbuddy 通道，那些链路一直在打旧站点。）
+ *
+ * `available` 恒 true 是有意的：这个通道的可用性说的是「站点可达」，不是「能否部署」。
+ * 读站点数据（verify / 同步面板）本来就不需要部署凭据；真去部署而没有凭据时，
+ * `deploy-botkeep.mjs` 会明确报错，而不是静默换一条通道把数据发到别处。
+ *
+ * 能力两项都是 true：自有服务器就是完整的 Node 服务，`/api/sites` 的读与写都在。
+ */
+registerPublisher({
+  id: 'botkeep',
+  label: '自有服务器（BotKeep）',
+  order: 30,
+  capabilities: { hotUpdate: true, verify: true },
+  available: () => true,
+  deployCommand: 'node scripts/deploy-botkeep.mjs',
+  siteUrl: () => String(process.env.NAV_SITE_URL || 'https://navigator-v2.bot-keep.xyz').replace(/\/+$/, ''),
+})
+
+/**
+ * WorkBuddy 云端（Node 服务）—— **不再是默认**，保留以便回退。
  *
  * 为什么换默认：Vercel Hobby 团队在 2026-10-11 因 fair-use 被平台停用，全站（含静态资源
  * 与所有 `/api/*`）返回 `402 DEPLOYMENT_DISABLED`，前端因此读不到云端数据、补全抓取也全部

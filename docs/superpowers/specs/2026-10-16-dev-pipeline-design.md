@@ -20,16 +20,30 @@
 也就是说：`nav publish run` 端到端九步但**部署到了错的地方**（线上早已迁到自有服务器），
 控制台「发布」走对了地方但**只覆盖后半段**。
 
-### 顺带发现的两处脱节（本轮未修，已如实记录）
+### 顺带发现的两处脱节（**已于同日收敛**）
 
 1. **两条部署路径并存**：`package.json#deploy`、`sync.mjs`、`nav publish run` 仍走 Vercel；
    而线上实际跑的是 BotKeep（自有服务器）。
 2. **云端链路指向旧平台**：`cloud.mjs` 的 `SITE_URL = resolvePublisher().siteUrl`，
-   当前解析到 **workbuddy** 通道（`nav-dashboard-19166.app.workbuddy.host`），
+   当时解析到 **workbuddy** 通道（`nav-dashboard-19166.app.workbuddy.host`），
    于是 `publish verify` / `publish sync-data` 验证与推送的仍是**旧站点**。
 
-第 2 条对本轮的影响：**流水线的部署段刻意不复用 `cloud.mjs`**，而是直接复用 `deploy.publish`
-（它直接打 BotKeep API，与 `SITE_URL` 无关），因此不受这个脱节影响。
+流水线的部署段刻意没复用 `cloud.mjs`（直接复用 `deploy.publish` 打 BotKeep API），
+所以它本身不受这两条影响；但**其余链路受影响**，因此当天做了一轮收敛：
+
+| 改什么 | 怎么改 |
+|---|---|
+| **通道默认值**（根因） | `publisher.mjs` 新增 `botkeep` 通道（order 30，排最前）→ `SITE_URL` 与所有下游自动收敛 |
+| 部署命令 | 新增 `scripts/deploy-botkeep.mjs`（通道需要一条**真实存在**的命令，测试会断言它存在） |
+| `npm run deploy` | 改指 BotKeep，Vercel 保留为 `deploy:vercel` |
+| 「历史」面板 | `history.mjs` 数据源从 Vercel 部署列表换成本机发布记录（`.deploy-history.json`），对外 shape 不变 |
+| 同步面板 / CLI 状态 | 字段从写死的 `vercel.*` 换成通道无关的 `publisher.*` |
+| doctor 自检 | 列出真正需要的 `BOTKEEP_*`（原先只列 Vercel 时代的变量，导致误报「未配置」） |
+| watch-deploy / publish.mjs | 部署分支改走 BotKeep，并标注不再是推荐路径 |
+
+**防复发**：`test-publisher.mjs` 加了两条守卫 —— 默认通道必须与线上实际所在一致、
+通道的部署命令指向的脚本必须真实存在。否则「默认悄悄落回旧平台」会让整条数据链路
+静默打到一个没人维护的站点上。
 
 ---
 

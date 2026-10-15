@@ -34,7 +34,9 @@ function renderSummary() {
   box.append(el('span', `chip ${l.behind ? 'warn' : ''}`, `落后 ${l.behind}`))
   box.append(el('span', 'chip', `已暂存 ${l.staged}`))
   box.append(el('span', `chip ${s.hotUpdateReady ? 'ok' : 'warn'}`, s.hotUpdateReady ? '热更新就绪' : '缺少管理密钥'))
-  box.append(el('span', `chip ${s.vercel.apiAvailable ? 'ok' : ''}`, s.vercel.apiAvailable ? 'Vercel API 可用' : 'Vercel API 未启用'))
+  const pub = s.publisher || {}
+  box.append(el('span', `chip ${pub.id ? 'ok' : 'warn'}`, pub.id ? `发布通道：${pub.label}` : '发布通道：未解析出'))
+  if (pub.siteUrl) box.append(el('span', 'dim', pub.siteUrl))
 }
 
 function renderCloud() {
