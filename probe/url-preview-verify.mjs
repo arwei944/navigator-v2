@@ -206,12 +206,16 @@ if (found) {
     host: document.querySelector('.unified-search .omni-item.is-preview .preview-host')?.textContent?.trim() || '',
     isTop: !!document.querySelector('.unified-search .search-suggestions .omni-group:first-child .omni-item.is-preview'),
     infoCount: document.querySelectorAll('.unified-search .omni-item.is-preview .omni-item-info').length,
+    hasInitial: !!document.querySelector('.unified-search .omni-item.is-preview .preview-initial'),
   })`)
   ok(card.title.includes(aSite.name), '卡片标题是站点名', card.title)
   ok(Boolean(card.host), '卡片给出域名', card.host)
   ok(card.isTop, '预览卡片在下拉最顶部')
   // 防回归：预览文本区若和通用文本区同时渲染，标题与副标题会各出现两次（截图逮到过）
   ok(card.infoCount === 1, '卡片只渲染一份文本（标题不重复）', `找到 ${card.infoCount} 份`)
+  // 防回归：字母块必须与 favicon **同时存在**（层叠模式）。若改成 v-if/v-else 互斥，
+  // 图片加载失败被移除后图标区会留一个空框 —— 线上截图逮到过。
+  ok(card.hasInitial, '图标层级里有字母块兜底（加载失败不至于空框）')
   await shot('url-preview-found.png')
 } else {
   // 兜底证据：哪怕徽标没等到，也把下拉当前内容打出来，别让失败不可诊断

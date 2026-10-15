@@ -25,10 +25,13 @@
                同时渲染，标题与副标题各出现两次（真机截图逮到的）。 -->
           <span v-if="item.preview && item.preview.card" class="preview-icon"
                 :style="{ background: item.preview.card.color }">
+            <!-- 字母块**先渲染**、favicon 绝对定位盖上去 —— 与下面站点图标的做法一致。
+                 若写成 v-if / v-else 互斥，图片加载失败被 @error 移除后就什么都不剩，
+                 图标区留一个空框（线上真机截图逮到过）。层叠模式下失败即自然露出字母块。 -->
+            <span class="preview-initial">{{ item.preview.card.initial || '·' }}</span>
             <img v-if="item.preview.card.iconUrl" :src="item.preview.card.iconUrl"
                  :alt="item.preview.card.title || item.preview.card.host"
                  class="preview-favicon" loading="lazy" @error="$event.target.remove()">
-            <span v-else class="preview-initial">{{ item.preview.card.initial || '·' }}</span>
           </span>
           <!-- 站点：用站点自己的图标 -->
           <span v-else-if="item.site" class="omni-site-icon" :style="{ background: item.site.color }">
