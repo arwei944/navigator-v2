@@ -34,11 +34,11 @@ function ask(question, { hidden = false } = {}) {
   return new Promise(resolve => {
     const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true })
     if (hidden) {
-      // 覆盖 _writeToOutput 实现回显屏蔽；这比关掉回显再恢复稳（后者在 Windows 上偶发失灵）
+      // 覆盖 _writeToOutput 屏蔽回显（比关掉 stdin 的回显再恢复稳，后者在 Windows 上偶发失灵）。
+      // **连星号都不打** —— 打星号会泄露口令长度，而长度本身就是一条攻击者想要的信息。
       const orig = rl._writeToOutput
       rl._writeToOutput = function (s) {
         if (s.includes(question)) orig.call(rl, s)
-        else orig.call(rl, '*'.repeat(String(s).length))
       }
     }
     rl.question(question, answer => { rl.close(); if (hidden) process.stdout.write('\n'); resolve(String(answer || '').trim()) })
