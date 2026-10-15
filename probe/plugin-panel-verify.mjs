@@ -39,7 +39,16 @@ const ok = (cond, label, extra = '') => {
   else { failures.push(`${label}${extra ? ` → ${extra}` : ''}`); console.log(`  ❌ ${label}${extra ? ` → ${extra}` : ''}`) }
 }
 
+/**
+ * 管理密钥来源。默认读本机 `.env.local`。
+ * 打线上时线上那份可能与本机不同（既有遗留），用 `ADMIN_KEY_FILE` 指一个文件覆盖 ——
+ * 这样凭据不必出现在命令行上（进程列表可见）。
+ */
 function readAdminKey() {
+  const f = process.env.ADMIN_KEY_FILE
+  if (f) {
+    try { return readFileSync(f, 'utf8').trim() } catch { /* 读不到就退回 .env.local */ }
+  }
   try {
     const m = readFileSync(join(ROOT, '.env.local'), 'utf8').match(/^SITES_ADMIN_KEY="?([^"\n]+)"?/m)
     return m ? m[1].trim() : ''
