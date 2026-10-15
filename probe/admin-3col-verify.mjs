@@ -145,7 +145,26 @@ console.log('\n── ① 三栏结构 ──')
 await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
 await send('Runtime.enable')
 await send('Page.enable')
-// 本机自动登录 → 直接进后台
+
+/**
+ * 打线上时**不会**本机自动登录（回环端点在线上返回 404），所以要先注入凭据。
+ * `PROBE_TOKEN` 由调用方给出（例如用口令调 /api/auth 拿到的 token）；
+ * 没给就走本机自动登录那条路（本地 dist 场景）。
+ */
+const PROBE_TOKEN = String(process.env.PROBE_TOKEN || '')
+if (PROBE_TOKEN) {
+  await evalJs(`(() => {
+    try {
+      localStorage.setItem('nav_admin_token', ${JSON.stringify(PROBE_TOKEN)})
+      localStorage.removeItem('nav_admin_token_exp')
+    } catch (e) {}
+    return true
+  })()`)
+  await evalJs(`location.reload()`)
+  await send('Runtime.enable')
+  await send('Page.enable')
+}
+
 await waitFor(`document.querySelector('.admin-tabs')`, 30000, '进入后台')
 await sleep(1200)
 
