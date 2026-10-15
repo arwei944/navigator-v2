@@ -295,7 +295,10 @@ const MAX_ATTEMPTS = 6
  * **唯独幂等键不合规不能重试** —— 那不是瞬时故障，重试只是白等。
  */
 async function uploadSlice(log, slice, attempt = 0, retryKey) {
-  // 重试**复用同一个键**：那才是「幂等」的本意（否则服务端看到的是一次新上传）
+  /**
+   * 命中「未确认」类失败（503 / 409 pending）时**不传 retryKey**，即换新键重试 ——
+   * 详见下方 unconfirmed 处的说明。其余情况复用同一个键，那才是幂等的本意。
+   */
   const idem = retryKey || idemFor([slice.name, Date.now().toString(36)])
   const bad = idemProblem(idem)
   if (bad) throw new Error(`幂等键不合规（${bad}）：${idem}`)
@@ -349,14 +352,25 @@ async function uploadSlice(log, slice, attempt = 0, retryKey) {
     // 重试日志必须带上响应体：不然「HTTP 422」这五个字什么信息都没有
     log(`  · ${slice.name} HTTP ${r.status} ${detail}，${Math.round(wait / 1000)}s 后重试（${attempt + 1}/${MAX_ATTEMPTS}）`)
     await sleep(wait)
-    return uploadSlice(log, slice, attempt + 1, idem)
+    /**
+     * 「未确认」类失败**必须换新键**重试 —— 复用同一个键会死循环：
+     *   503 说的是「未假定成功」（那次请求可能已在平台侧入队，也可能没有）；
+     *   紧随其后的 409「previous request is pending or unconfirmed」是平台按幂等语义
+     *   **回放那个悬而未决的键**，再用它重试只会一直拿到同一个 409，直到耗尽重试次数。
+     * 实测踩过：a.paa 成功、a.pab 首次 503，之后六轮全是 409，整个发布卡死在第二步。
+     * 换新键等价于「当作一次新上传」，同名文件若已在位会回 409 already exists ——
+     * 那个分支会先删再传，是收敛的。
+     */
+    const unconfirmed = r.status === 503 || (r.status === 409 && /pending or unconfirmed/i.test(detail))
+    return uploadSlice(log, slice, attempt + 1, unconfirmed ? undefined : idem)
   } catch (e) {
     if (/过.*大|幂等键不合规|不可重试/.test(e.message)) throw e
     if (attempt >= MAX_ATTEMPTS) throw e
-    // 超时/网络类错误也要等够：平台的写入通道是**排队**的，立刻重试只会再排一次队
+    // 超时/网络类错误也要等够：平台的写入通道是**排队**的，立刻重试只会再排一次队。
+    // 同样换新键：本地超时的那一刻，请求多半已经发出去且可能已被平台受理。
     log(`  · ${slice.name} ${e.message}，30s 后重试（${attempt + 1}/${MAX_ATTEMPTS}）`)
     await sleep(30000)
-    return uploadSlice(log, slice, attempt + 1, idem)
+    return uploadSlice(log, slice, attempt + 1)
   }
 }
 
