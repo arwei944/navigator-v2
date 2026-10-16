@@ -167,7 +167,7 @@ ok(d0?.tabbar === false && d0?.tabs === 0, '仪表盘上没有 tab 行（卡片�
 ok(d0?.gridRatio >= 0.95, '卡片网格铺满中间区', `占中间区 ${(d0?.gridRatio * 100).toFixed(0)}%`)
 ok(d0?.hasBack === false, '仪表盘上没有面包屑（还没进模块）')
 ok(d0?.dirty === false, '页面上没有 undefined / NaN 泄漏')
-ok(d0?.cardsWithValue >= 8, '至少 8 张卡带真实摘要数字', `${d0?.cardsWithValue}/12 张`)
+ok(d0?.cardsWithValue >= 11, '12 张卡都带真实状态（允许 1 张数据源失败）', `${d0?.cardsWithValue}/12 张`)
 const heads = await jsonOf(`(() => {
   const names = [...document.querySelectorAll('.admin-dash h2, .admin-dash h3')].map(e => e.textContent.trim()).filter(Boolean)
   const seen = {}

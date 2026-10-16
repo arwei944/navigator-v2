@@ -141,6 +141,8 @@ export const opsApi = {
   /** 追加一条审计记录（旁路，失败不影响主流程） */
   /** 备份与恢复（P5）：GET 导出 / POST 覆盖恢复。响应可能是文件，这里不走 res.json 的失败分支 */
   backup: (key) => call('/api/backup', { key }),
+  /** 只读元信息：条目数 + 真实序列化体积（不含数据本体）—— 仪表盘「备份与恢复」卡片用 */
+  backupMeta: (key) => call('/api/backup?meta=1', { key }),
   restoreBackup: (key, data) => call('/api/backup', { key, method: 'POST', body: { data } }),
   appendAudit: (key, entry) => call('/api/ops', { key, method: 'POST', body: { action: 'audit.append', entry } }),
 

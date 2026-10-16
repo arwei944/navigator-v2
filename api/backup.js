@@ -68,16 +68,49 @@ async function readBody(req) {
 }
 
 /** GET /api/backup → 导出全量备份（下载用） */
-async function exportBackup(req, res) {
-  const auth = checkAuthHeader(req)
-  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
-
+/** 备份源数据的统一读法：导出与元信息都从这里取，两边的数字不可能对不上 */
+async function readBackupSource() {
   const sites = await readJson(SITES_PATH)
   const cloud = {}
   for (const k of CLOUD_KEYS) {
     const v = await readJson(k)
     if (v) cloud[k] = v
   }
+  return { sites, cloud }
+}
+
+function countsOf(sites, cloud) {
+  return {
+    sites: sites && Array.isArray(sites.sites) ? sites.sites.length : 0,
+    categories: sites && Array.isArray(sites.categories) ? sites.categories.length : 0,
+    version: (sites && Number(sites.version)) || 0,
+    cloudKeys: Object.keys(cloud).length,
+  }
+}
+
+/**
+ * GET /api/backup?meta=1 → 只回答「一次备份会带走什么」：条目数 + 真实序列化体积。
+ * 供后台仪表盘的「备份与恢复」卡片用 —— 卡片只要一个数字，不该为此把整包数据拉下来。
+ * 体积按真实 JSON 字节算，所以卡片上写「约 XX KB」是有依据的，不是估的。
+ */
+async function exportMeta(req, res) {
+  const auth = checkAuthHeader(req)
+  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  const { sites, cloud } = await readBackupSource()
+  res.status(200).json({
+    ok: true,
+    meta: true,
+    counts: countsOf(sites, cloud),
+    bytes: Buffer.byteLength(JSON.stringify({ sites, cloud }), 'utf8'),
+    at: new Date().toISOString(),
+  })
+}
+
+async function exportBackup(req, res) {
+  const auth = checkAuthHeader(req)
+  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+
+  const { sites, cloud } = await readBackupSource()
 
   res.setHeader('Content-Disposition', `attachment; filename="navigator-backup-${new Date().toISOString().slice(0, 10)}.json"`)
   res.status(200).json({
@@ -165,7 +198,11 @@ async function pruneBackups() {
 
 export default async function handler(req, res) {
   noStore(res)
-  if (req.method === 'GET') return exportBackup(req, res)
+  if (req.method === 'GET') {
+    const query = (req.query && typeof req.query === 'object') ? req.query : {}
+    if (query.meta === '1') return exportMeta(req, res)
+    return exportBackup(req, res)
+  }
   if (req.method === 'POST') return restoreBackup(req, res)
   res.status(405).json({ ok: false, error: 'Method not allowed' })
 }

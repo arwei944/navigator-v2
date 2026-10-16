@@ -229,6 +229,8 @@ import AdminPlugins from '@/components/admin/AdminPlugins.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { pluginApi } from '@/services/pluginApi'
+import { aiApi } from '@/services/aiApi'
+import { alertApi } from '@/services/alertApi'
 import { authApi } from '@/services/authApi'
 import { recordAudit, setAuditActor } from '@/services/auditLog'
 import { ADMIN_SHORTCUTS, SHORTCUT_PREFIX, PREFIX_TTL_MS, matchShortcut, shouldIgnoreKey } from '../../shared/admin-shortcuts.mjs'
@@ -419,18 +421,27 @@ async function loadUnread() {
 const dashOps = ref(null)
 const dashPlugins = ref(null)
 const dashSnapshots = ref(null)
+const dashBackup = ref(null)
+const dashAlerts = ref(null)
+const dashAi = ref(null)
 
 async function loadDash() {
   const key = adminKey.value.trim()
   if (!key) return
-  const [ops, plug, snaps] = await Promise.all([
+  const [ops, plug, snaps, bak, alerts, ai] = await Promise.all([
     opsApi.dashboardSummary(key).catch(() => null),
     pluginApi.light(key).catch(() => null),
     opsApi.snapshots(key).catch(() => null),
+    opsApi.backupMeta(key).catch(() => null),
+    alertApi.load(key).catch(() => null),
+    aiApi.probe().catch(() => null),
   ])
   dashOps.value = ops && ops.ok ? ops : null
   dashPlugins.value = plug && plug.ok ? plug : null
   dashSnapshots.value = snaps && snaps.ok !== false && Number.isFinite(snaps.count) ? snaps : null
+  dashBackup.value = bak && bak.ok ? bak : null
+  dashAlerts.value = alerts && alerts.ok ? alerts : null
+  dashAi.value = ai && ai.ok !== false ? ai : null
 }
 
 function onLogin({ token, username, via, expiresAt, auto }) {
@@ -538,6 +549,26 @@ const dashCards = computed(() => TABS
       // 0 也要显示（「0 未读」是信息，「什么都不显示」不是）
       if (ops) { c.value = ops.notify.unread; c.unit = '未读' }
       else if (unreadBadge.value) { c.value = unreadBadge.value; c.unit = '未读' }
+    } else if (t.id === 'backup') {
+      // 备份没有「最近一次」的时间戳（服务端不记备份历史），所以给的是
+      // 「一次备份会带走什么」—— 条目数 + 真实序列化体积，都是现算的
+      if (dashBackup.value) {
+        const m = dashBackup.value
+        c.value = m.counts.sites
+        c.unit = `站点可导出 · 约 ${Math.max(1, Math.round(m.bytes / 1024))} KB`
+      }
+    } else if (t.id === 'preferences') {
+      if (dashAlerts.value) {
+        const rules = dashAlerts.value.config?.rules || []
+        c.value = rules.length
+        c.unit = rules.length ? '条告警规则' : '条告警规则 · 用全局阈值'
+      }
+    } else if (t.id === 'ai') {
+      // AI 的「状态」就是「能不能用 + 用的是哪个后端」，比任何数字都有用
+      if (dashAi.value) {
+        c.value = dashAi.value.ready ? (dashAi.value.model || '已配置') : '未配置'
+        c.unit = dashAi.value.ready ? '就绪' : '需要配置后端'
+      }
     }
     return c
   }))
