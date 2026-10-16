@@ -114,7 +114,7 @@ async function realClick(sel) {
   return true
 }
 
-console.log('\n── ① 设置里的开关 ──')
+console.log('\n── ① 工具栏一键开关（不用进设置）──')
 await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/')}`)
 await send('Runtime.enable'); await send('Page.enable')
 for (let i = 0; i < 60; i++) { if (await evalJs(`location.host`).catch(() => '')) break; await sleep(300) }
@@ -127,6 +127,17 @@ for (let i = 0; i < 80; i++) { if (await evalJs(`!!document.querySelector('.sett
 await sleep(1200)
 
 ok(await evalJs(`!document.querySelector('.bgm')`), '默认不渲染播放器（插件默认关，首屏不为它付费）')
+
+// 这一条对应真实反馈「线上没有显示这个插件」：插件默认关，而入口原本只在设置里
+// （第 3 个分区、要往下滚）。现在工具栏有一个 ♪，一眼可见、一次点击。
+ok(await evalJs(`!!document.querySelector('.bgm-toggle')`), '工具栏有背景音乐开关')
+await evalJs(`document.querySelector('.bgm-toggle').click()`)
+await sleep(900)
+ok(await evalJs(`!!document.querySelector('.bgm')`), '点一下工具栏开关，播放器出现（一次点击）')
+ok(await evalJs(`document.querySelector('.bgm-toggle')?.classList.contains('active')`), '开关显示生效态')
+await evalJs(`document.querySelector('.bgm-toggle').click()`)
+await sleep(700)
+ok(!(await evalJs(`!!document.querySelector('.bgm')`)), '再点一下关闭（播放器卸载）')
 await evalJs(`document.querySelector('.settings-btn').click()`)
 await sleep(900)
 const sec = await jsonOf(`(() => {

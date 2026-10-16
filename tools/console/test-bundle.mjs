@@ -142,8 +142,13 @@ const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
 // 实测增量：暂存本次改动前后各构建一次，610.7 → 612.6 KiB，净增 1.9 KiB。
 // 全部落在首屏组件自身：筛选条的取数模块（src/utils/filterChips.js，纯函数、有 20 条断言）、
 // 面板的渲染分支、以及挂载期生效的外部点击 / Esc 收起监听 —— 筛选条就在首屏，懒不掉。
-const BUDGET_RAW = 614 * 1024
-const BUDGET_GZ = 215 * 1024
+// 2026-10-17：614 → 616。工具栏加「背景音乐」一键开关（`MainToolbar.vue`，首屏组件）。
+// 为什么要为它付这 0.6 KiB：插件默认是关的，而它原本只能从「设置」里打开 ——
+// 设置面板里排第 3 个分区、要往下滚才看得见，结果是「线上没有显示这个插件」这条反馈。
+// 实测：613.8 → 614.4 KiB，净增 0.6 KiB，全部落在工具栏那个按钮上（图标是内联 SVG）。
+// 播放器本体仍然懒加载：`BgmPlayer` 独立成 5.3 KiB chunk，音频代码在首屏 0 命中。
+const BUDGET_RAW = 616 * 1024
+const BUDGET_GZ = 216 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)
 
