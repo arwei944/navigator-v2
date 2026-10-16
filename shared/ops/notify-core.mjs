@@ -17,6 +17,11 @@
 export const NOTIFY_KINDS = {
   'health.down': { id: 'health.down', label: '站点不可达', severity: 'error', cooldownMs: 6 * 3600e3, action: '查看可用性看板' },
   'health.recovered': { id: 'health.recovered', label: '站点恢复', severity: 'info', cooldownMs: 0, action: '查看可用性看板' },
+  // 与上面两条区分开：health.* 说的是**我们收录的站点**，uptime.* 说的是**我们自己部署的站点**。
+  // 混用同一个类型会让「哪个站挂了」和「我们挂了」在通知中心里分不清。
+  // down 带 30 分钟冷却：平台长时间故障时每 5 分钟一条会刷屏，冷却后仍能反映持续时长。
+  'uptime.down': { id: 'uptime.down', label: '本站不可达', severity: 'error', cooldownMs: 30 * 60e3, action: '查看可用性报告' },
+  'uptime.recovered': { id: 'uptime.recovered', label: '本站已恢复', severity: 'info', cooldownMs: 0, action: '查看可用性报告' },
   'publish.done': { id: 'publish.done', label: '发布完成', severity: 'info', cooldownMs: 0, action: '查看发布历史' },
   'publish.fail': { id: 'publish.fail', label: '发布失败', severity: 'error', cooldownMs: 0, action: '查看发布日志' },
   'rollback.done': { id: 'rollback.done', label: '数据已回滚', severity: 'warn', cooldownMs: 0, action: '查看发布历史' },
