@@ -131,6 +131,7 @@ ok(await evalJs(`!document.querySelector('.bgm')`), '默认不渲染播放器（
 // 这一条对应真实反馈「线上没有显示这个插件」：插件默认关，而入口原本只在设置里
 // （第 3 个分区、要往下滚）。现在工具栏有一个 ♪，一眼可见、一次点击。
 ok(await evalJs(`!!document.querySelector('.bgm-toggle')`), '工具栏有背景音乐开关')
+await shot('bgm-0-toolbar.png')
 await evalJs(`document.querySelector('.bgm-toggle').click()`)
 await sleep(900)
 ok(await evalJs(`!!document.querySelector('.bgm')`), '点一下工具栏开关，播放器出现（一次点击）')
