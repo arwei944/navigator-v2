@@ -3,6 +3,7 @@ import { ref, watch } from 'vue'
 import { versionedPersist } from '@/utils/storeVersioning'
 import { usePreferencesStore } from '@/stores/preferences'
 import { reduceRightPanel } from '../../shared/right-panel.mjs'
+import { clampSideWidth, DEFAULT_SIDE_WIDTH, MIN_SIDE_W, MAX_SIDE_W } from '@/utils/sideWidth'
 
 /** 右侧详情面板的出厂宽度（设置里的「重置宽度」要用，所以导出成本模块的常量） */
 export const DEFAULT_RIGHT_WIDTH = 280
@@ -15,7 +16,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
   const collapsed = ref(false)
   const rightCollapsed = ref(false)
   const activeNav = ref('discover')
-  const width = ref(240) // 左侧栏可拖拽宽度，默认240px
+  const width = ref(DEFAULT_SIDE_WIDTH) // 左侧栏可拖拽宽度（60–520，折叠态仍可拖）
   const rightWidth = ref(DEFAULT_RIGHT_WIDTH) // 右侧详情面板可拖拽宽度，默认280px
 
   /**
@@ -74,8 +75,11 @@ export const useSidebarStore = defineStore('sidebar', () => {
   // 计时取 300ms 而不是更短的 140ms：拖拽期间 mousemove 是连续来的，但用户随时可能
   // 停顿一下再继续。计时若短于停顿，模糊会在拖拽中途重新弹回来，正好卡在最需要流畅的
   // 那一刻重算。松手后多留 300ms 再恢复，用户看不到差别（面板本来就在动）。
-  function setWidth(val) { width.value = Math.max(60, Math.min(400, val)); markAnimating(300) }
-  function setRightWidth(val) { rightWidth.value = Math.max(60, Math.min(400, val)); markAnimating(300) }
+  function setWidth(val) { width.value = clampSideWidth(val); markAnimating(300) }
+  /** 双击把手：回到出厂宽度（拖宽之后想一键还原） */
+  function resetWidth() { setWidth(DEFAULT_SIDE_WIDTH) }
+  function setRightWidth(val) { rightWidth.value = clampSideWidth(val, DEFAULT_RIGHT_WIDTH); markAnimating(300) }
+  function resetRightWidth() { setRightWidth(DEFAULT_RIGHT_WIDTH) }
 
   /* ---------- 右边栏显示目标：唯一的写入口 ---------- */
 
@@ -152,7 +156,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
     open, collapsed, rightCollapsed, activeNav, width, rightWidth,
     rightSite, detailSheetSite, animating, rightFrozen,
     toggle, close, openSidebar, setActiveNav,
-    toggleCollapse, toggleRightCollapse, setWidth, setRightWidth,
+    toggleCollapse, toggleRightCollapse, setWidth, setRightWidth, resetWidth, resetRightWidth,
     hoverSite, selectSite, clearRight, setRightFrozen, applyCollapsePolicy, showDetail, closeDetailSheet
   }
 }, {

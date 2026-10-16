@@ -35,6 +35,10 @@
           </div>
         </div>
 
+        <button class="admin-btn ghost admin-rail-toggle" :title="railCollapsed ? '展开动作栏' : '收起动作栏'" @click="railCollapsed = !railCollapsed">
+          {{ railCollapsed ? '≡ 展开' : '≡ 收起' }}
+        </button>
+
         <button class="admin-btn admin-publish-btn" @click="selectTab('publish')" title="前往云端发布">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           发布到云端
@@ -48,79 +52,86 @@
       </template>
     </header>
 
-    <div v-if="authChecking" class="admin-body">
+    <div v-if="authChecking" class="admin-body admin-body-full">
       <div class="admin-auth-check">正在校验凭据…</div>
     </div>
 
-    <AdminLogin v-else-if="!authed" class="admin-body" :notice="loginNotice" @success="onLogin" />
+    <AdminLogin v-else-if="!authed" class="admin-body admin-body-full" :notice="loginNotice" @success="onLogin" />
 
     <template v-else>
-      <!-- 模块页顶部条：面包屑「← 全部模块 / 分组 / 模块名」。
-           仪表盘上不渲染它 —— 卡片本身就是导航；进去之后靠这一条返回与定位。 -->
-      <div v-if="activeTab !== 'overview'" class="admin-crumb">
-        <button type="button" class="admin-crumb-back" @click="selectTab('overview')">
-          <span class="admin-crumb-arrow">←</span> 全部模块
-        </button>
-        <span class="admin-crumb-sep">/</span>
-        <span class="admin-crumb-group">{{ groupLabelOf(activeGroup) }}</span>
-        <span class="admin-crumb-sep">/</span>
-        <span class="admin-crumb-now">{{ activeLabel }}</span>
-        <span v-if="activeTab === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
-      </div>
+      <!-- 左动作栏：栏里列的是「能做的事」，点一下即达。
+           模块的实时状态写在栏内右侧 —— 不再需要一屏等大的状态卡。
+           折叠态只显示图标；拖右边缘可调宽，双击复位。 -->
+      <nav
+        class="admin-rail"
+        :class="{ collapsed: railCollapsed }"
+        :style="{ width: (railCollapsed ? 56 : railW) + 'px' }"
+        aria-label="后台动作与模块"
+      >
+        <template v-for="g in RAIL_GROUPS" :key="g.id">
+          <div v-if="!railCollapsed" class="ar-group">{{ g.label }}</div>
+          <button
+            v-for="it in g.items" :key="it.id"
+            type="button"
+            class="ar-item"
+            :class="{ on: railSel === it.id, icon: railCollapsed }"
+            :title="it.label + (DASH_DESC[it.tab] ? ' — ' + DASH_DESC[it.tab] : '')"
+            @click="pickRail(it)"
+          >
+            <span class="ar-icon">{{ it.icon }}</span>
+            <span v-if="!railCollapsed" class="ar-label">{{ it.label }}</span>
+            <span v-if="!railCollapsed && railMetaOf(it.tab)" class="ar-meta">{{ railMetaOf(it.tab) }}</span>
+            <span v-if="railBusy === it.action" class="ar-spin">·</span>
+          </button>
+        </template>
+        <div class="ar-resize" @mousedown="startRailResize" @dblclick="resetRailWidth" title="拖拽调宽 · 双击复位"></div>
+      </nav>
 
       <div class="admin-body">
         <div class="admin-tabpanel">
-          <template v-if="activeTab === 'overview'">
-            <!-- 仪表盘：模块卡片铺满中间区（auto-fill 自适应宽度，不再是一条窄列）。
-                 卡片上的数字只放**已经拿得到**的：拿不到就不写，不编一个好看的数。 -->
-            <div class="admin-dash">
-              <div class="admin-stats">
-                <div class="admin-stat-card">
-                  <div class="admin-stat-value">{{ sitesStore.sites.length }}</div>
-                  <div class="admin-stat-label">站点总数</div>
-                </div>
-                <div class="admin-stat-card">
-                  <div class="admin-stat-value">{{ categoriesStore.categories.length }}</div>
-                  <div class="admin-stat-label">分类数</div>
-                </div>
-                <div class="admin-stat-card">
-                  <div class="admin-stat-value">{{ todayCount }}</div>
-                  <div class="admin-stat-label">今日访问</div>
-                </div>
-                <div class="admin-stat-card">
-                  <div class="admin-stat-value">{{ favoritesStore.count }}</div>
-                  <div class="admin-stat-label">收藏数</div>
-                </div>
-              </div>
-
-              <div class="admin-dash-head">
-                <h2>全部模块</h2>
-                <span class="admin-dash-sub">{{ dashCards.length }} 个 · 点卡片进入</span>
-              </div>
-              <div class="admin-dash-grid">
-                <button
-                  v-for="m in dashCards" :key="m.id"
-                  type="button" class="admin-dash-card"
-                  @click="selectTab(m.id)"
-                >
-                  <span class="adc-top">
-                    <span class="adc-name">{{ m.label }}</span>
-                  </span>
-                  <span class="adc-desc">{{ m.desc }}</span>
-                  <span class="adc-meta">
-                    <!-- 判空必须写 !== '' ：0 是**真实数据**（审计 0 条、未读 0），
-                         用 v-if="m.value" 会把它当成空而什么都不显示 -->
-                    <span v-if="m.value !== ''" class="adc-value">{{ m.value }}</span>
-                    <span v-if="m.unit" class="adc-unit">{{ m.unit }}</span>
-                    <span class="adc-go">进入 →</span>
-                  </span>
+          <!-- 动作执行结果：左动作栏里点「检查更新 / 导出备份 / 巡检结果」后落在这里 -->
+          <template v-if="activeAction">
+            <div class="admin-section">
+              <div class="admin-section-header">
+                <h2>{{ actionResult ? actionResult.title : (RAIL_TITLE[activeAction] || activeAction) }}</h2>
+                <button class="admin-btn ghost" :disabled="!!railBusy" @click="runAction(activeAction)">
+                  {{ railBusy ? '执行中…' : '再执行一次' }}
                 </button>
               </div>
-
-              <!-- 不要再加「数据洞察」标题：AdminInsights 自带同名标题，加了就是两份 -->
-              <div class="admin-section" style="padding-top:0">
-                <AdminInsights />
+              <p class="admin-action-tip">{{ RAIL_TIP[activeAction] }}</p>
+              <div v-if="actionResult" class="admin-action-rows">
+                <div v-for="row in actionResult.items" :key="row[0]" class="admin-action-row">
+                  <span>{{ row[0] }}</span><b>{{ row[1] }}</b>
+                </div>
+                <div v-if="actionResult.hint" class="admin-action-hint">{{ actionResult.hint }}</div>
               </div>
+              <div v-else-if="!railBusy" class="admin-action-empty">还没执行。</div>
+            </div>
+          </template>
+
+          <template v-else-if="activeTab === 'overview'">
+            <!-- 概览：站点库与洞察。模块入口与状态已经移到左动作栏 ——
+                 原来那一屏 12 个等大的卡片正是「没有层次、没有重点」的来源。 -->
+            <div class="admin-stats">
+              <div class="admin-stat-card">
+                <div class="admin-stat-value">{{ sitesStore.sites.length }}</div>
+                <div class="admin-stat-label">站点总数</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value">{{ categoriesStore.categories.length }}</div>
+                <div class="admin-stat-label">分类数</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value">{{ todayCount }}</div>
+                <div class="admin-stat-label">今日访问</div>
+              </div>
+              <div class="admin-stat-card">
+                <div class="admin-stat-value">{{ favoritesStore.count }}</div>
+                <div class="admin-stat-label">收藏数</div>
+              </div>
+            </div>
+            <div class="admin-section">
+              <AdminInsights />
             </div>
           </template>
 
@@ -229,6 +240,8 @@ import AdminPlugins from '@/components/admin/AdminPlugins.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { pluginApi } from '@/services/pluginApi'
+import { fetchStatus as fetchDeployStatus, checkUpstream } from '@/services/deployApi'
+import { clampRailWidth, DEFAULT_RAIL_W } from '@/utils/sideWidth'
 import { aiApi } from '@/services/aiApi'
 import { alertApi } from '@/services/alertApi'
 import { authApi } from '@/services/authApi'
@@ -335,15 +348,162 @@ function goResult(r) {
   query.value = ''
 }
 
-/* ---------------- 模块导航：面包屑 ---------------- */
+/* ---------------- 左动作栏（中间区） ----------------
+ * 取代原来的「一排 tab + 卡片仪表盘」。用户的两条诉求直接决定这里的形状：
+ *   ① 「层次感与重点」→ 栏里是**分组 + 主次分明**的动作与模块；模块的实时状态
+ *      写在栏内右侧。不再需要一屏 12 个等大的状态卡 —— 等大就是没有重点。
+ *   ② 「切换只需一次」→ 点栏内任一项即达；其中只读/安全的动作点一下就直接执行。
+ * 栏本身可折叠（图标态）可拖宽，宽度与折叠态存本机。
+ */
+const RAIL_GROUPS = [
+  { id: 'act', label: '常用动作', items: [
+    { id: 'publish', kind: 'tab', tab: 'publish', label: '发布到云端', icon: '⇪' },
+    { id: 'act:check', kind: 'act', action: 'check', label: '检查更新', icon: '⟳' },
+    { id: 'act:backup', kind: 'act', action: 'backup', label: '导出备份', icon: '⛁' },
+    { id: 'act:health', kind: 'act', action: 'health', label: '巡检结果', icon: '◎' },
+  ] },
+  { id: 'batch', label: '批量', items: [
+    { id: 'batch-sites', kind: 'tab', tab: 'sites', label: '批量刷新描述', icon: '✎' },
+    { id: 'batch-ai', kind: 'tab', tab: 'ai', label: 'AI 生成描述', icon: '✦' },
+  ] },
+  { id: 'mod', label: '模块', items: [
+    { id: 'overview', kind: 'tab', tab: 'overview', label: '概览', icon: '◱' },
+    { id: 'sites', kind: 'tab', tab: 'sites', label: '站点管理', icon: '☰' },
+    { id: 'categories', kind: 'tab', tab: 'categories', label: '分类体系', icon: '◇' },
+    { id: 'deploy', kind: 'tab', tab: 'deploy', label: '部署', icon: '⇪' },
+    { id: 'plugins', kind: 'tab', tab: 'plugins', label: '插件', icon: '◈' },
+    { id: 'snapshots', kind: 'tab', tab: 'snapshots', label: '快照与回滚', icon: '⟲' },
+    { id: 'history', kind: 'tab', tab: 'history', label: '发布历史', icon: '≡' },
+    { id: 'audit', kind: 'tab', tab: 'audit', label: '操作审计', icon: '▤' },
+    { id: 'notify', kind: 'tab', tab: 'notify', label: '通知中心', icon: '◔' },
+    { id: 'preferences', kind: 'tab', tab: 'preferences', label: '偏好设置', icon: '⚙' },
+    { id: 'backup', kind: 'tab', tab: 'backup', label: '备份与恢复', icon: '⛁' },
+  ] },
+]
 
-// 当前模块在模块表里的那一项：面包屑要显示「分组 / 模块名」
-const activeGroup = computed(() => TABS.find(t => t.id === activeTab.value)?.group || '')
-const activeLabel = computed(() => TABS.find(t => t.id === activeTab.value)?.label || '')
+const railSel = ref(localStorage.getItem('nav_admin_rail_sel') || 'overview')
+const railW = ref(clampRailWidth(localStorage.getItem('nav_admin_rail_w')))
+const railCollapsed = ref(localStorage.getItem('nav_admin_rail_collapsed') === '1')
+const activeAction = ref('')          // 选中「动作」时的动作名；与 activeTab 互斥
+const railBusy = ref('')
+const actionResult = ref(null)
 
-function groupLabelOf(id) {
-  return TAB_GROUPS.find(g => g.id === id)?.label || ''
+watch([railW, railCollapsed, railSel], () => {
+  try {
+    localStorage.setItem('nav_admin_rail_w', String(railW.value))
+    localStorage.setItem('nav_admin_rail_collapsed', railCollapsed.value ? '1' : '0')
+    localStorage.setItem('nav_admin_rail_sel', railSel.value)
+  } catch { /* 隐私模式写不了，忽略 */ }
+})
+
+// 栏内右侧的状态数字：复用卡片那套取值，取紧凑写法
+function railMetaOf(tabId) {
+  if (!tabId) return ''
+  const c = dashCards.value.find(x => x.id === tabId)
+  return c && c.short ? String(c.short) : ''
 }
+
+function pickRail(it) {
+  railSel.value = it.id
+  if (it.kind === 'act') {
+    activeAction.value = it.action
+    return runAction(it.action)
+  }
+  activeAction.value = ''
+  actionResult.value = null
+  selectTab(it.tab)
+}
+
+/* ---- 动作执行：点一下就跑 ----
+ * 这里只放**只读或安全**的动作（检查更新 / 导出备份 / 看巡检结果）。
+ * 发布、回滚、恢复备份这类不可逆动作**刻意不绑在导航点击上** —— 误触一次就是线上事故，
+ * 它们仍然要求「进入面板 → 再点执行」这一层确认。 */
+async function runAction(kind) {
+  const key = adminKey.value.trim()
+  if (!key) return
+  railBusy.value = kind
+  actionResult.value = null
+  try {
+    if (kind === 'check') {
+      const st = await fetchDeployStatus()
+      if (!st.ok) throw new Error(st.error)
+      const sha = st.status.version?.shortSha || st.status.version?.sha || ''
+      const up = await checkUpstream(sha)
+      actionResult.value = {
+        ok: true,
+        title: '检查更新',
+        items: [
+          ['线上版本', sha || '—'],
+          ['构建状态', st.status.version?.dirty ? '含未提交改动' : '与提交一致'],
+          ['与上游', up.ok ? (up.behind ? `落后 ${up.behind} 个提交` : '已是最新') : (up.error || '查不到上游')],
+        ],
+      }
+    } else if (kind === 'backup') {
+      const data = await opsApi.backup(key)
+      if (!data || data.kind !== 'navigator-backup') throw new Error('备份接口没返回有效数据')
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `navigator-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+      actionResult.value = {
+        ok: true,
+        title: '导出备份',
+        items: [
+          ['站点', String(data.counts?.sites ?? 0)],
+          ['分类', String(data.counts?.categories ?? 0)],
+          ['文件体积', `${Math.max(1, Math.round(blob.size / 1024))} KB`],
+        ],
+        hint: '文件已开始下载',
+      }
+    } else if (kind === 'health') {
+      const r = await fetch('/api/health', { headers: { Accept: 'application/json' } }).then(x => x.json())
+      const c = r.counts || {}
+      actionResult.value = {
+        ok: true,
+        title: '巡检结果',
+        items: [
+          ['正常', String(c.ok ?? 0)],
+          ['可忽略', String(c.limited ?? 0)],
+          ['需处理', String(c.down ?? 0)],
+        ],
+        hint: r.updatedAt ? `最近一轮 ${fmtTime(new Date(r.updatedAt).getTime())}` : '还没有巡检快照',
+      }
+    }
+  } catch (e) {
+    actionResult.value = { ok: false, title: '执行失败', items: [['原因', String(e?.message || e)]] }
+  } finally {
+    railBusy.value = ''
+  }
+}
+
+/* ---- 拖宽 / 复位 ---- */
+let railUnlisten = null
+function startRailResize(e) {
+  e.preventDefault()
+  const startX = e.clientX
+  const startW = railW.value
+  let pendingX = startX
+  let raf = 0
+  const flush = () => { raf = 0; railW.value = clampRailWidth(startW + (pendingX - startX)) }
+  const onMove = (ev) => { pendingX = ev.clientX; if (!raf) raf = requestAnimationFrame(flush) }
+  const onUp = () => {
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    if (raf) { cancelAnimationFrame(raf); raf = 0 }
+    railW.value = clampRailWidth(startW + (pendingX - startX))
+    document.body.style.cursor = ''
+    document.body.style.userSelect = ''
+    railUnlisten = null
+  }
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  railUnlisten = onUp
+}
+function resetRailWidth() { railW.value = DEFAULT_RAIL_W }
 
 /* ---------------- 快捷键（#19）：g 前缀序列 ---------------- */
 
@@ -522,7 +682,7 @@ const DASH_DESC = {
 const dashCards = computed(() => TABS
   .filter(t => t.id !== 'overview')
   .map(t => {
-    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '' }
+    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '', short: '' }
     const ops = dashOps.value
     const pl = dashPlugins.value
     const sn = dashSnapshots.value
@@ -570,8 +730,17 @@ const dashCards = computed(() => TABS
         c.unit = dashAi.value.ready ? '就绪' : '需要配置后端'
       }
     }
+    // 动作栏右侧只放一个紧凑数字/短串，长单位留给面板自己
+    c.short = c.value === '' ? '' : String(c.value)
     return c
   }))
+
+const RAIL_TITLE = { check: '检查更新', backup: '导出备份', health: '巡检结果' }
+const RAIL_TIP = {
+  check: '对比线上版本与上游仓库。只读检查，点一下即执行。',
+  backup: '把当前站点库与分类打包下载到本机，点一下即开始下载。',
+  health: '最近一轮服务端巡检的结果。巡检由服务端按间隔自动跑，这里只读快照。',
+}
 
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
@@ -708,13 +877,16 @@ async function notifyWebhook(version, count) {
 .admin-view {
   flex: 1;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
+  /* 两列：左动作栏（auto，宽度由内联样式给）+ 内容（1fr）；两行：头部 + 主体 */
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
   background: transparent; /* 主区背景透过来，和洞察 / 图谱 / 关于一致 */
   padding: 0;
 }
 .admin-header {
+  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -747,37 +919,89 @@ async function notifyWebhook(version, count) {
   cursor: default;
 }
 
-/* 模块页顶部条：面包屑。仪表盘上不渲染（卡片本身就是导航）。
-   比原来的 tab 行矮一档 —— 它只承担「我在哪 + 怎么回去」，不再承担切换。 */
-.admin-crumb {
-  flex-shrink: 0;
+/* 左动作栏：中间区左侧那一列，承担「切换 + 执行」，比主站侧栏窄一档。
+   折叠态只留图标（56px）；右边缘可拖宽、双击复位。 */
+.admin-rail {
+  position: relative;
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 10px;
+  background: var(--bg-white);
+  border-right: 1px solid var(--border-light);
+  overflow: hidden auto;
+}
+.ar-group {
+  padding: 12px 10px 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: .02em;
+}
+.ar-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
-  background: var(--bg-white);
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-.admin-crumb-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid var(--border);
+  gap: 9px;
+  width: 100%;
+  border: none;
   border-radius: var(--radius-sm);
-  background: var(--bg-white);
-  padding: 4px 10px;
-  font-size: 12px;
+  background: transparent;
+  padding: 8px 10px;
+  font-size: 13px;
   font-family: inherit;
   color: var(--text-primary);
+  text-align: left;
   cursor: pointer;
-  transition: border-color var(--transition), color var(--transition);
+  transition: background var(--transition), color var(--transition);
 }
-.admin-crumb-back:hover { border-color: var(--accent); color: var(--accent); }
-.admin-crumb-arrow { font-size: 12px; line-height: 1; }
-.admin-crumb-sep { color: var(--border); }
-.admin-crumb-group { color: var(--text-secondary); }
-.admin-crumb-now { font-weight: 600; color: var(--text-primary); }
+.ar-item:hover { background: var(--border-light); }
+.ar-item.on { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+.ar-item.icon { justify-content: center; padding: 9px 0; }
+.ar-icon { flex: 0 0 16px; text-align: center; font-size: 13px; color: var(--text-secondary); }
+.ar-item.on .ar-icon { color: var(--accent); }
+.ar-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 状态数字：模块的实时状态就写在这里，所以不再需要一屏等大的状态卡 */
+.ar-meta { font-size: 11px; color: var(--text-secondary); font-variant-numeric: tabular-nums; max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ar-item.on .ar-meta { color: var(--accent); }
+.ar-spin { color: var(--accent); font-weight: 700; }
+.ar-resize {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 5;
+  cursor: col-resize;
+  background: transparent;
+  transition: background .15s ease;
+}
+.ar-resize:hover, .ar-resize:active { background: var(--accent); opacity: .3; }
+.admin-rail-toggle { padding: 6px 10px; font-size: 12px; }
+
+/* 动作执行结果（左动作栏里点「检查更新 / 导出备份 / 巡检结果」后落在这里） */
+.admin-action-tip { margin: 0 0 14px; font-size: 12.5px; color: var(--text-secondary); line-height: 1.7; }
+.admin-action-rows {
+  background: var(--bg-white);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+}
+.admin-action-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 13px;
+}
+.admin-action-row:last-child { border-bottom: none; }
+.admin-action-row span { flex: 0 0 96px; font-size: 12px; color: var(--text-secondary); }
+.admin-action-row b { font-weight: 600; }
+.admin-action-hint { margin-top: 10px; font-size: 11.5px; color: var(--text-secondary); }
+.admin-action-empty { font-size: 12.5px; color: var(--text-secondary); }
+
 .admin-tab-badge {
   display: inline-block;
   min-width: 16px;
@@ -793,13 +1017,16 @@ async function notifyWebhook(version, count) {
   vertical-align: 1px;
 }
 
-/* 内容区是唯一滚动容器；min-height:0 让 flex 子项可收缩，否则滚动条不会出现 */
+/* 内容区是唯一滚动容器；min-height:0 让 grid 子项可收缩，否则滚动条不会出现 */
 .admin-body {
-  flex: 1;
+  grid-column: 2;
+  grid-row: 2;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* 未登录时不渲染动作栏，内容横跨整行 */
+.admin-body-full { grid-column: 1 / -1; }
 .admin-tabpanel { padding-top: 24px; }
 /* 各模块自带左右 32px 与底部留白，顶部留白统一由 .admin-tabpanel 给，避免叠加 */
 .admin-tabpanel > :first-child { padding-top: 0; }
@@ -834,56 +1061,6 @@ async function notifyWebhook(version, count) {
 .admin-stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .admin-section { padding: 0 32px 32px; }
 
-/* ── 仪表盘：模块卡片铺满中间区 ──────────────────────
- * 用 auto-fill + minmax 而不是固定列数：中间区宽度随两侧栏折叠/窗口变化，
- * 固定列数必然在某档宽度下留出大片空白（这正是「布局不自适应」的来源）。
- * 卡片高度靠 flex + margin-top:auto 对齐底部，所以同一行里数字和「进入」能对齐。 */
-.admin-dash { padding-bottom: 8px; }
-.admin-dash .admin-stats { padding-top: 24px; }
-.admin-dash-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 0 32px;
-  margin: 22px 0 12px;
-}
-.admin-dash-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
-.admin-dash-sub { font-size: 12px; color: var(--text-secondary); }
-.admin-dash-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 14px;
-  padding: 0 32px;
-}
-.admin-dash-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 118px;
-  padding: 18px;
-  border: 1px solid var(--border-light);
-  border-radius: var(--radius);
-  background: var(--bg-white);
-  color: var(--text-primary);
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
-}
-.admin-dash-card:hover {
-  border-color: var(--accent);
-  box-shadow: var(--shadow-hover);
-  transform: translateY(-1px);
-}
-.admin-dash-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.adc-top { display: flex; align-items: center; gap: 8px; }
-.adc-name { font-size: 15px; font-weight: 600; }
-.adc-desc { font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
-.adc-meta { display: flex; align-items: baseline; gap: 6px; margin-top: auto; padding-top: 10px; }
-.adc-value { font-size: 15px; font-weight: 600; }
-.adc-unit { font-size: 11px; color: var(--text-secondary); }
-.adc-go { margin-left: auto; font-size: 11px; color: var(--text-secondary); }
-.admin-dash-card:hover .adc-go { color: var(--accent); }
 .admin-section-header {
   display: flex;
   align-items: center;
@@ -991,7 +1168,10 @@ async function notifyWebhook(version, count) {
   .admin-header { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
   .admin-header h1 { font-size: 15px; }
   .admin-search { order: 10; flex-basis: 100%; max-width: none; margin: 4px 0 0; }
-  .admin-crumb { padding: 8px 14px; }
+  /* 窄屏：动作栏收到图标态，把宽度让给内容 */
+  .admin-rail { padding: 10px 6px; }
+  .ar-label, .ar-meta, .ar-group { display: none; }
+  .ar-item { justify-content: center; padding: 9px 0; }
   .admin-dash-head, .admin-dash-grid { padding-left: 14px; padding-right: 14px; }
   .admin-dash-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .admin-view :deep(.admin-section) { padding: 0 14px 24px; }

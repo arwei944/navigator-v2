@@ -65,9 +65,9 @@ const favoritesStore = useFavoritesStore()
 const TAB_META = {
   overview: {
     label: '仪表盘',
-    desc: '12 张模块卡片 + 站点库与分类体系的总览。',
+    desc: '站点库与分类体系的总览，以及使用热度的汇总视图。',
     tips: [
-      '点卡片进模块；模块页左上角「← 全部模块」回来。',
+      '模块入口与实时状态都在左侧动作栏 —— 点一下即达。',
       '下面的图表与主站「洞察」页看到的是同一份数据。',
     ],
     links: [{ route: 'Insights', label: '洞察（主站页面）', why: '看更完整的热度与分布' }],

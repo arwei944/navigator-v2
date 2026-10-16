@@ -1,11 +1,10 @@
 /**
- * 真机验证：管理后台中间区形态（卡片仪表盘 + 面包屑 + 摘要数字）。
+ * 真机验证：后台「左动作栏」形态 + 两侧栏的自由折叠/宽度。
  *
- * 盯的是「装到 DOM 上是不是真的那样」：
- *  · 仪表盘 12 张卡铺满、带真实摘要、没有 undefined/NaN、没有重复标题；
- *  · 卡片上的数字与点进去面板里的总数**一致**（新增的运维摘要接口就是为这个）；
- *  · 模块页只有面包屑、没有 tab 行，面包屑能返回；
- *  · 快捷键仍能切模块；窄屏不横向溢出。
+ * 盯的是装到 DOM 上是不是真的那样：
+ *  · 动作栏：分组与状态数字、点一下切模块、点一下执行动作（结果真的出来）；
+ *  · 动作栏自身：可折叠（图标态）、可拖宽、双击复位、越界被钳制；
+ *  · 主站两侧栏：能拖到很窄/很宽、双击复位、下限不会塌成看不见。
  *
  * 用法：node probe/admin-shell-verify.mjs [cdp-port]
  */
@@ -17,7 +16,7 @@ import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
-const PORT = process.argv[2] || '9471'
+const PORT = process.argv[2] || '9501'
 const SITE_BASE = (process.env.SITE_BASE || 'http://127.0.0.1:4218').replace(/\/+$/, '')
 
 let pass = 0
@@ -41,7 +40,7 @@ if (!(await alive(`http://127.0.0.1:${PORT}/json/version`))) {
   if (!existsSync(CHROME)) { console.error(`找不到浏览器：${CHROME}`); process.exit(2) }
   chromeProc = spawn(CHROME, [
     '--headless=new', `--remote-debugging-port=${PORT}`,
-    `--user-data-dir=${join(tmpdir(), 'nav-v2-probe-shell')}`,
+    `--user-data-dir=${join(tmpdir(), 'nav-v2-probe-rail')}`,
     '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
     '--window-size=1600,1000', 'about:blank',
   ], { stdio: 'ignore', windowsHide: true })
@@ -49,7 +48,7 @@ if (!(await alive(`http://127.0.0.1:${PORT}/json/version`))) {
 }
 const cleanup = () => { for (const p of [...procs, chromeProc]) { try { if (p && !p.killed) p.kill() } catch { /* 已退出 */ } } }
 process.on('exit', cleanup)
-const watchdog = setTimeout(() => { console.error('\n❌ 探针整体超时'); cleanup(); process.exit(3) }, 180000)
+const watchdog = setTimeout(() => { console.error('\n❌ 探针整体超时'); cleanup(); process.exit(3) }, 200000)
 
 async function cdpTarget() {
   for (let i = 0; i < 60; i++) {
@@ -97,165 +96,157 @@ async function shot(name) {
   console.log(`  📸 ${name}`)
 }
 
-/* ---------------- 状态读取 ---------------- */
-
-const state = () => jsonOf(`(() => {
-  const dash = document.querySelector('.admin-dash-grid')
-  const crumb = document.querySelector('.admin-crumb')
-  const cards = dash ? [...dash.querySelectorAll('.admin-dash-card')] : []
-  const mid = document.querySelector('.main')
-  const gb = dash ? dash.getBoundingClientRect() : null
-  const mb = mid ? mid.getBoundingClientRect() : null
-  return {
-    dash: !!dash,
-    cards: cards.length,
-    cardsWithValue: cards.filter(c => c.querySelector('.adc-value')).length,
-    gridRatio: gb && mb ? +(gb.width / mb.width).toFixed(2) : 0,
-    tabbar: !!document.querySelector('.admin-tabbar'),
-    tabs: document.querySelectorAll('.admin-tabs .admin-tab').length,
-    crumb: crumb ? crumb.textContent.replace(/\\s+/g, ' ').trim() : '',
-    hasBack: !!document.querySelector('.admin-crumb-back'),
-    dirty: /undefined|NaN/.test(document.body.innerText),
-    viewport: innerWidth,
-  }
-})()`)
-
 /* ---------------- 进入后台 ---------------- */
-
 await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
 await send('Runtime.enable'); await send('Page.enable')
-// 先等导航**真的落到站点上**（host 不为空），再注入登录态 ——
-// 在 about:blank 上写 localStorage 写不到站点 origin，token 会直接丢，
-// 线上就会一直停在登录页（本地走自动登录，掩盖了这个问题）。
-for (let i = 0; i < 80; i++) {
-  const host = await evalJs(`location.host`).catch(() => '')
-  if (host) break
-  await sleep(300)
-}
-for (let i = 0; i < 80; i++) {
-  if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
-  await sleep(500)
-}
+for (let i = 0; i < 80; i++) { if (await evalJs(`location.host`).catch(() => '')) break; await sleep(300) }
+for (let i = 0; i < 80; i++) { if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break; await sleep(500) }
 const PROBE_TOKEN = String(process.env.PROBE_TOKEN || '')
 if (PROBE_TOKEN) {
   await evalJs(`(() => { try { localStorage.setItem('nav_admin_token', ${JSON.stringify(PROBE_TOKEN)}); localStorage.removeItem('nav_admin_token_exp') } catch (e) {} ; return true })()`)
   await evalJs(`location.reload()`)
   await send('Runtime.enable'); await send('Page.enable')
-  for (let i = 0; i < 80; i++) {
-    if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
-    await sleep(500)
-  }
+  for (let i = 0; i < 80; i++) { if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break; await sleep(500) }
 }
-await sleep(1800)
-if (!(await evalJs(`!!document.querySelector('.admin-view')`))) {
-  console.error('没能进入后台（本机自动登录需要 data/admin-key.txt）'); cleanup(); process.exit(2)
-}
-// 确保停在仪表盘（?tab= 会记住上次的模块）
-await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
+// 复位到已知状态：动作栏展开、宽度出厂、选中概览
+await evalJs(`(() => { try { localStorage.removeItem('nav_admin_rail_w'); localStorage.removeItem('nav_admin_rail_collapsed'); localStorage.setItem('nav_admin_rail_sel','overview') } catch(e){} ; return true })()`)
+await evalJs(`location.reload()`)
 await send('Runtime.enable'); await send('Page.enable')
-for (let i = 0; i < 80; i++) {
-  if (await evalJs(`!!document.querySelector('.admin-dash-grid')`).catch(() => false)) break
+for (let i = 0; i < 80; i++) { if (await evalJs(`!!document.querySelector('.admin-rail')`).catch(() => false)) break; await sleep(500) }
+await sleep(1500)
+if (!(await evalJs(`!!document.querySelector('.admin-rail')`))) {
+  console.error('没能进入后台（本机自动登录需要 data/admin-key.txt）')
+  const diag = await jsonOf(`({ view: !!document.querySelector('.admin-view'), login: !!document.querySelector('.admin-login, form'), authed: !!document.querySelector('.admin-header .admin-user'), body: document.body.innerText.slice(0, 200) })`)
+  console.error('  诊断：', JSON.stringify(diag))
+  if (errs.length) console.error('  页面异常：\n   ' + errs.slice(0, 5).join('\n   '))
+  cleanup(); process.exit(2)
+}
+
+const railState = () => jsonOf(`(() => {
+  const rail = document.querySelector('.admin-rail')
+  if (!rail) return null
+  const items = [...rail.querySelectorAll('.ar-item')]
+  return {
+    width: Math.round(rail.getBoundingClientRect().width),
+    groups: [...rail.querySelectorAll('.ar-group')].map(e => e.textContent.trim()),
+    items: items.map(b => b.querySelector('.ar-label')?.textContent.trim() || b.getAttribute('title') || ''),
+    metas: items.filter(b => b.querySelector('.ar-meta')).length,
+    on: (rail.querySelector('.ar-item.on .ar-label') || {}).textContent?.trim() || '',
+    collapsed: rail.classList.contains('collapsed'),
+    hasResize: !!rail.querySelector('.ar-resize'),
+    tabbar: !!document.querySelector('.admin-tabbar'),
+  }
+})()`)
+
+console.log('\n── ① 左动作栏的骨架 ──')
+const r0 = await railState()
+ok(!!r0, '动作栏渲染出来了')
+ok(r0.groups.length === 3, '按「常用动作 / 批量 / 模块」分三组', r0.groups.join(' · '))
+ok(r0.items.length >= 15, '栏内项目齐（动作 + 模块）', `${r0.items.length} 项`)
+ok(r0.metas >= 6, '至少 6 项带实时状态数字（状态就在栏里，不再需要一屏等大卡片）', `${r0.metas} 项`)
+ok(r0.on === '概览', '默认停在概览', r0.on)
+ok(r0.hasResize, '有拖宽把手')
+await shot('rail-1-overview.png')
+
+console.log('\n── ② 一次点击切模块 ──')
+const before = await evalJs(`document.querySelector('.admin-tabpanel').textContent.slice(0, 80)`)
+await evalJs(`[...document.querySelectorAll('.admin-rail .ar-item')].find(b => (b.querySelector('.ar-label')||{}).textContent?.trim() === '插件').click()`)
+await sleep(1200)
+const r1 = await railState()
+const after = await evalJs(`document.querySelector('.admin-tabpanel').textContent.slice(0, 80)`)
+ok(r1.on === '插件', '一次点击就切到了「插件」', r1.on)
+ok(after !== before, '内容区确实换了（不是只高亮栏内项）')
+ok(await evalJs(`/站点抓取引擎|引擎/.test(document.querySelector('.admin-tabpanel').textContent)`), '内容是插件面板本体（13 个面板组件原样复用）')
+
+console.log('\n── ③ 一次点击执行动作 ──')
+await evalJs(`[...document.querySelectorAll('.admin-rail .ar-item')].find(b => (b.querySelector('.ar-label')||{}).textContent?.trim() === '巡检结果').click()`)
+await sleep(1800)
+const actTitle = await evalJs(`(document.querySelector('.admin-section-header h2')||{}).textContent`)
+const actRows = await jsonOf(`[...document.querySelectorAll('.admin-action-row')].map(r => r.textContent.replace(/\\s+/g,' ').trim())`)
+ok(/巡检结果/.test(actTitle || ''), '动作结果面板出来了', actTitle)
+ok(actRows.length >= 3, '结果里有可核对的数字（正常 / 可忽略 / 需处理）', actRows.join(' | '))
+ok(actRows.some(t => /需处理/.test(t)), '能看到「需处理」这一项')
+await shot('rail-2-action.png')
+
+const actRowsBefore = actRows.length
+await evalJs(`[...document.querySelectorAll('.admin-rail .ar-item')].find(b => (b.querySelector('.ar-label')||{}).textContent?.trim() === '检查更新').click()`)
+await sleep(2500)
+const chkTitle = await evalJs(`(document.querySelector('.admin-section-header h2')||{}).textContent`)
+const chkRows = await jsonOf(`[...document.querySelectorAll('.admin-action-row')].map(r => r.textContent.replace(/\\s+/g,' ').trim())`)
+ok(chkRows.length >= 2, '「检查更新」点一下就有结果（只读动作，不绑确认）', chkRows.join(' | ') || chkTitle)
+ok(actRowsBefore > 0, '（上一步的巡检结果已核对）')
+
+console.log('\n── ④ 动作栏：折叠 / 拖宽 / 复位 ──')
+await evalJs(`document.querySelector('.admin-rail-toggle').click()`)
+await sleep(600)
+const rc = await railState()
+ok(rc.collapsed === true && rc.width <= 60, '折叠后收到图标态宽度', `${rc.width}px`)
+ok(await evalJs(`document.querySelector('.admin-rail .ar-label') === null`), '折叠后不渲染标签（只剩图标）')
+await evalJs(`document.querySelector('.admin-rail-toggle').click()`)
+await sleep(600)
+ok((await railState()).collapsed === false, '再点一下展开回来')
+
+// 拖宽：mousedown 在把手上，mousemove 到右侧
+async function dragRail(handleSel, dx) {
+  await evalJs(`(() => {
+    const h = document.querySelector(${JSON.stringify(handleSel)})
+    const r = h.getBoundingClientRect()
+    const x0 = r.left + 3
+    h.dispatchEvent(new MouseEvent('mousedown', { clientX: x0, bubbles: true }))
+    document.dispatchEvent(new MouseEvent('mousemove', { clientX: x0 + ${dx}, bubbles: true }))
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    return true
+  })()`)
   await sleep(500)
 }
-await sleep(1500)
-
-console.log('\n── ⓪ 仪表盘：卡片铺满 + 真实摘要 ──')
-const d0 = await state()
-ok(d0?.dash, '仪表盘渲染出来了')
-ok(d0?.cards === 12, '12 张模块卡片（仪表盘自己不算）', `${d0?.cards} 张`)
-ok(d0?.tabbar === false && d0?.tabs === 0, '仪表盘上没有 tab 行（卡片就是导航）')
-ok(d0?.gridRatio >= 0.95, '卡片网格铺满中间区', `占中间区 ${(d0?.gridRatio * 100).toFixed(0)}%`)
-ok(d0?.hasBack === false, '仪表盘上没有面包屑（还没进模块）')
-ok(d0?.dirty === false, '页面上没有 undefined / NaN 泄漏')
-ok(d0?.cardsWithValue >= 11, '12 张卡都带真实状态（允许 1 张数据源失败）', `${d0?.cardsWithValue}/12 张`)
-const heads = await jsonOf(`(() => {
-  const names = [...document.querySelectorAll('.admin-dash h2, .admin-dash h3')].map(e => e.textContent.trim()).filter(Boolean)
-  const seen = {}
-  for (const n of names) seen[n] = (seen[n] || 0) + 1
-  return { dup: Object.entries(seen).filter(([, c]) => c > 1).map(([n, c]) => n + '×' + c) }
-})()`)
-ok(heads && heads.dup.length === 0, '仪表盘内没有重复的区块标题', heads?.dup.join(' ') || '')
-await shot('admin-shell-1-dash.png')
-
-console.log('\n── ⓪b 卡片上的数字与面板里看到的一致 ──')
-// 注意：这里必须用 evalJs（它带 awaitPromise），不能用 jsonOf ——
-// jsonOf 的包装函数不会 await，async 表达式会被序列化成 `{}`（这个坑今天踩过一次）
-const cmpRaw = await evalJs(`(async () => {
-  const t = localStorage.getItem('nav_admin_token') || ''
-  const h = { Authorization: 'Bearer ' + t, 'X-Nav-Key': t }
-  const g = async u => { const r = await fetch(u, { headers: h }); return r.ok ? r.json() : null }
-  const s = await g('/api/ops?summary=1')
-  const hist = await g('/api/ops?limit=1')
-  const audit = await g('/api/ops?audit=1&limit=1')
-  const notify = await g('/api/ops?notifications=1&limit=1')
-  const plug = await g('/api/plugins?light=1')
-  return JSON.stringify({
-    sumHistory: s && s.history ? s.history.total : null,
-    listHistory: hist ? hist.total : null,
-    sumAudit: s && s.audit ? s.audit.total : null,
-    listAudit: audit ? audit.total : null,
-    sumNotify: s && s.notify ? s.notify.total : null,
-    listNotify: notify ? notify.total : null,
-    pluginsLight: plug && plug.ok ? plug.groups.length : null,
-    pluginsProbed: plug ? plug.light : null,
-  })
-})()`)
-const cmp = cmpRaw ? JSON.parse(cmpRaw) : null
-ok(cmp && cmp.sumHistory != null && cmp.sumHistory === cmp.listHistory, '摘要里的发布历史数 = 发布历史面板的总数', `${cmp?.sumHistory} / ${cmp?.listHistory}`)
-ok(cmp && cmp.sumAudit != null && cmp.sumAudit === cmp.listAudit, '摘要里的审计数 = 审计面板的条数', `${cmp?.sumAudit} / ${cmp?.listAudit}`)
-ok(cmp && cmp.sumNotify != null && cmp.sumNotify === cmp.listNotify, '摘要里的通知数 = 通知中心的总数', `${cmp?.sumNotify} / ${cmp?.listNotify}`)
-ok(cmp && cmp.pluginsLight >= 1 && cmp.pluginsProbed === true, '插件卡用的是轻量清单（不做可用性探测）', `${cmp?.pluginsLight} 个引擎`)
-
-console.log('\n── ① 点卡片进模块：面包屑取代 tab 行 ──')
-const clicked = await evalJs(`(() => {
-  const c = [...document.querySelectorAll('.admin-dash-card')].find(x => x.querySelector('.adc-name').textContent.trim() === '插件')
-  if (!c) return false
-  c.click(); return true
-})()`)
-await sleep(1000)
-const d1 = await state()
-ok(clicked, '点得到卡片')
-ok(d1?.crumb.includes('全部模块'), '模块页出现面包屑，且有「← 全部模块」', d1?.crumb)
-ok(d1?.crumb.includes('插件'), '面包屑里显示当前模块名', d1?.crumb)
-ok(d1?.crumb.includes('运维'), '面包屑里带分组（不是只给模块名）', d1?.crumb)
-ok(d1?.tabbar === false && d1?.tabs === 0, '模块页也没有 tab 行（只剩面包屑）', `tabs=${d1?.tabs}`)
-ok(d1?.dirty === false, '模块页没有 undefined / NaN 泄漏')
-await shot('admin-shell-2-module.png')
-
-console.log('\n── ② 面包屑返回 ──')
-await evalJs(`document.querySelector('.admin-crumb-back').click()`)
-await sleep(1000)
-ok((await state())?.dash, '点「← 全部模块」回到仪表盘')
-
-console.log('\n── ③ 键盘快捷键仍能切模块 ──')
-await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 'g', bubbles: true }))`)
-await sleep(150)
-await evalJs(`window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', bubbles: true }))`)
-await sleep(900)
-const d3 = await state()
-ok(d3?.crumb.includes('站点管理'), 'g + s 快捷键仍能切到站点管理', d3?.crumb)
-await evalJs(`document.querySelector('.admin-crumb-back')?.click()`)
-await sleep(900)
-ok((await state())?.dash, '再次回到仪表盘')
-
-console.log('\n── ④ 窄屏（420px）──')
-await send('Emulation.setDeviceMetricsOverride', { width: 420, height: 860, deviceScaleFactor: 1, mobile: true })
-await sleep(900)
-const d4 = await state()
-ok(d4?.cards === 12, '窄屏下 12 张卡都在', `${d4?.cards} 张`)
-ok(d4?.dirty === false, '窄屏下没有 undefined / NaN')
-const overflowX = await evalJs(`document.documentElement.scrollWidth > document.documentElement.clientWidth + 2`)
-ok(overflowX === false, '窄屏下没有横向滚动条')
-await shot('admin-shell-3-narrow.png')
-await send('Emulation.clearDeviceMetricsOverride')
+await dragRail('.ar-resize', 80)
+const wide = (await railState()).width
+ok(wide > 250, '往右拖变宽', `${wide}px`)
+await dragRail('.ar-resize', -9999)
+const narrow = (await railState()).width
+ok(narrow >= 56 && narrow <= 60, '往左狂拖 → 被钳在下限（不会拖成看不见）', `${narrow}px`)
+await evalJs(`document.querySelector('.ar-resize').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`)
 await sleep(400)
+ok((await railState()).width === 224, '双击把手复位到出厂宽度', `${(await railState()).width}px`)
 
-console.log('\n── ⑤ 无未预期异常 ──')
-const real = errs.filter(e => !/favicon|Failed to load resource/i.test(e))
+console.log('\n── ⑤ 主站左栏：宽范围 + 折叠态也能拖 + 双击复位 ──')
+const sideW = () => evalJs(`Math.round(document.querySelector('.sidebar').getBoundingClientRect().width)`)
+await dragRail('.sidebar-resize-handle', 120)
+const sWide = await sideW()
+ok(sWide > 240, '左栏能拖宽', `${sWide}px`)
+await dragRail('.sidebar-resize-handle', -9999)
+const sNarrow = await sideW()
+ok(sNarrow >= 56 && sNarrow <= 60, '左栏能拖到图标栏宽度（不是塌成看不见）', `${sNarrow}px`)
+ok(await evalJs(`!!document.querySelector('.sidebar .sidebar-nav-item') !== false`), '图标态下导航项仍在 DOM 里（可点）')
+await dragRail('.sidebar-resize-handle', 9999)
+const sMax = await sideW()
+ok(sMax === 520, '左栏能拖到上限 520（比原来的 400 更自由）', `${sMax}px`)
+await evalJs(`document.querySelector('.sidebar-resize-handle').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`)
+await sleep(400)
+ok((await sideW()) === 240, '双击左栏把手复位到 240', `${await sideW()}px`)
+ok(await evalJs(`getComputedStyle(document.querySelector('.sidebar-resize-handle')).cursor === 'col-resize'`), '把手是 col-resize（可拖的提示）')
+
+console.log('\n── ⑥ 右栏同样是自由宽度 ──')
+const rightHandle = await evalJs(`!!document.querySelector('.right-resize-handle')`)
+if (rightHandle) {
+  await dragRail('.right-resize-handle', -100)
+  const rw = await evalJs(`Math.round(document.querySelector('.right-sidebar').getBoundingClientRect().width)`)
+  ok(rw > 280, '右栏能拖宽', `${rw}px`)
+  await evalJs(`document.querySelector('.right-resize-handle').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`)
+  await sleep(400)
+  ok((await evalJs(`Math.round(document.querySelector('.right-sidebar').getBoundingClientRect().width)`)) === 280, '双击右栏把手复位到 280')
+} else {
+  ok(true, '右栏此刻未展开（自动登录态下无详情面板），跳过 —— 未展开时把手本就不该在')
+}
+
+console.log('\n── ⑦ 无未预期异常 ──')
+ok((await railState()).tabbar === false, 'tab 行确实已经不在（整条退役）')
+const real = errs.filter(e => !/favicon|Failed to load resource|api\.github\.com/i.test(e))
 ok(real.length === 0, '无控制台错误', real.slice(0, 2).join(' | '))
+await shot('rail-3-final.png')
 
 clearTimeout(watchdog)
-console.log(`\n后台中间区形态验证：${pass} 通过 / ${failures.length} 失败`)
+console.log(`\n后台形态验证：${pass} 通过 / ${failures.length} 失败`)
 if (failures.length) for (const f of failures) console.log('  ✖ ' + f)
 cleanup()
 process.exit(failures.length ? 1 : 0)

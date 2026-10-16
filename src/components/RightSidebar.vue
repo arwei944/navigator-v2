@@ -39,7 +39,15 @@
     </div>
 
     <!-- 拖拽调节宽度手柄：折叠时收起（此时没有可调宽度的余地） -->
-    <div v-if="!sidebarStore.rightCollapsed" class="right-resize-handle" @mousedown="startResize" title="拖拽调节宽度"></div>
+    <!-- 右栏折叠是「收成 0 宽」（不是图标栏），把手会跟着跑到屏幕最右 —— 所以只在展开时给。
+         左栏是图标栏形态，那边连折叠态也留着把手。双击复位到出厂宽度。 -->
+    <div
+      v-if="!isNarrow && !sidebarStore.rightCollapsed"
+      class="right-resize-handle"
+      @mousedown="startResize"
+      @dblclick="sidebarStore.resetRightWidth()"
+      title="拖拽调宽 · 双击复位"
+    ></div>
   </aside>
 </template>
 

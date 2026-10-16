@@ -85,7 +85,15 @@
     </button>
 
     <!-- 拖拽调节宽度手柄：显式折叠时收起（此时没有可调宽度的余地） -->
-    <div v-if="!isCollapsed" class="sidebar-resize-handle" @mousedown="startResize" title="拖拽调节宽度"></div>
+    <!-- 折叠态也留把手：从图标栏直接往外拖就能展开到任意宽度，不用先按展开按钮 -->
+    <div
+      v-if="!isMobile"
+      class="sidebar-resize-handle"
+      :class="{ collapsed: isCollapsed }"
+      @mousedown="startResize"
+      @dblclick="sidebarStore.resetWidth()"
+      :title="isCollapsed ? '拖拽展开并调宽 · 双击复位' : '拖拽调宽 · 双击复位'"
+    ></div>
   </aside>
 </template>
 
@@ -113,7 +121,7 @@ const isCollapsed = computed(() => sidebarStore.collapsed && !isMobile.value)
 
 // 纯图标态：显式折叠，或者把宽度拖到图标宽度以下 —— 拖窄就自动收标签，不必非得按折叠按钮。
 // 60px 是图标的物理下限（nav 项 44px + 两侧各 8px 内边距），所以「无最小宽度限制」的下限就是它。
-const ICON_ONLY_W = 110
+const ICON_ONLY_W = 110 // 与 utils/sideWidth.js 的 ICON_ONLY_W 同值：低于它自动收标签
 const iconOnly = computed(() => !isMobile.value && (isCollapsed.value || sidebarStore.width <= ICON_ONLY_W))
 
 const sidebarWidth = computed(() =>
@@ -352,6 +360,7 @@ onUnmounted(() => {
   background: transparent;
   transition: background .15s ease;
 }
+.sidebar-resize-handle.collapsed { width: 10px; }
 .sidebar-resize-handle:hover,
 .sidebar-resize-handle:active {
   background: var(--accent);
