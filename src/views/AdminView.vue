@@ -60,21 +60,73 @@
     <AdminLogin v-else-if="!authed" class="admin-body" :notice="loginNotice" @success="onLogin" />
 
     <template v-else>
-      <nav class="admin-tabs" :class="{ vertical: layout === 'side' }" role="tablist" aria-label="管理后台模块">
-        <button
-          v-for="t in TABS"
-          :key="t.id"
-          type="button"
-          role="tab"
-          class="admin-tab"
-          :class="{ active: activeTab === t.id }"
-          :aria-selected="activeTab === t.id"
-          @click="selectTab(t.id)"
+      <!-- 模块导航（升级）：分组 + 溢出「更多」+ 键盘可达。
+           ① 按职责分组（组间一条细分隔线），13 个模块不再是找不着的一条长线；
+           ② 装不下的模块收进「更多」，不再被横向滚动甩到可视区外 ——
+              1440 屏下中间区只有约 900px，13 个标签本来就装不下；
+           ③ 当前模块若被收起，「更多」按钮直接显示它的名字并高亮 ——
+              否则用户切过去之后，导航里看不到自己在哪个模块。
+           「更多」面板挂在 .admin-tabs **外面**：它是 overflow-x:auto 的滚动容器，
+           放里面会被裁掉。 -->
+      <div class="admin-tabbar" ref="tabbarEl">
+        <nav
+          ref="tabNavEl"
+          class="admin-tabs"
+          :class="{ vertical: layout === 'side' }"
+          role="tablist"
+          aria-label="管理后台模块"
+          @keydown="onTabKey"
         >
-          {{ t.label }}
-          <span v-if="t.id === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
+          <template v-for="t in visibleTabs" :key="t.id">
+            <div v-if="layout === 'side' && isGroupStart(t.id)" class="admin-tab-group">{{ groupLabelOf(t.group) }}</div>
+            <button
+              :ref="el => setTabEl(t.id, el)"
+              type="button"
+              role="tab"
+              class="admin-tab"
+              :class="{ active: activeTab === t.id, 'group-start': isGroupStart(t.id) }"
+              :tabindex="focusTabId === t.id ? 0 : -1"
+              :aria-selected="activeTab === t.id"
+              @click="selectTab(t.id)"
+            >
+              {{ t.label }}
+              <span v-if="t.id === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
+            </button>
+          </template>
+        </nav>
+
+        <button
+          v-if="overflowing"
+          type="button"
+          class="admin-more-btn"
+          :class="{ active: activeHidden }"
+          :aria-expanded="moreOpen"
+          aria-haspopup="true"
+          :title="activeHidden ? `当前模块「${activeLabel}」已收起，点开查看全部模块` : '展开其余模块'"
+          @click="moreOpen = !moreOpen"
+        >
+          <span class="admin-more-label">{{ activeHidden ? '⋯ ' + activeLabel : '更多' }}</span>
+          <span class="chev">▾</span>
         </button>
-      </nav>
+
+        <div v-if="moreOpen" class="admin-more-panel" role="menu" aria-label="其余模块">
+          <template v-for="g in hiddenGroups" :key="g.id">
+            <div class="admin-more-group">{{ g.label }}</div>
+            <button
+              v-for="t in g.tabs"
+              :key="t.id"
+              type="button"
+              role="menuitem"
+              class="admin-more-item"
+              :class="{ active: activeTab === t.id }"
+              @click="pickHidden(t.id)"
+            >
+              {{ t.label }}
+              <span v-if="t.id === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
+            </button>
+          </template>
+        </div>
+      </div>
 
       <div class="admin-body">
         <div class="admin-tabpanel">
@@ -185,7 +237,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
@@ -210,6 +262,7 @@ import { authApi } from '@/services/authApi'
 import { recordAudit, setAuditActor } from '@/services/auditLog'
 import { ADMIN_SHORTCUTS, SHORTCUT_PREFIX, PREFIX_TTL_MS, matchShortcut, shouldIgnoreKey } from '../../shared/admin-shortcuts.mjs'
 import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
+import { computeVisibleCount, MORE_BTN_WIDTH } from '@/utils/tabOverflow'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -234,20 +287,31 @@ const publishMsg = ref('')
  * 未登记的 id 一律回落默认页，避免手改地址栏把页面切成空白。
  * 面板用 v-if 懒挂载：8 个面板里有一半在挂载时就会打接口，全量常驻会造成首屏并发请求。
  */
+/* 模块导航的表结构（升级）：加了 group，并按「看 → 管 → 发 → 系统」重排。
+   原来 13 个模块平铺，没有分组 —— 找「发布相关」要在一条线上从左扫到右。
+   重排是这次升级的一部分（不是顺手改的）：分组必须对应一个连贯的顺序才有意义。 */
+const TAB_GROUPS = [
+  { id: 'overview', label: '总览' },
+  { id: 'data', label: '数据' },
+  { id: 'ops', label: '运维' },
+  { id: 'release', label: '发布' },
+  { id: 'system', label: '系统' },
+]
+
 const TABS = [
-  { id: 'overview', label: '概览' },
-  { id: 'deploy', label: '部署' },
-  { id: 'plugins', label: '插件' },
-  { id: 'preferences', label: '偏好设置' },
-  { id: 'sites', label: '站点管理' },
-  { id: 'categories', label: '分类体系' },
-  { id: 'publish', label: '云端发布' },
-  { id: 'snapshots', label: '快照与回滚' },
-  { id: 'history', label: '发布历史' },
-  { id: 'audit', label: '操作审计' },
-  { id: 'notify', label: '通知中心' },
-  { id: 'backup', label: '备份与恢复' },
-  { id: 'ai', label: 'AI 助手' },
+  { id: 'overview', label: '概览', group: 'overview' },
+  { id: 'sites', label: '站点管理', group: 'data' },
+  { id: 'categories', label: '分类体系', group: 'data' },
+  { id: 'deploy', label: '部署', group: 'ops' },
+  { id: 'plugins', label: '插件', group: 'ops' },
+  { id: 'backup', label: '备份与恢复', group: 'ops' },
+  { id: 'publish', label: '云端发布', group: 'release' },
+  { id: 'snapshots', label: '快照与回滚', group: 'release' },
+  { id: 'history', label: '发布历史', group: 'release' },
+  { id: 'preferences', label: '偏好设置', group: 'system' },
+  { id: 'notify', label: '通知中心', group: 'system' },
+  { id: 'audit', label: '操作审计', group: 'system' },
+  { id: 'ai', label: 'AI 助手', group: 'system' },
 ]
 const DEFAULT_TAB = 'overview'
 const TAB_IDS = new Set(TABS.map(t => t.id))
@@ -307,6 +371,107 @@ function toggleLayout() {
   try { localStorage.setItem('nav_admin_layout', layout.value) } catch { /* 隐私模式下写不了，忽略 */ }
 }
 
+/* ---------------- 模块导航：溢出「更多」+ 键盘 ---------------- */
+
+const tabbarEl = ref(null)
+const tabNavEl = ref(null)
+const tabWidths = ref([])             // 各标签占位宽度，只在「全部渲染」时量一次
+const visibleCount = ref(TABS.length) // 量到之前先全渲染，免得闪一下「全被收进更多」
+const moreOpen = ref(false)
+const focusTabId = ref(activeTab.value)
+
+const visibleTabs = computed(() => (visibleCount.value >= TABS.length ? TABS : TABS.slice(0, visibleCount.value)))
+const hiddenTabs = computed(() => (visibleCount.value >= TABS.length ? [] : TABS.slice(visibleCount.value)))
+const overflowing = computed(() => hiddenTabs.value.length > 0)
+const activeHidden = computed(() => hiddenTabs.value.some(t => t.id === activeTab.value))
+const activeLabel = computed(() => TABS.find(t => t.id === activeTab.value)?.label || '')
+
+// 收起的模块按原分组列出，与可见区保持同一套信息层级
+const hiddenGroups = computed(() => {
+  const out = []
+  for (const t of hiddenTabs.value) {
+    const last = out[out.length - 1]
+    if (last && last.id === t.group) last.tabs.push(t)
+    else out.push({ id: t.group, label: groupLabelOf(t.group), tabs: [t] })
+  }
+  return out
+})
+
+function groupLabelOf(id) {
+  return TAB_GROUPS.find(g => g.id === id)?.label || ''
+}
+
+// 一组的第一个模块：横排时在它左边画一条分组分隔线，竖排时在它上面插组标题
+function isGroupStart(id) {
+  const i = TABS.findIndex(t => t.id === id)
+  return i <= 0 || TABS[i - 1].group !== TABS[i].group
+}
+
+function pickHidden(id) {
+  selectTab(id)
+  moreOpen.value = false
+}
+
+/* 量宽度用**容器**宽度，不用 nav 自身宽度：nav 会随「更多」按钮出现而变窄，
+   拿它当基准会形成「按钮出现 → nav 变窄 → 又少放一个 → 按钮文案变回去」的回路。 */
+function measureTabs() {
+  const bar = tabbarEl.value
+  const nav = tabNavEl.value
+  if (!bar || !nav) return
+  if (layout.value === 'side') { visibleCount.value = TABS.length; return } // 竖排是列，不会溢出
+
+  const els = [...nav.querySelectorAll('.admin-tab')]
+  if (els.length === TABS.length) {
+    tabWidths.value = els.map(el => {
+      const cs = getComputedStyle(el)
+      return el.getBoundingClientRect().width + (parseFloat(cs.marginLeft) || 0)
+    })
+  } else if (!tabWidths.value.length) {
+    return // 还没拿到基准宽度，保持现状等下一轮
+  }
+
+  const cs = getComputedStyle(nav)
+  const avail = bar.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
+  if (!avail) return
+  visibleCount.value = computeVisibleCount(tabWidths.value, avail, MORE_BTN_WIDTH)
+}
+
+let tabRO = null
+
+/* 键盘：←/→ 在可见模块间移动，Home/End 到首尾（roving tabindex，符合 tablist 语义） */
+const tabEls = {}
+function setTabEl(id, el) { if (el) tabEls[id] = el; else delete tabEls[id] }
+
+function focusTab(id) {
+  focusTabId.value = id
+  nextTick(() => tabEls[id]?.focus?.())
+}
+
+function onTabKey(e) {
+  const ids = visibleTabs.value.map(t => t.id)
+  if (!ids.length) return
+  const from = ids.includes(focusTabId.value) ? ids.indexOf(focusTabId.value) : ids.indexOf(activeTab.value)
+  const cur = from < 0 ? 0 : from
+  let next = null
+  if (e.key === 'ArrowRight') next = ids[(cur + 1) % ids.length]
+  else if (e.key === 'ArrowLeft') next = ids[(cur - 1 + ids.length) % ids.length]
+  else if (e.key === 'Home') next = ids[0]
+  else if (e.key === 'End') next = ids[ids.length - 1]
+  else return
+  e.preventDefault()
+  selectTab(next)
+  focusTab(next)
+}
+
+// 切模块后焦点跟着走、面板自动关；换布局要重量一次
+watch(activeTab, id => { focusTabId.value = id; moreOpen.value = false })
+watch(layout, () => nextTick(measureTabs))
+
+function onTabbarDocDown(e) {
+  if (moreOpen.value && !tabbarEl.value?.contains(e.target)) moreOpen.value = false
+}
+function onTabbarEsc(e) { if (e.key === 'Escape' && moreOpen.value) moreOpen.value = false }
+
 /* ---------------- 快捷键（#19）：g 前缀序列 ---------------- */
 
 let prefixAt = 0
@@ -338,6 +503,8 @@ const authed = ref(false)
 const authChecking = ref(true)
 const authUser = ref('')
 const authVia = ref('')
+// 导航栏要登录后才渲染，所以「刚进去」这一刻得重量一次标签宽度
+watch(authed, v => { if (v) nextTick(measureTabs) })
 /** 'local' = 本机自动登录（服务端回环端点给的密钥），空 = 人工登录 */
 const authAuto = ref('')
 /** 版本标识：读 /api/deploy-status（公开只读），未登录时也显示 */
@@ -432,6 +599,16 @@ function onAuthExpired() {
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
   window.addEventListener('keydown', onShortcutKey)
+  // 模块导航：容器宽度一变就重量（侧栏折叠、窗口缩放都会改变能放几个标签）
+  tabRO = window.ResizeObserver ? new ResizeObserver(() => measureTabs()) : null
+  nextTick(() => {
+    if (tabbarEl.value && tabRO) tabRO.observe(tabbarEl.value)
+    measureTabs()
+  })
+  // 字体就绪后再量一次：字体换了，标签宽度就不一样，可见数量得跟着改
+  if (document.fonts?.ready) document.fonts.ready.then(() => measureTabs()).catch(() => {})
+  document.addEventListener('mousedown', onTabbarDocDown)
+  document.addEventListener('keydown', onTabbarEsc)
   loadVersion()
   const key = adminKey.value.trim()
   if (!key) {
@@ -462,6 +639,9 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onShortcutKey)
   window.removeEventListener('nav-auth-expired', onAuthExpired)
+  document.removeEventListener('mousedown', onTabbarDocDown)
+  document.removeEventListener('keydown', onTabbarEsc)
+  tabRO?.disconnect()
 })
 
 watch(webhookUrl, (v) => {
@@ -602,18 +782,103 @@ async function notifyWebhook(version, count) {
   cursor: default;
 }
 
-/* Tab 栏：窄屏横向滚动而非换行，保持始终一行 */
-.admin-tabs {
+/* 模块导航条。
+   背景与下边框放在外层 .admin-tabbar，让「更多」按钮与标签共用同一条底线；
+   同时「更多」面板才能作为它的**兄弟节点**绝对定位 ——
+   面板不能放进 .admin-tabs，那里是 overflow-x:auto 的滚动容器，会被裁掉。 */
+.admin-tabbar {
+  position: relative;
   flex-shrink: 0;
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-white);
+  border-bottom: 1px solid var(--border);
+}
+.admin-tabs {
+  flex: 1;
+  min-width: 0;
   display: flex;
   gap: 2px;
   padding: 0 24px;
-  background: var(--bg-white);
-  border-bottom: 1px solid var(--border);
+  /* 兜底：万一度量偏了，仍能滚到，不至于点不到；正常情况不会有溢出 */
   overflow-x: auto;
   scrollbar-width: none;
 }
 .admin-tabs::-webkit-scrollbar { display: none; }
+/* 分组：一组的第一项左边隔开并画一条细线（竖排时改用组标题，见下） */
+.admin-tab.group-start { margin-left: 10px; border-left: 1px solid var(--border); padding-left: 20px; }
+.admin-tabs > .admin-tab:first-child { margin-left: 0; border-left: none; padding-left: 14px; }
+
+/* 「更多」：宽度固定 —— 文案在「更多」和「⋯ 当前模块名」之间切换，
+   自适应宽度会造成「按钮变宽 → 可见标签变少 → 文案又变回去」的抖动 */
+.admin-more-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 104px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  padding: 11px 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
+}
+.admin-more-btn:hover { color: var(--text-primary); }
+/* 当前模块被收起时，按钮代替它承担「我在哪」的指示 */
+.admin-more-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.admin-more-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-more-btn .chev { font-size: 9px; line-height: 1; }
+
+.admin-more-panel {
+  position: absolute;
+  top: 100%;
+  right: 16px;
+  z-index: 30;
+  min-width: 168px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hover);
+}
+.admin-more-group {
+  padding: 8px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.admin-more-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.admin-more-item:hover { background: var(--border-light); }
+.admin-more-item.active { color: var(--accent); font-weight: 600; }
+
+/* 竖排：不画分隔线，改用组标题 */
+.admin-tab-group {
+  padding: 12px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
 .admin-tab {
   flex-shrink: 0;
   border: none;
@@ -785,6 +1050,8 @@ async function notifyWebhook(version, count) {
 /* 布局切换（#20）：竖排 tab */
 .admin-tabs.vertical { flex-direction: column; align-items: stretch; }
 .admin-tabs.vertical .admin-tab { text-align: left; }
+/* 竖排有组标题做分隔，再画竖线就重复了 */
+.admin-tabs.vertical .admin-tab.group-start { margin-left: 0; border-left: none; padding-left: 14px; }
 .admin-layout-btn {
   padding: 6px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--bg-white); color: var(--text-secondary); cursor: pointer;
@@ -803,6 +1070,9 @@ async function notifyWebhook(version, count) {
   .admin-search { order: 10; flex-basis: 100%; max-width: none; margin: 4px 0 0; }
   .admin-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
   .admin-tab { flex-shrink: 0; white-space: nowrap; }
+  .admin-more-panel { right: 8px; left: 8px; min-width: 0; }
+  /* 窄屏下分组线会把本就紧张的宽度再切一刀，去掉 */
+  .admin-tab.group-start { margin-left: 0; border-left: none; padding-left: 14px; }
   /* 窄屏下竖排 tab 会占掉半屏宽度，强制回到横排（横滚可及） */
   .admin-tabs.vertical { flex-direction: row; align-items: center; }
   .admin-view :deep(.admin-section) { padding: 0 14px 24px; }
