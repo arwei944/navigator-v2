@@ -1,6 +1,6 @@
 <template>
-  <div class="filter-bar" role="group" aria-label="筛选">
-    <!-- 一级：域 -->
+  <div class="filter-bar" ref="rootEl" role="group" aria-label="筛选">
+    <!-- 第一行：域 -->
     <div class="domain-tabs" role="tablist" aria-label="方向">
       <button
         class="domain-tab" :class="{ active: activeDomain === 'all' }"
@@ -21,49 +21,71 @@
       </button>
     </div>
 
-    <!-- 二级：当前域下的子分类，按域分组多行铺开 -->
-    <div class="chip-row">
-      <div v-for="group in chipGroups" :key="group.id" class="chip-group">
-        <span v-if="group.label" class="chip-group-label">{{ group.label }}</span>
+    <!-- 第二行：常用标签 + 更多。整条强制单行、超宽横向滑动 —— 筛选条总高固定两行。
+         已选中的标签由 pickInlineChips 强制留在行内，不会被计数挤出可视区。
+         「更多」刻意留在滚动区**之外**：标签一溢出，最先被切掉的恰好是唯一的入口。 -->
+    <div class="chip-row-wrap">
+      <div class="chip-row">
         <button
-          v-for="item in group.chips" :key="item.id"
-          class="chip" :class="{ active: current === item.id }"
-          :aria-pressed="current === item.id"
+          v-for="item in inlineChips" :key="item.id"
+          class="chip" :class="{ active: isActive(item) }"
+          :aria-pressed="isActive(item)"
           :title="item.hint"
-          @click="selectCategory(item)"
+          @click="clickInline(item)"
         >
           <span v-if="item.color" class="chip-dot" :style="{ background: item.color }"></span>
           {{ item.label }}
           <span class="chip-count">{{ item.count }}</span>
         </button>
       </div>
+
+      <button
+        type="button"
+        class="chip more-btn" :class="{ open: moreOpen }"
+        :aria-expanded="moreOpen" aria-haspopup="true"
+        title="展开全部分类与用途"
+        @click="moreOpen = !moreOpen"
+      >
+        更多<span class="chev">▾</span>
+      </button>
     </div>
 
-    <!-- 三级：用途，与分类正交，可跨分类聚合（如「所有查资料站」） -->
-    <div v-if="purposeChips.length" class="chip-row purpose-row">
-      <span class="chip-group-label">用途</span>
-      <button
-        v-for="item in purposeChips" :key="item.id"
-        class="chip purpose-chip" :class="{ active: activePurpose === item.id }"
-        :aria-pressed="activePurpose === item.id"
-        @click="selectPurpose(item.id)"
+    <!-- 「更多」面板：同列内展开，不用浮层 —— .main 是 overflow:hidden，浮层会被裁掉。
+         展开时把下方卡片区下压，不覆盖内容、不与卡片抢层。 -->
+    <div v-if="moreOpen" class="more-panel" role="group" aria-label="全部分类与用途">
+      <div
+        v-for="g in panelGroups" :key="g.id"
+        class="pop-group" :class="{ 'pop-purpose': g.purpose }"
       >
-        <span v-if="item.color" class="chip-dot" :style="{ background: item.color }"></span>
-        {{ item.label }}
-        <span class="chip-count">{{ item.count }}</span>
-      </button>
+        <span v-if="g.label" class="chip-group-label">{{ g.label }}</span>
+        <div class="pop-chips">
+          <button
+            v-for="item in g.chips" :key="item.id"
+            class="chip"
+            :class="{ active: g.purpose ? activePurpose === item.id : current === item.id }"
+            :aria-pressed="g.purpose ? activePurpose === item.id : current === item.id"
+            :title="item.hint"
+            @click="g.purpose ? pickPurpose(item.id) : pickCategory(item)"
+          >
+            <span v-if="item.color" class="chip-dot" :style="{ background: item.color }"></span>
+            {{ item.label }}
+            <span class="chip-count">{{ item.count }}</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useSidebarStore } from '@/stores/sidebar'
 import { PURPOSE_TAGS } from '../../shared/purposes.mjs'
+import { pickInlineChips, INLINE_MAX } from '@/utils/filterChips'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,15 +123,21 @@ function domainCount(domainId) {
     .reduce((sum, c) => sum + catCount(c.id), 0)
 }
 
+/**
+ * 候选标签，按域分组。域内会被这两个地方共用：
+ *   · 第二行 —— 取一个扁平列表，按站点数挑常用的；
+ *   · 「更多」面板 —— 保留分组和域标签，铺全。
+ */
 const chipGroups = computed(() => {
   const dom = activeDomain.value
 
   if (dom !== 'all') {
     const cats = categoriesStore.categoriesOfDomain(dom)
+    const meta = categoriesStore.domains.find(d => d.id === dom)
     // 首位「全部」= 退回整个域，是这一层最显眼的重置手势
     return [{
       id: dom,
-      label: '',
+      label: meta ? meta.label : '',
       chips: [
         { id: dom, label: '全部', count: domainCount(dom), hint: '显示该方向下全部站点' },
         ...cats.map(c => ({ id: c.id, label: c.label, color: c.dotColor, count: catCount(c.id) }))
@@ -117,13 +145,50 @@ const chipGroups = computed(() => {
     }]
   }
 
-  // 未选方向：按域分组铺开，每组自带换行，标签不会被甩到行尾
   return categoriesStore.groups.map(g => ({
     id: g.id,
     label: g.label,
     chips: g.categories.map(c => ({ id: c.id, label: c.label, color: c.dotColor, count: catCount(c.id) }))
   }))
 })
+
+/* ---------------- 第二行：常用标签 ---------------- */
+
+const moreOpen = ref(false)
+
+const allChips = computed(() => chipGroups.value.flatMap(g => g.chips))
+
+function purposeTagOf(id) {
+  const t = PURPOSE_TAGS.find(x => x.id === id)
+  return t ? { id: t.id, label: t.label, color: t.color, count: 0 } : null
+}
+
+// 已选项永远留在第二行、并排在前面：被计数挤出去就等于「看不见自己选了什么」。
+// 用途不在分类候选里，所以要单独补一个（带上 kind 以便点击时走对分支）。
+const pinnedChips = computed(() => {
+  const list = []
+  const cat = allChips.value.find(c => c.id === current.value)
+  if (cat) list.push(cat)
+  if (activePurpose.value !== 'all') {
+    const p = purposeChips.value.find(c => c.id === activePurpose.value)
+      || purposeTagOf(activePurpose.value)
+    if (p) list.push({ ...p, kind: 'purpose' })
+  }
+  return list
+})
+
+const inlineChips = computed(() => pickInlineChips(allChips.value, pinnedChips.value, INLINE_MAX))
+
+function isActive(item) {
+  return item.kind === 'purpose' ? activePurpose.value === item.id : current.value === item.id
+}
+
+function clickInline(item) {
+  if (item.kind === 'purpose') selectPurpose(item.id)
+  else selectCategory(item)
+}
+
+/* ---------------- 筛选动作 ---------------- */
 
 function go(value) {
   // 留在当前范围（收藏页就还是收藏），只换筛选值 —— 范围与筛选互不挤占
@@ -141,6 +206,12 @@ function selectCategory(item) {
   // 再点一次已选中的子分类 = 退回它所属的域，避免「只能前进不能后退」
   const next = current.value === item.id ? activeDomain.value : item.id
   go(next)
+}
+
+// 面板里的选择：选完即收起，不必再点一次「更多」
+function pickCategory(item) {
+  selectCategory(item)
+  moreOpen.value = false
 }
 
 /* ---------------- 用途（Axis 4） ---------------- */
@@ -179,6 +250,17 @@ const purposeChips = computed(() => {
   return chips
 })
 
+// 面板的渲染模型：分类各组 + 用途一组，走同一条渲染路径。
+// 两块标记结构完全一样，只有「哪个是选中值、点击落哪个动作」不同 ——
+// 拆成两段写等于把同一段模板抄两遍。
+const panelGroups = computed(() => {
+  const groups = chipGroups.value.map(g => ({ id: g.id, label: g.label, purpose: false, chips: g.chips }))
+  if (purposeChips.value.length) {
+    groups.push({ id: '__purpose', label: '用途', purpose: true, chips: purposeChips.value })
+  }
+  return groups
+})
+
 function selectPurpose(id) {
   // 再点一次已选中的用途 = 取消该筛选，回到「全部用途」
   const next = id === 'all' || activePurpose.value === id ? 'all' : id
@@ -187,6 +269,33 @@ function selectPurpose(id) {
   else query.p = next
   router.push({ name: route.name, query })
 }
+
+function pickPurpose(id) {
+  selectPurpose(id)
+  moreOpen.value = false
+}
+
+/* ---------------- 面板收起 ---------------- */
+
+const rootEl = ref(null)
+
+function onDocPointerDown(e) {
+  if (moreOpen.value && rootEl.value && !rootEl.value.contains(e.target)) moreOpen.value = false
+}
+
+function onKeydown(e) {
+  if (e.key === 'Escape' && moreOpen.value) moreOpen.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', onDocPointerDown)
+  document.addEventListener('keydown', onKeydown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onDocPointerDown)
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <style scoped>
@@ -237,19 +346,22 @@ function selectPurpose(id) {
 .tab-count { font-size: 11px; font-weight: 600; color: var(--text-secondary); opacity: .75; }
 .domain-tab.active .tab-count { color: var(--accent); opacity: 1; }
 
-/* 二级：子分类，按域分组多行铺开，一屏看全，无横向滚动条 */
+/* 二级：常用标签。
+   强制单行 + 横向滑动，筛选条总高就是固定的两行；滚动条藏起来，
+   不给「这里还能滑」之外的视觉噪声（触控板横滑 / Shift+滚轮都可以）。
+   「更多」在滚动区外，所以标签溢出时它也完整可见。 */
+.chip-row-wrap { display: flex; align-items: center; gap: 6px; }
 .chip-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px 14px;
-}
-.chip-group {
-  display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.chip-row::-webkit-scrollbar { display: none; }
 
 .chip {
   display: inline-flex;
@@ -279,6 +391,35 @@ function selectPurpose(id) {
 .chip-count { font-size: 10px; font-weight: 600; opacity: .6; }
 .chip.active .chip-count { opacity: .9; }
 
+/* 「更多」是入口不是筛选项：虚线边框 + 箭头，与可筛选的 chip 区分开 */
+.more-btn { gap: 4px; border-style: dashed; }
+.more-btn.open {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+.chev { font-size: 9px; line-height: 1; transition: transform var(--transition); }
+.more-btn.open .chev { transform: rotate(180deg); }
+
+/* 「更多」面板：同列内展开（浮层会被 .main 的 overflow:hidden 裁掉） */
+.more-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.pop-group { display: flex; align-items: flex-start; gap: 10px; }
+.pop-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1; min-width: 0; }
+/* 用途与分类是两把正交的筛子，同面板内也要分得清 */
+.pop-purpose { border-top: 1px dashed var(--border-light); padding-top: 10px; }
+
 .chip-group-label {
   font-size: 11px;
   font-weight: 600;
@@ -286,13 +427,15 @@ function selectPurpose(id) {
   opacity: .65;
   white-space: nowrap;
   flex-shrink: 0;
+  /* 各组的标签对齐成一列，扫起来不用逐个重新定位 */
+  min-width: 60px;
+  padding-top: 4px;
 }
-
-/* 用途行与分类行用一条浅分隔线区隔：两把筛子正交，视觉上也要分得清 */
-.purpose-row { border-top: 1px dashed var(--border-light); padding-top: 8px; }
 
 @media (max-width: 768px) {
   .filter-bar { padding: 0 16px 10px; gap: 7px; }
   .domain-tab { padding: 6px 11px; font-size: 12px; }
+  .pop-group { flex-direction: column; gap: 6px; }
+  .chip-group-label { min-width: 0; padding-top: 0; }
 }
 </style>

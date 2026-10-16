@@ -138,7 +138,11 @@ const initGz = initialJs.reduce((n, f) => n + gzOf(f), 0)
 // 两条命令，且 useOmniBox 为此引入 health store（判断哪些站「需处理」）—— 命令面板（Ctrl+K）
 // 是首屏组件，这部分必然计入。新增的 0.7 KiB 全部来自这里；后台专属模块（快捷键表 /
 // 全局搜索索引 / 告警规则接口 / 事件历史接口）已逐一 grep 确认为 0 命中首屏。
-const BUDGET_RAW = 612 * 1024
+// 2026-10-16：612 → 614。筛选条从 5–6 行压到固定两行（「更多」面板收纳其余标签与用途）。
+// 实测增量：暂存本次改动前后各构建一次，610.7 → 612.6 KiB，净增 1.9 KiB。
+// 全部落在首屏组件自身：筛选条的取数模块（src/utils/filterChips.js，纯函数、有 20 条断言）、
+// 面板的渲染分支、以及挂载期生效的外部点击 / Esc 收起监听 —— 筛选条就在首屏，懒不掉。
+const BUDGET_RAW = 614 * 1024
 const BUDGET_GZ = 215 * 1024
 ok(initRaw <= BUDGET_RAW, `首屏 JS 原始体积 ${(initRaw / 1024).toFixed(1)} KiB ≤ ${BUDGET_RAW / 1024} KiB`)
 ok(initGz <= BUDGET_GZ, `首屏 JS gzip 体积 ${(initGz / 1024).toFixed(1)} KiB ≤ ${BUDGET_GZ / 1024} KiB`)
