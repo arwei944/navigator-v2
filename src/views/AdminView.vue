@@ -35,11 +35,6 @@
           </div>
         </div>
 
-        <!-- 布局切换（#20）：当前只有两种 tab 排布，偏好存本机 -->
-        <button class="admin-btn ghost admin-layout-btn" :title="layout === 'top' ? '切换为左侧竖排导航' : '切换为顶部横向导航'" @click="toggleLayout">
-          {{ layout === 'top' ? '≡ 横排' : '☰ 竖排' }}
-        </button>
-
         <button class="admin-btn admin-publish-btn" @click="selectTab('publish')" title="前往云端发布">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
           发布到云端
@@ -60,73 +55,17 @@
     <AdminLogin v-else-if="!authed" class="admin-body" :notice="loginNotice" @success="onLogin" />
 
     <template v-else>
-      <!-- 模块导航（升级）：分组 + 溢出「更多」+ 键盘可达。
-           ① 按职责分组（组间一条细分隔线），13 个模块不再是找不着的一条长线；
-           ② 装不下的模块收进「更多」，不再被横向滚动甩到可视区外 ——
-              1440 屏下中间区只有约 900px，13 个标签本来就装不下；
-           ③ 当前模块若被收起，「更多」按钮直接显示它的名字并高亮 ——
-              否则用户切过去之后，导航里看不到自己在哪个模块。
-           「更多」面板挂在 .admin-tabs **外面**：它是 overflow-x:auto 的滚动容器，
-           放里面会被裁掉。 -->
-      <!-- 仪表盘上不显示模块 tab 行：卡片本身就是导航（「不再是一排 tab + 单面板」） -->
-      <div class="admin-tabbar" ref="tabbarEl" v-if="activeTab !== 'overview'">
-        <nav
-          ref="tabNavEl"
-          class="admin-tabs"
-          :class="{ vertical: layout === 'side' }"
-          role="tablist"
-          aria-label="管理后台模块"
-          @keydown="onTabKey"
-        >
-          <template v-for="t in visibleTabs" :key="t.id">
-            <div v-if="layout === 'side' && isGroupStart(t.id)" class="admin-tab-group">{{ groupLabelOf(t.group) }}</div>
-            <button
-              :ref="el => setTabEl(t.id, el)"
-              type="button"
-              role="tab"
-              class="admin-tab"
-              :class="{ active: activeTab === t.id, 'group-start': isGroupStart(t.id) }"
-              :tabindex="focusTabId === t.id ? 0 : -1"
-              :aria-selected="activeTab === t.id"
-              @click="selectTab(t.id)"
-            >
-              {{ t.label }}
-              <span v-if="t.id === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
-            </button>
-          </template>
-        </nav>
-
-        <button
-          v-if="overflowing"
-          type="button"
-          class="admin-more-btn"
-          :class="{ active: activeHidden }"
-          :aria-expanded="moreOpen"
-          aria-haspopup="true"
-          :title="activeHidden ? `当前模块「${activeLabel}」已收起，点开查看全部模块` : '展开其余模块'"
-          @click="moreOpen = !moreOpen"
-        >
-          <span class="admin-more-label">{{ activeHidden ? '⋯ ' + activeLabel : '更多' }}</span>
-          <span class="chev">▾</span>
+      <!-- 模块页顶部条：面包屑「← 全部模块 / 分组 / 模块名」。
+           仪表盘上不渲染它 —— 卡片本身就是导航；进去之后靠这一条返回与定位。 -->
+      <div v-if="activeTab !== 'overview'" class="admin-crumb">
+        <button type="button" class="admin-crumb-back" @click="selectTab('overview')">
+          <span class="admin-crumb-arrow">←</span> 全部模块
         </button>
-
-        <div v-if="moreOpen" class="admin-more-panel" role="menu" aria-label="其余模块">
-          <template v-for="g in hiddenGroups" :key="g.id">
-            <div class="admin-more-group">{{ g.label }}</div>
-            <button
-              v-for="t in g.tabs"
-              :key="t.id"
-              type="button"
-              role="menuitem"
-              class="admin-more-item"
-              :class="{ active: activeTab === t.id }"
-              @click="pickHidden(t.id)"
-            >
-              {{ t.label }}
-              <span v-if="t.id === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
-            </button>
-          </template>
-        </div>
+        <span class="admin-crumb-sep">/</span>
+        <span class="admin-crumb-group">{{ groupLabelOf(activeGroup) }}</span>
+        <span class="admin-crumb-sep">/</span>
+        <span class="admin-crumb-now">{{ activeLabel }}</span>
+        <span v-if="activeTab === 'notify' && unreadBadge" class="admin-tab-badge">{{ unreadBadge }}</span>
       </div>
 
       <div class="admin-body">
@@ -166,11 +105,12 @@
                 >
                   <span class="adc-top">
                     <span class="adc-name">{{ m.label }}</span>
-                    <span v-if="m.badge" class="admin-tab-badge">{{ m.badge }}</span>
                   </span>
                   <span class="adc-desc">{{ m.desc }}</span>
                   <span class="adc-meta">
-                    <span v-if="m.value" class="adc-value">{{ m.value }}</span>
+                    <!-- 判空必须写 !== '' ：0 是**真实数据**（审计 0 条、未读 0），
+                         用 v-if="m.value" 会把它当成空而什么都不显示 -->
+                    <span v-if="m.value !== ''" class="adc-value">{{ m.value }}</span>
                     <span v-if="m.unit" class="adc-unit">{{ m.unit }}</span>
                     <span class="adc-go">进入 →</span>
                   </span>
@@ -267,7 +207,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
@@ -288,11 +228,11 @@ import AdminDeploy from '@/components/admin/AdminDeploy.vue'
 import AdminPlugins from '@/components/admin/AdminPlugins.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
+import { pluginApi } from '@/services/pluginApi'
 import { authApi } from '@/services/authApi'
 import { recordAudit, setAuditActor } from '@/services/auditLog'
 import { ADMIN_SHORTCUTS, SHORTCUT_PREFIX, PREFIX_TTL_MS, matchShortcut, shouldIgnoreKey } from '../../shared/admin-shortcuts.mjs'
 import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
-import { computeVisibleCount, MORE_BTN_WIDTH } from '@/utils/tabOverflow'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -393,119 +333,15 @@ function goResult(r) {
   query.value = ''
 }
 
-/* ---------------- 布局切换（#20） ---------------- */
+/* ---------------- 模块导航：面包屑 ---------------- */
 
-const layout = ref(localStorage.getItem('nav_admin_layout') || 'top')
-function toggleLayout() {
-  layout.value = layout.value === 'top' ? 'side' : 'top'
-  try { localStorage.setItem('nav_admin_layout', layout.value) } catch { /* 隐私模式下写不了，忽略 */ }
-}
-
-/* ---------------- 模块导航：溢出「更多」+ 键盘 ---------------- */
-
-const tabbarEl = ref(null)
-const tabNavEl = ref(null)
-const tabWidths = ref([])             // 各标签占位宽度，只在「全部渲染」时量一次
-const visibleCount = ref(TABS.length) // 量到之前先全渲染，免得闪一下「全被收进更多」
-const moreOpen = ref(false)
-const focusTabId = ref(activeTab.value)
-
-const visibleTabs = computed(() => (visibleCount.value >= TABS.length ? TABS : TABS.slice(0, visibleCount.value)))
-const hiddenTabs = computed(() => (visibleCount.value >= TABS.length ? [] : TABS.slice(visibleCount.value)))
-const overflowing = computed(() => hiddenTabs.value.length > 0)
-const activeHidden = computed(() => hiddenTabs.value.some(t => t.id === activeTab.value))
+// 当前模块在模块表里的那一项：面包屑要显示「分组 / 模块名」
+const activeGroup = computed(() => TABS.find(t => t.id === activeTab.value)?.group || '')
 const activeLabel = computed(() => TABS.find(t => t.id === activeTab.value)?.label || '')
-
-// 收起的模块按原分组列出，与可见区保持同一套信息层级
-const hiddenGroups = computed(() => {
-  const out = []
-  for (const t of hiddenTabs.value) {
-    const last = out[out.length - 1]
-    if (last && last.id === t.group) last.tabs.push(t)
-    else out.push({ id: t.group, label: groupLabelOf(t.group), tabs: [t] })
-  }
-  return out
-})
 
 function groupLabelOf(id) {
   return TAB_GROUPS.find(g => g.id === id)?.label || ''
 }
-
-// 一组的第一个模块：横排时在它左边画一条分组分隔线，竖排时在它上面插组标题
-function isGroupStart(id) {
-  const i = TABS.findIndex(t => t.id === id)
-  return i <= 0 || TABS[i - 1].group !== TABS[i].group
-}
-
-function pickHidden(id) {
-  selectTab(id)
-  moreOpen.value = false
-}
-
-/* 量宽度用**容器**宽度，不用 nav 自身宽度：nav 会随「更多」按钮出现而变窄，
-   拿它当基准会形成「按钮出现 → nav 变窄 → 又少放一个 → 按钮文案变回去」的回路。 */
-function measureTabs() {
-  const bar = tabbarEl.value
-  const nav = tabNavEl.value
-  if (!bar || !nav) return
-  if (layout.value === 'side') { visibleCount.value = TABS.length; return } // 竖排是列，不会溢出
-
-  const els = [...nav.querySelectorAll('.admin-tab')]
-  if (els.length === TABS.length) {
-    tabWidths.value = els.map(el => {
-      const cs = getComputedStyle(el)
-      return el.getBoundingClientRect().width + (parseFloat(cs.marginLeft) || 0)
-    })
-  } else if (!tabWidths.value.length) {
-    return // 还没拿到基准宽度，保持现状等下一轮
-  }
-
-  const cs = getComputedStyle(nav)
-  const avail = bar.clientWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0)
-  if (!avail) return
-  visibleCount.value = computeVisibleCount(tabWidths.value, avail, MORE_BTN_WIDTH)
-}
-
-let tabRO = null
-
-/* 键盘：←/→ 在可见模块间移动，Home/End 到首尾（roving tabindex，符合 tablist 语义） */
-const tabEls = {}
-function setTabEl(id, el) { if (el) tabEls[id] = el; else delete tabEls[id] }
-
-function focusTab(id) {
-  focusTabId.value = id
-  nextTick(() => tabEls[id]?.focus?.())
-}
-
-function onTabKey(e) {
-  const ids = visibleTabs.value.map(t => t.id)
-  if (!ids.length) return
-  const from = ids.includes(focusTabId.value) ? ids.indexOf(focusTabId.value) : ids.indexOf(activeTab.value)
-  const cur = from < 0 ? 0 : from
-  let next = null
-  if (e.key === 'ArrowRight') next = ids[(cur + 1) % ids.length]
-  else if (e.key === 'ArrowLeft') next = ids[(cur - 1 + ids.length) % ids.length]
-  else if (e.key === 'Home') next = ids[0]
-  else if (e.key === 'End') next = ids[ids.length - 1]
-  else return
-  e.preventDefault()
-  selectTab(next)
-  focusTab(next)
-}
-
-// 切模块后焦点跟着走、面板自动关；换布局要重量一次
-watch(activeTab, id => {
-  focusTabId.value = id
-  moreOpen.value = false
-  // tab 行在仪表盘上不渲染，从仪表盘进模块时才挂载 —— 挂载后得重新量一次宽度
-  nextTick(measureTabs)
-})
-watch(layout, () => nextTick(measureTabs))
-
-function onTabbarDocDown(e) {
-  if (moreOpen.value && !tabbarEl.value?.contains(e.target)) moreOpen.value = false
-}
-function onTabbarEsc(e) { if (e.key === 'Escape' && moreOpen.value) moreOpen.value = false }
 
 /* ---------------- 快捷键（#19）：g 前缀序列 ---------------- */
 
@@ -538,8 +374,6 @@ const authed = ref(false)
 const authChecking = ref(true)
 const authUser = ref('')
 const authVia = ref('')
-// 导航栏要登录后才渲染，所以「刚进去」这一刻得重量一次标签宽度
-watch(authed, v => { if (v) nextTick(measureTabs) })
 /** 'local' = 本机自动登录（服务端回环端点给的密钥），空 = 人工登录 */
 const authAuto = ref('')
 /** 版本标识：读 /api/deploy-status（公开只读），未登录时也显示 */
@@ -575,6 +409,30 @@ async function loadUnread() {
   }
 }
 
+/**
+ * 仪表盘摘要：三个请求并行发出，拿不到就留空。
+ * 为什么是三次而不是一次大接口：这三份数据分属三个端点（运维面 / 插件清单 / 快照），
+ * 而它们各自的读者就在自己那侧 —— 为了"一次请求"去跨层拼一个聚合接口，
+ * 代价是把数据面和运维面又搅在一起（`api/ops.js` 头部专门解释过为什么要分开）。
+ * 三次并行 GET 换来分层清楚，值。
+ */
+const dashOps = ref(null)
+const dashPlugins = ref(null)
+const dashSnapshots = ref(null)
+
+async function loadDash() {
+  const key = adminKey.value.trim()
+  if (!key) return
+  const [ops, plug, snaps] = await Promise.all([
+    opsApi.dashboardSummary(key).catch(() => null),
+    pluginApi.light(key).catch(() => null),
+    opsApi.snapshots(key).catch(() => null),
+  ])
+  dashOps.value = ops && ops.ok ? ops : null
+  dashPlugins.value = plug && plug.ok ? plug : null
+  dashSnapshots.value = snaps && snaps.ok !== false && Number.isFinite(snaps.count) ? snaps : null
+}
+
 function onLogin({ token, username, via, expiresAt, auto }) {
   adminKey.value = token
   // expiresAt 一并存下：前端据此在过期时就地清掉凭据，不必等一次 401 往返
@@ -587,6 +445,7 @@ function onLogin({ token, username, via, expiresAt, auto }) {
   loginNotice.value = ''
   authed.value = true
   loadUnread()
+  loadDash()
 }
 
 /**
@@ -652,29 +511,40 @@ const DASH_DESC = {
 const dashCards = computed(() => TABS
   .filter(t => t.id !== 'overview')
   .map(t => {
-    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '', badge: 0 }
-    // 只放手头真有的数：拿不到就留空（宁可不显示，也不编一个好看的数）
-    if (t.id === 'sites') c.value = sitesStore.sites.length
+    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '' }
+    const ops = dashOps.value
+    const pl = dashPlugins.value
+    const sn = dashSnapshots.value
+    // 只放手头真有的数：拿不到就留空（宁可不显示，也不编一个好看的数）。
+    // 备份与恢复 / 偏好设置 / AI 助手 没有「数字型」的实时状态，所以它们永远只有说明 ——
+    // 硬塞一个数只会是假信息。
+    if (t.id === 'sites') { c.value = sitesStore.sites.length; c.unit = '条' }
     else if (t.id === 'categories') { c.value = categoriesStore.categories.length; c.unit = '个' }
     else if (t.id === 'deploy') c.value = version.value || ''
-    else if (t.id === 'publish' && sitesStore.cloudVersion) { c.value = 'v' + sitesStore.cloudVersion; c.unit = '云端' }
-    else if (t.id === 'notify') c.badge = unreadBadge.value
+    else if (t.id === 'plugins') { if (pl) { c.value = pl.groups.length; c.unit = '个引擎' } }
+    else if (t.id === 'publish') { if (sitesStore.cloudVersion) { c.value = 'v' + sitesStore.cloudVersion; c.unit = '云端' } }
+    else if (t.id === 'snapshots') { if (sn) { c.value = sn.count; c.unit = '个可回滚' } }
+    else if (t.id === 'history') {
+      if (ops) {
+        c.value = ops.history.total
+        c.unit = ops.history.successRate == null ? '次' : `次 · 成功率 ${ops.history.successRate}%`
+      }
+    } else if (t.id === 'audit') {
+      if (ops) {
+        c.value = ops.audit.total
+        c.unit = ops.audit.failures ? `条 · 异常 ${ops.audit.failures}` : '条'
+      }
+    } else if (t.id === 'notify') {
+      // 0 也要显示（「0 未读」是信息，「什么都不显示」不是）
+      if (ops) { c.value = ops.notify.unread; c.unit = '未读' }
+      else if (unreadBadge.value) { c.value = unreadBadge.value; c.unit = '未读' }
+    }
     return c
   }))
 
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
   window.addEventListener('keydown', onShortcutKey)
-  // 模块导航：容器宽度一变就重量（侧栏折叠、窗口缩放都会改变能放几个标签）
-  tabRO = window.ResizeObserver ? new ResizeObserver(() => measureTabs()) : null
-  nextTick(() => {
-    if (tabbarEl.value && tabRO) tabRO.observe(tabbarEl.value)
-    measureTabs()
-  })
-  // 字体就绪后再量一次：字体换了，标签宽度就不一样，可见数量得跟着改
-  if (document.fonts?.ready) document.fonts.ready.then(() => measureTabs()).catch(() => {})
-  document.addEventListener('mousedown', onTabbarDocDown)
-  document.addEventListener('keydown', onTabbarEsc)
   loadVersion()
   const key = adminKey.value.trim()
   if (!key) {
@@ -690,6 +560,7 @@ onMounted(async () => {
       setAuditActor(r.username || '')
       authed.value = true
       loadUnread()
+      loadDash()
     } else {
       adminKey.value = ''
       clearAdminKey()
@@ -705,9 +576,6 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onShortcutKey)
   window.removeEventListener('nav-auth-expired', onAuthExpired)
-  document.removeEventListener('mousedown', onTabbarDocDown)
-  document.removeEventListener('keydown', onTabbarEsc)
-  tabRO?.disconnect()
 })
 
 watch(webhookUrl, (v) => {
@@ -848,118 +716,37 @@ async function notifyWebhook(version, count) {
   cursor: default;
 }
 
-/* 模块导航条。
-   背景与下边框放在外层 .admin-tabbar，让「更多」按钮与标签共用同一条底线；
-   同时「更多」面板才能作为它的**兄弟节点**绝对定位 ——
-   面板不能放进 .admin-tabs，那里是 overflow-x:auto 的滚动容器，会被裁掉。 */
-.admin-tabbar {
-  position: relative;
+/* 模块页顶部条：面包屑。仪表盘上不渲染（卡片本身就是导航）。
+   比原来的 tab 行矮一档 —— 它只承担「我在哪 + 怎么回去」，不再承担切换。 */
+.admin-crumb {
   flex-shrink: 0;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
   background: var(--bg-white);
   border-bottom: 1px solid var(--border);
+  font-size: 13px;
 }
-.admin-tabs {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  gap: 2px;
-  padding: 0 24px;
-  /* 兜底：万一度量偏了，仍能滚到，不至于点不到；正常情况不会有溢出 */
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.admin-tabs::-webkit-scrollbar { display: none; }
-/* 分组：一组的第一项左边隔开并画一条细线（竖排时改用组标题，见下） */
-.admin-tab.group-start { margin-left: 10px; border-left: 1px solid var(--border); padding-left: 20px; }
-.admin-tabs > .admin-tab:first-child { margin-left: 0; border-left: none; padding-left: 14px; }
-
-/* 「更多」：宽度固定 —— 文案在「更多」和「⋯ 当前模块名」之间切换，
-   自适应宽度会造成「按钮变宽 → 可见标签变少 → 文案又变回去」的抖动 */
-.admin-more-btn {
-  flex: 0 0 auto;
+.admin-crumb-back {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  width: 104px;
-  border: none;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  padding: 11px 6px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color .15s ease, border-color .15s ease;
-}
-.admin-more-btn:hover { color: var(--text-primary); }
-/* 当前模块被收起时，按钮代替它承担「我在哪」的指示 */
-.admin-more-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-.admin-more-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-more-btn .chev { font-size: 9px; line-height: 1; }
-
-.admin-more-panel {
-  position: absolute;
-  top: 100%;
-  right: 16px;
-  z-index: 30;
-  min-width: 168px;
-  max-height: 60vh;
-  overflow-y: auto;
-  padding: 6px;
-  background: var(--bg-white);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-hover);
-}
-.admin-more-group {
-  padding: 8px 10px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-.admin-more-item {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  border: none;
   border-radius: var(--radius-sm);
-  background: transparent;
-  padding: 7px 10px;
-  font-size: 13px;
+  background: var(--bg-white);
+  padding: 4px 10px;
+  font-size: 12px;
   font-family: inherit;
   color: var(--text-primary);
-  text-align: left;
   cursor: pointer;
+  transition: border-color var(--transition), color var(--transition);
 }
-.admin-more-item:hover { background: var(--border-light); }
-.admin-more-item.active { color: var(--accent); font-weight: 600; }
-
-/* 竖排：不画分隔线，改用组标题 */
-.admin-tab-group {
-  padding: 12px 14px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-.admin-tab {
-  flex-shrink: 0;
-  border: none;
-  background: transparent;
-  padding: 11px 14px 12px;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  border-bottom: 2px solid transparent;
-  transition: color .15s ease, border-color .15s ease;
-}
-.admin-tab:hover { color: var(--text-primary); }
-.admin-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+.admin-crumb-back:hover { border-color: var(--accent); color: var(--accent); }
+.admin-crumb-arrow { font-size: 12px; line-height: 1; }
+.admin-crumb-sep { color: var(--border); }
+.admin-crumb-group { color: var(--text-secondary); }
+.admin-crumb-now { font-weight: 600; color: var(--text-primary); }
 .admin-tab-badge {
   display: inline-block;
   min-width: 16px;
@@ -1164,36 +951,18 @@ async function notifyWebhook(version, count) {
 .as-sub { color: var(--text-secondary); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .admin-search-empty { padding: 10px; font-size: 12.5px; color: var(--text-secondary); }
 
-/* 布局切换（#20）：竖排 tab */
-.admin-tabs.vertical { flex-direction: column; align-items: stretch; }
-.admin-tabs.vertical .admin-tab { text-align: left; }
-/* 竖排有组标题做分隔，再画竖线就重复了 */
-.admin-tabs.vertical .admin-tab.group-start { margin-left: 0; border-left: none; padding-left: 14px; }
-.admin-layout-btn {
-  padding: 6px 10px; font-size: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--bg-white); color: var(--text-secondary); cursor: pointer;
-}
-.admin-layout-btn:hover { border-color: var(--accent); color: var(--accent); }
-
 /* ── 移动端适配（#18）──────────────────────────────
  * 后台原本是给宽屏设计的，窄屏上有三个具体毛病：
  *   ① 搜索框与标题挤在一行，标题被压到换行；
- *   ② 12 个 tab 撑破容器（横向溢出被裁掉，后面的模块点不到）；
- *   ③ 各面板自带的 `padding: 0 32px` 在手机上把内容压成一条。
+ *   ② 各面板自带的 `padding: 0 32px` 在手机上把内容压成一条。
  * 用 :deep() 覆盖子组件的 scoped padding —— 那是唯一能跨组件命中它们的写法。 */
 @media (max-width: 820px) {
   .admin-header { flex-wrap: wrap; padding: 10px 14px; gap: 8px; }
   .admin-header h1 { font-size: 15px; }
   .admin-search { order: 10; flex-basis: 100%; max-width: none; margin: 4px 0 0; }
-  .admin-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
-  .admin-tab { flex-shrink: 0; white-space: nowrap; }
-  .admin-more-panel { right: 8px; left: 8px; min-width: 0; }
+  .admin-crumb { padding: 8px 14px; }
   .admin-dash-head, .admin-dash-grid { padding-left: 14px; padding-right: 14px; }
   .admin-dash-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
-  /* 窄屏下分组线会把本就紧张的宽度再切一刀，去掉 */
-  .admin-tab.group-start { margin-left: 0; border-left: none; padding-left: 14px; }
-  /* 窄屏下竖排 tab 会占掉半屏宽度，强制回到横排（横滚可及） */
-  .admin-tabs.vertical { flex-direction: row; align-items: center; }
   .admin-view :deep(.admin-section) { padding: 0 14px 24px; }
   .admin-view :deep(.admin-stats) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

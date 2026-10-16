@@ -117,6 +117,13 @@ async function call(url, { key, method = 'GET', body } = {}) {
 }
 
 export const opsApi = {
+  /**
+   * 仪表盘摘要：发布历史 / 审计 / 通知三份数据的总量，**一次请求**拿全。
+   * 后台首屏是 12 张模块卡片，没有它就得分三次读；而且这三份汇总由服务端用
+   * 与各自面板相同的读者与汇总函数算出，所以卡片上的数字与进去看到的必然一致。
+   */
+  dashboardSummary: (key) => call('/api/ops?summary=1', { key }),
+
   /** 发布历史（新 → 旧），附概览统计 */
   history: (key, params = {}) => call(`/api/ops?${qs({ limit: 30, ...params })}`, { key }),
 

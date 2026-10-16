@@ -128,6 +128,23 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
+      /* 仪表盘摘要：把三份运维数据的总量一次给出去。
+         为什么要有这一条：后台首屏是 12 张模块卡片，没有它就得为卡上的每个数字各发一次请求
+         （发布历史 / 审计 / 通知 —— 三次读 Blob）。摘要复用下面三个动作同一批读者与汇总函数，
+         所以卡片上的数字和面板里看到的**必然一致**，不会出现「卡片说 148 条、进去只有 30 条」。 */
+      if (query.summary !== undefined) {
+        const history = sortRecords(await readHistory())
+        const audit = await readAudit()
+        const notify = collapseNotifications(sortNotifications(await readNotifications()))
+        res.status(200).json({
+          ok: true,
+          history: summarizeRecords(history),
+          audit: summarizeEntries(audit),
+          notify: summarizeNotifications(notify),
+        })
+        return
+      }
+
       if (query.audit !== undefined) {
         const all = await readAudit()
         const items = filterEntries(all, {

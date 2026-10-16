@@ -8,10 +8,10 @@ import { getAdminKey } from './opsApi'
 
 const BASE = '/api/plugins'
 
-async function call(method, body, key) {
+async function call(method, body, key, query = '') {
   const k = key || getAdminKey()
   if (!k) return { ok: false, error: '未登录' }
-  const res = await fetch(BASE, {
+  const res = await fetch(BASE + query, {
     method,
     headers: {
       // 双头并发：Authorization 给本机直连，X-Nav-Key 穿透发布沙箱的网关
@@ -28,8 +28,14 @@ async function call(method, body, key) {
 }
 
 export const pluginApi = {
-  /** 拉取全部插件组（含真实可用性探测） */
+  /** 拉取全部插件组（含真实可用性探测）——面板用这个 */
   list: (key) => call('GET', null, key),
+
+  /**
+   * 只读清单，不做可用性探测 —— 只想要个引擎数量时用（后台首屏的「插件」卡片）。
+   * 为卡片上的一个数字把每个 provider 都探一遍不值当。
+   */
+  light: (key) => call('GET', null, key, '?light=1'),
 
   /**
    * 保存配置覆盖。只传变化的项：

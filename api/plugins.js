@@ -112,10 +112,15 @@ export default async function handler(req, res) {
   if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
 
   if (req.method === 'GET') {
+    // ?light=1：只读清单，逐个 provider 的可用性探测跳过。
+    // 后台首屏的「插件」卡片只要一个引擎数量，为这一个数字去探完所有 provider 不值当。
+    const query = (req.query && typeof req.query === 'object') ? req.query : {}
+    const light = query.light === '1'
     await ensureApplied()
-    const groups = await pluginGroups({ check: true })
+    const groups = await pluginGroups({ check: !light })
     return res.status(200).json({
       ok: true,
+      light,
       groups,
       overrides: currentOverrides(),
       writable: [...WRITABLE_ENVS],

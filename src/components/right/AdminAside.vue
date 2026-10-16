@@ -64,9 +64,12 @@ const favoritesStore = useFavoritesStore()
 /** 每个模块的说明书。label 与 AdminView 的 TABS 一一对应。 */
 const TAB_META = {
   overview: {
-    label: '概览',
-    desc: '站点库与分类体系的总览，以及使用热度的汇总视图。',
-    tips: ['下面的图表与主站「洞察」页看到的是同一份数据。'],
+    label: '仪表盘',
+    desc: '12 张模块卡片 + 站点库与分类体系的总览。',
+    tips: [
+      '点卡片进模块；模块页左上角「← 全部模块」回来。',
+      '下面的图表与主站「洞察」页看到的是同一份数据。',
+    ],
     links: [{ route: 'Insights', label: '洞察（主站页面）', why: '看更完整的热度与分布' }],
   },
   deploy: {
