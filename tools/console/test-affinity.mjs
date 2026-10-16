@@ -143,11 +143,18 @@ eq(neighborsOf('不存在', g).length, 0, '不存在的 id 返回空数组')
     categoryId: i % 3 === 0 ? 'aichat' : i % 3 === 1 ? 'defi' : 'design',
     purposes: i % 3 === 0 ? ['ai-chat'] : i % 3 === 1 ? ['trading'] : ['design'],
   }))
-  const t0 = Date.now()
-  const big = buildAffinityGraph(many)
-  const ms = Date.now() - t0
-  // 特征包若退回内层循环重复构造，这里会立刻涨到 1.4s 量级（实测过）
-  ok(ms < 600, '300 站建图在 600ms 内', `${ms}ms`)
+  // 计时断言取「多次里的最小值」：全量回归是几十个脚本背靠背跑，CPU 争抢能让单次测量翻好几倍
+  // （实测空载 123ms → 争抢时 705ms），贴着实测值的阈值只会变成假失败。
+  // 最小值对调度抖动最不敏感；而这条断言要抓的是「特征包退回内层循环重造」那类**数量级**退化
+  // （实测会涨到 1.4s），所以阈值仍定在 600ms。
+  let ms = Infinity
+  let big = null
+  for (let i = 0; i < 3; i++) {
+    const t0 = Date.now()
+    big = buildAffinityGraph(many)
+    ms = Math.min(ms, Date.now() - t0)
+  }
+  ok(ms < 600, '300 站建图在 600ms 内（取三次最小值）', `${ms}ms`)
   ok(big.edges.length > 0, '大图确实连出了边', `${big.edges.length} 条`)
 }
 
@@ -189,14 +196,15 @@ eq(neighborsOf('不存在', g).length, 0, '不存在的 id 返回空数组')
   const big = Array.from({ length: 300 }, (_, i) => S({
     id: 'b' + i, name: 'B' + i, categoryId: 'c' + (i % 12), purposes: ['trading'], desc: '交易所 交易 行情 数据',
   }))
-  const t0 = Date.now()
-  relatedTo(big[0], big, { topN: 5 })
-  const ms = Date.now() - t0
-  // 阈值定 400ms 而不是贴着空载实测值（约 120ms）：
-  // 这条断言要抓的是「退化回预计算之前那版（实测 1462ms）」这类问题，
-  // 而全量回归是几十个脚本背靠背跑，CPU 争抢时实测值能翻到 240ms+ ——
-  // 贴在实测值上的阈值会变成假失败，假失败和假通过一样费时间。
-  ok(ms < 400, '300 站单点查询在 400ms 内', `${ms}ms`)
+  // 同上：取三次最小值。这条要抓的是「退化回预计算之前那版（实测 1462ms）」，
+  // 阈值 400ms 留足余量，不与调度抖动较劲。
+  let ms = Infinity
+  for (let i = 0; i < 3; i++) {
+    const t0 = Date.now()
+    relatedTo(big[0], big, { topN: 5 })
+    ms = Math.min(ms, Date.now() - t0)
+  }
+  ok(ms < 400, '300 站单点查询在 400ms 内（取三次最小值）', `${ms}ms`)
 }
 
 /* ---------------- 结果 ---------------- */

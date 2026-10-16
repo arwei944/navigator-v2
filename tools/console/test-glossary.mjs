@@ -166,10 +166,14 @@ for (const [text, min] of BASELINE) {
 
 {
   const text = 'The best free online tools for developers to create images and videos with AI'
-  const t0 = Date.now()
-  for (let i = 0; i < 2000; i++) glossaryGloss(text)
-  const ms = Date.now() - t0
-  ok(ms < 900, `★ 2000 次抽取 < 900ms（实得 ${ms}ms，单次 < ${(ms / 2000).toFixed(3)}ms）`)
+  // 取三次最小值（理由同 test-affinity）
+  let ms = Infinity
+  for (let i = 0; i < 3; i++) {
+    const t0 = Date.now()
+    for (let j = 0; j < 2000; j++) glossaryGloss(text)
+    ms = Math.min(ms, Date.now() - t0)
+  }
+  ok(ms < 900, `★ 2000 次抽取 < 900ms（取三次最小值，实得 ${ms}ms，单次 < ${(ms / 2000).toFixed(3)}ms）`)
 }
 
 /* ---------------- 结果 ---------------- */
