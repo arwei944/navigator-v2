@@ -128,6 +128,12 @@ const navState = () => jsonOf(`(() => {
 /* ---------------- 进入后台 ---------------- */
 
 await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
+// 打线上时靠口令换 token 注入（线上没有本机自动登录）；token 只经环境变量传，不写进文件
+const PROBE_TOKEN = String(process.env.PROBE_TOKEN || '')
+if (PROBE_TOKEN) {
+  await evalJs(`(() => { try { localStorage.setItem('nav_admin_token', ${JSON.stringify(PROBE_TOKEN)}); localStorage.removeItem('nav_admin_token_exp') } catch (e) {} ; return true })()`)
+  await evalJs(`location.reload()`)
+}
 await send('Runtime.enable'); await send('Page.enable')
 for (let i = 0; i < 80; i++) {
   if (await evalJs(`!!document.querySelector('.admin-tabs')`).catch(() => false)) break
