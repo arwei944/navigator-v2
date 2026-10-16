@@ -125,6 +125,8 @@
 
   <!-- 全局轻提示：自动添加的成功 / 重复 / 失败反馈都从这里出，替代原预览卡片 -->
   <ToastHost />
+  <!-- 背景音乐播放器：只在设置里打开后才加载与挂载 —— 首屏一行代码都不为它多付 -->
+  <BgmPlayer v-if="preferencesStore.bgmOn" />
 
   <!-- 全局单例右键菜单：替代每张卡片各自一份（300 卡 = 600 个 document 监听） -->
   <ContextMenuHost />
@@ -200,6 +202,8 @@ const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue
 const GraphView = defineAsyncComponent(() => import('@/views/GraphView.vue'))
 const AboutView = defineAsyncComponent(() => import('@/views/AboutView.vue'))
 const AdminView = defineAsyncComponent(() => import('@/views/AdminView.vue'))
+// 背景音乐播放器：懒加载，且只在设置里打开后才挂载 —— 首屏为它只付一行声明
+const BgmPlayer = defineAsyncComponent(() => import('@/components/BgmPlayer.vue'))
 /**
  * 管线日志：排查「多跳异步链路到底停在哪」用的 Observability 浮层。
  *

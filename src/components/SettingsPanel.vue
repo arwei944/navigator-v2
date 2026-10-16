@@ -14,6 +14,7 @@
           <ThemeSection @open-editor="$emit('open-theme-editor')" />
           <VisualSchemeSection />
           <DisplaySection />
+          <BgmSection />
           <RightSidebarSection />
           <SessionSyncSection @open-import="$emit('open-import')" />
           <AdminSection @open-admin="$emit('open-admin')" />
@@ -27,6 +28,7 @@
 import ThemeSection from '@/components/settings/ThemeSection.vue'
 import VisualSchemeSection from '@/components/settings/VisualSchemeSection.vue'
 import DisplaySection from '@/components/settings/DisplaySection.vue'
+import BgmSection from '@/components/settings/BgmSection.vue'
 import RightSidebarSection from '@/components/settings/RightSidebarSection.vue'
 import SessionSyncSection from '@/components/settings/SessionSyncSection.vue'
 import AdminSection from '@/components/settings/AdminSection.vue'

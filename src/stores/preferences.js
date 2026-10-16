@@ -58,6 +58,15 @@ export const usePreferencesStore = defineStore('preferences', () => {
   const clickBoost = ref(true)
 
   /**
+   * 背景音乐（趣味插件）。
+   * 默认**关**：这是"趣味"而不是功能，不该替所有人决定要不要出声。
+   * 音源是程序合成（utils/bgmScore.js），所以没有素材版权问题，也不占打包体积。
+   */
+  const bgmOn = ref(false)
+  const bgmVolume = ref(0.35)
+  const bgmTrack = ref('dusk')
+
+  /**
    * 右边栏（站点详情面板）的显示模式。
    *
    * 为什么必须可配：面板内容原本**完全由 hover 决定** —— 鼠标一移开就清空，
@@ -136,6 +145,15 @@ export const usePreferencesStore = defineStore('preferences', () => {
   function setClickBoost(v) {
     clickBoost.value = Boolean(v)
   }
+
+  function setBgmOn(v) { bgmOn.value = Boolean(v) }
+  // 偏好这一层只做「存」：音量范围与曲目校验放在真正出声的那层（useBgmPlayer 里 clampVolume /
+  // trackById）。好处是偏好 store 不必依赖音乐模块 —— 否则曲目表会被拖进首屏。
+  function setBgmVolume(v) {
+    const n = Number(v)
+    if (Number.isFinite(n)) bgmVolume.value = Math.max(0, Math.min(1, n))
+  }
+  function setBgmTrack(id) { bgmTrack.value = String(id || 'dusk') }
 
   function setRightPanelMode(v) {
     if (RIGHT_PANEL_MODES.includes(v)) rightPanelMode.value = v
@@ -334,13 +352,14 @@ export const usePreferencesStore = defineStore('preferences', () => {
     theme, themePreset, searchEngine, wallpaper, wallpaperBlur, autoAddOnUrl, engines,
     cardDensity,
     visualScheme, visualOverrides, activeTokens, activeScheme, isVisualCustomized,
-    cardLayoutMode, cardDisplay, smartBar, clickBoost,
+    cardLayoutMode, cardDisplay, smartBar, clickBoost, bgmOn, bgmVolume, bgmTrack,
     rightPanelMode, rightSections, activeRightSections, rightCollapsePolicy, pipelineLog,
     toggleTheme, setTheme, setSearchEngine, setAutoAdd, getCurrentEngine, setCardDensity, setSmartBar, setClickBoost,
+    setBgmOn, setBgmVolume, setBgmTrack,
     setRightPanelMode, setRightSection, resetRightSections, setRightCollapsePolicy, setPipelineLog,
     setThemePreset, setWallpaper, applyColors, THEME_PRESETS,
     setVisualScheme, setVisualToken, setVisualTokens, resetVisualTokens
   }
 }, {
-  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides', 'rightPanelMode', 'rightSections', 'rightCollapsePolicy', 'pipelineLog'])
+  persist: versionedPersist('preferences', ['theme', 'themePreset', 'searchEngine', 'wallpaper', 'wallpaperBlur', 'autoAddOnUrl', 'cardDensity', 'smartBar', 'clickBoost', 'visualScheme', 'visualOverrides', 'rightPanelMode', 'rightSections', 'rightCollapsePolicy', 'pipelineLog', 'bgmOn', 'bgmVolume', 'bgmTrack'])
 })
