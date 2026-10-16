@@ -123,15 +123,28 @@ const state = () => jsonOf(`(() => {
 /* ---------------- 进入后台 ---------------- */
 
 await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
+await send('Runtime.enable'); await send('Page.enable')
+// 先等导航**真的落到站点上**（host 不为空），再注入登录态 ——
+// 在 about:blank 上写 localStorage 写不到站点 origin，token 会直接丢，
+// 线上就会一直停在登录页（本地走自动登录，掩盖了这个问题）。
+for (let i = 0; i < 80; i++) {
+  const host = await evalJs(`location.host`).catch(() => '')
+  if (host) break
+  await sleep(300)
+}
+for (let i = 0; i < 80; i++) {
+  if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
+  await sleep(500)
+}
 const PROBE_TOKEN = String(process.env.PROBE_TOKEN || '')
 if (PROBE_TOKEN) {
   await evalJs(`(() => { try { localStorage.setItem('nav_admin_token', ${JSON.stringify(PROBE_TOKEN)}); localStorage.removeItem('nav_admin_token_exp') } catch (e) {} ; return true })()`)
   await evalJs(`location.reload()`)
-}
-await send('Runtime.enable'); await send('Page.enable')
-for (let i = 0; i < 80; i++) {
-  if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
-  await sleep(500)
+  await send('Runtime.enable'); await send('Page.enable')
+  for (let i = 0; i < 80; i++) {
+    if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
+    await sleep(500)
+  }
 }
 await sleep(1800)
 if (!(await evalJs(`!!document.querySelector('.admin-view')`))) {
