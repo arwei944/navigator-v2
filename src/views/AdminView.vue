@@ -68,7 +68,8 @@
               否则用户切过去之后，导航里看不到自己在哪个模块。
            「更多」面板挂在 .admin-tabs **外面**：它是 overflow-x:auto 的滚动容器，
            放里面会被裁掉。 -->
-      <div class="admin-tabbar" ref="tabbarEl">
+      <!-- 仪表盘上不显示模块 tab 行：卡片本身就是导航（「不再是一排 tab + 单面板」） -->
+      <div class="admin-tabbar" ref="tabbarEl" v-if="activeTab !== 'overview'">
         <nav
           ref="tabNavEl"
           class="admin-tabs"
@@ -131,26 +132,55 @@
       <div class="admin-body">
         <div class="admin-tabpanel">
           <template v-if="activeTab === 'overview'">
-            <div class="admin-stats">
-              <div class="admin-stat-card">
-                <div class="admin-stat-value">{{ sitesStore.sites.length }}</div>
-                <div class="admin-stat-label">站点总数</div>
+            <!-- 仪表盘：模块卡片铺满中间区（auto-fill 自适应宽度，不再是一条窄列）。
+                 卡片上的数字只放**已经拿得到**的：拿不到就不写，不编一个好看的数。 -->
+            <div class="admin-dash">
+              <div class="admin-stats">
+                <div class="admin-stat-card">
+                  <div class="admin-stat-value">{{ sitesStore.sites.length }}</div>
+                  <div class="admin-stat-label">站点总数</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="admin-stat-value">{{ categoriesStore.categories.length }}</div>
+                  <div class="admin-stat-label">分类数</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="admin-stat-value">{{ todayCount }}</div>
+                  <div class="admin-stat-label">今日访问</div>
+                </div>
+                <div class="admin-stat-card">
+                  <div class="admin-stat-value">{{ favoritesStore.count }}</div>
+                  <div class="admin-stat-label">收藏数</div>
+                </div>
               </div>
-              <div class="admin-stat-card">
-                <div class="admin-stat-value">{{ categoriesStore.categories.length }}</div>
-                <div class="admin-stat-label">分类数</div>
+
+              <div class="admin-dash-head">
+                <h2>全部模块</h2>
+                <span class="admin-dash-sub">{{ dashCards.length }} 个 · 点卡片进入</span>
               </div>
-              <div class="admin-stat-card">
-                <div class="admin-stat-value">{{ todayCount }}</div>
-                <div class="admin-stat-label">今日访问</div>
+              <div class="admin-dash-grid">
+                <button
+                  v-for="m in dashCards" :key="m.id"
+                  type="button" class="admin-dash-card"
+                  @click="selectTab(m.id)"
+                >
+                  <span class="adc-top">
+                    <span class="adc-name">{{ m.label }}</span>
+                    <span v-if="m.badge" class="admin-tab-badge">{{ m.badge }}</span>
+                  </span>
+                  <span class="adc-desc">{{ m.desc }}</span>
+                  <span class="adc-meta">
+                    <span v-if="m.value" class="adc-value">{{ m.value }}</span>
+                    <span v-if="m.unit" class="adc-unit">{{ m.unit }}</span>
+                    <span class="adc-go">进入 →</span>
+                  </span>
+                </button>
               </div>
-              <div class="admin-stat-card">
-                <div class="admin-stat-value">{{ favoritesStore.count }}</div>
-                <div class="admin-stat-label">收藏数</div>
+
+              <!-- 不要再加「数据洞察」标题：AdminInsights 自带同名标题，加了就是两份 -->
+              <div class="admin-section" style="padding-top:0">
+                <AdminInsights />
               </div>
-            </div>
-            <div class="admin-section">
-              <AdminInsights />
             </div>
           </template>
 
@@ -299,7 +329,7 @@ const TAB_GROUPS = [
 ]
 
 const TABS = [
-  { id: 'overview', label: '概览', group: 'overview' },
+  { id: 'overview', label: '仪表盘', group: 'overview' },
   { id: 'sites', label: '站点管理', group: 'data' },
   { id: 'categories', label: '分类体系', group: 'data' },
   { id: 'deploy', label: '部署', group: 'ops' },
@@ -464,7 +494,12 @@ function onTabKey(e) {
 }
 
 // 切模块后焦点跟着走、面板自动关；换布局要重量一次
-watch(activeTab, id => { focusTabId.value = id; moreOpen.value = false })
+watch(activeTab, id => {
+  focusTabId.value = id
+  moreOpen.value = false
+  // tab 行在仪表盘上不渲染，从仪表盘进模块时才挂载 —— 挂载后得重新量一次宽度
+  nextTick(measureTabs)
+})
 watch(layout, () => nextTick(measureTabs))
 
 function onTabbarDocDown(e) {
@@ -595,6 +630,37 @@ function onAuthExpired() {
   logout()
   loginNotice.value = '登录状态已失效，请重新登录'
 }
+
+/* ---------------- 仪表盘卡片 ---------------- */
+
+// 一句话说明：让「这个模块是干什么的」在进去之前就能读到
+const DASH_DESC = {
+  sites: '增删改、批量操作、书签导入',
+  categories: '全部方向下的分类表',
+  deploy: '本地 / 上次构建 / 线上三方对照',
+  plugins: '九个引擎模块的统一管理面',
+  backup: '备份与恢复站点库',
+  publish: '把站点库推到线上，30 秒内热更新',
+  snapshots: '发布前快照与一键回滚',
+  history: '发布记录与结果',
+  preferences: '主题、卡片、告警规则',
+  notify: '需要你处理的事',
+  audit: '谁在何时做了什么',
+  ai: '分类、摘要、描述这些对话能力',
+}
+
+const dashCards = computed(() => TABS
+  .filter(t => t.id !== 'overview')
+  .map(t => {
+    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '', badge: 0 }
+    // 只放手头真有的数：拿不到就留空（宁可不显示，也不编一个好看的数）
+    if (t.id === 'sites') c.value = sitesStore.sites.length
+    else if (t.id === 'categories') { c.value = categoriesStore.categories.length; c.unit = '个' }
+    else if (t.id === 'deploy') c.value = version.value || ''
+    else if (t.id === 'publish' && sitesStore.cloudVersion) { c.value = 'v' + sitesStore.cloudVersion; c.unit = '云端' }
+    else if (t.id === 'notify') c.badge = unreadBadge.value
+    return c
+  }))
 
 onMounted(async () => {
   window.addEventListener('nav-auth-expired', onAuthExpired)
@@ -949,6 +1015,57 @@ async function notifyWebhook(version, count) {
 .admin-stat-value { font-size: 28px; font-weight: 700; color: var(--accent); }
 .admin-stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .admin-section { padding: 0 32px 32px; }
+
+/* ── 仪表盘：模块卡片铺满中间区 ──────────────────────
+ * 用 auto-fill + minmax 而不是固定列数：中间区宽度随两侧栏折叠/窗口变化，
+ * 固定列数必然在某档宽度下留出大片空白（这正是「布局不自适应」的来源）。
+ * 卡片高度靠 flex + margin-top:auto 对齐底部，所以同一行里数字和「进入」能对齐。 */
+.admin-dash { padding-bottom: 8px; }
+.admin-dash .admin-stats { padding-top: 24px; }
+.admin-dash-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 0 32px;
+  margin: 22px 0 12px;
+}
+.admin-dash-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.admin-dash-sub { font-size: 12px; color: var(--text-secondary); }
+.admin-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+  padding: 0 32px;
+}
+.admin-dash-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 118px;
+  padding: 18px;
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
+  background: var(--bg-white);
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition), box-shadow var(--transition), transform var(--transition);
+}
+.admin-dash-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-hover);
+  transform: translateY(-1px);
+}
+.admin-dash-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.adc-top { display: flex; align-items: center; gap: 8px; }
+.adc-name { font-size: 15px; font-weight: 600; }
+.adc-desc { font-size: 12px; line-height: 1.6; color: var(--text-secondary); }
+.adc-meta { display: flex; align-items: baseline; gap: 6px; margin-top: auto; padding-top: 10px; }
+.adc-value { font-size: 15px; font-weight: 600; }
+.adc-unit { font-size: 11px; color: var(--text-secondary); }
+.adc-go { margin-left: auto; font-size: 11px; color: var(--text-secondary); }
+.admin-dash-card:hover .adc-go { color: var(--accent); }
 .admin-section-header {
   display: flex;
   align-items: center;
@@ -1071,6 +1188,8 @@ async function notifyWebhook(version, count) {
   .admin-tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
   .admin-tab { flex-shrink: 0; white-space: nowrap; }
   .admin-more-panel { right: 8px; left: 8px; min-width: 0; }
+  .admin-dash-head, .admin-dash-grid { padding-left: 14px; padding-right: 14px; }
+  .admin-dash-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   /* 窄屏下分组线会把本就紧张的宽度再切一刀，去掉 */
   .admin-tab.group-start { margin-left: 0; border-left: none; padding-left: 14px; }
   /* 窄屏下竖排 tab 会占掉半屏宽度，强制回到横排（横滚可及） */

@@ -136,24 +136,93 @@ if (PROBE_TOKEN) {
 }
 await send('Runtime.enable'); await send('Page.enable')
 for (let i = 0; i < 80; i++) {
-  if (await evalJs(`!!document.querySelector('.admin-tabs')`).catch(() => false)) break
+  if (await evalJs(`!!document.querySelector('.admin-view')`).catch(() => false)) break
   await sleep(500)
 }
 await sleep(1500)
-if (!(await evalJs(`!!document.querySelector('.admin-tabs')`))) {
+if (!(await evalJs(`!!document.querySelector('.admin-view')`))) {
   console.error('没能进入后台（本机自动登录需要 data/admin-key.txt）'); cleanup(); process.exit(2)
 }
-// 竖排偏好会换掉布局，先复位成横排
+// 竖排偏好会换掉布局，先复位成横排，并回到仪表盘
 await evalJs(`(() => { try { localStorage.setItem('nav_admin_layout','top') } catch(e){} ; return true })()`)
-await evalJs(`location.reload()`)
+await evalJs(`location.href = ${JSON.stringify(SITE_BASE + '/admin')}`)
 await send('Runtime.enable'); await send('Page.enable')
 for (let i = 0; i < 80; i++) {
-  if (await evalJs(`!!document.querySelector('.admin-more-btn') || document.querySelectorAll('.admin-tabs .admin-tab').length > 6`).catch(() => false)) break
+  if (await evalJs(`!!document.querySelector('.admin-dash-grid') || !!document.querySelector('.admin-more-btn')`).catch(() => false)) break
   await sleep(500)
 }
 await sleep(1200)
 
+console.log('\n── ⓪ 仪表盘：模块卡片铺满中间区 ──')
+const dash = await jsonOf(`(() => {
+  const grid = document.querySelector('.admin-dash-grid')
+  const mid = document.querySelector('.main')
+  if (!grid || !mid) return null
+  const cards = [...grid.querySelectorAll('.admin-dash-card')]
+  const gb = grid.getBoundingClientRect(), mb = mid.getBoundingClientRect()
+  const tops = [...new Set(cards.map(c => Math.round(c.getBoundingClientRect().top)))]
+  return {
+    cards: cards.length,
+    names: cards.map(c => c.querySelector('.adc-name').textContent.trim()),
+    withValue: cards.filter(c => c.querySelector('.adc-value')).length,
+    tabbar: !!document.querySelector('.admin-tabbar'),
+    widthRatio: +(gb.width / (mb.width - 64)).toFixed(2),
+    rows: tops.length,
+    perRow: cards.filter(c => Math.round(c.getBoundingClientRect().top) === tops[0]).length,
+    // 卡片上的数只能来自真实数据：不许出现 undefined / NaN
+    dirty: /undefined|NaN/.test(document.body.innerText),
+  }
+})()`)
+ok(!!dash, '仪表盘渲染出来了')
+ok(dash && dash.cards === 12, '12 张模块卡片（当前所在的仪表盘自己不算）', dash ? `${dash.cards} 张` : '')
+ok(dash && !dash.tabbar, '仪表盘上不渲染模块 tab 行（卡片本身就是导航）')
+ok(dash && dash.widthRatio >= 0.95, '卡片网格铺满中间区（不再是一条窄列）', dash ? `占内容宽 ${(dash.widthRatio * 100).toFixed(0)}%` : '')
+ok(dash && dash.perRow >= 3, '每行至少 3 张（确实按可用宽度自适应）', dash ? `${dash.perRow} 张/行 · 共 ${dash.rows} 行` : '')
+ok(dash && !dash.dirty, '页面上没有 undefined / NaN 泄漏')
+// 本项目被「同一块内容渲染两遍」咬过两次（卡片标题重复、关于页星号），这里守一道
+const heads = await jsonOf(`(() => {
+  const names = [...document.querySelectorAll('.admin-dash h2, .admin-dash h3')].map(e => e.textContent.trim()).filter(Boolean)
+  const seen = {}
+  for (const n of names) seen[n] = (seen[n] || 0) + 1
+  return { dup: Object.entries(seen).filter(([, c]) => c > 1).map(([n, c]) => n + '×' + c), count: names.length }
+})()`)
+ok(heads && heads.dup.length === 0, '仪表盘内没有重复的区块标题', heads?.dup.join(' ') || `${heads?.count} 个标题`)
+await shot('admin-dash-1-cards.png')
+
+console.log('\n── ⓪b 点卡片进模块，再从模块回仪表盘 ──')
+const cardClicked = await evalJs(`(() => {
+  const c = [...document.querySelectorAll('.admin-dash-card')].find(x => x.querySelector('.adc-name').textContent.trim() === '插件')
+  if (!c) return false
+  c.click(); return true
+})()`)
+await sleep(900)
+const inModule = await jsonOf(`({
+  tabbar: !!document.querySelector('.admin-tabbar'),
+  active: (document.querySelector('.admin-tabs .admin-tab.active') || {}).textContent?.trim() || '',
+  url: location.search
+})`)
+ok(cardClicked, '点得到卡片')
+ok(inModule?.tabbar, '进模块后 tab 行出现（可切模块 / 返回）')
+ok(inModule?.active === '插件', '进入的正是点的那张卡对应的模块', `${inModule?.active} · ${inModule?.url}`)
+await evalJs(`[...document.querySelectorAll('.admin-tabs .admin-tab')].find(b => b.textContent.trim().startsWith('仪表盘'))?.click()`)
+await sleep(900)
+ok(await evalJs(`!!document.querySelector('.admin-dash-grid')`), '从模块能回到仪表盘')
+await shot('admin-dash-2-back.png')
+
+// 后面的导航断言都在**模块页**里做：tab 行只在模块页出现（仪表盘上它是收起的）
+await evalJs(`[...document.querySelectorAll('.admin-dash-card')].find(x => x.querySelector('.adc-name').textContent.trim() === '部署')?.click()`)
+await sleep(900)
+
 console.log('\n── ① 分组 ──')
+// 后台是套在三栏壳里的（左侧栏 + 中间区 + 右侧栏）。这条守的是「别把后台退回独立页」。
+const shell = await jsonOf(`({
+  sidebar: !!document.querySelector('.sidebar'),
+  right: !!document.querySelector('.right-sidebar'),
+  inMain: !!document.querySelector('.main .admin-tabbar'),
+  viewport: innerWidth
+})`)
+ok(shell?.sidebar && shell?.right, '后台仍套在三栏壳里（左右两侧栏都在）', shell ? `侧栏 ${shell.sidebar} / 右栏 ${shell.right} / 视口 ${shell.viewport}px` : '')
+ok(shell?.inMain, '中间区渲染在 .main 里（不是独立页）')
 const s0 = await navState()
 ok(!!s0, '导航条渲染出来了')
 ok(s0 && s0.groupStarts >= 4, '模块按组分开（有分组分隔线）', s0 ? `${s0.groupStarts} 条分隔线` : '')
