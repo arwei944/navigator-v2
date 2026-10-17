@@ -293,7 +293,15 @@ function onHover() {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: var(--card-padding, 18px);
-  transition: all var(--transition);
+  /* 只过渡实际会变的属性（hover 的阴影/位移、选中/高亮/归档的边与底色）——
+     `all` 会让 300 张卡在每次重排时把全部属性都挂进过渡判定（P1-1） */
+  transition:
+    box-shadow var(--transition),
+    transform var(--transition),
+    border-color var(--transition),
+    border-left-color var(--transition),
+    background-color var(--transition),
+    opacity var(--transition);
   /* 卡片主体就是「打开站点」这一个动作，光标必须说得出这件事 */
   cursor: pointer;
   position: relative;
@@ -406,7 +414,13 @@ function onHover() {
 .card-clicks svg { width: 12px; height: 12px; }
 .card-clicks.warm { color: var(--color-heat-warm); background: var(--color-heat-warm-bg); }
 .card-clicks.hot { color: var(--color-heat-hot); background: var(--color-heat-hot-bg); }
-.card-clicks.hot svg { animation: flamePulse 1.4s ease-in-out infinite; }
+/* 火焰脉动只播 3 轮（≈4.2s）后停在原状：常驻 infinite 会让每张热门卡 7×24
+   占着一个合成层动画，300 卡下是持续的重绘负担（P1-2）；脉动只是「这条很热」
+   的提示，提示过就够了。减少动态效果的用户直接关掉（见下方媒体查询）。 */
+.card-clicks.hot svg { animation: flamePulse 1.4s ease-in-out 3; }
+@media (prefers-reduced-motion: reduce) {
+  .card-clicks.hot svg { animation: none; }
+}
 
 @keyframes flamePulse {
   0%, 100% { transform: scale(1); opacity: 1; }
@@ -462,7 +476,11 @@ function onHover() {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all .2s cubic-bezier(.4,0,.2,1);
+  transition:
+    background-color .2s cubic-bezier(.4,0,.2,1),
+    border-color .2s cubic-bezier(.4,0,.2,1),
+    color .2s cubic-bezier(.4,0,.2,1),
+    transform .2s cubic-bezier(.4,0,.2,1);
   color: var(--text-secondary);
 }
 .card-visit:hover { background: var(--accent); border-color: var(--accent); color: var(--color-on-solid); transform: scale(1.1); }
@@ -504,7 +522,7 @@ function onHover() {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid var(--border); background: var(--bg-white);
   display: flex; align-items: center; justify-content: center;
-  transition: all .15s ease;
+  transition: background-color .15s ease, border-color .15s ease;
 }
 .card-checkbox.checked { background: var(--accent); border-color: var(--accent); }
 .card-checkbox svg { width: 12px; height: 12px; color: var(--color-on-solid); }
