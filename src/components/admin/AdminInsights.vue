@@ -86,8 +86,13 @@
         <div v-for="s in deadSites" :key="s.id" class="dead-item">
           <span class="dead-name">{{ s.name }}</span>
           <span class="dead-url">{{ s.url }}</span>
+          <span v-if="s.fails" class="dead-fails">连续 {{ s.fails }} 次</span>
           <span class="dead-code" :class="{ warn: s.statusCode === 'ERR' }">HTTP {{ s.statusCode || 'ERR' }}</span>
         </div>
+      </div>
+      <div v-if="deadSites.length" class="dead-actions">
+        <button type="button" class="quality-fix" @click="archiveDead">归档全部失效站点（{{ deadSites.length }}）</button>
+        <span class="quality-hint">进回收站，可随时恢复；判据来自本机探活，归档前建议复核 WAF / 限流误判</span>
       </div>
     </div>
     <!-- 数据质量体检（F1）：判据与 `scripts/audit-data.mjs` 同源（shared/ops/data-quality.mjs） -->
@@ -194,7 +199,7 @@ const deadSites = computed(() =>
   sitesStore.sites
     .map(s => {
       const h = healthStore.getStatus(s.id)
-      return h.status === 'down' ? { ...s, statusCode: h.code } : null
+      return h.status === 'down' ? { ...s, statusCode: h.code, fails: Number(h.fails) || 0 } : null
     })
     .filter(Boolean),
 )
@@ -213,6 +218,16 @@ const descLabel = (issue) => DESC_ISSUE_LABEL[issue] || issue
 function mergeDuplicate(g) {
   const removeIds = (g.ids || []).filter(id => id !== g.keep)
   if (removeIds.length) sitesStore.batchArchive(removeIds)
+}
+
+/**
+ * F6：把当前判定的失效站点**一键归档**（进回收站，可恢复）。
+ * 服务端巡检（cron 的「连续失效自动归档」）按 alert-rules 阈值已会自动做这件事，
+ * 这里是**人工干预面**：看着这批不合意就立刻处理，不必等下一轮巡检。
+ */
+function archiveDead() {
+  const ids = deadSites.value.map(s => s.id)
+  if (ids.length) sitesStore.batchArchive(ids)
 }
 
 /* ---------------- 可用性 / 响应时间趋势 ---------------- */
@@ -284,6 +299,8 @@ const trendRange = computed(() => {
 .quality-fix:hover { background: var(--accent); color: var(--color-on-solid); }
 .quality-hint { font-size: 11px; color: var(--text-secondary); opacity: .85; font-weight: 400; }
 .quality-empty { font-size: 12.5px; color: var(--text-secondary); }
+.dead-fails { font-size: 11px; color: var(--warn-fg); flex-shrink: 0; }
+.dead-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .insight-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
 .insight-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
