@@ -63,6 +63,17 @@ const MIN_TAP = 44
   ok(/env\(safe-area-inset-bottom\)/.test(src), '底部栏处理底部安全区')
 }
 
+/* ---- 4. 返回手势协同（App.vue：用原生返回关抽屉，而不是自实现边缘手势）---- */
+{
+  const app = read('src/App.vue')
+  ok(/addEventListener\(\s*'popstate'/.test(app), 'App.vue 监听 popstate（消费原生返回以关闭抽屉）')
+  ok(/history\.pushState\(\s*\{\s*navDrawer/.test(app), '抽屉打开时压一条哨兵历史记录')
+  ok(/drawerClosedByPop/.test(app), "区分「popstate 关闭」与「UI 关闭」，避免多退一次历史")
+  ok(/matchMedia\(\s*'\(max-width:\s*768px\)'/.test(app), '只在窄屏压历史（桌面侧栏常驻，不该被牵连）')
+  // 反模式：自实现边缘 touch 手势会与浏览器原生返回抢事件
+  ok(!/touchstart[\s\S]{0,80}clientX\s*<\s*30/.test(app), '没有自实现左缘滑动返回（会与原生手势冲突）')
+}
+
 /* ---- 报告 ---- */
 console.log(`\n移动端触摸目标守卫（F4）：${pass} 通过，${failures.length} 失败`)
 if (failures.length) {

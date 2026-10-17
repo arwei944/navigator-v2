@@ -260,6 +260,49 @@ const pipelineOpenToken = ref(0)
 // 连续触发时丢弃过期结果，避免旧请求把新卡片覆盖回去
 let autoAddSeq = 0
 
+/* ---------- 移动端返回手势与抽屉的协同（F4）---------- */
+/**
+ * 为什么是「用原生返回」而不是「自己监听边缘滑动」：Android / iOS 的边缘返回手势由
+ * 浏览器实现，页面再在同样区域叠一层 touch 监听必然与它抢事件（要么自定义手势失灵，
+ * 要么误触发返回）。正解是**让原生手势为我们干活** —— 抽屉打开时压一条哨兵历史记录，
+ * 原生返回（滑动手势或返回键）触发 popstate 时消费掉它来**关闭抽屉**，用户不会一按返回
+ * 就离开站点；经 UI 关闭时再把哨兵弹掉，历史保持干净（开 / 关 1:1）。
+ *
+ * 只在窄屏压历史：桌面端侧栏是常驻栏位，不该被历史记录牵连。桌面按浏览器返回键仍是
+ * 正常后退（popstate 里判到抽屉没开就不消费）。
+ */
+const drawerOpen = computed(() => sidebarStore.open || Boolean(sidebarStore.detailSheetSite))
+const isNarrowViewport = () => typeof window !== 'undefined'
+  && typeof window.matchMedia === 'function'
+  && window.matchMedia('(max-width: 768px)').matches
+
+function closeDrawers() {
+  if (sidebarStore.open) sidebarStore.close()
+  if (sidebarStore.detailSheetSite) sidebarStore.closeDetailSheet()
+}
+
+// 由 popstate 关闭时置位：哨兵记录已被那一次返回弹掉，UI 关闭路径不能再回退一次
+let drawerClosedByPop = false
+function onDrawerPopState() {
+  if (drawerOpen.value) { drawerClosedByPop = true; closeDrawers() }
+}
+
+watch(drawerOpen, (open) => {
+  if (typeof window === 'undefined' || typeof window.history === 'undefined') return
+  if (open) {
+    if (isNarrowViewport()) window.history.pushState({ navDrawer: true }, '')
+    drawerClosedByPop = false
+    return
+  }
+  // 因 popstate 而关闭：哨兵已弹，不能再 history.back()
+  if (drawerClosedByPop) { drawerClosedByPop = false; return }
+  // 因 UI 关闭（点遮罩 / 关闭按钮 / Esc / 下滑）：把哨兵弹掉，别让下次返回「返回」到抽屉
+  if (window.history.state && window.history.state.navDrawer) window.history.back()
+})
+
+onMounted(() => { if (typeof window !== 'undefined') window.addEventListener('popstate', onDrawerPopState) })
+onBeforeUnmount(() => { if (typeof window !== 'undefined') window.removeEventListener('popstate', onDrawerPopState) })
+
 // 备注 / 便利贴的自动上行句柄（onMounted 里启动，卸载时停掉）
 let stopLiveSync = null
 
