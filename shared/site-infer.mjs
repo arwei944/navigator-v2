@@ -745,3 +745,49 @@ export function inferSite({ html, rootHtml = '', manifestTheme = '', url, existi
     },
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * desc「机器垃圾」形态检测（F1 补充层）
+ *
+ * 与 `shared/ops/data-quality.mjs#descIssue` 是**互补**，不是重复：
+ *   · descIssue 查「缺失 / 过短 / 与站名雷同 / 占位词」—— 语义层面的没信息量；
+ *   · 这里查抓取/生成环节留下的机器垃圾 —— HTML 标签与实体未解码、替换字符乱码、
+ *     字面 undefined/null、连续重复填充。这类描述往往「又长又像话」，长度与占位检查
+ *     都会放行，只有形态匹配才抓得住。
+ *
+ * 判重、重复 host、缺 icon 一律**不在本文件实现**：全项目唯一判据是
+ * `shared/ops/site-ops.mjs`（判重）与 `shared/ops/data-quality.mjs`（体检内核），
+ * 后台面板与 CLI 都消费它们。本文件只补这一层内核没覆盖的形态。
+ * ───────────────────────────────────────────────────────────── */
+
+/** desc 垃圾形态：正则 → 给面板看的人读原因 */
+export const DESC_JUNK_RULES = [
+  [/<\/?[a-z][^>]{0,80}>/i, 'HTML 标签残留'],
+  [/&[a-z]{2,8};|&#\d{1,5};/i, 'HTML 实体未解码'],
+  [/�/, '替换字符（乱码）'],
+  [/^\s*(undefined|null|nan)\s*$/i, '字面 undefined / null'],
+  [/(.)\1{9,}/, '连续重复字符'],
+]
+
+/** 命中的垃圾形态原因；无则 ''（空描述不算垃圾，交给内核的 descIssue 报「缺失」） */
+export function descJunkReason(desc) {
+  const d = String(desc ?? '')
+  if (!d.trim()) return ''
+  for (const [re, label] of DESC_JUNK_RULES) if (re.test(d)) return label
+  return ''
+}
+
+/**
+ * 从站点表里挑出 desc 命中垃圾形态的条目（后台面板与 tools 脚本共用）。
+ * @param {object[]} sites
+ * @returns {{ id: string, name: string, url: string, desc: string, reason: string }[]}
+ */
+export function auditDescJunk(sites) {
+  const list = Array.isArray(sites) ? sites.filter(s => s && typeof s === 'object') : []
+  const out = []
+  for (const s of list) {
+    const reason = descJunkReason(s.desc)
+    if (reason) out.push({ id: s.id, name: s.name, url: s.url, desc: s.desc, reason })
+  }
+  return out
+}
