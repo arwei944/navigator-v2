@@ -246,7 +246,7 @@ function runStep(log, label, command, args, opts = {}) {
  * tar 只是把文件按字节串起来，不对内容做任何假设。
  */
 /** 遍历 dist（跳过 data/），返回 `{ 相对路径: 内容 sha1 前 16 位 }` */
-function walkDistHashes(dir = DIST, base = '') {
+export function walkDistHashes(dir = DIST, base = '') {
   const out = {}
   let entries
   try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return out }
