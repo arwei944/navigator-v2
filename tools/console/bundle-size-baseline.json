@@ -4,8 +4,8 @@
   "baseline": {
     "shellGzBytes": 552960,
     "_shellGzBytes_note": "540 KiB。2026-10-18 实测 520.4 KiB gz，留约 4% 余量防构建抖动。M2 减重后应下调到 500 KiB 目标附近。",
-    "swPrecacheItems": 61,
-    "_swPrecacheItems_note": "2026-10-18 实测 61 条。M2 目标 24 条（规划 §3.1：复核新增条目里哪些用户一辈子看不到）。",
+    "swPrecacheItems": 62,
+    "_swPrecacheItems_note": "2026-10-18 实测 61 条；lyqfof 把种子数据切成独立 chunk 后 62 条（离线兜底要预缓存它）。M2 目标 24 条（规划 §3.1：复核新增条目里哪些用户一辈子看不到）。",
     "swPrecacheBytes": 1677721,
     "_swPrecacheBytes_note": "1.60 MB。2026-10-18 实测 1.44 MB。M2 目标 1.1 MB。"
   },
@@ -16,6 +16,7 @@
     "swPrecacheBytes": 1153434
   },
   "history": [
-    { "date": "2026-10-18", "by": "4pnj9g", "note": "建立基线：外壳 520.4 KiB gz / 预缓存 61 条 1.44 MB。此刻一周新功能已把外壳推高 62%，而此前无任何门禁守总量。" }
+    { "date": "2026-10-18", "by": "4pnj9g", "note": "建立基线：外壳 520.4 KiB gz / 预缓存 61 条 1.44 MB。此刻一周新功能已把外壳推高 62%，而此前无任何门禁守总量。" },
+    { "date": "2026-10-18", "by": "lyqfof", "note": "种子数据（sites-data chunk，32.6 KiB gz）从首屏静态图移出成独立懒加载 chunk；因离线兜底需要，它进预缓存，条目数 61 → 62。" }
   ]
 }
