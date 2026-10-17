@@ -43,6 +43,21 @@ const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
 const CHECKPOINT_FILE = join(ROOT, 'tools', 'console', '.deploy-checkpoint.json')
 
 /**
+ * 客户端幂等键台账（N2 硬约束）：`<key> → { jobId, endpoints, at }`。
+ *
+ * 与上面那个「上游平台的幂等键」（`idemFor`/`idemProblem`，发给 BotKeep 防同一分片重复传）
+ * **不是一回事**：这里是**控制台发布执行接口自己的**幂等键，防「同一个发布请求被重复提交
+ * 触发两次部署」（典型场景：请求发出去了、响应在网络上丢了、客户端超时重试）。
+ *
+ * 为什么必须落盘：`jobs` 是内存态，控制台一重启就全没了。台账若只在内存里，
+ * 「响应丢失 + 控制台恰好重启 + 客户端重试」这条路径会**真的重复发布一次**。
+ * 落盘后，即便重启，同 key 的重复请求也会被明确拒绝（报错点名原任务），而不是悄悄再发一份。
+ */
+const IDEM_FILE = join(ROOT, 'tools', 'console', '.data', 'deploy-idempotency.json')
+/** 台账保留期：过期允许该 key 重新使用（太长会拦住用户「我就想重发一次」的合法意图） */
+const IDEM_TTL_MS = 24 * 60 * 60 * 1000
+
+/**
  * 上次发布成功的**产物文件指纹**（相对路径 → 内容 sha1 前 16 位）。
  *
  * 用来算「增量集」——只上传与上次不同的文件。实测平台上传限速约 27 KB/s
@@ -83,6 +98,32 @@ function idemFor(parts) {
     .map(p => String(p).replace(/[^A-Za-z0-9_-]/g, '-'))
     .join('-')
     .slice(0, 64)
+}
+
+/* ---------------- 客户端幂等键台账（发布执行接口，N2） ---------------- */
+
+function readIdemLedger() {
+  try {
+    const obj = JSON.parse(readFileSync(IDEM_FILE, 'utf8'))
+    return obj && typeof obj === 'object' && !Array.isArray(obj) ? obj : {}
+  } catch { return {} } // 文件不存在或坏了都当空台账：坏了不能把发布接口整个拦死
+}
+
+function writeIdemLedger(ledger) {
+  try {
+    mkdirSync(dirname(IDEM_FILE), { recursive: true })
+    writeFileSync(IDEM_FILE, JSON.stringify(ledger), 'utf8')
+    return true
+  } catch { return false }
+}
+
+/** 读时顺手回收过期条目，避免台账无限增长；返回是否发生了删除（决定要不要回写） */
+function pruneIdemLedger(ledger, now = Date.now()) {
+  let changed = false
+  for (const [k, v] of Object.entries(ledger)) {
+    if (!v || typeof v.at !== 'number' || now - v.at > IDEM_TTL_MS) { delete ledger[k]; changed = true }
+  }
+  return changed
 }
 
 /* ---------------- 凭据 ---------------- */
@@ -793,15 +834,62 @@ function finish({ ok, error, steps, started, source, seen }) {
  * `publishAll` 对单元素数组同样正确（它会临时把 env 切到该端点再恢复）。
  *
  * 不传 `endpoints` 的旧调用者维持原样直接 `publish()` —— 多端点是加法，不是替换。
+ *
+ * 另外接受可选的 `idempotencyKey`（N2 硬约束「重复请求不得重复部署」）：见函数内幂等闸门。
+ * 不传则行为与从前一字不差。
  */
 export function startPublish(opts = {}) {
+  const eps = Array.isArray(opts.endpoints) ? opts.endpoints.filter(Boolean) : []
+  const epsIds = eps.length ? eps.map(e => e.id).sort().join(',') : 'default'
+  const idem = String(opts.idempotencyKey || '').trim()
+
+  /**
+   * 幂等闸门（N2 硬约束：重复请求不得重复部署）。
+   *
+   * 三个分支，全部**明确报错、不静默**：
+   *   ① 同 key + 同端点 + 任务还在内存 → **返回原任务**（客户端重试拿到同一个 jobId，不新发一次）；
+   *   ② 同 key 但端点不同 → 拒绝（同一个键换端点重发会绕过「这次发到哪」的确认，属误用）；
+   *   ③ 同 key 但任务已不在内存（控制台重启过）→ 拒绝并点名原任务号 —— 这里**绝不能**
+   *      当「没发生过」再发一次，那正是幂等键要防的「响应丢失后重试导致重复部署」。
+   *
+   * 不传 key 的调用者（如控制台 UI 的「发布」按钮 —— 用户每次点击都是新意图）
+   * 完全维持原行为，只在下面那道「运行中互斥」上兜底。
+   */
+  if (idem) {
+    const bad = idemProblem(idem)
+    if (bad) throw new Error(`幂等键不合规（${bad}）：${idem}`)
+    const ledger = readIdemLedger()
+    const pruned = pruneIdemLedger(ledger)
+    const hit = ledger[idem]
+    if (hit) {
+      if (hit.endpoints && hit.endpoints !== epsIds) {
+        if (pruned) writeIdemLedger(ledger)
+        throw new Error(`幂等键 ${idem} 已用于端点「${hit.endpoints}」，本次是「${epsIds}」—— 同一个键不能换端点重发，请换一个新键。`)
+      }
+      const existing = jobs.getJob(hit.jobId)
+      if (existing) {
+        existing.replayed = (existing.replayed || 0) + 1
+        if (pruned) writeIdemLedger(ledger)
+        return existing
+      }
+      if (pruned) writeIdemLedger(ledger)
+      throw new Error(`幂等键 ${idem} 已用于任务 ${hit.jobId}，该任务在控制台重启后已不在内存。为避免重复部署，本次请求被拒绝；如确需重新发布，请换一个新的幂等键。`)
+    }
+  }
+
   if (jobs.listJobs().some(j => j.title.startsWith('发布到服务器') && j.status === 'running')) {
     throw new Error('已有发布任务在运行中，请等它结束。')
   }
   const job = jobs.createJob('发布到服务器')
+  // 先落台账再跑：任务一存在就把它记进幂等台账，重启后同 key 仍有据可查
+  if (idem) {
+    const ledger = readIdemLedger()
+    pruneIdemLedger(ledger)
+    ledger[idem] = { jobId: job.id, endpoints: epsIds, at: Date.now() }
+    writeIdemLedger(ledger)
+  }
   const log = (t) => jobs.log(job, t)
   const src = localSource()
-  const eps = Array.isArray(opts.endpoints) ? opts.endpoints.filter(Boolean) : []
   const head = `开始发布 ${src.shortSha}${src.dirty ? '（含未提交改动）' : ''}`
 
   if (eps.length > 1) log(`${head} —— ${eps.length} 个端点：${eps.map(e => e.label || e.id).join('、')}`)

@@ -11,7 +11,7 @@
  *
  * 运行：node tools/console/test-endpoints-run.mjs
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, rmSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -131,6 +131,89 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
     'publish 路由用 resolveEndpoints 解析请求里的端点')
   ok(/if\s*\(picked && !picked\.ok\)[\s\S]{0,160}sendJson\(res,\s*400/.test(apiSrc),
     '未知端点 → 400（明确报错，不静默发布）')
+}
+
+/* ============ 5. N2 幂等键：重复请求不得重复部署 ============ */
+{
+  // 与第 3 节同法：先占住凭据 env（含空串），publish 在构建前即抛 —— 不联网、不构建
+  const saved = {}
+  for (const k of ['BOTKEEP_API_KEY', 'BK_KEY', 'BOTKEEP_WORKLOAD_ID', 'BK_WID']) {
+    saved[k] = process.env[k]
+    process.env[k] = ''
+  }
+  const idemFile = join(ROOT, 'tools', 'console', '.data', 'deploy-idempotency.json')
+  let original = null
+  let hadFile = true
+  try { original = readFileSync(idemFile, 'utf8') } catch { hadFile = false }
+
+  try {
+    const { startPublish } = await import('./lib/deploy.mjs')
+    const jobsMod = await import('./lib/jobs.mjs')
+    const waitDone = async (id) => {
+      for (let i = 0; i < 120; i++) {
+        const j = jobsMod.getJob(id)
+        if (!j || j.status !== 'running') return j
+        await new Promise(r => setTimeout(r, 50))
+      }
+      return jobsMod.getJob(id)
+    }
+    let seq = 0
+    const K = (s) => `test-idem-${s}-${Date.now()}-${++seq}`.slice(0, 64)
+
+    const key = K('same')
+    const j1 = startPublish({ skipBuild: true, idempotencyKey: key })
+    ok(!!(j1 && j1.id), '首次带幂等键发布 → 返回任务')
+    const j2 = startPublish({ skipBuild: true, idempotencyKey: key })
+    ok(j2.id === j1.id, '同 key 重复请求 → 返回同一任务（未重复部署）', `实得 ${j2.id} vs ${j1.id}`)
+    ok(Number(j2.replayed) >= 1, '重复请求被标记为幂等回放（replayed）')
+    await waitDone(j1.id)
+    const j3 = startPublish({ skipBuild: true, idempotencyKey: key })
+    ok(j3.id === j1.id, '任务结束后再用同 key → 仍回放同一任务，不再发一次')
+
+    const ledger = JSON.parse(readFileSync(idemFile, 'utf8'))
+    ok(ledger[key] && ledger[key].jobId === j1.id, '幂等台账已落盘（控制台重启后仍有据可查）')
+
+    let threwShort = ''
+    try { startPublish({ skipBuild: true, idempotencyKey: 'short' }) } catch (e) { threwShort = e.message }
+    ok(/不合规/.test(threwShort), '幂等键格式不合规 → 明确抛错，不静默接受', threwShort)
+
+    // 模拟「控制台重启」：台账里有、内存里没有该任务 —— 绝不能当没发生过再发一次
+    const ghost = K('ghost')
+    const l2 = JSON.parse(readFileSync(idemFile, 'utf8'))
+    l2[ghost] = { jobId: 'deadbeef', endpoints: 'default', at: Date.now() }
+    writeFileSync(idemFile, JSON.stringify(l2))
+    let threwGhost = ''
+    try { startPublish({ skipBuild: true, idempotencyKey: ghost }) } catch (e) { threwGhost = e.message }
+    ok(/已用于任务|避免重复部署/.test(threwGhost), '重启后（台账有、内存无）同 key → 拒绝而非重发', threwGhost)
+
+    const epKey = K('ep')
+    const ja = startPublish({ skipBuild: true, idempotencyKey: epKey, endpoints: [{ id: 'mirror', label: '镜像站', url: 'https://mirror.example.com' }] })
+    await waitDone(ja.id)
+    let threwEp = ''
+    try {
+      startPublish({ skipBuild: true, idempotencyKey: epKey, endpoints: [{ id: 'backup', label: '备用站', url: 'https://backup.example.com' }] })
+    } catch (e) { threwEp = e.message }
+    ok(/端点/.test(threwEp), '同一幂等键换端点 → 拒绝（防绕过端点确认）', threwEp)
+  } finally {
+    for (const [k, v] of Object.entries(saved)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+    try {
+      if (hadFile) writeFileSync(idemFile, original)
+      else rmSync(idemFile)
+    } catch { /* 清理失败不影响用例结论（最多在 .data 下留一条测试键） */ }
+  }
+}
+
+/* ============ 6. 静态不变量：防幂等能力被回退掉 ============ */
+{
+  const apiSrc = read('tools/console/lib/api.mjs')
+  ok(/idempotency-key/.test(apiSrc), '发布路由读 Idempotency-Key 请求头')
+  ok(/idempotencyKey:\s*idem/.test(apiSrc), '路由把幂等键传给 startPublish')
+  const deploySrc = read('tools/console/lib/deploy.mjs')
+  ok(/IDEM_FILE/.test(deploySrc) && /writeIdemLedger/.test(deploySrc), '幂等台账落盘实现仍在')
+  ok(/避免重复部署，本次请求被拒绝/.test(deploySrc), '重启后重复请求的拒绝分支仍在（防回退成「重复部署」）')
 }
 
 /* ---------------- 报告 ---------------- */

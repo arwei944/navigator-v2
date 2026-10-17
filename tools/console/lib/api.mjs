@@ -433,20 +433,28 @@ export async function handleApi(req, res, path, url) {
         sendJson(res, 400, { error: picked.error })
         return true
       }
+      /**
+       * 幂等键（N2 硬约束）：优先取 `Idempotency-Key` 请求头（脚本/HTTP 客户端惯例），
+       * 其次取 body.idempotencyKey。同 key 的重复请求返回**同一个 job**，不会重复部署；
+       * 格式不合规或命中已失效台账则由 startPublish 抛错，下面统一转 409 并记审计（失败不静默）。
+       */
+      const idem = String(req.headers['idempotency-key'] || body.idempotencyKey || '').trim()
       try {
         const job = deploy.startPublish({
           skipBuild: body.skipBuild === true,
           url: String(body.url || ''),
           endpoints: picked ? picked.endpoints : undefined,
+          idempotencyKey: idem || undefined,
         })
         const ids = picked ? picked.endpoints.map(e => e.id) : ['default']
+        const replayed = Number(job.replayed) > 0
         // 审计只记端点 id 与任务号，不记任何凭据
         record({
           action: 'deploy.publish',
           target: 'botkeep',
-          detail: `job ${job.id}${ids.length > 1 ? ` · ${ids.length} 端点：${ids.join(',')}` : ''}`,
+          detail: `job ${job.id}${ids.length > 1 ? ` · ${ids.length} 端点：${ids.join(',')}` : ''}${replayed ? ' · 幂等回放（未重复部署）' : ''}`,
         })
-        sendJson(res, 200, { jobId: job.id, endpoints: ids })
+        sendJson(res, 200, { jobId: job.id, endpoints: ids, replayed })
       } catch (e) {
         record({ action: 'deploy.publish', result: 'fail', target: 'botkeep', detail: e.message })
         sendJson(res, 409, { error: e.message })
