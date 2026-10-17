@@ -1,0 +1,21 @@
+{
+  "_note": "NAV-v8 产物体积基线。由 tools/console/test-bundle-size.mjs 读取，超基线即失败。有意的体积增量请改本文件并在此补一句备注（格式见下方 history）。",
+  "_updated": "2026-10-18",
+  "baseline": {
+    "shellGzBytes": 552960,
+    "_shellGzBytes_note": "540 KiB。2026-10-18 实测 520.4 KiB gz，留约 4% 余量防构建抖动。M2 减重后应下调到 500 KiB 目标附近。",
+    "swPrecacheItems": 61,
+    "_swPrecacheItems_note": "2026-10-18 实测 61 条。M2 目标 24 条（规划 §3.1：复核新增条目里哪些用户一辈子看不到）。",
+    "swPrecacheBytes": 1677721,
+    "_swPrecacheBytes_note": "1.60 MB。2026-10-18 实测 1.44 MB。M2 目标 1.1 MB。"
+  },
+  "target": {
+    "_note": "M2 减重目标（规划 §3.1 / §4 验收表），仅供台账打印，不作为断言。",
+    "shellGzBytes": 512000,
+    "swPrecacheItems": 24,
+    "swPrecacheBytes": 1153434
+  },
+  "history": [
+    { "date": "2026-10-18", "by": "4pnj9g", "note": "建立基线：外壳 520.4 KiB gz / 预缓存 61 条 1.44 MB。此刻一周新功能已把外壳推高 62%，而此前无任何门禁守总量。" }
+  ]
+}
