@@ -229,6 +229,9 @@
       "productivity",
       "learning",
       "trading"
+    ],
+    "aliases": [
+      "pplx"
     ]
   },
   {
@@ -439,6 +442,9 @@
     "purposes": [
       "design",
       "video"
+    ],
+    "aliases": [
+      "RunwayML"
     ]
   },
   {
@@ -721,6 +727,9 @@
       "learning",
       "news",
       "data"
+    ],
+    "aliases": [
+      "jiqizhixin"
     ]
   },
   {
@@ -739,6 +748,9 @@
     "purposes": [
       "learning",
       "news"
+    ],
+    "aliases": [
+      "qbitai"
     ]
   },
   {
@@ -1015,6 +1027,9 @@
     "icon": "icons/dx1.png",
     "purposes": [
       "trading"
+    ],
+    "aliases": [
+      "UNI"
     ]
   },
   {
@@ -1086,7 +1101,8 @@
     "icon": "icons/dx5.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "aliases": []
   },
   {
     "id": "dx6",
@@ -1159,7 +1175,8 @@
     "purposes": [
       "trading",
       "coding"
-    ]
+    ],
+    "aliases": []
   },
   {
     "id": "df2",
@@ -1245,6 +1262,9 @@
     "icon": "icons/df6.png",
     "purposes": [
       "trading"
+    ],
+    "aliases": [
+      "COMP"
     ]
   },
   {
@@ -1311,6 +1331,9 @@
       "reference",
       "community",
       "trading"
+    ],
+    "aliases": [
+      "Trading View"
     ]
   },
   {
@@ -1748,6 +1771,9 @@
     "icon": "icons/in3.ico",
     "purposes": [
       "tool"
+    ],
+    "aliases": [
+      "ARB"
     ]
   },
   {
@@ -1766,6 +1792,9 @@
     "purposes": [
       "tool",
       "trading"
+    ],
+    "aliases": [
+      "OP"
     ]
   },
   {
@@ -1806,6 +1835,9 @@
       "tool",
       "trading",
       "data"
+    ],
+    "aliases": [
+      "LINK"
     ]
   },
   {
@@ -1841,6 +1873,9 @@
     "purposes": [
       "tool",
       "data"
+    ],
+    "aliases": [
+      "TIA"
     ]
   },
   {
@@ -1859,6 +1894,9 @@
     "purposes": [
       "trading",
       "design"
+    ],
+    "aliases": [
+      "OS"
     ]
   },
   {
@@ -1878,7 +1916,8 @@
       "trading",
       "design",
       "tool"
-    ]
+    ],
+    "aliases": []
   },
   {
     "id": "nf3",
@@ -2031,6 +2070,9 @@
     "purposes": [
       "news",
       "data"
+    ],
+    "aliases": [
+      "CT"
     ]
   },
   {
@@ -2269,6 +2311,9 @@
     "purposes": [
       "ai-chat",
       "trading"
+    ],
+    "aliases": [
+      "RNDR"
     ]
   },
   {
@@ -2288,6 +2333,9 @@
       "ai-chat",
       "trading",
       "learning"
+    ],
+    "aliases": [
+      "TAO"
     ]
   },
   {
@@ -2367,6 +2415,9 @@
       "trading",
       "data",
       "tool"
+    ],
+    "aliases": [
+      "GRT"
     ]
   },
   {
@@ -2385,6 +2436,9 @@
     "purposes": [
       "ai-chat",
       "trading"
+    ],
+    "aliases": [
+      "HNT"
     ]
   },
   {
@@ -2561,6 +2615,9 @@
     "purposes": [
       "coding",
       "ai-chat"
+    ],
+    "aliases": [
+      "Codeium"
     ]
   },
   {
@@ -2637,6 +2694,9 @@
       "design",
       "video",
       "community"
+    ],
+    "aliases": [
+      "Pika Labs"
     ]
   },
   {
@@ -3374,7 +3434,8 @@
     "purposes": [
       "tool",
       "learning"
-    ]
+    ],
+    "aliases": []
   },
   {
     "id": "nf5",
@@ -4060,7 +4121,8 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "aliases": []
   },
   {
     "id": "aiapi1",
@@ -5221,6 +5283,9 @@
     "purposes": [
       "learning",
       "news"
+    ],
+    "aliases": [
+      "shuge"
     ]
   },
   {
