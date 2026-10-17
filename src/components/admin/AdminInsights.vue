@@ -90,6 +90,47 @@
         </div>
       </div>
     </div>
+    <!-- 数据质量体检（F1）：判据与 `scripts/audit-data.mjs` 同源（shared/ops/data-quality.mjs） -->
+    <div class="insight-card quality-card">
+      <h3 class="insight-title">数据质量体检
+        <span class="dead-note">（判据与 <code>nav data audit</code> 同源；「同站多入口」需人工甄别，不自动合并）</span>
+      </h3>
+      <p class="quality-summary" :class="{ ok: quality.clean }">{{ qualitySummary }}</p>
+
+      <div v-if="quality.duplicateUrls.length" class="quality-block">
+        <div class="quality-block-title danger">完全重复 · {{ quality.duplicateUrls.length }} 组（同一页被收录多次）</div>
+        <div v-for="g in quality.duplicateUrls" :key="g.url" class="quality-row">
+          <span class="quality-host">{{ g.url }}</span>
+          <span class="quality-names">{{ g.names.join(' / ') }}</span>
+          <button type="button" class="quality-fix" @click="mergeDuplicate(g)">合并（归档其余）</button>
+        </div>
+      </div>
+
+      <div v-if="quality.sameHostGroups.length" class="quality-block">
+        <div class="quality-block-title warn">同站多入口 · {{ quality.sameHostGroups.length }} 组（不同页面，需人工确认是否合并）</div>
+        <div v-for="g in quality.sameHostGroups" :key="g.host" class="quality-row">
+          <span class="quality-host">{{ g.host }}</span>
+          <span class="quality-names">{{ g.names.join(' / ') }}</span>
+        </div>
+      </div>
+
+      <div v-if="quality.weakDesc.length" class="quality-block">
+        <div class="quality-block-title">描述待改进 · {{ quality.weakDesc.length }} 条</div>
+        <div v-for="d in quality.weakDesc.slice(0, 10)" :key="d.id" class="quality-row">
+          <span class="quality-host">{{ d.name || d.id }}</span>
+          <span class="quality-names">{{ descLabel(d.issue) }}</span>
+        </div>
+        <div v-if="quality.weakDesc.length > 10" class="quality-hint">…另有 {{ quality.weakDesc.length - 10 }} 条</div>
+      </div>
+
+      <div v-if="quality.missingIcon.length" class="quality-block">
+        <div class="quality-block-title">缺 icon · {{ quality.missingIcon.length }} 条
+          <span class="quality-hint">（前端退化为字母块，功能不受影响）</span>
+        </div>
+      </div>
+
+      <div v-if="quality.clean && !quality.sameHostGroups.length" class="quality-empty">未发现数据质量问题。</div>
+    </div>
   </div>
 </template>
 
@@ -101,6 +142,7 @@ import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../../shared/clicks-core.mjs'
 import { sparkline } from '@/utils/chartkit'
+import { auditSites, DESC_ISSUE_LABEL, summarizeAudit } from '../../../shared/ops/data-quality.mjs'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -157,6 +199,22 @@ const deadSites = computed(() =>
     .filter(Boolean),
 )
 
+/* ---------------- 数据质量体检（F1） ---------------- */
+
+/**
+ * 判据与 scripts/audit-data.mjs **同源**（shared/ops/data-quality.mjs）——
+ * 面板与 CLI 不会各说各话。这里只消费内核结果，不重复实现判据。
+ */
+const quality = computed(() => auditSites(sitesStore.sites))
+const qualitySummary = computed(() => summarizeAudit(quality.value))
+const descLabel = (issue) => DESC_ISSUE_LABEL[issue] || issue
+
+/** 合并真重复：保留每组首条，其余**归档**进回收站（可恢复，比直接删除安全） */
+function mergeDuplicate(g) {
+  const removeIds = (g.ids || []).filter(id => id !== g.keep)
+  if (removeIds.length) sitesStore.batchArchive(removeIds)
+}
+
 /* ---------------- 可用性 / 响应时间趋势 ---------------- */
 
 const histPoints = ref([])
@@ -211,6 +269,21 @@ const trendRange = computed(() => {
 .insight-notes { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .insight-note.muted { color: var(--text-secondary); font-weight: 500; }
 .insight-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 16px; }
+.quality-summary { margin: 0 0 12px; font-size: 12.5px; color: var(--text-secondary); }
+.quality-summary.ok { color: var(--ok-fg); }
+.quality-block { margin-bottom: 12px; }
+.quality-block:last-child { margin-bottom: 0; }
+.quality-block-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
+.quality-block-title.danger { color: var(--danger-fg); }
+.quality-block-title.warn { color: var(--warn-fg); }
+.quality-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border-light); }
+.quality-row:last-child { border-bottom: none; }
+.quality-host { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-primary); flex-shrink: 0; }
+.quality-names { color: var(--text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quality-fix { border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 11px; padding: 2px 10px; border-radius: 999px; cursor: pointer; flex-shrink: 0; font-family: var(--font); }
+.quality-fix:hover { background: var(--accent); color: var(--color-on-solid); }
+.quality-hint { font-size: 11px; color: var(--text-secondary); opacity: .85; font-weight: 400; }
+.quality-empty { font-size: 12.5px; color: var(--text-secondary); }
 .insight-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
 .insight-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
