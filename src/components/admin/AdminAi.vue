@@ -24,6 +24,7 @@ const categoriesStore = useCategoriesStore()
 const healthStore = useHealthStore()
 
 const ready = ref(false)
+const probed = ref(false)
 const model = ref('')
 const busy = ref('')
 const message = ref('')
@@ -37,6 +38,7 @@ onMounted(async () => {
   const p = await aiApi.probe()
   ready.value = p.ready
   model.value = p.model
+  probed.value = true
 })
 
 /** 未分类 / 未识别的站点优先（这才是「AI 出手」的地方） */
@@ -292,6 +294,9 @@ const dedupe = computed(() => auditSites(sitesStore.sites))
       <button class="mini-btn primary" :disabled="busy === 'desc' || !ready" @click="runDescribe">
         {{ busy === 'desc' ? '生成中…' : `生成 ${descTargets.length} 个站点的候选描述` }}
       </button>
+      <p v-if="probed && !ready" class="ops-note warn">
+        未检测到可用的 AI 供应商，按钮已禁用。到「设置 → AI」配置 baseURL 与 API key 后刷新本页。
+      </p>
       <ul v-if="descSuggestions.length" class="list">
         <li v-for="d in descSuggestions" :key="d.id" class="row desc-row">
           <input type="checkbox" v-model="d.picked" class="desc-pick" />
@@ -334,6 +339,7 @@ const dedupe = computed(() => auditSites(sitesStore.sites))
 .panel { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .panel h4 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
 .ops-hint, .ops-note { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.ops-note.warn { color: var(--warn-fg); }
 .list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .row { display: flex; align-items: center; gap: 10px; font-size: 13px; padding: 6px 8px; border-radius: 6px; background: var(--border-light); }
 .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

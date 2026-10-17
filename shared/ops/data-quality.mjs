@@ -154,6 +154,22 @@ export function planHostMerge(audit) {
   return { removeIds, groups: audit?.duplicateUrls?.length || 0 }
 }
 
+/**
+ * 单组合并计划：保留 `keepId`，其余归档。
+ *
+ * 用于「同站多入口」的人工合并 —— 这类组**不建议自动合并**（不同页面可能是不同产品），
+ * 所以保留哪条必须由人选。`keepId` 不在组内时返回空清单，宁可不动也不误删。
+ *
+ * @param {{ids: string[]}} group
+ * @param {string} keepId
+ * @returns {{ keepId: string, removeIds: string[] }}
+ */
+export function planGroupMerge(group, keepId) {
+  const ids = Array.isArray(group?.ids) ? group.ids : []
+  if (!ids.includes(keepId)) return { keepId: '', removeIds: [] }
+  return { keepId, removeIds: ids.filter(id => id !== keepId) }
+}
+
 /** 体检报告的一行人类可读摘要（CLI 与面板提示共用） */
 export function summarizeAudit(audit) {
   if (!audit) return '（无数据）'

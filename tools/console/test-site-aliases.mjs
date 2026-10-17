@@ -108,6 +108,14 @@ const HITS = [
   ['trading view', 'TradingView'],
   ['UNI', 'Uniswap'],
   ['CT', 'Cointelegraph'],
+  // 第二批（2026-10-18）：实测搜不到的无空格/缩写写法，补别名后必须命中首位
+  ['oneinch', '1inch'],
+  ['one inch', '1inch'],
+  ['pwc', 'Papers With Code'],
+  ['layer zero', 'LayerZero'],
+  ['ionet', 'IO.net'],
+  ['theblock', 'The Block'],
+  ['certik', 'CertiK'],
 ]
 for (const [q, expect] of HITS) {
   const top = rankSites(sites, q)[0]?.name

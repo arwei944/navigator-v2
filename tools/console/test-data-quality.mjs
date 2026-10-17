@@ -8,7 +8,7 @@
  *
  * 运行：node tools/console/test-data-quality.mjs
  */
-import { auditSites, descIssue, planHostMerge, summarizeAudit } from '../../shared/ops/data-quality.mjs'
+import { auditSites, descIssue, planHostMerge, planGroupMerge, summarizeAudit } from '../../shared/ops/data-quality.mjs'
 
 let pass = 0
 const failures = []
@@ -91,6 +91,26 @@ const eq = (a, b, label) => ok(Object.is(a, b), label, `期望 ${JSON.stringify(
   const dirty = auditSites([{ id: 'a', name: 'A', url: 'https://a.com', desc: '', icon: '' }])
   ok(summarizeAudit(dirty).startsWith('⚠️'), '有问题的摘要以 ⚠️ 开头')
   eq(summarizeAudit(null), '（无数据）', '空输入不崩')
+}
+
+/* ---------------- 同站多入口的人工合并（planGroupMerge） ---------------- */
+{
+  const group = { host: 'github.com', ids: ['cd2', 'l9'], names: ['GitHub Copilot', 'GitHub Trending'] }
+  eq(planGroupMerge(group, 'cd2').removeIds.join(','), 'l9', '保留 cd2 时，l9 待归档')
+  eq(planGroupMerge(group, 'l9').removeIds.join(','), 'cd2', '保留 l9 时，cd2 待归档 —— 保留项由人指定，不默认首条')
+  eq(planGroupMerge(group, 'l9').keepId, 'l9', 'keepId 原样回传')
+  eq(planGroupMerge(group, '').removeIds.length, 0, '未选保留项时不动任何数据')
+  eq(planGroupMerge(group, 'nope').removeIds.length, 0, 'keepId 不在组内时不合并（宁可不动也不误删）')
+  eq(planGroupMerge(null, 'a').removeIds.length, 0, '空组不崩')
+  // 合并结果必须覆盖整组：保留 1 条 + 移除 N-1 条 = 原组大小，不多删也不漏删
+  const three = { host: 'x.com', ids: ['a', 'b', 'c'] }
+  const p = planGroupMerge(three, 'b')
+  eq(p.removeIds.length, 2, '三选一：移除 2 条')
+  ok(!p.removeIds.includes('b'), '保留项不出现在移除清单里')
+  ok(planHostMerge(auditSites([
+    { id: 'x1', name: 'X1', url: 'https://x.com/a', desc: '描述文本足够长', icon: 'x' },
+    { id: 'x2', name: 'X2', url: 'https://x.com/b', desc: '描述文本足够长', icon: 'x' },
+  ])).removeIds.length === 0, '同站多入口仍不进「自动合并」清单 —— 人工合并是独立入口')
 }
 
 /* ---------------- 报告 ---------------- */

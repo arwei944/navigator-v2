@@ -113,9 +113,19 @@
 
       <div v-if="quality.sameHostGroups.length" class="quality-block">
         <div class="quality-block-title warn">同站多入口 · {{ quality.sameHostGroups.length }} 组（不同页面，需人工确认是否合并）</div>
-        <div v-for="g in quality.sameHostGroups" :key="g.host" class="quality-row">
+        <div v-for="g in quality.sameHostGroups" :key="g.host" class="quality-row merge-row">
           <span class="quality-host">{{ g.host }}</span>
           <span class="quality-names">{{ g.names.join(' / ') }}</span>
+          <select v-model="mergeKeep[g.host]" class="merge-pick" :aria-label="`保留 ${g.host} 的哪一条`">
+            <option value="">保留…</option>
+            <option v-for="(id, i) in g.ids" :key="id" :value="id">{{ g.names[i] }}</option>
+          </select>
+          <button
+            type="button"
+            class="quality-fix"
+            :disabled="!mergeKeep[g.host]"
+            @click="mergeHostGroup(g)"
+          >合并其余</button>
         </div>
       </div>
 
@@ -147,7 +157,7 @@ import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../../shared/clicks-core.mjs'
 import { sparkline } from '@/utils/chartkit'
-import { auditSites, DESC_ISSUE_LABEL, summarizeAudit } from '../../../shared/ops/data-quality.mjs'
+import { auditSites, DESC_ISSUE_LABEL, summarizeAudit, planGroupMerge } from '../../../shared/ops/data-quality.mjs'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -217,7 +227,27 @@ const descLabel = (issue) => DESC_ISSUE_LABEL[issue] || issue
 /** 合并真重复：保留每组首条，其余**归档**进回收站（可恢复，比直接删除安全） */
 function mergeDuplicate(g) {
   const removeIds = (g.ids || []).filter(id => id !== g.keep)
-  if (removeIds.length) sitesStore.batchArchive(removeIds)
+  if (!removeIds.length) return
+  const names = (g.names || []).join(' / ')
+  if (!window.confirm(`合并「${names}」：保留 ${g.keep}，归档其余 ${removeIds.length} 条？\n\n归档进回收站，可随时恢复。`)) return
+  sitesStore.batchArchive(removeIds)
+}
+
+/**
+ * 同站多入口的人工合并：保留用户选中的那条，其余归档。
+ *
+ * 与 `mergeDuplicate` 的区别是**保留项由人指定** —— 同 host 的不同页面往往是不同产品
+ * （github.com/trending 与 github.com/copilot），默认保留首条会删错。
+ */
+const mergeKeep = ref({})
+function mergeHostGroup(g) {
+  const keepId = mergeKeep.value[g.host]
+  const { removeIds } = planGroupMerge(g, keepId)
+  if (!removeIds.length) return
+  const keepName = g.names[(g.ids || []).indexOf(keepId)] || keepId
+  if (!window.confirm(`合并 ${g.host}：保留「${keepName}」，归档其余 ${removeIds.length} 条？\n\n归档进回收站，可随时恢复。`)) return
+  sitesStore.batchArchive(removeIds)
+  delete mergeKeep.value[g.host]
 }
 
 /**
@@ -297,6 +327,9 @@ const trendRange = computed(() => {
 .quality-names { color: var(--text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quality-fix { border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 11px; padding: 2px 10px; border-radius: 999px; cursor: pointer; flex-shrink: 0; font-family: var(--font); }
 .quality-fix:hover { background: var(--accent); color: var(--color-on-solid); }
+.quality-fix:disabled { opacity: .5; cursor: default; border-color: var(--border); color: var(--text-secondary); background: transparent; }
+.merge-row { flex-wrap: wrap; }
+.merge-pick { font-family: var(--font); font-size: 11px; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-white); color: var(--text-primary); flex-shrink: 0; max-width: 180px; }
 .quality-hint { font-size: 11px; color: var(--text-secondary); opacity: .85; font-weight: 400; }
 .quality-empty { font-size: 12.5px; color: var(--text-secondary); }
 .dead-fails { font-size: 11px; color: var(--warn-fg); flex-shrink: 0; }
