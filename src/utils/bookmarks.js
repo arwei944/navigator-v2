@@ -63,6 +63,27 @@ export function buildExportJSON(sites, favorites, history) {
   }
 }
 
+/**
+ * HTML 转义：站名 / URL 会被直接拼进书签文件的标签体与属性值里。
+ * 中文站名里出现 `<`、`&`、引号并不罕见（「搜索 & 发现」「<工具>」），
+ * 不转义就会破坏导出文件的结构 —— 属性被引号截断、标签提前闭合，
+ * 导入到浏览器后条目丢失或串位。`&` 必须最先替换，否则会二次转义。
+ */
+export function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** ADD_DATE 取 Unix 秒；createdAt 缺失 / 非数值时兜底为导出时刻 —— 导出 NaN 导入浏览器后是非法时间 */
+function addDateSeconds(createdAt) {
+  const t = Number(createdAt)
+  return Number.isFinite(t) && t > 0 ? Math.floor(t / 1000) : Math.floor(Date.now() / 1000)
+}
+
 // 导出站点为 Netscape 书签 HTML
 export function buildExportHTML(sites) {
   const now = new Date().toISOString().split('T')[0]
@@ -74,7 +95,8 @@ export function buildExportHTML(sites) {
   <DT><H3>Navigator 导航站 (${now})</H3>
   <DL><p>\n`
   sites.forEach(s => {
-    html += `    <DT><A HREF="https://${s.url}" ADD_DATE="${Math.floor(s.createdAt / 1000)}">${s.name}</A>\n`
+    // HREF 与标签体都过 escapeHtml：url 里出现引号会把属性截断，站名里的 < & 会破坏标签
+    html += `    <DT><A HREF="https://${escapeHtml(s.url)}" ADD_DATE="${addDateSeconds(s.createdAt)}">${escapeHtml(s.name)}</A>\n`
   })
   html += `  </DL><p>\n</DL><p>\n`
   return html
