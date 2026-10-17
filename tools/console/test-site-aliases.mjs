@@ -15,6 +15,7 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { rankSites } from '../../src/utils/search.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const dataPath = join(root, 'api', 'sites-data.json')
@@ -87,6 +88,31 @@ for (const s of sites) {
 ok(badShape === 0, '所有别名都是非空字符串', `${badShape} 条异常`)
 ok(dupAliases === 0, '同站内别名无重复', `${dupAliases} 条重复`)
 ok(aliasEqualsName === 0, '别名不与自身站名重复', `${aliasEqualsName} 条重复`)
+
+/* ---------------- 端到端：别名真的搜得到 ---------------- */
+
+/**
+ * 走 rankSites —— 与搜索框同一条路径（内部 trim + toLowerCase），
+ * 断言「输入这个别名，首位就是期望站点」。只验数据存在不验命中，
+ * 等于没验：别名可能因档位、拼音或域名主体抢先而排不到第一。
+ * 大小写混着写：别名分档对小写化是幂等的，用户不会都按原样输入。
+ */
+const HITS = [
+  ['pplx', 'Perplexity'],
+  ['codeium', 'Windsurf'],
+  ['ARB', 'Arbitrum'],
+  ['link', 'Chainlink'],
+  ['GRT', 'The Graph'],
+  ['jiqizhixin', '机器之心'],
+  ['QBITAI', '量子位'],
+  ['trading view', 'TradingView'],
+  ['UNI', 'Uniswap'],
+  ['CT', 'Cointelegraph'],
+]
+for (const [q, expect] of HITS) {
+  const top = rankSites(sites, q)[0]?.name
+  ok(top === expect, `搜「${q}」首位是「${expect}」`, `实得「${top}」`)
+}
 
 /* ---------------- 结果 ---------------- */
 
