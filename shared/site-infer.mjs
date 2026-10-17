@@ -791,3 +791,62 @@ export function auditDescJunk(sites) {
   }
   return out
 }
+
+/* ─────────────────────────────────────────────────────────────
+ * 自动归类一致性体检（F5①）
+ *
+ * 「准确率」的可解释口径：把每条**已有分类**的站点重新喂给 `inferCategory`
+ * （与「新增站点」时同一套推断），比对推荐分类与现值。一致的算命中；不一致的列出来，
+ * 就是「现存归类里可能与规则不符」的清单 —— 高频出现的偏差模式才是调规则 / 提示词的依据。
+ *
+ * 两条刻意的边界：
+ *   · **无信号不算进分母**：规则对该站（如纯品牌名、无关键词）判断不了时（score<=0），
+ *     把它算成「不命中」会凭空拉低准确率。这里直接跳过 —— 准确率衡量的是「规则出手时的正确率」。
+ *   · **排除自己再比**：inferCategory 有「同域 / 同族站点」信号，若把自己也算进参照，
+ *     每个站都会命中自己而恒等，准确率永远 100%，等于没测。
+ * ───────────────────────────────────────────────────────────── */
+export function auditCategoryConsistency(sites, { categoryMeta = {} } = {}) {
+  const list = Array.isArray(sites) ? sites.filter(s => s && typeof s === 'object') : []
+  const meta = categoryMeta && typeof categoryMeta === 'object' ? categoryMeta : {}
+
+  let scored = 0          // 规则能出手的站点数（分母）
+  let consistent = 0      // 其中与现值一致的（分子）
+  const mismatches = []
+
+  for (const s of list) {
+    const current = String(s.categoryId || '').trim()
+    if (!current) continue
+    const others = list.filter(x => x.id !== s.id)
+    const u = String(s.url || '')
+    let host = ''
+    let path = ''
+    try {
+      const parsed = new URL(u.includes('://') ? u : 'https://' + u)
+      host = parsed.hostname
+      path = parsed.pathname
+    } catch { /* 地址解析不了 → 用空域名，只靠名称/描述信号 */ }
+    const rec = inferCategory({ name: s.name, desc: s.desc, domain: host, path }, others, meta, { fallback: '' })
+    if (!(rec.score > 0)) continue   // 规则无信号，不计入分母
+    scored++
+    if (rec.categoryId === current) consistent++
+    else mismatches.push({
+      id: s.id, name: s.name, url: s.url,
+      current, recommended: rec.categoryId,
+      confidence: rec.confidence, reasons: rec.reasons,
+    })
+  }
+
+  const rate = scored ? consistent / scored : 1
+  // 高频偏差：按「现值 → 推荐值」聚合，供「先看哪类系统性判错」排序
+  const pattern = new Map()
+  for (const m of mismatches) {
+    const k = `${m.current} → ${m.recommended}`
+    pattern.set(k, (pattern.get(k) || 0) + 1)
+  }
+  const topPatterns = [...pattern.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([pair, count]) => ({ pair, count }))
+
+  return { scored, consistent, rate, mismatches, topPatterns }
+}

@@ -14,6 +14,8 @@ import { aiApi } from '@/services/aiApi'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useHealthStore } from '@/stores/health'
+import { auditCategoryConsistency, auditDescJunk } from '../../../shared/site-infer.mjs'
+import { auditSites } from '../../../shared/ops/data-quality.mjs'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 
@@ -108,6 +110,99 @@ async function applySuggestion(row) {
     sitesStore.updateSiteField(row.id, 'categoryId', cid)
   }
 }
+
+/* ─────────── F5① 归类一致性 ─────────── */
+
+const consistency = ref(null)   // { scored, consistent, rate, mismatches, topPatterns }
+
+/**
+ * 本地跑一致性体检：**不依赖 AI 配置**（纯规则重算），任何时候都可用。
+ * 准确率口径见 shared/site-infer.mjs#auditCategoryConsistency 的注释 ——
+ * 规则判断不了的站点不计入分母，不然会用「规则没意见」稀释「规则判错了」。
+ */
+function runConsistency() {
+  const meta = Object.fromEntries(categoriesStore.categories.map(c => [c.id, c]))
+  consistency.value = auditCategoryConsistency(sitesStore.sites, { categoryMeta: meta })
+  const r = consistency.value
+  say(r.scored
+    ? `规则可判断 ${r.scored} 条，一致 ${r.consistent} 条，准确率 ${(r.rate * 100).toFixed(1)}%`
+    : '规则没有对任何站点出手（无信号），没有可比样本', 'ok')
+}
+
+/** 把「规则推荐 ≠ 现值」的站点送去 AI 复核 —— 与批量分类同一通道，人确认后才应用 */
+async function recheckWithAi() {
+  const ids = new Set((consistency.value?.mismatches || []).map(m => m.id))
+  const targets = sitesStore.sites.filter(s => ids.has(s.id)).slice(0, 20)
+  if (!targets.length) { say('没有待复核的站点', 'ok'); return }
+  busy.value = 'cat'; say('AI 正在复核这些站点的归类…')
+  try {
+    const r = await aiApi.categorize(
+      targets.map(s => ({ id: s.id, name: s.name, url: s.url, desc: s.desc })),
+      categoriesStore.categories.map(c => ({ id: c.id, label: c.label })),
+    )
+    if (!r.ok) throw new Error(r.error || '失败')
+    suggestions.value = r.suggestions || []
+    say(`AI 复核给出 ${suggestions.value.length} 条建议（在上方「批量分类建议」里勾选应用）`, 'ok')
+  } catch (e) {
+    say('复核失败：' + (e.message || e), 'err')
+  } finally { busy.value = '' }
+}
+
+/* ─────────── F5② 描述生成 ─────────── */
+
+/**
+ * 目标站点 = 「弱描述」（内核 descIssue：缺失/过短/占位/雷同）∪「机器垃圾」（junk 层）。
+ * 两个判据都来自共用实现，这里只负责圈人，不另写一套「什么叫描述差」。
+ */
+const descTargets = computed(() => {
+  const weakIds = new Set(auditSites(sitesStore.sites).weakDesc.map(w => w.id))
+  const junkIds = new Set(auditDescJunk(sitesStore.sites).map(j => j.id))
+  return sitesStore.sites.filter(s => !s.archived && (weakIds.has(s.id) || junkIds.has(s.id))).slice(0, 20)
+})
+
+const descSuggestions = ref([])   // [{ id, name, old, desc, changed, picked }]
+const pickedCount = computed(() => descSuggestions.value.filter(d => d.picked).length)
+
+async function runDescribe() {
+  const targets = descTargets.value
+  if (!targets.length) { say('没有待改进的描述（弱描述与机器垃圾检出均为 0）', 'ok'); return }
+  busy.value = 'desc'; say('AI 正在写候选描述…')
+  try {
+    const catLabel = Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.label]))
+    const r = await aiApi.describe(targets.map(s => ({
+      id: s.id, name: s.name, url: s.url, desc: s.desc,
+      categoryId: s.categoryId, categoryLabel: catLabel[s.categoryId] || s.categoryId || '',
+    })))
+    if (!r.ok) throw new Error(r.error || '失败')
+    const old = new Map(targets.map(s => [s.id, s.desc || '']))
+    descSuggestions.value = (r.results || [])
+      .filter(x => x.changed && x.desc)
+      .map(x => ({ ...x, old: old.get(x.id) || '', picked: true }))
+    say(descSuggestions.value.length
+      ? `给出 ${descSuggestions.value.length} 条候选（默认全选，逐条审阅后写入）`
+      : 'AI 认为现有描述已合格，没有重写建议', 'ok')
+  } catch (e) {
+    say('描述生成失败：' + (e.message || e), 'err')
+  } finally { busy.value = '' }
+}
+
+/** 写回勾选的描述。只写 picked 的 —— 候选永远只是候选，不勾不写 */
+function applyDescSuggestions() {
+  const picked = descSuggestions.value.filter(d => d.picked && d.changed && d.desc)
+  if (!picked.length) { say('没有勾选任何候选', 'ok'); return }
+  const pickedSet = new Set(picked)
+  for (const d of picked) sitesStore.updateSiteField(d.id, 'desc', d.desc)
+  descSuggestions.value = descSuggestions.value.filter(d => !pickedSet.has(d))
+  say(`已写入 ${picked.length} 条描述（本地覆盖层，云端发布后全站生效）`, 'ok')
+}
+
+/* ─────────── F5③ 去重建议 ─────────── */
+
+/**
+ * 检测与「数据质量体检」（F1）共用同一份内核（shared/ops/data-quality.mjs），
+ * 这里只做**只读建议** —— 真正的合并动作在「数据洞察」的体检卡片执行，两处不重复落地。
+ */
+const dedupe = computed(() => auditSites(sitesStore.sites))
 </script>
 
 <template>
@@ -158,6 +253,78 @@ async function applySuggestion(row) {
       </p>
     </section>
 
+    <section class="panel">
+      <h4>归类一致性体检</h4>
+      <p class="ops-note">
+        把每条已有分类的站点重新喂给「新增站点时的同一套推断规则」，比对推荐与现值。
+        这是<b>规则出手时的准确率</b> —— 规则判断不了的站点不计入分母。
+      </p>
+      <button class="mini-btn primary" @click="runConsistency">跑一致性体检</button>
+      <template v-if="consistency">
+        <p class="ops-note cons-rate">
+          规则可判断 {{ consistency.scored }} 条 · 一致 {{ consistency.consistent }} 条 ·
+          准确率 <b>{{ Math.round(consistency.rate * 1000) / 10 }}%</b>
+        </p>
+        <div v-if="consistency.topPatterns.length" class="cons-patterns">
+          <span v-for="p in consistency.topPatterns" :key="p.pair" class="cons-pattern">{{ p.pair }} ×{{ p.count }}</span>
+        </div>
+        <ul v-if="consistency.mismatches.length" class="list">
+          <li v-for="m in consistency.mismatches.slice(0, 20)" :key="m.id" class="row">
+            <span class="name">{{ m.name }}</span>
+            <span class="tag diff">{{ m.current }} → {{ m.recommended }}</span>
+          </li>
+        </ul>
+        <button v-if="consistency.mismatches.length" class="mini-btn" @click="recheckWithAi">
+          把不一致的送去 AI 复核
+        </button>
+        <p class="ops-note">
+          高频偏差多来自「规则分类粒度比人工体系粗」。系统性改规则前，先看上方偏差是否集中在某几对分类之间。
+        </p>
+      </template>
+    </section>
+
+    <section class="panel">
+      <h4>描述生成（缺描述 / 弱描述 / 机器垃圾）</h4>
+      <p class="ops-note">
+        对描述缺失、过短、占位、与站名雷同或含机器垃圾的站点批量生成候选。
+        <b>只出候选</b>，写回要你逐条勾选确认。
+      </p>
+      <button class="mini-btn primary" :disabled="busy === 'desc' || !ready" @click="runDescribe">
+        {{ busy === 'desc' ? '生成中…' : `生成 ${descTargets.length} 个站点的候选描述` }}
+      </button>
+      <ul v-if="descSuggestions.length" class="list">
+        <li v-for="d in descSuggestions" :key="d.id" class="row desc-row">
+          <input type="checkbox" v-model="d.picked" class="desc-pick" />
+          <span class="desc-body">
+            <span class="name">{{ d.name }}</span>
+            <span class="desc-old">现：{{ d.old || '（空）' }}</span>
+            <span class="desc-new">新：{{ d.desc }}</span>
+          </span>
+        </li>
+      </ul>
+      <button v-if="pickedCount" class="mini-btn primary" @click="applyDescSuggestions">
+        写入选中的 {{ pickedCount }} 条
+      </button>
+    </section>
+
+    <section class="panel">
+      <h4>重复 / 近似站点建议</h4>
+      <p class="ops-note">
+        检测与「数据质量体检」共用同一份判据，这里只出建议；合并动作在「数据洞察 → 数据质量体检」卡片里执行。
+      </p>
+      <ul v-if="dedupe.duplicateUrls.length || dedupe.sameHostGroups.length" class="list">
+        <li v-for="g in dedupe.duplicateUrls" :key="g.url" class="row">
+          <span class="name">{{ g.names.join(' ／ ') }}</span>
+          <span class="tag dup">真重复 · 建议合并（保留 {{ g.keep }}）</span>
+        </li>
+        <li v-for="g in dedupe.sameHostGroups" :key="g.host" class="row">
+          <span class="name">{{ g.names.join(' ／ ') }}</span>
+          <span class="tag">同站多入口 · 需人工甄别</span>
+        </li>
+      </ul>
+      <p v-else class="ops-note">未发现真重复或同站多入口。</p>
+    </section>
+
     <p v-if="message" class="ops-msg" :class="tone">{{ message }}</p>
   </div>
 </template>
@@ -179,4 +346,16 @@ async function applySuggestion(row) {
 .mini-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; }
 .mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }
+
+/* F5 三项：一致性体检 / 描述生成 / 去重建议 */
+.cons-rate b { color: var(--accent); }
+.cons-patterns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.cons-pattern { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: var(--warn-bg); color: var(--warn-fg); }
+.tag.diff { color: var(--warn-fg); }
+.tag.dup { color: var(--danger-fg); }
+.desc-row { align-items: flex-start; gap: 8px; }
+.desc-pick { margin-top: 3px; flex-shrink: 0; accent-color: var(--accent); }
+.desc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.desc-old { font-size: 11px; color: var(--text-secondary); }
+.desc-new { font-size: 12px; color: var(--ok-fg); }
 </style>
