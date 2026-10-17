@@ -5665,7 +5665,8 @@
       "ai-chat",
       "trading",
       "tool"
-    ]
+    ],
+    "icon": "icons/ac14.png"
   },
   {
     "id": "s12",
