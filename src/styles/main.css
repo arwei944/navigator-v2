@@ -84,6 +84,53 @@ body {
 a { color: var(--accent); text-decoration: none; }
 button { font-family: inherit; }
 
+/* ============================================
+   无障碍（F3）
+   ============================================ */
+
+/**
+ * 键盘焦点必须可见。用 :focus-visible 而非 :focus —— 只在**键盘**操作时显示焦点环，
+ * 鼠标点击不出现（WAI-ARIA 推荐：既满足键盘可达，又不给鼠标用户添视觉噪声）。
+ * 此前全局没有任何焦点样式，键盘用户 Tab 一圈看不到落在哪。
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/**
+ * 尊重系统「减少动态效果」。一条全局兜底覆盖所有组件 ——
+ * 此前只有 6 个组件各自写了 @media，其余（卡片入场、脉冲、列表过渡）照旧动。
+ * 用极小的 duration 而非 none：避免个别依赖 transitionend / animationend 的逻辑收不到事件。
+ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/**
+ * 跳转链接：键盘/读屏用户第一个 Tab 到的元素，可一键跳过导航直达主内容。
+ * 平时移出视口，聚焦时才出现。
+ */
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 9999;
+  padding: 10px 16px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 0 0 var(--radius-sm) 0;
+}
+.skip-link:focus { left: 0; }
+
 /* App Layout */
 .app-layout {
   display: flex;

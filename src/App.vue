@@ -3,6 +3,9 @@
   <router-view v-if="isStandalone" />
 
   <div v-else class="app-layout" :class="{ 'sidebar-collapsed': sidebarStore.collapsed, 'no-blur': sidebarStore.animating }" :style="wallpaperStyle">
+    <!-- 无障碍（F3）：第一个可聚焦元素，键盘/读屏用户一键跳过导航直达主内容 -->
+    <a href="#main" class="skip-link">跳到主内容</a>
+
     <!-- 移动端顶部栏 -->
     <MobileHeader />
 
@@ -13,7 +16,7 @@
     <div class="overlay" :class="{ show: sidebarStore.open }" @click="sidebarStore.close()"></div>
 
     <!-- 主内容区 -->
-    <main class="main">
+    <main class="main" id="main">
       <!-- 云端数据状态条：断网/超时/服务端报错/响应不合法时，让用户知道
            「现在看到的可能是本机数据而不是云端最新」。旧实现是 catch 全空，
            断网与正常在界面上完全一样，用户会以为数据没问题。
