@@ -7,7 +7,18 @@ export function parseBookmarkFile(file, onResult) {
       onResult(parseJSON(content))
     } else if (file.name.endsWith('.html')) {
       onResult(parseBookmarkHTML(content))
+    } else {
+      // 扩展名不认识时也要给结果 —— 否则 onload 一声不响，用户以为按钮坏了
+      onResult({ error: '不支持的文件类型，请选择 .html 或 .json 书签文件' })
     }
+  }
+  /**
+   * 读取失败必须**说出来**：原先只挂 onload，编码不符 / 文件被占用 / 体积过大导致
+   * 读取失败时回调永不触发，界面停在「点了导入但什么都没发生」——用户只会以为按钮坏了。
+   * FileReader 的 error 事件覆盖这三类失败，统一回一个可展示的错误结果。
+   */
+  reader.onerror = () => {
+    onResult({ error: '读取文件失败，请确认文件未损坏、未被其他程序占用后重试' })
   }
   reader.readAsText(file, 'UTF-8')
 }
