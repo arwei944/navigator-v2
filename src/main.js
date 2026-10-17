@@ -4,7 +4,6 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App.vue'
 import router from './router'
-import { preloadPinyin } from './utils/search'
 import { useToastStore } from './stores/toast'
 import './styles/main.css'
 
@@ -42,13 +41,17 @@ app.use(router)
 app.mount('#app')
 
 /**
- * 拼音引擎（pinyin-pro，317 KB raw）不在首屏关键路径上，但用户第一次敲中文搜索时就得用。
- * 挂载完成后趁空闲把它取回来 —— 正常网络下用户还没打完第一个字，届时引擎已就绪，
- * 于是「降级为无拼音命中」的窗口在体感上不存在。
+ * 拼音引擎（pinyin-pro，317 KB raw / 139 KB gz）的加载时机——**故意不在这里预热**。
  *
- * 用 requestIdleCallback 而非 setTimeout：它保证不与首屏渲染抢主线程；
- * Safari 直到 16.4 才支持，所以留 setTimeout 兜底（宁可晚一点，也不能不预取）。
- * preloadPinyin 自身幂等，重复调用无副作用。
+ * 原先这里是 `requestIdleCallback(() => preloadPinyin(), { timeout: 3000 })`：
+ * 挂载后 3 秒内必然把它下载回来。问题是**多数访客从不搜中文**，
+ * 这 139 KB 是替他们白下的（2026-10-17 实测：首访下载 1266 KB，它是单项最大的懒加载块）。
+ *
+ * 现在改为「用户第一次表达搜索意图」才取，三条入口都走幂等的 preloadPinyin()：
+ *   - 聚焦搜索框（UnifiedSearchBox 的 @focus）；
+ *   - 打开命令面板（CommandPalette 的 open()）；
+ *   - 兜底：utils/search.js 的 keysOf() 在真的开始检索时若引擎未就绪会顺手催一次。
+ *
+ * 体感代价可忽略：本地加载约 20–40 ms，而「聚焦 → 敲下第一个字」通常远超它。
+ * 首屏预算守卫见 tools/console/test-bundle.mjs（拼音必须在独立 chunk、不在首屏清单）。
  */
-const idle = window.requestIdleCallback || (cb => setTimeout(cb, 2000))
-idle(() => preloadPinyin(), { timeout: 3000 })

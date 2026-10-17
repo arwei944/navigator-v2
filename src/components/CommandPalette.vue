@@ -37,6 +37,7 @@ import { nextTick, ref } from 'vue'
 import { useOmniBox } from '@/composables/useOmniBox'
 import { useFocusTrap } from '@/composables/useFocusTrap'
 import OmniResults from '@/components/OmniResults.vue'
+import { preloadPinyin } from '@/utils/search'
 
 const visible = ref(false)
 const inputRef = ref(null)
@@ -55,6 +56,9 @@ function open() {
   visible.value = true
   reset()
   trap.activate()
+  // 打开面板 = 用户要搜了：此刻预热拼音引擎（幂等、失败静默）。
+  // 拼音不在启动时空闲下载，理由见 main.js 末尾注释。
+  preloadPinyin()
   nextTick(() => inputRef.value?.focus())
 }
 

@@ -19,7 +19,7 @@
              :placeholder="page ? '筛选站点操作…' : '搜索站点、命令、页面…'"
              aria-label="全能搜索框"
              @mousedown="onInputPointerDown"
-             @focus="focused = true" @blur="onBlur"
+             @focus="onSearchFocus" @blur="onBlur"
              @keydown="onKeydownInput"
              ref="searchInput">
       <span v-if="raw && !page" class="search-count">{{ filteredCount }} 个结果</span>
@@ -68,6 +68,7 @@ import { useOmniBox } from '@/composables/useOmniBox'
 import { openInNewTab } from '@/utils/open'
 import OmniResults from '@/components/OmniResults.vue'
 import { describeIntent, intentToQuery, parseIntent } from '@/utils/intent'
+import { preloadPinyin } from '@/utils/search'
 
 const emit = defineEmits(['open-palette'])
 
@@ -87,6 +88,18 @@ const {
 } = omni
 
 const filteredCount = computed(() => sitesStore.filteredSites.length)
+
+/**
+ * 聚焦搜索框 = 用户要搜了：此刻预热拼音引擎（幂等、失败静默）。
+ *
+ * 为什么不在启动时预热：pinyin-pro 是 317 KB raw / 139 KB gz 的巨块，
+ * 而多数访客从不搜中文——原先启动时的 idle 预热让每个首访者都必然下载它。
+ * 详见 main.js 末尾注释与 tools/console/test-bundle.mjs 的首屏守卫。
+ */
+function onSearchFocus() {
+  focused.value = true
+  preloadPinyin()
+}
 
 /* ---- 意图识别 ----
    把「免费的 AI 画图工具」这类输入解析成 分类 × 用途 × 排序 的组合，给一条可应用的提示。
