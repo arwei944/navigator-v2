@@ -20,6 +20,21 @@
  *   · 合并去重：同 kind + 同 siteId 的重复编辑只留最新一条（把同一个站改十遍只需同步一次）；
  *   · 上限：长期离线也不至于无限增长，超限丢最旧的；
  *   · 纯逻辑 + localStorage，不碰 Pinia / DOM，可被直接断言。
+ *
+ * ## 重放（`replayOffline`）：幂等 / 可丢弃 / 冲突可回溯
+ *
+ * 恢复在线后按 `at` 升序逐条重放，**只有 push 成功才把该条移出队列**。
+ *   · 幂等：本项目推送的是**当前完整快照**（本地优先，见 liveSync），
+ *     而服务端 `/api/session` 是字段级浅合并 + 条目级 LWW —— 同一条重放两次结果不变。
+ *     所以「不敢丢弃队列」的代价仅是重复推一次同样的快照，不会造成数据错乱。
+ *   · 可丢弃：失败次数达到 `maxAttempts` 的条目会被移出并**记进 `dropped`**（带最后一次错误），
+ *     避免一条永远推不上去的脏记录把整条队列卡死。
+ *   · 冲突可回溯：`dropped` / `kept` 都带原始 `kind/siteId/at/attempts`，
+ *     调用方（或排查的人）据此可知「哪条、什么时候、为什么没同步上去」。
+ *
+ * 为什么不是「按字段重放」：编辑走的是本地 overlay + 整快照推送，队列记的是
+ * 「离线期间有过哪些待同步动作」而非「某个字段的新值」。硬做字段级重放会与
+ * LWW 合并规则打架，反而制造第二套真相。
  */
 
 const KEY = 'nav-offline-edits'
@@ -31,11 +46,14 @@ function normalizeOp(op) {
   if (!op || typeof op !== 'object') return null
   const kind = String(op.kind || '').trim()
   if (!kind) return null
-  return {
+  const out = {
     kind,
     siteId: op.siteId != null ? String(op.siteId) : '',
     at: Number(op.at) || 0,
   }
+  // 重放失败计数要跟着条目走，否则「可丢弃」永远等不到 maxAttempts
+  if (op.attempts) out.attempts = Number(op.attempts) || 0
+  return out
 }
 
 function sameOp(a, b) {
@@ -81,6 +99,41 @@ export function enqueueEdit(op) {
 export function clearOffline() {
   try { localStorage.removeItem(KEY) } catch { /* 忽略 */ }
   return []
+}
+
+/**
+ * 重放队列：按 `at` 升序逐条调用 `push(op)`，**只有成功才移出队列**。
+ *
+ * @param {object} o
+ * @param {(op:object)=>Promise<void>|void} o.push 单条重放动作（抛错视为失败）
+ * @param {()=>boolean} [o.canSend] 可发送判定（离线 / 无 key / 冷却中 → false）；false 时**不消耗队列**
+ * @param {number} [o.maxAttempts] 单条失败上限，达到即丢弃并记入 dropped
+ * @returns {Promise<{replayed:number, kept:number, dropped:Array, deferred:boolean}>}
+ *   deferred=true 表示本次没发（离线/不可发送），队列原样保留，不算失败
+ */
+export async function replayOffline({ push, canSend = () => true, maxAttempts = 5 } = {}) {
+  const queue = readRaw()
+  if (typeof push !== 'function' || !canSend()) {
+    return { replayed: 0, kept: queue.length, dropped: [], deferred: true }
+  }
+  const kept = []
+  const dropped = []
+  let replayed = 0
+  // 稳定按时间升序：离线期间的改动本就有先后，重放顺序不该随机
+  const ordered = [...queue].sort((a, b) => a.at - b.at)
+  for (const op of ordered) {
+    try {
+      await push(op)
+      replayed++
+    } catch (e) {
+      const attempts = (Number(op.attempts) || 0) + 1
+      const rec = { ...op, attempts }
+      if (attempts >= maxAttempts) dropped.push({ ...rec, error: String(e?.message || e) })
+      else kept.push(rec)
+    }
+  }
+  write(kept)
+  return { replayed, kept: kept.length, dropped, deferred: false }
 }
 
 /** 给 UI 的一句话摘要；队列为空时返回空串 */

@@ -18,6 +18,8 @@
  * POST 任意大小 JSON 灌满 Blob」的正解 —— 限流是 best-effort，体积上限是硬门禁。
  */
 import { get, put } from '#store'
+// 字段级合并的口径唯一出处（含「同字段双方都改」的完整规则），见该文件的头部注释
+import { mergeSessionData } from '../shared/session-merge.mjs'
 
 /**
  * 单次写入的体量上限。
@@ -146,17 +148,9 @@ export default async function handler(req, res) {
         return
       }
 
-      // 读旧快照，字段级合并：客户端传 replace 标记的字段整覆盖，否则合并对象
+      // 读旧快照，字段级合并 —— 口径的唯一出处见 mergeSessionData 的注释
       const prev = await readSession(name)
-      const prevData = (prev && prev.data) || {}
-      const merged = { ...prevData }
-      for (const [field, value] of Object.entries(data)) {
-        if (value && typeof value === 'object' && !Array.isArray(value)) {
-          merged[field] = { ...(prevData[field] || {}), ...value }
-        } else {
-          merged[field] = value
-        }
-      }
+      const merged = mergeSessionData((prev && prev.data) || {}, data)
 
       const version = (prev && prev.version ? prev.version : 0) + 1
       const snapshot = { version, data: merged, updatedAt: new Date().toISOString() }
