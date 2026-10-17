@@ -52,6 +52,21 @@ const CHECKPOINT_FILE = join(ROOT, 'tools', 'console', '.deploy-checkpoint.json'
 const MANIFEST_FILE = join(ROOT, 'tools', 'console', '.deploy-manifest.json')
 
 /**
+ * 容器启动**必需**的文件 —— 增量包必须**始终**带上它们。
+ *
+ * 容器靠「删 server.js → POST restart → 启动命令 `test -f server.js || (解压)` → node server.js」
+ * 复活：删文件是「让重启时触发解压」的开关。所以一旦某次增量包漏掉 server.js
+ * （或它 import 的 store/cron/api/shared），解压后容器**仍缺件**，`node server.js`
+ * 起不来 → 线上 503。
+ *
+ * **2026-10-18 实测踩过**：只含 4 个前端文件的增量包把线上打挂约 3 分钟。
+ * 这 ~670 KiB 是每次发布的固定开销，换来「容器一定能起来」—— 值得。
+ */
+export const STARTUP_REQUIRED = (rel) =>
+  rel === 'server.js' || rel === 'store.mjs' || rel === 'cron.mjs' || rel === 'package.json' ||
+  rel.startsWith('api/') || rel.startsWith('shared/')
+
+/**
  * 幂等键自校验。**必须区分「长度不对」与「字符不对」** ——
  * 早先只回一句「不合规（18 位）」，而 18 位明明在 16–64 区间里：
  * 真正的原因是分片名 `a.paa` 里的那个点。错误信息指错方向比不报还费时间。
@@ -293,7 +308,10 @@ async function packSlices(log, { full = false } = {}) {
   const incremental = !full && sameTarget
 
   const allRels = Object.keys(cur)
-  const toPack = incremental ? allRels.filter(rel => prev.files[rel] !== cur[rel]) : allRels
+  // 增量集 = 变化的文件 **∪ 容器启动必需文件**（后者漏了会让容器起不来，见 STARTUP_REQUIRED）
+  const toPack = incremental
+    ? allRels.filter(rel => prev.files[rel] !== cur[rel] || STARTUP_REQUIRED(rel))
+    : allRels
   const sizeOf = (rel) => { try { return statSync(join(DIST, rel)).size } catch { return 0 } }
   const packBytes = toPack.reduce((s, r) => s + sizeOf(r), 0)
   const fullBytes = allRels.reduce((s, r) => s + sizeOf(r), 0)

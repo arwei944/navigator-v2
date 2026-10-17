@@ -11,7 +11,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { walkDistHashes } from './lib/deploy.mjs'
+import { walkDistHashes, STARTUP_REQUIRED } from './lib/deploy.mjs'
 
 let pass = 0, fail = 0
 const eq = (a, b, msg) => { if (a === b) pass++; else { fail++; console.error(`✗ ${msg}：期望「${b}」，实得「${a}」`) } }
@@ -49,6 +49,26 @@ try {
   // 维持原样 → 增量为空（此时不应重传任何文件）
   const h5 = walkDistHashes(dir)
   eq(Object.keys(h5).filter(r => h4[r] !== h5[r]).length, 0, '无改动时增量集必须为空')
+
+  /* ---------- 容器启动必需文件（2026-10-18 线上 503 事故的根因防线） ----------
+   * 容器靠「删 server.js → 解压 → 启动」复活，所以增量包**任何时候**都必须含
+   * server.js 及其依赖。锁住这条，避免重演「只传前端把容器打挂」。 */
+  ok(STARTUP_REQUIRED('server.js'), 'server.js 必须被认定为启动必需')
+  ok(STARTUP_REQUIRED('store.mjs') && STARTUP_REQUIRED('cron.mjs'), 'store/cron 是启动必需')
+  ok(STARTUP_REQUIRED('package.json'), 'package.json 是启动必需（平台据此识别 Node 项目）')
+  ok(STARTUP_REQUIRED('api/sites.js') && STARTUP_REQUIRED('shared/auth.mjs'), 'api/* 与 shared/* 是启动必需')
+  ok(!STARTUP_REQUIRED('assets/index-abc.js'), '前端 chunk 不是启动必需（应随变化才传）')
+  ok(!STARTUP_REQUIRED('icons/a.png'), '图标不是启动必需')
+
+  // 端到端：只改了一个前端 chunk → 增量集仍必须含全部启动文件
+  const all = ['index.html', 'assets/index-abc.js', 'server.js', 'store.mjs', 'api/sites.js', 'icons/a.png']
+  const prevH = Object.fromEntries(all.map(r => [r, 'h1']))
+  const curH = { ...prevH, 'assets/index-abc.js': 'h2' }   // 只有前端变了
+  const incr = all.filter(r => prevH[r] !== curH[r] || STARTUP_REQUIRED(r))
+  ok(incr.includes('server.js'), '只改前端时，增量集必须仍包含 server.js（否则容器起不来）')
+  ok(incr.includes('api/sites.js'), '只改前端时，增量集必须仍包含 api/*')
+  ok(incr.includes('assets/index-abc.js'), '改动的文件必须进增量集')
+  ok(!incr.includes('icons/a.png'), '未变化且非启动文件不应进增量集（增量才有意义）')
 } finally {
   rmSync(dir, { recursive: true, force: true })
 }
