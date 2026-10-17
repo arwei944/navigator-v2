@@ -15,6 +15,7 @@
  */
 import { watch } from 'vue'
 import { getStoredKey, pushSession } from '@/services/session'
+import { clearOffline, enqueueEdit, loadOffline } from '@/utils/offlineQueue'
 
 const COOLDOWN_MS = 30_000
 
@@ -24,8 +25,10 @@ export function startLiveSync(stores, { debounce = 5000 } = {}) {
 
   let timer = null
   let cooldownUntil = 0
-  let pending = false
   let stopped = false
+  // F8：启动时若持久队列里有「上次离线没推上去」的记录，直接进入待推状态 ——
+  // 内存标记 pending 刷新即失，只靠它的话，断网刷新后再也想不起来还有一批没推。
+  let pending = loadOffline().length > 0
 
   function schedule() {
     if (stopped || !getStoredKey()) return
@@ -40,7 +43,12 @@ export function startLiveSync(stores, { debounce = 5000 } = {}) {
     if (!key) return
     // 后台标签页与断网状态都先攒着，回到前台 / 联网时补推
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') { pending = true; return }
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) { pending = true; return }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      pending = true
+      // F8：持久入队 —— 「离线期间有改动没同步」落进 localStorage，刷新后仍能续上
+      enqueueEdit({ kind: 'session', at: Date.now() })
+      return
+    }
     if (Date.now() < cooldownUntil) return
     try {
       await pushSession(key, {
@@ -60,6 +68,8 @@ export function startLiveSync(stores, { debounce = 5000 } = {}) {
   function onResume() {
     if (!pending) return
     pending = false
+    // 恢复在线：这批已被 flush 接走，清掉持久队列（若 flush 再次失败会重新入队）
+    clearOffline()
     schedule()
   }
 
