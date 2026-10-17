@@ -44,12 +44,13 @@
           <OmniIcon v-else :name="item.icon" />
 
           <div v-if="item.preview && item.preview.card" class="omni-item-info">
-            <span class="omni-item-title">{{ item.preview.card.title }}<span
+            <span class="omni-item-title">{{ item.preview.card.titleTranslated || item.preview.card.title }}<span
+              v-if="item.preview.card.titleTranslated" class="preview-badge translated" title="名称已译为中文">译</span><span
               v-if="item.preview.kind === 'found'" class="preview-badge found">已收录</span><span
               v-else-if="item.preview.kind === 'loading'" class="preview-badge loading">抓取中</span><span
               v-else-if="item.preview.kind === 'error'" class="preview-badge error">抓取失败</span></span>
             <span v-if="item.preview.kind === 'error'" class="preview-desc">{{ item.preview.message }}</span>
-            <span v-else-if="item.preview.card.desc" class="preview-desc">{{ item.preview.card.desc }}</span>
+            <span v-else-if="item.preview.card.descTranslated || item.preview.card.desc" class="preview-desc">{{ item.preview.card.descTranslated || item.preview.card.desc }}</span>
             <!-- 「收在哪、用它干什么、去过没有」：已收录时才有的半句，未收录这几项为空 -->
             <span class="preview-meta">
               <span class="preview-host">{{ item.preview.card.host }}</span>
@@ -335,6 +336,7 @@ watch(() => props.selectedIndex, async (v) => {
 .preview-badge.found { color: var(--color-ok, #16a34a); background: rgba(22, 163, 74, .12); }
 .preview-badge.loading { color: var(--accent); background: var(--accent-light); }
 .preview-badge.error { color: var(--color-danger); background: rgba(220, 38, 38, .1); }
+.preview-badge.translated { color: var(--accent); background: var(--accent-light); }
 /* 抓取中的转圈：只动 transform，动画时钟不推进时也只是不转，不会定格成透明 */
 .preview-badge.loading::before {
   content: '';

@@ -227,6 +227,60 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     siteCardOpts: previewCardOpts.value,
   }))
 
+  /* ---------- 预览卡片的中文译文（N1） ----------
+     卡片给的是站点原文名称与描述（多为英文）。这里**不阻塞首屏**地补一层译文：
+     先按原文出卡，译文异步到位后响应式替换；未命中（已是中文 / 词表与引擎都没结果）
+     或翻译失败，一律回落原文 —— 卡片不会因「译不出来」而空着。
+
+     为什么落在这里而非渲染层：译文要跟着 url / meta 变、要防竞态（用户快速改主意时
+     迟到的译文不能盖回新卡），这些与抓取侧是同一套状态，和 previewState 同源最稳。
+
+     translateFields 必须**动态 import**：它是懒加载链路（test-bundle.mjs 第 7 节点名了
+     「翻译编排」「离线词表」不许进首屏），静态 import 会把词表拖回首屏、顶穿首屏预算。 */
+  const previewTranslation = ref(null)
+  let previewTranslateSeq = 0
+  watch(
+    () => {
+      const st = previewState.value
+      if (!st.card) return ''
+      return JSON.stringify([st.kind, st.card.host, st.card.title, st.card.desc])
+    },
+    async (key) => {
+      previewTranslation.value = null
+      if (!key) return
+      const card = previewState.value.card
+      if (!card) return
+      const my = ++previewTranslateSeq
+      try {
+        const { translateFields } = await import('@/services/translateFields')
+        const res = await translateFields({ name: card.title, desc: card.desc })
+        if (my !== previewTranslateSeq) return
+        previewTranslation.value = {
+          title: res.translated.name ? res.name : '',
+          desc: res.translated.desc ? res.desc : '',
+          source: res.source || '',
+        }
+      } catch { /* 翻译整链不可用 → 静默回落原文 */ }
+    },
+    { immediate: true }
+  )
+
+  /** 把译文并进卡片（有译文才覆盖；没有就保持原文）。渲染层只看这个。 */
+  const previewCardFinal = computed(() => {
+    const st = previewState.value
+    const t = previewTranslation.value
+    if (!st.card || !t) return st
+    return {
+      ...st,
+      card: {
+        ...st.card,
+        titleTranslated: t.title || '',
+        descTranslated: t.desc || '',
+        translationSource: t.source,
+      },
+    }
+  })
+
   /**
    * 预取的触发条件，与卡片「该不该出现」共用同一把尺子（`shouldPreview`），
    * 否则会出现「抓了却不显示」或「显示了却没抓」两种对不上的情况。
@@ -371,14 +425,14 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     if (!cand) return []
 
     const col = collected.value
-    const state = previewState.value
+    const state = previewCardFinal.value
     return [{
       key: col ? `site:${col.id}` : 'preview:url',
       // type 说的是「这是什么条目」，不是「在哪个组」：已收录是一条站点项，
       // 未收录是一条添加项 —— 外壳据此决定回车后要不要保留搜索词（见 UnifiedSearchBox#done），
       // 换成 'preview' 会让「打开站点」变成「清空搜索框」。
       type: col ? 'site' : 'add',
-      title: state.card?.title || cand.host,
+      title: state.card?.titleTranslated || state.card?.title || cand.host,
       subtitle: col ? '该域名已收录' : '按此网址自动抓取名称、描述与图标',
       icon: col ? '' : 'plus',
       // 渲染成卡片而不是单行，全靠这个字段；数据与状态判定都在 utils/urlPreview.js
