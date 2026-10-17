@@ -90,6 +90,34 @@
         <p v-else class="ins-empty">尚无失效或受限的站点。体检由服务端定时巡检产出，未配置时这里会显示「未探测」。</p>
       </section>
 
+      <!-- 点击趋势：近 N 天全站点击量按天汇总 -->
+      <section class="ins-card">
+        <div class="ins-card-head">
+          <h2>点击趋势</h2>
+          <span class="ins-hint">近 {{ days }} 天 · 共 {{ trendTotal }} 次</span>
+        </div>
+        <div class="trend-body" v-html="trendSpark" aria-hidden="true"></div>
+        <p v-if="!trendTotal" class="ins-empty">
+          近 {{ days }} 天没有点击记录。趋势要靠时间积累 —— 云端巡检与访客点击持续累积后这里才有曲线。
+        </p>
+      </section>
+
+      <!-- 冷门站点：点击最少的长尾，供「该不该清理/归档」的决策参考 -->
+      <section class="ins-card">
+        <div class="ins-card-head">
+          <h2>冷门站点</h2>
+          <span class="ins-hint">{{ coldSites.zero }} / {{ sitesStore.sites.length }} 个零点击</span>
+        </div>
+        <ul v-if="coldSites.least.length" class="cold-list" role="list">
+          <li v-for="s in coldSites.least" :key="s.id" class="cold-row">
+            <span class="cold-name" :title="s.name">{{ s.name }}</span>
+            <span class="cold-count">{{ s.count }}</span>
+          </li>
+        </ul>
+        <p v-else class="ins-empty">暂无点击数据，无法判别冷门。</p>
+        <p class="ins-note">长期零点击的站点可考虑归档；归档建议与一键操作在后台「数据洞察」提供。</p>
+      </section>
+
       <!-- 图表外观：三个令牌只服务这个页面，放在这里比塞进设置面板更近 -->
       <section class="ins-card">
         <div class="ins-card-head">
@@ -127,7 +155,7 @@ import { useClicksStore } from '@/stores/clicks'
 import { useHealthStore } from '@/stores/health'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSidebarStore } from '@/stores/sidebar'
-import { rankByClicks, seriesOf } from '../../shared/clicks-core.mjs'
+import { rankByClicks, seriesOf, dayKey } from '../../shared/clicks-core.mjs'
 import { sparkline, donut, heatstrip, barTrack } from '@/utils/chartkit'
 
 /**
@@ -271,6 +299,52 @@ function showDetail(site) {
   sidebarStore.showDetail(site)
 }
 
+/* ---- 点击趋势（F6）：近 N 天全站点击量按天聚合 ---- */
+
+/**
+ * 把 mergedSeries 里每个站点的按天分桶，按日期横向汇总成全站曲线。
+ * 为什么逐日回填而不是遍历 series 的 key：分桶只记录**有点击的那天**，
+ * 缺的天要补 0，否则曲线会把「没人点的那天」挤掉，看上去像天天都有人来。
+ */
+const trendVals = computed(() => {
+  const n = days.value
+  const out = []
+  const base = new Date()
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(base)
+    d.setDate(d.getDate() - i)
+    const key = dayKey(d)
+    let total = 0
+    for (const buckets of Object.values(clicksStore.mergedSeries)) {
+      total += Number(buckets?.[key]) || 0
+    }
+    out.push(total)
+  }
+  return out
+})
+const trendTotal = computed(() => trendVals.value.reduce((a, b) => a + b, 0))
+const trendSpark = computed(() => sparkline(trendVals.value, {
+  width: 420,
+  height: chartHeight.value + 8,
+  area: chartArea.value ? undefined : null,
+}))
+
+/* ---- 冷门站点（F6）：点击最少的长尾 ---- */
+
+/**
+ * 冷门 = 点击最少。零点击单独计数（它是「从没被打开过」的强信号），
+ * 清单则取「有点击但最少」的 10 条 —— 全列零点击会有几百行，看不出重点。
+ */
+const coldSites = computed(() => {
+  const rows = sitesStore.sites.map(s => ({
+    id: s.id, name: s.name, url: s.url, count: clicksStore.countFor(s.id),
+  }))
+  return {
+    zero: rows.filter(r => r.count === 0).length,
+    least: rows.filter(r => r.count > 0).sort((a, b) => a.count - b.count).slice(0, 10),
+  }
+})
+
 /* ---- 预览（调令牌时立刻看到效果，不必滚回上面） ---- */
 const previewSpark = computed(() =>
   sparkline([2, 5, 3, 8, 6, 11, 9, 14], {
@@ -344,6 +418,16 @@ const previewSpark = computed(() =>
 .tune-row input[type='checkbox'] { accent-color: var(--accent); }
 .tune-value { flex: 0 0 44px; text-align: right; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .tune-preview { margin-top: 12px; padding: 10px; border: 1px solid var(--border-light); border-radius: var(--radius-sm); display: flex; align-items: center; }
+
+/* 点击趋势 + 冷门站点（F6） */
+.trend-body { display: flex; align-items: center; }
+.trend-body svg { max-width: 100%; height: auto; }
+.cold-list { list-style: none; margin: 0; padding: 0; }
+.cold-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--border-light); }
+.cold-row:last-child { border-bottom: none; }
+.cold-name { flex: 1; min-width: 0; font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cold-count { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.ins-note { font-size: 11.5px; color: var(--text-secondary); margin: 10px 0 0; line-height: 1.6; }
 
 @media (max-width: 900px) {
   .insights { padding: 16px 14px 32px; }
