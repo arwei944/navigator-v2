@@ -492,6 +492,18 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
 
   const steps = []
 
+  /**
+   * 分阶段计时（部署提速研究：受控实测用）—— 纯日志，不改变任何行为。
+   * 目的是把「部署段总耗时」拆成 构建 / 门禁 / 打包 / 上传 / 重启 / 验证 各占多少。
+   */
+  const T0 = Date.now()
+  let tPrev = T0
+  const tick = (name) => {
+    const now = Date.now()
+    log(`⏱ ${name}：${((now - tPrev) / 1000).toFixed(1)}s（累计 ${((now - T0) / 1000).toFixed(1)}s）`)
+    tPrev = now
+  }
+
   try {
     /* 1. 构建 */
     if (skipBuild) {
@@ -513,6 +525,7 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       if (!b.ok) throw Object.assign(new Error(`构建失败：${b.error}`), { step: 'build' })
       steps.push({ key: 'build', ok: true })
     }
+    tick('构建')
 
     /* 2. 发布门禁：产物必须新于源码、完整性可校验 */
     log('\n· 发布门禁')
@@ -521,11 +534,13 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
     // 门禁脚本不支持 --check 时（旧版）不阻塞发布，但要把实情写进日志
     steps.push({ key: 'gate', ok: gate.ok, note: gate.ok ? '' : '门禁未通过或脚本不支持 --check' })
     if (!gate.ok) log('  ⚠ 门禁未通过 —— 继续发布，但请自行确认产物有效性')
+    tick('产物门禁')
 
     /* 3. 打包切片 */
     log('\n· 打包')
     const { work, slices } = await packSlices(log)
     steps.push({ key: 'pack', ok: true, note: `${slices.length} 片` })
+    tick('打包（tar + base64 切片）')
 
     try {
       /* 4. 上传 */
@@ -563,7 +578,11 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       } else {
         log('  · 没有需要清理的旧分片')
       }
-      for (const s of slices) await uploadSlice(log, s)
+      for (const s of slices) {
+        const tSlice = Date.now()
+        await uploadSlice(log, s)
+        log(`⏱   分片 ${s.name}：${((Date.now() - tSlice) / 1000).toFixed(1)}s`)
+      }
       writeCheckpoint({
         fingerprint,
         workloadId: credentials().workloadId,
@@ -573,6 +592,7 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       })
       steps.push({ key: 'upload', ok: true, note: `${slices.length} 片` })
       }
+      tick('上传（含清理旧分片 + 逐片）')
 
       /* 5. 触发解压：容器启动命令里有「server.js 不存在才解压」的守卫 */
       log('\n· 触发容器解压')
@@ -594,12 +614,17 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
         }
       } catch { /* 读不到详情不影响发布 */ }
 
+      const tDel = Date.now()
       const del = await deleteFiles(['/server.js'])
       log(del.ok ? '  ✓ server.js 已移除（解压触发器就绪）' : `  ⚠ 没能移除 server.js（HTTP ${del.status}）—— 容器会继续跑旧版本`)
+      log(`⏱   删除 server.js：${((Date.now() - tDel) / 1000).toFixed(1)}s`)
+      const tAct = Date.now()
       await action(log, 'restart')
+      log(`⏱   restart 入队：${((Date.now() - tAct) / 1000).toFixed(1)}s`)
       // 解压触发已发出 → 这一轮的分片不再需要，断点记录清掉（避免下次误用它跳过上传）
       clearCheckpoint()
       steps.push({ key: 'restart', ok: true })
+      tick('重启触发（删 server.js + restart）')
 
       /* 6. 线上验证：等到线上自述的 sha 与新构建一致 */
       log('\n· 等待线上就绪并验证版本')
@@ -614,6 +639,7 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
           if (String(r.version?.sha || '') === want) {
             log(`  ✓ 线上已是最新版本 ${String(want).slice(0, 7)}`)
             steps.push({ key: 'verify', ok: true })
+            tick('线上验证（含容器重启 + 解压完成）')
             break
           }
           log(`  · 线上仍在跑 ${String(r.version?.sha || '(未知)').slice(0, 7)}，继续等…`)
