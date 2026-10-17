@@ -31,7 +31,8 @@ const sidebarStore = useSidebarStore()
   z-index: 60;
 }
 .hamburger {
-  width: 36px; height: 36px;
+  /* F4：触摸目标 ≥44px（WCAG 2.5.5）。图标仍 20px，扩大的是命中区 */
+  min-width: 44px; min-height: 44px;
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -48,7 +49,7 @@ const sidebarStore = useSidebarStore()
   font-weight: 600;
   letter-spacing: -.2px;
 }
-.mobile-header-spacer { width: 36px; height: 36px; }
+.mobile-header-spacer { width: 44px; height: 44px; }
 
 @media (max-width: 768px) {
   .mobile-header { display: flex; }

@@ -3,8 +3,9 @@
     <Transition name="detail-sheet">
       <div v-if="site" class="detail-sheet" role="dialog" aria-modal="true" aria-label="站点详情">
         <div class="detail-sheet-backdrop" @click="close"></div>
-        <div class="detail-sheet-panel">
-          <div class="detail-sheet-grip" aria-hidden="true"></div>
+        <div class="detail-sheet-panel" :style="dragOffset ? { transform: `translateY(${dragOffset}px)`, transition: 'none' } : null">
+          <div class="detail-sheet-grip" aria-hidden="true"
+               @touchstart.passive="onGripStart" @touchmove.passive="onGripMove" @touchend="onGripEnd"></div>
           <button type="button" class="detail-sheet-close" aria-label="关闭详情" @click="close">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
@@ -18,7 +19,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useSidebarStore } from '@/stores/sidebar'
 import SiteDetailPanel from '@/components/right/SiteDetailPanel.vue'
 
@@ -26,6 +27,20 @@ const sidebarStore = useSidebarStore()
 const site = computed(() => sidebarStore.detailSheetSite)
 
 function close() { sidebarStore.closeDetailSheet() }
+
+/* F4 手势：拖拽条下滑关闭。只绑在顶部 grip 上，不绑整个面板 ——
+   抽屉内容是可滚动的，在内容区监听纵向拖动会把「滚动」与「关闭」搅在一起。 */
+const dragOffset = ref(0)
+let gripStartY = 0
+function onGripStart(e) { gripStartY = e.touches?.[0]?.clientY ?? 0 }
+function onGripMove(e) {
+  const y = e.touches?.[0]?.clientY ?? 0
+  dragOffset.value = Math.max(0, y - gripStartY)
+}
+function onGripEnd() {
+  if (dragOffset.value > 80) close()
+  dragOffset.value = 0
+}
 function onKeydown(e) { if (e.key === 'Escape') close() }
 
 onMounted(() => document.addEventListener('keydown', onKeydown))
@@ -48,7 +63,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .detail-sheet-grip { width: 40px; height: 4px; border-radius: 999px; background: var(--border); margin: 8px auto 0; flex-shrink: 0; }
 .detail-sheet-close {
   position: absolute; top: 10px; right: 12px;
-  width: 30px; height: 30px;
+  /* F4：触摸目标 ≥44px（WCAG 2.5.5）—— 原 30px 偏小，指腹容易点偏 */
+  width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid var(--border); border-radius: 50%;
   background: var(--bg-white); color: var(--text-secondary);
