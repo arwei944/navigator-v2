@@ -52,19 +52,19 @@ const CHECKPOINT_FILE = join(ROOT, 'tools', 'console', '.deploy-checkpoint.json'
 const MANIFEST_FILE = join(ROOT, 'tools', 'console', '.deploy-manifest.json')
 
 /**
- * 容器启动**必需**的文件 —— 增量包必须**始终**带上它们。
+ * 增量包**必须始终带上**的文件 —— 只有 `server.js` 一个。
  *
  * 容器靠「删 server.js → POST restart → 启动命令 `test -f server.js || (解压)` → node server.js」
- * 复活：删文件是「让重启时触发解压」的开关。所以一旦某次增量包漏掉 server.js
- * （或它 import 的 store/cron/api/shared），解压后容器**仍缺件**，`node server.js`
- * 起不来 → 线上 503。
- *
+ * 复活：删文件是「让重启时触发解压」的开关。所以增量包只要漏掉 `server.js`，
+ * 解压后容器仍缺它，`node server.js` 起不来 → 线上 503。
  * **2026-10-18 实测踩过**：只含 4 个前端文件的增量包把线上打挂约 3 分钟。
- * 这 ~670 KiB 是每次发布的固定开销，换来「容器一定能起来」—— 值得。
+ *
+ * 为什么**不含** store/cron/api/shared：发布后 GET `/files?path=/` 实测确认
+ * **容器 restart 保留文件系统** —— 它们从未被删除，一直在容器里；每次重传这
+ * ~670 KiB 纯属浪费。**容器被平台重建**的罕见情况由 `containerLooksHealthy()` 兜底
+ * （发现关键文件缺失就回退全量）。
  */
-export const STARTUP_REQUIRED = (rel) =>
-  rel === 'server.js' || rel === 'store.mjs' || rel === 'cron.mjs' || rel === 'package.json' ||
-  rel.startsWith('api/') || rel.startsWith('shared/')
+export const STARTUP_REQUIRED = (rel) => rel === 'server.js'
 
 /**
  * 幂等键自校验。**必须区分「长度不对」与「字符不对」** ——
@@ -305,7 +305,15 @@ async function packSlices(log, { full = false } = {}) {
   const cur = walkDistHashes()
   const prev = readManifest()
   const sameTarget = Boolean(prev && prev.files && prev.workloadId === credentials().workloadId)
-  const incremental = !full && sameTarget
+  /**
+   * 增量前提：① 有匹配的 manifest；② 容器根目录关键文件还在
+   * （restart 保留文件系统，但万一被平台重建就得全量，否则只传 server.js 会缺件）。
+   */
+  const healthy = !full && sameTarget ? await containerLooksHealthy() : false
+  const incremental = !full && sameTarget && healthy
+  if (!full && !incremental) {
+    log(`  · ${!sameTarget ? '无有效 manifest（首次发布 / 换端点）' : '容器根目录缺关键文件（疑似被重建）'} → 全量打包`)
+  }
 
   const allRels = Object.keys(cur)
   // 增量集 = 变化的文件 **∪ 容器启动必需文件**（后者漏了会让容器起不来，见 STARTUP_REQUIRED）
@@ -490,6 +498,21 @@ async function listRoot() {
   } catch {
     return null
   }
+}
+
+/**
+ * 容器根目录是否「看起来健康」—— 关键运行时文件还在。
+ *
+ * 依据（2026-10-18 实测）：BotKeep 的 restart **保留文件系统**（删 server.js 只是
+ * 触发解压的开关，store/cron/api/shared 都还在）。所以增量只需带 server.js。
+ * 但**万一容器被平台重建**（文件系统重置），只传 server.js 会缺件 ——
+ * 这里读一次根目录，缺关键项就回退全量。读不到时也保守回退。
+ */
+async function containerLooksHealthy() {
+  const set = await listRoot()
+  if (!set) return false
+  const need = ['/server.js', '/store.mjs', '/cron.mjs', '/api', '/shared']
+  return need.every(p => set.has(p))
 }
 
 async function action(log, name, attempt = 0) {
