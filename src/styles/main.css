@@ -14,7 +14,12 @@
   --bg-primary: #f5f5f7;
   --bg-white: #ffffff;
   --text-primary: #1d1d1f;
-  --text-secondary: #86868b;
+  /* 次要文字与占位符的实底。#86868b 取自 Apple 官网灰阶，但**实测**不达标：
+     无头 Chrome 读 computed style（`probe/_contrast-audit.mjs`）得到卡片描述 3.62:1、
+     占位符 3.62:1、浅分隔底上的标签 3.18:1，都低于 WCAG AA 对正文的 4.5:1。
+     提到 #636366 后同一批位置为 4.70–5.50:1。主次层级不只靠明度差维持 ——
+     字号（11–13px）与字重仍在区分，观感只是「更实」，不是「变成正文」。 */
+  --text-secondary: #636366;
   --border: #e5e5e7;
   --border-light: #f0f0f2;
   --accent: #0071e3;
@@ -29,7 +34,9 @@
   --sidebar-w: 240px;
   --sidebar-w-collapsed: 60px;
   --text-sidebar: #1d1d1f;
-  --text-sidebar-dim: #86868b;
+  /* 与 --text-secondary 同值：侧栏次要文字和正文次要文字是同一档灰度，
+     合并成引用而不是各写一份 —— 免得下次调对比度只改了一处（双源漂移）。 */
+  --text-sidebar-dim: var(--text-secondary);
   --sidebar-hover: rgba(0, 113, 227, 0.08);
   --sidebar-active: rgba(0, 113, 227, 0.12);
 
@@ -49,7 +56,9 @@
   --bg-primary: #1a1a1e;
   --bg-white: #2c2c30;
   --text-primary: #f5f5f7;
-  --text-secondary: #98989d;
+  /* 实测：#98989d 在卡片底 #1e293b 上 5.09:1（达标），但在浅分隔底 #323236 上只剩 4.45:1，
+     差 0.05 也是不达标。提一档到 #9d9da2 后同一位置 4.73:1，观感差异不可辨。 */
+  --text-secondary: #9d9da2;
   --border: #3a3a3e;
   --border-light: #323236;
   --accent: #0a84ff;
@@ -64,7 +73,7 @@
   --sidebar-bg: var(--glass-bg);
   --sidebar-bg-solid: #2c2c30;
   --text-sidebar: #f5f5f7;
-  --text-sidebar-dim: #98989d;
+  --text-sidebar-dim: var(--text-secondary);
   --sidebar-hover: rgba(10, 132, 255, 0.12);
   --sidebar-active: rgba(10, 132, 255, 0.18);
 }
@@ -123,8 +132,12 @@ button { font-family: inherit; }
   top: 0;
   z-index: 9999;
   padding: 10px 16px;
-  background: var(--accent);
-  color: #fff;
+  /* 不拿 accent 当底：暗色主题 accent(#3b82f6) 上的白字实测只有 3.68:1 ——
+     一个「给键盘用户看」的提示自己却看不清说不过去。改用主题表面色 + 正文色，
+     明暗两套分别为 16.83:1 / 13.44:1；accent 只留作描边提供焦点感。 */
+  background: var(--bg-white);
+  color: var(--text-primary);
+  border: 2px solid var(--accent);
   font-size: 13px;
   font-weight: 600;
   border-radius: 0 0 var(--radius-sm) 0;
@@ -281,7 +294,9 @@ button { font-family: inherit; }
  * 在暗色主题下浅底会刺眼、深字几乎不可读（`[data-theme="dark"]` 只覆盖了结构性令牌，
  * 覆盖不到这些硬编码值）。这里把它们收成语义令牌，暗色下整体换成半透明底 + 亮字。 */
 :root {
-  --ok-fg: #059669; --ok-bg: #ecfdf5; --ok-border: #a7f3d0;
+  /* ok-fg 原 #059669 在 ok-bg(#ecfdf5) 上实测仅 3.58:1，低于 AA 4.5（徽章文字是 12–13px 正文档）。
+     #047857 提到 5.21:1，并与其他几档一样统一走「深字浅底」。 */
+  --ok-fg: #047857; --ok-bg: #ecfdf5; --ok-border: #a7f3d0;
   --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-border: #fde68a;
   --danger-fg: #dc2626; --danger-bg: #fef2f2; --danger-border: #fecaca;
   --info-fg: #1d4ed8; --info-bg: #dbeafe;
