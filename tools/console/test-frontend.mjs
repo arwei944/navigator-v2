@@ -57,7 +57,7 @@ try {
 
   // 非拼音路径不受影响 —— 降级只摘掉拼音一档，其余照常工作
   eq(search.scoreSite(site, '谷歌'), search.SCORE.NAME_EXACT, '降级期间中文精确命中照常工作')
-  eq(search.scoreSite(site, 'example'), search.SCORE.URL_INCLUDES, '降级期间域名命中照常工作')
+  eq(search.scoreSite(site, 'example'), search.SCORE.HOST_EXACT, '降级期间域名主体命中照常工作（F2 起域名主体走独立档）')
   eq(search.scoreText('切换主题', '切换'), 700, '降级期间文本直接命中照常工作')
 
   // 就绪

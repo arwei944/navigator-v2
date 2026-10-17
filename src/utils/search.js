@@ -83,6 +83,26 @@ export function preloadPinyin() {
   return pinyinLoading
 }
 
+/**
+ * 域名主体（F2 别名扩充）：去协议 / 去 www / 去路径与查询 / 去后缀，只留首段。
+ * github.com → github；www.fast.ai → fast。IP、端口、单字符等非常规值返回 ''，
+ * 不作为别名，避免「ai.com → ai」这种极短主体污染结果。
+ */
+export function hostMainOf(url) {
+  try {
+    const h = String(url || '')
+      .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+      .split(/[/?#]/)[0]
+      .replace(/^www\./i, '')
+    const first = h.split('.')[0].toLowerCase()
+    // 纯数字首段（IPv4 / 端口）不作别名
+    if (/^\d+$/.test(first)) return ''
+    return /^[a-z0-9][a-z0-9-]+$/.test(first) ? first : ''
+  } catch {
+    return ''
+  }
+}
+
 function keysOf(site) {
   // 读一下就绪信号，让调用它的 computed 在引擎到位后自动重算（见文件头）
   void pinyinReady.value
@@ -93,13 +113,19 @@ function keysOf(site) {
   if (k) return k
   const name = String(site?.name ?? '')
   const desc = String(site?.desc ?? '')
+  const url = String(site?.url ?? '')
+  // 别名扩充（F2）：域名主体**单独成档**（见 SCORE.HOST_EXACT），刻意**不并入 aliases** ——
+  // 它是所有站点都必然有的稳定标识（github.com → github），但不该像作者手写的别名那样
+  // 抢占「别名精确」档，否则搜 ai 这类短词会让 ai.com 盖过一堆真正相关的站。
+  const hostMain = hostMainOf(url)
   const aliases = Array.isArray(site?.aliases) ? site.aliases.map(a => String(a ?? '')) : []
   // 用途既能按中文标签（查资料）也能按英文 id（reference）命中，两种写法拼成一段可搜文本
   const purposes = (Array.isArray(site?.purposes) ? site.purposes : []).map(p => String(p ?? ''))
   k = {
     name: name.toLowerCase(),
     desc: desc.toLowerCase(),
-    url: String(site?.url ?? '').toLowerCase(),
+    url: url.toLowerCase(),
+    hostMain,
     aliases: aliases.map(a => a.toLowerCase()),
     purposes: purposes.map(p => p.toLowerCase()),
     purposeText: purposes.map(p => purposeLabel(p)).filter(Boolean).join(' ').toLowerCase(),
@@ -145,6 +171,10 @@ export const SCORE = {
   ALIAS_PREFIX: 760,
   NAME_INCLUDES: 640,
   ALIAS_INCLUDES: 580,
+  // 域名主体精确匹配（F2 别名扩充）：比「url 里恰好包含该串」更精确
+  // （example.org 搜 example 是整主体命中，而非 URL 里某段顺带包含），
+  // 但仍低于名称包含 —— 域名是稳定标识，不该盖过「站名真的含这个词」。
+  HOST_EXACT: 590,
   URL_INCLUDES: 520,
   PURPOSE_INCLUDES: 500,
   // 备注：比描述可信（是你自己写的），但覆盖的站点少，故压在用途之后、描述之前
@@ -169,6 +199,8 @@ export function scoreSite(site, q) {
   if (anyStarts(k.aliases, q)) return SCORE.ALIAS_PREFIX
   if (k.name.includes(q)) return SCORE.NAME_INCLUDES
   if (anyIncludes(k.aliases, q)) return SCORE.ALIAS_INCLUDES
+  // 域名主体精确匹配必须排在 url 包含之前 —— 主体命中时 url 必然也包含该串
+  if (k.hostMain && k.hostMain === q) return SCORE.HOST_EXACT
   if (k.url.includes(q)) return SCORE.URL_INCLUDES
   // 用途是受控词表，命中即「这条站就是干这个的」，比描述里的顺带提及更可信，故排在描述之前
   if (anyIncludes(k.purposes, q) || k.purposeText.includes(q)) return SCORE.PURPOSE_INCLUDES
@@ -182,6 +214,35 @@ export function scoreSite(site, q) {
   if (anyIncludes(k.pyAliases, q)) return SCORE.PY_ALIAS_INCLUDES
   if (k.pyDesc.includes(q)) return SCORE.PY_DESC_INCLUDES
   return 0
+}
+
+/**
+ * 命中质量（F2「命中位置 × 频次」）：同一评分档位内部的次级排序键。
+ *
+ * scoreSite 只回答「命中在哪个字段」（档位），但同一档位里仍可能十几条并列。
+ * 位置更靠前、命中字段更多的显然更该排前 —— 这是档位制能解释的范围内、
+ * 最自然的一层细化，刻意**不**引入连续分数（那会让「7 次 vs 8 次」无法归因）。
+ *
+ * 返回 { pos, hits }：
+ *   · pos  —— 所有字段中最早的命中下标（越小越靠前）；无命中为 Infinity；
+ *   · hits —— 命中的字段个数（名称与别名同时命中等，越多越相关）。
+ * 两者都无命中的极端情况（只因备注命中）由调用方用 `|| ` 短路天然跳过。
+ */
+export function matchQuality(site, q) {
+  if (!q) return { pos: Infinity, hits: 0 }
+  const k = keysOf(site)
+  const fields = [
+    k.name, ...k.aliases, k.hostMain, k.url, ...k.purposes, k.purposeText, k.desc,
+    k.pyName, ...k.pyAliases, k.pyInitial, ...k.pyAliasInitial, k.pyDesc
+  ]
+  let pos = Infinity
+  let hits = 0
+  for (const f of fields) {
+    if (!f) continue
+    const i = f.indexOf(q)
+    if (i !== -1) { hits++; if (i < pos) pos = i }
+  }
+  return { pos, hits }
 }
 
 /**
@@ -256,13 +317,20 @@ export function rankSites(sites, query, { limit, tieBreak, clicks, clickBoost = 
   const scored = []
   for (const s of sites) {
     const score = scoreSite(s, q)
-    if (score > 0) scored.push({ site: s, score, tier: tierOf ? tierOf(s) : 0 })
+    if (score > 0) {
+      // 命中位置 × 频次（F2）作为档位内的次级键：排在点击档之后、tieBreak 之前，
+      // 于是「切换排序方式」仍只影响最后一档，相关性的优先级丝毫未变。
+      const mq = matchQuality(s, q)
+      scored.push({ site: s, score, tier: tierOf ? tierOf(s) : 0, pos: mq.pos, hits: mq.hits })
+    }
   }
   let out
   if (scored.length) {
     scored.sort((a, b) =>
       (b.score - a.score) ||
       (b.tier - a.tier) ||
+      (a.pos - b.pos) ||      // 命中越靠前越优先（两者皆 Infinity 时为 NaN，被 || 跳过）
+      (b.hits - a.hits) ||    // 命中字段越多越优先
       (tieBreak ? tieBreak(a.site, b.site) : 0))
     out = scored.map(x => x.site)
   } else {

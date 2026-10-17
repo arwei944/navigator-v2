@@ -32,26 +32,44 @@
 
     <!-- 全能下拉：命令 / 页面 / 方向 / 分类 / 用途 / 站点 / 站外，一套结果 -->
     <div v-if="open" class="search-suggestions">
-      <!-- 意图提示：一句话被理解成了分类 / 用途 / 排序的组合。
-           永远可清除 —— 理解错了要能一键回到普通搜索，不能把用户锁在猜测里。 -->
-      <div v-if="intent.hit" class="intent-chip">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
-        <span class="intent-text">已理解：{{ intentText }}</span>
-        <button class="intent-apply" @click="applyIntent">应用筛选</button>
-        <button class="intent-clear" @click="clearIntent" aria-label="清除意图筛选">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
+      <!-- 搜索历史（F2）：聚焦且未输入时显示，一键回填最近搜过的词 -->
+      <div v-if="historyOpen" class="history-panel">
+        <div class="history-head">
+          <span>最近搜索</span>
+          <button type="button" class="history-clear" @click="dropHistory">清空</button>
+        </div>
+        <ul class="history-list">
+          <li v-for="q in history" :key="q">
+            <button type="button" class="history-item" @mousedown.prevent="useHistory(q)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 13.8"/></svg>
+              <span class="history-text">{{ q }}</span>
+            </button>
+          </li>
+        </ul>
       </div>
-      <OmniResults
-        :groups="groups"
-        :selected-index="selectedIndex"
-        :query="trimmed"
-        :breadcrumb="breadcrumb"
-        :empty="empty"
-        @select="onSelect"
-        @hover="setSelected"
-        @back="back"
-      />
+
+      <template v-else>
+        <!-- 意图提示：一句话被理解成了分类 / 用途 / 排序的组合。
+             永远可清除 —— 理解错了要能一键回到普通搜索，不能把用户锁在猜测里。 -->
+        <div v-if="intent.hit" class="intent-chip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+          <span class="intent-text">已理解：{{ intentText }}</span>
+          <button class="intent-apply" @click="applyIntent">应用筛选</button>
+          <button class="intent-clear" @click="clearIntent" aria-label="清除意图筛选">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <OmniResults
+          :groups="groups"
+          :selected-index="selectedIndex"
+          :query="trimmed"
+          :breadcrumb="breadcrumb"
+          :empty="empty"
+          @select="onSelect"
+          @hover="setSelected"
+          @back="back"
+        />
+      </template>
       <div class="omni-hints">
         <kbd>↑↓</kbd> 导航 <kbd>⏎</kbd> 执行 <kbd>⇥</kbd> 站点操作 <kbd>ESC</kbd> 关闭
       </div>
@@ -69,6 +87,7 @@ import { openInNewTab } from '@/utils/open'
 import OmniResults from '@/components/OmniResults.vue'
 import { describeIntent, intentToQuery, parseIntent } from '@/utils/intent'
 import { preloadPinyin } from '@/utils/search'
+import { clearSearchHistory, loadSearchHistory, rememberSearch } from '@/utils/searchHistory'
 
 const emit = defineEmits(['open-palette'])
 
@@ -88,6 +107,22 @@ const {
 } = omni
 
 const filteredCount = computed(() => sitesStore.filteredSites.length)
+
+/* ---- 搜索历史（F2）----
+   聚焦且还没输入时，把最近搜过的几条摆出来、一键回填 —— 这是搜索框自己的记忆
+   （区别于站点的「点击次数」）。只在「没有输入、也没进二级页」时出现，绝不挤占正常结果。 */
+const history = ref([])
+const historyOpen = computed(() =>
+  focused.value && !trimmed.value && !page.value && history.value.length > 0)
+
+function useHistory(q) {
+  raw.value = q
+  searchInput.value?.focus()
+}
+
+function dropHistory() {
+  history.value = clearSearchHistory()
+}
 
 /**
  * 聚焦搜索框 = 用户要搜了：此刻预热拼音引擎（幂等、失败静默）。
@@ -149,7 +184,7 @@ watch(() => sitesStore.searchQuery, (val) => {
   if (!page.value && val !== raw.value) raw.value = val || ''
 })
 
-const open = computed(() => focused.value && (Boolean(trimmed.value) || Boolean(page.value)))
+const open = computed(() => focused.value && (Boolean(trimmed.value) || Boolean(page.value) || historyOpen.value))
 
 // 鼠标悬停即改选中项。写成方法而不是模板里直接赋值，避免依赖模板对 ref 的赋值解包
 function setSelected(i) {
@@ -186,6 +221,8 @@ function externalSearch() {
  */
 function done(item) {
   focused.value = false
+  // 记下这次搜索（在清空输入之前）—— 执行了才算一次「有效的搜索」
+  if (trimmed.value) history.value = rememberSearch(trimmed.value)
   const keepSearch = Boolean(page.value) === false && item?.type === 'site'
   if (page.value) back()
   if (!keepSearch) {
@@ -203,7 +240,10 @@ function onSelect(item) {
 /** 回车：无选中项时沿用既有决策链（网址优先收录，否则站外搜索） */
 function onEnter() {
   if (enter()) return
-  if (trimmed.value) externalSearch()
+  if (trimmed.value) {
+    history.value = rememberSearch(trimmed.value)
+    externalSearch()
+  }
 }
 
 function onKeydownInput(e) {
@@ -266,6 +306,7 @@ function onKeydown(e) {
 onMounted(() => {
   document.addEventListener('keydown', onKeydown)
   document.addEventListener('mousedown', onDocPointerDown)
+  history.value = loadSearchHistory()
 })
 
 onUnmounted(() => {
@@ -460,6 +501,25 @@ onUnmounted(() => {
 .intent-clear { width: 20px; height: 20px; border: none; border-radius: 50%; background: transparent; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
 .intent-clear:hover { background: var(--border-light); }
 .intent-clear svg { width: 12px; height: 12px; }
+
+/* 搜索历史（F2）：与结果区同一层，只在「没输入时」出现 */
+.history-panel { padding: 4px 0; }
+.history-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 14px 4px; font-size: 11px; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: .4px; opacity: .75;
+}
+.history-clear { border: none; background: none; padding: 0; font-size: 11px; color: var(--accent); cursor: pointer; text-transform: none; letter-spacing: 0; }
+.history-clear:hover { text-decoration: underline; }
+.history-list { list-style: none; margin: 0; padding: 0; }
+.history-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 14px; border: none; background: none; cursor: pointer;
+  font-family: var(--font); font-size: 13px; color: var(--text-primary); text-align: left;
+}
+.history-item:hover { background: var(--border-light); }
+.history-item svg { width: 14px; height: 14px; color: var(--text-secondary); flex-shrink: 0; }
+.history-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .omni-hints {
   padding: 8px 14px;
   border-top: 1px solid var(--border);
