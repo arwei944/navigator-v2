@@ -5,10 +5,21 @@
  * 它与「同步」面板的分工：同步管的是**站点数据**进云端 Blob（不用重新部署）；
  * 这里管的是**代码**进服务器（要重新构建、打包、重启进程）。两者互不替代 ——
  * 只改数据不必部署，只改代码部署了也带不走数据。
+ *
+ * ## 部署端点（N2）
+ *
+ * 面板可以一次发到多个端点（主站 + 镜像站等）。端点**清单**由服务端从
+ * `NAV_DEPLOY_ENDPOINTS` 读出来（`GET /api/deploy/endpoints`），前端只是勾选框 ——
+ * 凭据永远不进浏览器，前端拿到的只有 `hasCredentials` 这个布尔。
+ * 默认**一个都不勾**：不勾任何端点 = 只发主站默认端点，与单端点时代行为一致。
+ * 勾了就发到勾中的那几个，且**逐个端点回报成功/失败**（一个挂了不影响其余）。
  */
 import { $, api, renderKv, openStream } from './core.js'
 
 const state = { data: null, loading: false }
+
+/** 端点清单（只读）。选中状态记在 DOM 的 checkbox 上，避免与渲染顺序耦合 */
+const epState = { list: [] }
 
 function el(tag, cls, text) {
   const node = document.createElement(tag)
@@ -114,6 +125,58 @@ function renderHistory() {
   }
 }
 
+/* ---------- 部署端点（N2）---------- */
+
+/** 读端点清单（不含凭据，只有 id/label/url/hasCredentials）。读不到就退化成「只发默认端点」 */
+async function loadEndpoints() {
+  try {
+    const r = await api('/api/deploy/endpoints')
+    epState.list = Array.isArray(r?.endpoints) ? r.endpoints : []
+  } catch {
+    epState.list = []
+  }
+}
+
+/** 当前勾中的端点 id。**一个都没勾**是合法状态，代表「只发默认端点」 */
+function selectedEndpointIds() {
+  return [...document.querySelectorAll('#deploy-endpoints input[type="checkbox"]:checked')]
+    .map(cb => cb.dataset.endpointId)
+}
+
+function renderEndpoints() {
+  const box = $('#deploy-endpoints')
+  if (!box) return
+  box.innerHTML = ''
+  if (!epState.list.length) {
+    box.append(el('span', 'dim', '读不到端点清单 —— 只会发布默认端点。'))
+    renderEndpointSummary()
+    return
+  }
+  const chosen = new Set(selectedEndpointIds()) // 重渲染时保留已勾选（refresh 会重画）
+  for (const e of epState.list) {
+    const label = el('label', 'hint')
+    label.style.cssText = 'display:flex;align-items:center;gap:6px;white-space:nowrap'
+    const cb = document.createElement('input')
+    cb.type = 'checkbox'
+    cb.dataset.endpointId = e.id
+    cb.checked = chosen.has(e.id)
+    cb.addEventListener('change', renderEndpointSummary)
+    label.append(cb, document.createTextNode(`${e.label || e.id}${e.hasCredentials ? '' : '（未配凭据）'}`))
+    box.append(label)
+  }
+  renderEndpointSummary()
+}
+
+/** 一句话说清「将部署到哪」—— 确认弹窗与提示行同源，不各写一套判断 */
+function renderEndpointSummary() {
+  const hint = $('#deploy-endpoints-hint')
+  if (!hint) return
+  const ids = selectedEndpointIds()
+  hint.textContent = ids.length
+    ? `将部署到 ${ids.length} 个端点：${ids.join('、')}`
+    : '未选择任何端点 —— 只发布到主站默认端点。'
+}
+
 /* ---------- 数据 ---------- */
 
 export async function refresh() {
@@ -131,6 +194,8 @@ export async function refresh() {
   renderCreds()
   renderFlow()
   renderHistory()
+  await loadEndpoints()
+  renderEndpoints()
 }
 
 /* ---------- 交互 ---------- */
@@ -153,9 +218,13 @@ export function initDeployPanel() {
 
   $('#btn-deploy-publish').addEventListener('click', async () => {
     const skipBuild = $('#deploy-skip-build').checked
-    if (!confirm(`开始发布到服务器？\n\n${skipBuild ? '跳过构建，直接用现有 dist/' : '先重新构建产物，再打包上传'}。\n过程需要几分钟，可在日志区看到每一步。`)) return
+    const ids = selectedEndpointIds()
+    // 二次确认里点名**要发到哪几个端点** —— 多端点是不可逆动作，不能只问「确定吗」
+    const target = ids.length ? `${ids.length} 个端点：${ids.join('、')}` : '默认端点（主站）'
+    const buildNote = skipBuild ? '跳过构建，直接用现有 dist/' : '先重新构建产物，再打包上传'
+    if (!confirm(`开始发布到服务器？\n\n目标：${target}\n${buildNote}。\n过程需要几分钟，可在日志区看到每一步（逐个端点回报成功/失败）。`)) return
     try {
-      const { jobId } = await api('/api/deploy/publish', { method: 'POST', body: { skipBuild } })
+      const { jobId } = await api('/api/deploy/publish', { method: 'POST', body: { skipBuild, endpoints: ids } })
       openStream(jobId, '发布到服务器', () => refresh())
       refresh()
     } catch (e) {

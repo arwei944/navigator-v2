@@ -425,13 +425,28 @@ export async function handleApi(req, res, path, url) {
 
     if (path === '/api/deploy/publish') {
       const body = await readJsonBody(req)
+      // 端点解析（N2）：给了就校验 —— 未知 id 明确报错，绝不静默少发一个端点。
+      // 没给就不传，startPublish 落回原单端点 publish()，与多端点引入前一字不差。
+      const picked = Array.isArray(body.endpoints) ? endpointsCfg.resolveEndpoints(body.endpoints) : null
+      if (picked && !picked.ok) {
+        record({ action: 'deploy.publish', result: 'fail', target: 'botkeep', detail: picked.error })
+        sendJson(res, 400, { error: picked.error })
+        return true
+      }
       try {
         const job = deploy.startPublish({
           skipBuild: body.skipBuild === true,
           url: String(body.url || ''),
+          endpoints: picked ? picked.endpoints : undefined,
         })
-        record({ action: 'deploy.publish', target: 'botkeep', detail: `job ${job.id}` })
-        sendJson(res, 200, { jobId: job.id })
+        const ids = picked ? picked.endpoints.map(e => e.id) : ['default']
+        // 审计只记端点 id 与任务号，不记任何凭据
+        record({
+          action: 'deploy.publish',
+          target: 'botkeep',
+          detail: `job ${job.id}${ids.length > 1 ? ` · ${ids.length} 端点：${ids.join(',')}` : ''}`,
+        })
+        sendJson(res, 200, { jobId: job.id, endpoints: ids })
       } catch (e) {
         record({ action: 'deploy.publish', result: 'fail', target: 'botkeep', detail: e.message })
         sendJson(res, 409, { error: e.message })

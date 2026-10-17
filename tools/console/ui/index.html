@@ -437,6 +437,14 @@
       </div>
 
       <div class="card">
+        <h3>部署端点</h3>
+        <!-- 端点清单来自服务端配置（NAV_DEPLOY_ENDPOINTS），不硬编码在前端；
+             默认全部不选中：不选任何端点时只发布到主站默认端点，与单端点时代行为一致 -->
+        <div class="row-actions" id="deploy-endpoints" style="flex-wrap:wrap;gap:10px"></div>
+        <p class="hint" id="deploy-endpoints-hint"></p>
+      </div>
+
+      <div class="card">
         <h3>发布流程</h3>
         <p class="hint" id="deploy-flow"></p>
         <p class="hint">

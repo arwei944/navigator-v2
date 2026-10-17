@@ -655,6 +655,18 @@ function finish({ ok, error, steps, started, source, seen }) {
 /**
  * 以「任务」形式启动发布：前端拿 jobId 走 SSE 看实时日志
  * （构建、上传、重启、验证全是分钟级动作，没有流就只能干等）。
+ *
+ * ## 多端点（N2）
+ *
+ * `opts.endpoints` 收**已解析的端点对象数组** —— 解析由调用方用
+ * `endpoints.mjs#resolveEndpoints` 完成，未知 id 在那一步就报错，不会静默少发一个端点。
+ *
+ * 只要显式给了端点就走 `publishAll`，**包括只给一个**：`publish()` 是按环境变量
+ * （BOTKEEP_* / DEPLOY_SITE_URL）决定发到哪的，单选一个镜像站却走 `publish()`
+ * 会把镜像站的选择悄悄丢掉、把默认端点发出去，而且全程不报错。
+ * `publishAll` 对单元素数组同样正确（它会临时把 env 切到该端点再恢复）。
+ *
+ * 不传 `endpoints` 的旧调用者维持原样直接 `publish()` —— 多端点是加法，不是替换。
  */
 export function startPublish(opts = {}) {
   if (jobs.listJobs().some(j => j.title.startsWith('发布到服务器') && j.status === 'running')) {
@@ -663,10 +675,22 @@ export function startPublish(opts = {}) {
   const job = jobs.createJob('发布到服务器')
   const log = (t) => jobs.log(job, t)
   const src = localSource()
-  log(`开始发布 ${src.shortSha}${src.dirty ? '（含未提交改动）' : ''} —— ${src.subject}`)
+  const eps = Array.isArray(opts.endpoints) ? opts.endpoints.filter(Boolean) : []
+  const head = `开始发布 ${src.shortSha}${src.dirty ? '（含未提交改动）' : ''}`
 
-  publish({ ...opts, log })
-    .then(r => {
+  if (eps.length > 1) log(`${head} —— ${eps.length} 个端点：${eps.map(e => e.label || e.id).join('、')}`)
+  else if (eps.length === 1) log(`${head} —— 端点「${eps[0].label || eps[0].id}」（${eps[0].url || '默认'}）`)
+  else log(`${head} —— ${src.subject}`)
+
+  const run = eps.length
+    ? publishAll({ log, skipBuild: Boolean(opts.skipBuild), endpoints: eps }).then(r => {
+      // 失败不静默：哪个端点挂了、为什么挂，逐条点名进日志，退出码非零
+      const bad = r.results.filter(x => !x.ok)
+      if (!bad.length) log(`\n✓ ${r.results.length} 个端点全部发布完成`)
+      else log(`\n✗ ${bad.length}/${r.results.length} 个端点失败：${bad.map(x => `${x.endpoint} —— ${x.error}`).join('；')}`)
+      jobs.finish(job, bad.length ? 1 : 0)
+    })
+    : publish({ ...opts, log }).then(r => {
       if (r.ok) {
         log(`\n✓ 发布完成，用时 ${r.seconds}s，线上版本 ${r.online || '(未知)'}`)
         jobs.finish(job, 0)
@@ -675,10 +699,11 @@ export function startPublish(opts = {}) {
         jobs.finish(job, 1)
       }
     })
-    .catch(e => {
-      log(`\n✗ ${e.message}`)
-      jobs.finish(job, 1)
-    })
+
+  run.catch(e => {
+    log(`\n✗ ${e.message}`)
+    jobs.finish(job, 1)
+  })
   return job
 }
 
