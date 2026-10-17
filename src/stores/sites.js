@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import SEED_SITES from '../../api/sites-data.json'
 import { encodeStored, decodeStored } from '@/utils/storeVersioning'
 import { rankSites } from '@/utils/search'
 import { watchVisibility } from '@/utils/visibility'
@@ -64,8 +63,10 @@ export const useSitesStore = defineStore('sites', () => {
   // 恢复回收站时若发现记录损坏，要能「说出来」而不是静默放回坏数据
   const toast = useToastStore()
 
-  // 云端基底（种子数据只是首屏兜底，拉到云端后即被替换）
-  const cloudSites = ref([...SEED_SITES])
+  // 云端基底。**不再用种子数据做同步首屏**：那份 152 KB 的站点表原先静态 import，
+  // 必然进首屏静态图，而它只在「云端拉取失败」时才用得上 —— 改成云端首拉失败时
+  // 再动态 import（见 loadSeedSites / applySeedFallback），不为少数路径付首屏字节。
+  const cloudSites = ref([])
   // 渲染用列表 = 基底 + 覆盖层，由 rebuild() 维护，不要直接改它
   const sites = ref([])
 
@@ -927,12 +928,43 @@ function fetchCloud() {
     return applyCloudData(data)
   }
 
+  /**
+   * 种子兜底：**只在首次云端拉取失败时**才动态取回那份 152 KB 的站点表。
+   *
+   * 承诺缓存（seedPromise）确保只 import 一次；失败也兑现空数组 ——
+   * 否则每次轮询失败都会重试同一个必然失败的 import。
+   */
+  let seedPromise = null
+  let seedApplied = false
+  function loadSeedSites() {
+    if (!seedPromise) {
+      seedPromise = import('../../api/sites-data.json')
+        .then(m => (Array.isArray(m?.default) ? m.default : (Array.isArray(m) ? m : [])))
+        .catch(() => [])
+    }
+    return seedPromise
+  }
+
+  /** 把种子灌进基底。期间云端若已成功（cloudSites 非空），这次惰性加载直接作废。 */
+  async function applySeedFallback() {
+    if (seedApplied) return
+    seedApplied = true
+    const seed = await loadSeedSites()
+    if (seed.length && !cloudSites.value.length) {
+      cloudSites.value = seed
+      rebuild()
+    }
+  }
+
   async function initCloudSites() {
     try {
       applyIfNewer(await fetchCloud())
     } finally {
       cloudLoaded.value = true
     }
+    // 首拉没拿到数据（离线 / 接口不存在 / 平台暂停 / 响应不合法）→ 种子兜底，
+    // 别让首屏停在空列表上。云端正常时这一步不执行，那份字节也就不会被下载。
+    if (!cloudSites.value.length) await applySeedFallback()
   }
 
   /* ── 轮询节奏：成功间隔恒定，失败指数退避 ──
@@ -1040,7 +1072,8 @@ function fetchCloud() {
   // 无改动就不写盘（pruneTrash 返回 false），避免每次启动都白写一次 localStorage。
   if (pruneTrash()) saveTrash()
 
-  // 首屏先用种子数据渲染，云端拉到后由 applyCloudData 重建
+  // 首屏从空列表起步：云端拉到后由 applyCloudData 填充，拉取失败则由
+  // initCloudSites 末尾的 applySeedFallback 用种子兜底，两条路径都走 rebuild()
   rebuild()
 
   return {
