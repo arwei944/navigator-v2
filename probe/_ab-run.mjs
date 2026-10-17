@@ -42,7 +42,10 @@ for (let i = 0; i < 40; i++) {
 if (!up) { console.error('Chrome 未就绪'); process.exit(1) }
 
 console.log(`\n##################### ${label} #####################`)
-const child = spawn(process.execPath, ['probe/perf-batch2.mjs', String(PORT), 'http://localhost:4173', '5'], { stdio: 'inherit' })
+// 可选第 3 个参数指定被测地址：4173 常被并行的 preview 占用，用它切到自带 static-server
+// 起的端口，测的仍是当前 dist，避免「测到别人的产物」。
+const BASE = process.argv[3] || 'http://localhost:4173'
+const child = spawn(process.execPath, ['probe/perf-batch2.mjs', String(PORT), BASE, '5'], { stdio: 'inherit' })
 const code = await new Promise(r => child.on('exit', r))
 
 // 收工：杀掉这个临时 Chrome
