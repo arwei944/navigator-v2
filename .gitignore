@@ -42,3 +42,8 @@ tools/proxy-ports.txt
 
 # 本机控制台的插件配置（引擎链选择，属本机状态，不改线上）
 plugins.local.json
+
+# 图标抓取脚本（scripts/fetch-favicons.mjs）写回 api/sites-data.json 前的备份副产物
+# 每次运行都生成一份带时间戳的 .bak-*.json，属本机状态，不入库
+api/sites-data.bak-*.json
+api/*.bak-*.json
