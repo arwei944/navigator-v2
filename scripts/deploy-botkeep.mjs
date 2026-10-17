@@ -20,9 +20,12 @@ import { publish } from '../tools/console/lib/deploy.mjs'
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')
 const quiet = args.includes('--quiet')
+/** 强制全量打包（线上产物被重建 / manifest 失效时的逃生阀） */
+const full = args.includes('--full')
 
 const r = await publish({
   skipBuild,
+  full,
   log: quiet ? () => {} : (t) => process.stdout.write(String(t).endsWith('\n') ? t : t + '\n'),
 })
 

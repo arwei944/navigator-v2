@@ -23,6 +23,7 @@
  *   盖到线上、顺手清空站点库。
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, statSync, readdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -40,6 +41,15 @@ const SLICE_BYTES = Math.floor(3.5 * 1024 * 1024)
 const IDEM_RE = /^[A-Za-z0-9_-]{16,64}$/
 /** 断点续传：记录「这一轮分片是否已传完」，让失败重跑时跳过已完成的阶段 */
 const CHECKPOINT_FILE = join(ROOT, 'tools', 'console', '.deploy-checkpoint.json')
+
+/**
+ * 上次发布成功的**产物文件指纹**（相对路径 → 内容 sha1 前 16 位）。
+ *
+ * 用来算「增量集」——只上传与上次不同的文件。实测平台上传限速约 27 KB/s
+ * （见 `projects/.../outputs/deploy-speed-research.md` §7）：全量 8.86 MiB 要 ~800s，
+ * 而其中 6.7 MB 是几乎不变的站点图标，真正变化的通常只有几个 chunk（几百 KB）。
+ */
+const MANIFEST_FILE = join(ROOT, 'tools', 'console', '.deploy-manifest.json')
 
 /**
  * 幂等键自校验。**必须区分「长度不对」与「字符不对」** ——
@@ -235,25 +245,66 @@ function runStep(log, label, command, args, opts = {}) {
  * 用 tar 而不是 zip：产物里有 270 个二进制图标，而平台的 ZIP 通道明确不支持二进制。
  * tar 只是把文件按字节串起来，不对内容做任何假设。
  */
-async function packSlices(log) {
+/** 遍历 dist（跳过 data/），返回 `{ 相对路径: 内容 sha1 前 16 位 }` */
+function walkDistHashes(dir = DIST, base = '') {
+  const out = {}
+  let entries
+  try { entries = readdirSync(dir, { withFileTypes: true }) } catch { return out }
+  for (const e of entries) {
+    if (!base && e.name === 'data') continue          // data/（密钥 + SQLite）绝不进包
+    const rel = base ? `${base}/${e.name}` : e.name
+    const full = join(dir, e.name)
+    if (e.isDirectory()) Object.assign(out, walkDistHashes(full, rel))
+    else {
+      try { out[rel] = createHash('sha1').update(readFileSync(full)).digest('hex').slice(0, 16) }
+      catch { out[rel] = 'unreadable' }
+    }
+  }
+  return out
+}
+
+function readManifest() {
+  try { return JSON.parse(readFileSync(MANIFEST_FILE, 'utf-8')) } catch { return null }
+}
+function writeManifest(obj) {
+  try { writeFileSync(MANIFEST_FILE, JSON.stringify(obj, null, 2), 'utf-8') } catch { /* 记录失败不影响发布 */ }
+}
+
+/**
+ * 把 dist/ 打成 tar 并切片。**默认增量**：只打包「与上次发布不同的文件」。
+ *
+ * 安全兜底（任一命中即回退全量）：
+ *   · manifest 不存在 / 损坏；
+ *   · manifest 的 workloadId 与当前工作负载不符（换了目标端点）；
+ *   · 调用方显式传 `full: true`。
+ *
+ * 删除的文件不进包：vite 产物文件名带内容 hash，旧 chunk 残留在容器里无害且不被引用。
+ */
+async function packSlices(log, { full = false } = {}) {
   const work = join(tmpdir(), `nav-deploy-${Date.now()}`)
   const staged = join(work, 'stage')
   mkdirSync(staged, { recursive: true })
 
-  // 复制 dist → staging，**排除 data/**
-  const skip = new Set(['data'])
-  const copyDir = (from, to) => {
-    mkdirSync(to, { recursive: true })
-    for (const e of readdirSync(from, { withFileTypes: true })) {
-      if (skip.has(e.name)) continue
-      const src = join(from, e.name)
-      const dst = join(to, e.name)
-      if (e.isDirectory()) copyDir(src, dst)
-      else writeFileSync(dst, readFileSync(src))
-    }
-  }
   if (!existsSync(DIST)) throw new Error('没有 dist/，先构建')
-  copyDir(DIST, staged)
+
+  const cur = walkDistHashes()
+  const prev = readManifest()
+  const sameTarget = Boolean(prev && prev.files && prev.workloadId === credentials().workloadId)
+  const incremental = !full && sameTarget
+
+  const allRels = Object.keys(cur)
+  const toPack = incremental ? allRels.filter(rel => prev.files[rel] !== cur[rel]) : allRels
+  const sizeOf = (rel) => { try { return statSync(join(DIST, rel)).size } catch { return 0 } }
+  const packBytes = toPack.reduce((s, r) => s + sizeOf(r), 0)
+  const fullBytes = allRels.reduce((s, r) => s + sizeOf(r), 0)
+  log(`  · 打包范围：${incremental ? '增量' : '全量'} ${toPack.length}/${allRels.length} 文件 · ${(packBytes / 1048576).toFixed(2)} MiB（全量参考 ${(fullBytes / 1048576).toFixed(2)} MiB）`)
+
+  // 只把要打包的文件按原目录结构复制进 staging（data/ 已在 walkDistHashes 里排除）
+  for (const rel of toPack) {
+    const dst = join(staged, rel)
+    mkdirSync(dirname(dst), { recursive: true })
+    writeFileSync(dst, readFileSync(join(DIST, rel)))
+  }
   if (existsSync(join(staged, 'data'))) throw new Error('打包时 data/ 没有被排除（这会覆盖线上站点库）')
 
   const tarName = 'app.tar'
@@ -276,7 +327,7 @@ async function packSlices(log) {
     slices.push({ name: SLICE_NAMES[i], base64: chunk.toString('base64'), bytes: chunk.length })
   }
   log(`切成 ${slices.length} 片：${slices.map(s => `${s.name} ${(s.bytes / 1048576).toFixed(2)}M`).join('、')}`)
-  return { work, slices }
+  return { work, slices, files: cur }
 }
 
 /* ---------------- 上传 ---------------- */
@@ -483,7 +534,7 @@ function clearCheckpoint() {
  * @param {boolean} [o.skipBuild] 跳过构建（复用现有 dist）
  * @param {string} [o.url] 线上地址
  */
-export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
+export async function publish({ log = () => {}, skipBuild = false, url, full = false } = {}) {
   const started = Date.now()
   const source = localSource()
 
@@ -538,7 +589,7 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
 
     /* 3. 打包切片 */
     log('\n· 打包')
-    const { work, slices } = await packSlices(log)
+    const { work, slices, files: distFingerprint } = await packSlices(log, { full })
     steps.push({ key: 'pack', ok: true, note: `${slices.length} 片` })
     tick('打包（tar + base64 切片）')
 
@@ -591,6 +642,8 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
         ts: Date.now(),
       })
       steps.push({ key: 'upload', ok: true, note: `${slices.length} 片` })
+      // 上传成功后记下**本次全量**指纹 —— 下次发布据此算增量集
+      writeManifest({ workloadId: credentials().workloadId, files: distFingerprint, ts: Date.now() })
       }
       tick('上传（含清理旧分片 + 逐片）')
 
@@ -631,8 +684,14 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
       const target = (url || process.env.DEPLOY_SITE_URL || 'https://navigator-v2.bot-keep.xyz').replace(/\/+$/, '')
       const want = localBuild().sha || source.sha
       let seen = null
-      for (let i = 0; i < 40; i++) {
-        await sleep(6000)
+      /**
+       * 轮询间隔：实测容器重启 + 解压只需 ~6-10s，原 6s 间隔最坏要白等一轮。
+       * 缩短到 1.5s（可用 NAV_VERIFY_INTERVAL_MS 覆盖），总预算维持 ~240s。
+       */
+      const verifyInterval = Math.max(500, Number(process.env.NAV_VERIFY_INTERVAL_MS) || 1500)
+      const verifyTries = Math.max(1, Math.ceil(240000 / verifyInterval))
+      for (let i = 0; i < verifyTries; i++) {
+        await sleep(verifyInterval)
         const r = await remoteStatus(target)
         if (r.available) {
           seen = r
@@ -646,7 +705,7 @@ export async function publish({ log = () => {}, skipBuild = false, url } = {}) {
         } else {
           log(`  · ${r.error || '暂不可达'}，继续等…`)
         }
-        if (i === 39) {
+        if (i === verifyTries - 1) {
           log(`  ⚠ 等待超时：线上版本仍不是 ${String(want).slice(0, 7)}`)
           steps.push({ key: 'verify', ok: false, note: '等待超时' })
           return finish({ ok: false, error: '线上验证未通过（版本未更新）', steps, started, source, seen })
