@@ -6,6 +6,8 @@ import { rankSites } from '@/utils/search'
 import { watchVisibility } from '@/utils/visibility'
 import { safeSetItem } from '@/utils/safeStorage'
 import { sanitizeSites } from '../../shared/sanitize.mjs'
+import { hostOf } from '../../shared/host.mjs'
+import { useToastStore } from '@/stores/toast'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
 import { usePreferencesStore } from '@/stores/preferences'
@@ -14,6 +16,15 @@ import { buildSignals, hasSignal, rankSites as rankSmart } from '@/utils/smartRa
 
 const OVERLAY_KEY = 'nav-sites-overlay'
 const TRASH_KEY = 'nav-sites-trash'
+
+/* ── 回收站治理阈值（F7）─────────────────────────────────────────
+ * 三道闸：保留期 / 条数上限 / 字节上限。取值理由见 saveTrash() 上方的长注释。
+ * 字节口径是**编码后的字符串长度**（UTF-16 码元数），与 localStorage 的
+ * 配额统计口径接近；中文站名较多时它比 JSON 字节数略小，作为闸门足够。
+ */
+const TRASH_MAX_ITEMS = 200
+const TRASH_MAX_BYTES = 256 * 1024
+const TRASH_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000
 
 /**
  * 本地覆盖层：云端数据是基底，访客自己的增 / 改 / 删 / 排序叠加其上并持久化。
@@ -50,6 +61,8 @@ export const useSitesStore = defineStore('sites', () => {
   const prefs = usePreferencesStore()
   // 智能排序要用访问记录（时段偏好与共现）—— 这是本地信号，不上云
   const historyStore = useHistoryStore()
+  // 恢复回收站时若发现记录损坏，要能「说出来」而不是静默放回坏数据
+  const toast = useToastStore()
 
   // 云端基底（种子数据只是首屏兜底，拉到云端后即被替换）
   const cloudSites = ref([...SEED_SITES])
@@ -76,7 +89,9 @@ export const useSitesStore = defineStore('sites', () => {
 
   // 回收站（持久化，否则刷新后「恢复」就没了）
   const storedTrash = decodeStored(TRASH_KEY, localStorage.getItem(TRASH_KEY), [])
-  const trash = ref(Array.isArray(storedTrash) ? storedTrash : [])
+  // 读盘只丢「非对象」项：字段级完整性留到恢复时逐条校验（见 validateTrashSite）——
+  // 读盘阶段做深度过滤会把「字段略缺但仍可用」的条目直接丢掉，反而丢用户数据
+  const trash = ref(Array.isArray(storedTrash) ? storedTrash.filter(s => s && typeof s === 'object') : [])
 
   // 批量选择 / 手动拖拽排序（工具栏移出列表后，两者需跨组件共享）
   const batchMode = ref(false)
@@ -189,8 +204,77 @@ export const useSitesStore = defineStore('sites', () => {
     }))
   }
 
+  /** 最旧一条的下标（deletedAt 最小）。无合法时间戳的条目视为「年龄未知」，排在最后。 */
+  function oldestTrashIndex() {
+    let idx = 0
+    let oldest = Infinity
+    for (let i = 0; i < trash.value.length; i++) {
+      const t = Number(trash.value[i]?.deletedAt)
+      const v = Number.isFinite(t) && t > 0 ? t : Infinity
+      if (v < oldest) { oldest = v; idx = i }
+    }
+    return idx
+  }
+
+  /** 按保留期与条数上限裁剪回收站，返回是否发生改动。就地改 trash.value（渲染要看到）。 */
+  function pruneTrash() {
+    if (!trash.value.length) return false
+    const now = Date.now()
+    let changed = false
+    // 1) 保留期：30 天前的条目自动清掉。没有合法 deletedAt 的不清（无法判定年龄，宁可留着）
+    const kept = trash.value.filter(s => {
+      const t = Number(s?.deletedAt)
+      return !(Number.isFinite(t) && t > 0) || now - t <= TRASH_MAX_AGE_MS
+    })
+    if (kept.length !== trash.value.length) { trash.value = kept; changed = true }
+    // 2) 条数上限：超出时淘汰最旧的，但**保持其余条目的原有顺序**（回收站是按删除先后读的）
+    if (trash.value.length > TRASH_MAX_ITEMS) {
+      const keep = new Set(
+        [...trash.value]
+          .sort((a, b) => (Number(b?.deletedAt) || 0) - (Number(a?.deletedAt) || 0))
+          .slice(0, TRASH_MAX_ITEMS)
+          .map(s => s.id)
+      )
+      trash.value = trash.value.filter(s => keep.has(s.id))
+      changed = true
+    }
+    return changed
+  }
+
+  /** 恢复前的完整性校验：返回 '' 表示通过，否则返回可展示的原因。 */
+  function validateTrashSite(s) {
+    if (!s || typeof s !== 'object') return '记录已损坏'
+    if (typeof s.id !== 'string' || !s.id.trim()) return '缺少站点 id'
+    if (typeof s.name !== 'string' || !s.name.trim()) return '缺少站点名称'
+    if (typeof s.url !== 'string' || !s.url.trim()) return '缺少站点地址'
+    // 域名解析不出来 = 恢复后既打不开、又会污染列表（空 host 在去重/图谱里是脏输入）
+    if (!hostOf(s.url)) return `站点地址无法解析出域名（${s.url}）`
+    return ''
+  }
+
+  /**
+   * 回收站落盘：**所有**改动回收站的入口都走这里，所以治理只挂一处即可，不会漏。
+   *
+   * 为什么需要治理：此前只写不治，300 站全删会往 localStorage 堆 150 KB+，
+   * 是配额异常的历史诱因（配额打满时连覆盖层都写不进去）。
+   *
+   * 触发时机：仅在有回收站写入时（删除 / 批量删除 / 恢复 / 彻底删除 / 清空），
+   * **没有常驻定时器** —— 一个每 N 秒跑一次的清理器本身就是性能负担，
+   * 而回收站只在用户动手时才变，挂在写入路径上已经够了。
+   *
+   * 三道闸，按「便宜的先来」排列：
+   *   保留期（一次 filter）→ 条数上限（一次排序）→ 字节上限（超限才逐条淘汰）。
+   * 字节上限放最后且自带提前退出：正常使用几乎不会走到 while 循环。
+   */
   function saveTrash() {
-    safeSetItem(TRASH_KEY, encodeStored(trash.value))
+    pruneTrash()
+    let payload = encodeStored(trash.value)
+    // 3) 字节上限：条数闸放过去了但总量仍超标（个别条目描述特别长）时，从最旧继续淘汰
+    while (payload.length > TRASH_MAX_BYTES && trash.value.length > 1) {
+      trash.value.splice(oldestTrashIndex(), 1)
+      payload = encodeStored(trash.value)
+    }
+    safeSetItem(TRASH_KEY, payload)
   }
 
 /**
@@ -663,9 +747,22 @@ function rebuild() {
   }
 
   // ── 回收站管理 ──
+  /**
+   * 从回收站恢复一条站点。返回 `{ ok, reason }`。
+   *
+   * 恢复前先做**完整性校验**：回收站是持久化数据，可能被外部改坏（手工编辑
+   * localStorage、旧版本结构、写入被截断）。坏数据一旦放回列表，轻则卡片渲染报错、
+   * 重则整站白屏，而且它会随下一次发布进入云端 —— 所以宁可拒绝恢复并明确告知，
+   * 也不静默放进一个坏条目。
+   */
   function restoreFromTrash(id) {
     const idx = trash.value.findIndex(s => s.id === id)
-    if (idx === -1) return
+    if (idx === -1) return { ok: false, reason: 'not-found' }
+    const bad = validateTrashSite(trash.value[idx])
+    if (bad) {
+      toast.push({ message: `无法恢复：${bad}`, tone: 'error' })
+      return { ok: false, reason: bad }
+    }
     const [site] = trash.value.splice(idx, 1)
     delete site.deletedAt
     const dIdx = localDeletes.value.indexOf(id)
@@ -679,6 +776,7 @@ function rebuild() {
     rebuild()
     saveOverlay()
     saveTrash()
+    return { ok: true }
   }
 
   function permanentDelete(id) {
@@ -937,6 +1035,10 @@ function fetchCloud() {
       if (!pollTimer) retryCloudNow()
     }
   })
+
+  // 启动时先按保留期收一轮：把「上次关闭期间已经过了 30 天」的条目清掉。
+  // 无改动就不写盘（pruneTrash 返回 false），避免每次启动都白写一次 localStorage。
+  if (pruneTrash()) saveTrash()
 
   // 首屏先用种子数据渲染，云端拉到后由 applyCloudData 重建
   rebuild()
