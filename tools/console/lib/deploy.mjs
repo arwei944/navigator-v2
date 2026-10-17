@@ -683,6 +683,76 @@ export function startPublish(opts = {}) {
 }
 
 /** dist 的体积概况（发布前用来判断「这次产物有多大、和上次差多少」） */
+/** 环境变量恢复：原值为 undefined 时必须 delete，否则会把它写成字符串 "undefined" */
+function restoreEnv(key, value) {
+  if (value === undefined) delete process.env[key]
+  else process.env[key] = value
+}
+
+/** 临时把 BOTKEEP_* / DEPLOY_SITE_URL 切到某个端点，返回恢复函数 */
+function applyEndpointEnv(ep) {
+  if (!ep) return () => {}
+  const saved = {
+    apiKey: process.env.BOTKEEP_API_KEY,
+    bkKey: process.env.BK_KEY,
+    workload: process.env.BOTKEEP_WORKLOAD_ID,
+    bkWorkload: process.env.BK_WID,
+    siteUrl: process.env.DEPLOY_SITE_URL,
+  }
+  if (ep.key) { process.env.BOTKEEP_API_KEY = ep.key; process.env.BK_KEY = ep.key }
+  if (ep.workloadId) { process.env.BOTKEEP_WORKLOAD_ID = ep.workloadId; process.env.BK_WID = ep.workloadId }
+  if (ep.url) process.env.DEPLOY_SITE_URL = ep.url
+  return () => {
+    restoreEnv('BOTKEEP_API_KEY', saved.apiKey)
+    restoreEnv('BK_KEY', saved.bkKey)
+    restoreEnv('BOTKEEP_WORKLOAD_ID', saved.workload)
+    restoreEnv('BK_WID', saved.bkWorkload)
+    restoreEnv('DEPLOY_SITE_URL', saved.siteUrl)
+  }
+}
+
+/**
+ * 多端点发布（N2）：对每个端点依次跑一遍 `publish`。
+ *
+ * ## 为什么用「临时切环境变量」而不是给 publish 加参数
+ *
+ * `publish` 内部对 `BOTKEEP_API_KEY` / `BOTKEEP_WORKLOAD_ID` / `DEPLOY_SITE_URL`
+ * 有 5 处以上直接依赖（credentials / bk / listRoot / deleteFiles / 验证目标）。
+ * 逐个改成传参既要穿透整条调用链（bk ← uploadSlice ← publish），又极易漏掉一处 ——
+ * 漏掉的那个端点就会用**上一个端点的凭据**发出去，而且不报错。
+ * 临时切换 + `finally` 恢复，把风险收在一个函数里，且完全不改 publish 本身。
+ *
+ * ## 一个端点失败不阻断其余
+ *
+ * 多端点场景下「部分成功」比「全停」有用：主站发好了、镜像站挂了，不该让主站白跑一趟。
+ * 每个端点的结果都如实进 `results`，调用方自行决定如何处置。
+ *
+ * @param {{log?:Function, skipBuild?:boolean, endpoints?:object[]}} opts
+ *   endpoints 为端点对象数组（见 endpoints.mjs 的 resolveEndpoints）；空则等价单端点。
+ */
+export async function publishAll({ log = () => {}, skipBuild = false, endpoints } = {}) {
+  const list = Array.isArray(endpoints) && endpoints.length ? endpoints : [null]
+  const results = []
+  for (let i = 0; i < list.length; i++) {
+    const ep = list[i]
+    const label = ep ? `${ep.label || ep.id}（${ep.url}）` : '默认端点'
+    log(`\n===== 端点 ${i + 1}/${list.length}：${label} =====`)
+    const restore = applyEndpointEnv(ep)
+    try {
+      // 第一个端点构建，其余复用同一份 dist —— 多端点不该重复构建
+      const r = await publish({ log, skipBuild: skipBuild || i > 0, url: ep?.url })
+      results.push({ endpoint: ep?.id || 'default', ok: true, result: r })
+    } catch (e) {
+      const error = String(e?.message || e)
+      log(`✗ 端点「${label}」发布失败：${error}`)
+      results.push({ endpoint: ep?.id || 'default', ok: false, error })
+    } finally {
+      restore()
+    }
+  }
+  return { ok: results.every(r => r.ok), results }
+}
+
 export function distSize() {
   let bytes = 0, files = 0
   const walk = (d) => {

@@ -28,6 +28,7 @@ import { ROOT } from './env.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as deploy from './deploy.mjs'
+import * as endpointsLib from './endpoints.mjs'
 
 export const RELEASE_JOB_TITLE = '开发流水线'
 export const TEST_JOB_TITLE = '测试门禁'
@@ -221,9 +222,7 @@ async function runRelease(job, steps, opts) {
   else mark(job, steps, 'build', { status: 'running' })
   let cur = 'build'
 
-  const r = await deploy.publish({
-    skipBuild: Boolean(opts.skipBuild),
-    log: (t) => {
+  const deployLog = (t) => {
       for (const raw of String(t).split(/\r?\n/)) {
         const line = raw.trim()
         if (!line) continue
@@ -242,8 +241,25 @@ async function runRelease(job, steps, opts) {
         }
       }
       jobs.log(job, t)
-    },
-  })
+  }
+
+  /**
+   * N2：多端点。选了 ≥2 个端点时依次发布（一个失败不阻断其余）；否则走原单端点路径，
+   * 行为与多端点引入之前一字不差。第一个端点构建，其余复用同一份 dist。
+   */
+  let r
+  let multiEndpointResults = null
+  const endpointPick = opts.endpointIds && opts.endpointIds.length
+    ? endpointsLib.resolveEndpoints(opts.endpointIds) : null
+  if (endpointPick && !endpointPick.ok) throw new Error(endpointPick.error)
+  if (endpointPick && endpointPick.endpoints.length > 1) {
+    const all = await deploy.publishAll({ skipBuild: Boolean(opts.skipBuild), log: deployLog, endpoints: endpointPick.endpoints })
+    const firstOk = all.results.find(x => x.ok)
+    r = firstOk ? firstOk.result : { ok: false, error: all.results.map(x => `${x.endpoint}: ${x.error || '失败'}`).join('；') }
+    multiEndpointResults = all.results
+  } else {
+    r = await deploy.publish({ skipBuild: Boolean(opts.skipBuild), log: deployLog })
+  }
 
   if (!r.ok) throw new Error(r.error || '发布失败')
   const verifyStep = steps.find(x => x.key === 'verify')
@@ -251,7 +267,12 @@ async function runRelease(job, steps, opts) {
 
   const seconds = Math.round((Date.now() - t0) / 1000)
   jobs.log(job, `\n✓ 流水线完成 —— 用时 ${seconds}s，线上版本 ${r.shortSha}（${r.subject || ''}）`, 'info')
-  job.release = { sha: r.sha, shortSha: r.shortSha, subject: r.subject || '', seconds, steps: r.steps || [] }
+  job.release = {
+    sha: r.sha, shortSha: r.shortSha, subject: r.subject || '', seconds, steps: r.steps || [],
+    endpoints: multiEndpointResults
+      ? multiEndpointResults.map(x => ({ endpoint: x.endpoint, ok: x.ok, shortSha: x.result?.shortSha || '' }))
+      : null,
+  }
   jobs.finish(job, 0)
 }
 

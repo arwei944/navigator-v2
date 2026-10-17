@@ -15,6 +15,8 @@ function optsOf(v) {
     skipTest: Boolean(v['skip-test']),
     noPush: Boolean(v['no-push']),
     skipBuild: Boolean(v['skip-build']),
+    // N2：部署端点单选 / 多选（逗号分隔）；空 = 默认端点，行为与之前一致
+    endpointIds: String(v.endpoint || '').split(',').map(s => s.trim()).filter(Boolean),
   }
 }
 
@@ -23,6 +25,7 @@ const FLAGS = {
   'skip-test': { type: 'boolean', desc: '跳过测试门禁（会在日志留痕）' },
   'no-push': { type: 'boolean', desc: '不推送远端（本地演练）' },
   'skip-build': { type: 'boolean', desc: '跳过前端构建，复用现有 dist' },
+  endpoint: { desc: '部署端点 id，逗号分隔可多选（默认 default；额外端点见 NAV_DEPLOY_ENDPOINTS）' },
 }
 
 const planCmd = {

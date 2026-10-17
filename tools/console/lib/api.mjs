@@ -19,6 +19,7 @@ import * as notify from './notify.mjs'
 import * as schedule from './schedule.mjs'
 import * as deploy from './deploy.mjs'
 import * as pluginsCfg from './plugins.mjs'
+import * as endpointsCfg from './endpoints.mjs'
 import * as release from './release.mjs'
 import { record } from './audit.mjs'
 
@@ -201,6 +202,16 @@ export async function handleApi(req, res, path, url) {
 
   if (method === 'GET' && path === '/api/publish/gates') {
     sendJson(res, 200, { gates: gate.listGates() })
+    return true
+  }
+
+  /**
+   * N2：可部署端点清单。**不含任何凭据材料**（只回「配没配」）——
+   * 端点配置（NAV_DEPLOY_ENDPOINTS）在本地 .env.local，所以只有本地控制台能看到全量端点；
+   * 线上产物里没有这份配置。发布后的选择与执行也在本地（线上无源码、无发布凭据）。
+   */
+  if (method === 'GET' && path === '/api/deploy/endpoints') {
+    sendJson(res, 200, { endpoints: endpointsCfg.publicEndpoints() })
     return true
   }
 
