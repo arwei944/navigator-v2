@@ -48,9 +48,26 @@ export default defineConfig({
          * 绝大多数图标用户一辈子不会看到（首访实测多传约 4.6 MB）。
          * 图标改走下方 runtimeCaching：谁被渲染到就缓存谁，仍是离线可用的。
          */
-        globPatterns: ['**/*.{js,css}', 'favicon.svg', 'pwa-*.png'],
-        // sw.js / workbox-*.js 由 workbox 自行管理，绝不进预缓存清单
-        globIgnores: ['icons/**', 'sw.js', 'workbox-*.js', '**/*.html'],
+        // 只预缓存「应用外壳 + 核心交互 chunk」：
+        //   - 外壳：index / vendor-vue（html 不进预缓存，见下方 nav-html）
+        //   - 核心交互：添加 / 编辑站点弹窗、设置、详情面板相关站、用途选择器、
+        //     秒加链路（autoAdd / meta / site-infer）、首页视图……
+        // favicon.svg / pwa-*.png **不写在这里** —— includeAssets 与 manifest.icons
+        // 会各注入一次，glob 再匹配一遍就是重复条目（实测曾因此各重复 1 条）。
+        globPatterns: ['**/*.{js,css}'],
+        globIgnores: [
+          // sw.js / workbox-*.js 由 workbox 自行管理，绝不进预缓存清单
+          'sw.js', 'workbox-*.js',
+          // 图标：谁被渲染到就运行时缓存谁（见下方 site-icons）。全量预缓存实测 6.11 MB
+          'icons/**',
+          // html 走下方 nav-html 的 NetworkFirst（2026-10-14 白屏事故，见文件头注释）
+          '**/*.html',
+          // 低频功能 chunk：管理后台 / 洞察 / 图谱 / 翻译三层 / BGM 播放器 / 便签 /
+          // 主题市场 / 书签导入 / 拼音引擎 / 更新提示 / 中文别名表 / 自动归类。
+          // 这些界面多数访客一辈子都不打开，却会让 SW 安装期替每个访客多下 ~470 KB。
+          // 改走运行时缓存（下方 lazy-chunks），谁真被打开到就缓存谁。
+          '**/{AdminView,AdminAside,InsightsView,chartkit,GraphView,affinity,AboutView,NotFoundView,translateFields,browserTranslate,aiApi,PipelineLogPanel,pipelineTrace,bgmScore,BgmPlayer,StickyBoard,StickyNote,ThemeEditor,bookmark-import,pinyin,swRefresh,phraseAliases,auto-category,siteRefresh,sites-data}-*.{js,css}',
+        ],
         runtimeCaching: [
           {
             /**
@@ -78,6 +95,25 @@ export default defineConfig({
               cacheName: 'site-icons',
               expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] }
+            }
+          },
+          {
+            /**
+             * 低频功能 chunk（上方 globIgnores 里排除的那批）：管理后台 / 洞察 / 图谱 /
+             * 翻译三层 / BGM 播放器 / 便签 / 主题市场 / 书签导入 / 拼音引擎 / 更新提示 /
+             * 中文别名表 / 自动归类。
+             *
+             * 为什么不预缓存：SW 安装期会把这些全下完，而多数访客一辈子不打开其中任何一个
+             * —— 实测这批约 470 KB raw，正是「首访多传约 4.6 MB」那类浪费的同源问题。
+             * 文件名带内容 hash、内容不变，适合 CacheFirst；谁真被打开到就缓存谁，
+             * 之后离线也能用。离线且从未打开过的功能会拿不到 —— 可接受（本就不是核心路径）。
+             */
+            urlPattern: /\/assets\/(?:AdminView|AdminAside|InsightsView|chartkit|GraphView|affinity|AboutView|NotFoundView|translateFields|browserTranslate|aiApi|PipelineLogPanel|pipelineTrace|bgmScore|BgmPlayer|StickyBoard|StickyNote|ThemeEditor|bookmark-import|pinyin|swRefresh|phraseAliases|auto-category|siteRefresh|sites-data)-[^/]+\.(?:js|css)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lazy-chunks',
+              expiration: { maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] }
             }
           }
         ]
