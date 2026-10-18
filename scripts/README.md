@@ -1,6 +1,6 @@
 # scripts/ —— 仓库脚本台账
 
-> 本文件是 `scripts/` 的**分类台账**。门禁 `test-scripts.mjs` 会断言：
+> 本文件是 `scripts/` 的**分类台账**。门禁（tools/console/test-scripts.mjs）会断言：
 > ① 目录里每个 `.mjs` 都在此登记；② 清单里每个文件都真实存在；③ package.json 引用
 > 的脚本文件都在。**新增脚本务必先在此登记**，否则门禁会红。
 
