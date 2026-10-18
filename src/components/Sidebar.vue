@@ -63,18 +63,17 @@
         <span v-show="!iconOnly">管理后台</span>
       </div>
 
+      <!-- 「关于」入口与版本号同处一行：既一眼看出这是「关于」，也一眼看清「跑的是哪一版」，
+           报问题时不必先进页面。版本号来自构建期注入的 package.json.version（见 vite.config.js），
+           未注入时该 span 不渲染 —— 不编一个假的版本号出来。 -->
       <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'about' }"
-           @click="navigate('About')" @keydown.enter="navigate('About')" :title="iconOnly ? '关于' : ''" tabindex="0" role="button">
+           @click="navigate('About')" @keydown.enter="navigate('About')"
+           :title="iconOnly ? (appVersion ? `关于 · v${appVersion}` : '关于') : ''" tabindex="0" role="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
         <span v-show="!iconOnly">关于</span>
+        <span v-if="appVersion && !iconOnly" class="nav-version">v{{ appVersion }}</span>
       </div>
     </nav>
-
-    <!-- 版本标识：显式显示当前产品版本，一眼看清「跑的是哪一版」，报问题时不必先点进「关于」。
-         数据来自构建期注入的 package.json.version（见 vite.config.js 的 define）。
-         没注入（直接跑源码）时整块不渲染 —— 不编一个假的版本号出来。点击可进「关于」页看构建详情。 -->
-    <div v-if="appVersion && !iconOnly" class="sidebar-version" :title="`Navigator v${appVersion} · 点击查看构建详情`"
-         @click="navigate('About')" @keydown.enter="navigate('About')" tabindex="0" role="button">v{{ appVersion }}</div>
 
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。
          折叠后按钮常驻，保证还能展开。「添加网站」在右上角工具栏；
@@ -220,23 +219,18 @@ onUnmounted(() => {
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-/* 版本标识：贴在侧栏底部的小字。只作标识用，所以弱化到 45% 不透明度，不与导航项抢注意力。
-   margin-top:auto 让它在 flex 列容器里被推到底部（内容不足时不会飘在中间）。 */
-.sidebar-version {
-  margin-top: auto;
-  flex: 0 0 auto;
-  padding: 12px 20px 14px;
+/* 版本号：紧跟在「关于」导航项右侧，靠 margin-left:auto 顶到行尾。
+   只作标识用，弱化到 55% 不透明度，不与导航文字抢注意力；hover / 选中该项时提升到可读。 */
+.nav-version {
+  margin-left: auto;
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 11px;
   letter-spacing: .3px;
-  color: var(--text-sidebar);
-  opacity: .45;
-  cursor: pointer;
-  user-select: none;
+  opacity: .55;
   transition: opacity .18s ease;
 }
-.sidebar-version:hover { opacity: .8; }
-.sidebar-version:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+.sidebar-nav-item:hover .nav-version,
+.sidebar-nav-item.active .nav-version { opacity: .9; }
 
 /* 纯图标状态：显式折叠，或宽度被拖到图标宽度以下 */
 .sidebar.icon-only .sidebar-header {
