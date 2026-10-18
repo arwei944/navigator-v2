@@ -11,8 +11,15 @@ import {
   extractLinks, resolveDocLink, classify, inferStatus,
 } from './util.mjs'
 
-/** 默认纳入的子目录（工作区根级的 *.md 自动纳入，无需在此列出） */
-export const DEFAULT_INCLUDE = ['docs', 'projects', '.superpowers', 'backups', 'tools']
+/**
+ * 默认纳入的子目录（工作区根级的 *.md 自动纳入，无需在此列出）。
+ *
+ * **不含 `backups/`**：那是历史快照归档（`sites-data-*.json`、整包工作区快照），
+ * 里面的 md 是**某份文档在某个时间点的副本**，不是活的文档资产。实测把它算进来会产生
+ * 「同一文档的快照与正式版标题重复」这类噪音（duplicate-title 假阳性）。
+ * 需要时可通过 `include` 参数显式加回。
+ */
+export const DEFAULT_INCLUDE = ['docs', 'projects', '.superpowers', 'tools']
 
 /** 单个文档超过此大小只记录元信息、不解析正文（防超大文件拖垮整轮扫描） */
 export const MAX_PARSE_BYTES = 512 * 1024

@@ -25,7 +25,10 @@ export function runChecks(scanResult) {
     issues.push({ level, rule, path: docPath, message, detail })
 
   const docByPath = new Map(docs.map(d => [d.path, d]))
-  const docSet = new Set(docs.keys())
+  // 注意：必须是 docs.map(d => d.path)。`new Set(docs.keys())` 对**数组**返回的是下标集合 {0,1,…}，
+  // 会让下面的 docSet.has(l) 恒为 false → incoming 恒空 → 所有知识型文档都被误报为孤立
+  //（真实数据实测：41 条假阳性，且与 graph 的孤立数不一致）。参见 test-doc-manager.mjs 的回归用例。
+  const docSet = new Set(docs.map(d => d.path))
 
   /* 1) 死链：链接目标相对工作区根存在性检查 */
   for (const d of docs) {

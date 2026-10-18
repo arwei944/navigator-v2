@@ -67,6 +67,8 @@ ok(resolveDocLink('docs/a.md', '../../escape.md') === null, 'util：越出工作
 const fm = parseFrontmatter('---\nstatus: archived\n---\n# 标题\n')
 ok(fm.data.status === 'archived' && fm.body.startsWith('# 标题'), 'util：frontmatter 解析')
 ok(extractLinks('![图](x.png) 与 [文](y.md)').length === 1, 'util：图片不算行内文档链接')
+ok(extractLinks('```\n[示例](nope.md)\n```').length === 0, 'util：围栏代码块内的链接不算活链接')
+ok(extractLinks('`[示例](nope.md)` 与 [真](z.md)').length === 1, 'util：行内代码内的链接不算，正文链接照收')
 
 /* ---------------- 3. indexer ---------------- */
 
@@ -90,6 +92,16 @@ ok(
 ok(
   rules('stale-reference').includes('docs/audit/old.md') === false,
   'checker：归档文档自己不报过期引用',
+)
+/* 回归：docSet 曾误用 `new Set(docs.keys())`（对数组返回下标集合），导致「是否库内文档」恒 false、
+   所有知识型文档被误报孤立（真实数据实测 41 条假阳性，且与 graph 的孤立数对不上）。 */
+ok(!rules('orphan').includes('docs/a.md'), 'checker：有入链的文档不算孤立（回归：docSet 必须是路径集合）')
+ok(!rules('orphan').includes('docs/b.md'), 'checker：被引用的文档不算孤立')
+ok(rules('orphan').includes('docs/dup.md'), 'checker：真正无入链无出链的知识型文档才报孤立')
+ok(
+  rules('orphan').length === 5,
+  'checker：孤立文档数精确（fixture 增减文档时需同步更新本断言）',
+  `实际 ${rules('orphan').length}`,
 )
 
 /* ---------------- 5. lifecycle ---------------- */

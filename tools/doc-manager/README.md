@@ -49,6 +49,10 @@ node tools/doc-manager/cli.mjs graph --mermaid       # 关联图谱（文档↔�
 > 过程产物（任务简报 `.superpowers/sdd/`、`memory`、`outputs`）天然由任务系统组织，不算孤立 ——
 > 否则实测会有 84/87 条噪声。
 
+> **`backups/` 不在默认扫描范围**：它是历史快照归档（内含整包工作区快照），其中的 markdown 是
+> **某份文档在某个时间点的副本**、不是活文档资产。算进来只会产生「快照与正式版标题重复」这类噪音。
+> 需要时通过 `scanWorkspace({ include })` 显式加回。
+
 ## 生命周期：显式声明优先
 
 状态按三层判定（优先级从高到低）：
@@ -66,6 +70,23 @@ node tools/doc-manager/cli.mjs graph --mermaid       # 关联图谱（文档↔�
 3. **同名多版本启发式** —— 同一目录下、去掉 `v数字`/日期/序号后同名的多份 active 文档，
    视为同一份的多个版本，**建议保留版本号最大的**（同目录是硬条件，避免把不同任务目录下的
    `progress.md` 误当同一系列）。
+
+## 互链约定：相关文档
+
+工具鼓励文档之间用**相对路径链接**互相引用 —— 图谱有边，人和 AI 才能「顺藤摸瓜」。
+每份知识型文档可在**末尾**追加一小节：
+
+```markdown
+---
+
+## 相关文档
+
+- [标题](../relative/to/it.md)
+- [另一份](same-dir.md)
+```
+
+nav-v2 工作区已按真实选题关系补齐一轮（spec↔plan 配套、版本系列 v8→v11、管理后台系列、
+部署流水线系列、升级计划系列…），**文档间边数从 7 条增至 80+ 条，孤立文档归零**。
 
 ## 让 AI 用起来
 
@@ -87,11 +108,14 @@ nav-v2 已有的「插件系统」（`shared/plugin-registry.mjs` + `AdminPlugin
 
 ## 门禁
 
+两道，分工不同：
+
 ```bash
-node tools/console/test-doc-manager.mjs     # 自测（fixture 驱动，不依赖真实文档数量）
+npm run console:test:doc-manager   # 自测：fixture 驱动，守工具逻辑（不随真实文档增减而变红）
+npm run docs:check                 # 工作区巡检：--strict，存在死链即以非 0 退出（守真实文档资产）
 ```
 
-已接入 `npm run console:test:all`。
+两者都已接入 `npm run console:test:all`（后者串在末尾，即发布前会扫一遍真实工作区）。
 
 ## 目录结构
 

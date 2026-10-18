@@ -83,12 +83,21 @@ export function allHeadings(text) {
   return out
 }
 
-/** 抓 Markdown 行内链接的目标（排除图片 `![...]()`） */
+/**
+ * 抓 Markdown 行内链接的目标（排除图片 `![...]()`）。
+ *
+ * **先剔除代码块与行内代码**：围栏块（``` / ~~~）与 `` `…` `` 里的「链接」是示例或字面文本，
+ * 读者点不了，参与死链巡检只会产生假阳性 —— 本工具自己的 README 就写过这种语法示例。
+ */
 export function extractLinks(text) {
   const out = []
+  const stripped = text
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/~~~[\s\S]*?~~~/g, '')
+    .replace(/`[^`\n]*`/g, '')
   const re = /(?<!!)\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g
   let m
-  while ((m = re.exec(text))) out.push(m[1])
+  while ((m = re.exec(stripped))) out.push(m[1])
   return out
 }
 
