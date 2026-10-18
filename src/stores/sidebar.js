@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { versionedPersist } from '@/utils/storeVersioning'
 import { usePreferencesStore } from '@/stores/preferences'
+import { MOBILE_QUERY, safeMatchMedia } from '@/utils/breakpoints'
 import { reduceRightPanel } from '../../shared/right-panel.mjs'
 import { clampSideWidth, DEFAULT_SIDE_WIDTH, MIN_SIDE_W, MAX_SIDE_W } from '@/utils/sideWidth'
 
@@ -139,7 +140,7 @@ export const useSidebarStore = defineStore('sidebar', () => {
    */
   function showDetail(site) {
     if (!site) return
-    const narrow = typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+    const narrow = safeMatchMedia(MOBILE_QUERY)
     if (narrow) {
       detailSheetSite.value = site
       return

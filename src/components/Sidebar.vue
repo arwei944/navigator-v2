@@ -108,6 +108,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useSitesStore } from '@/stores/sites'
 import { useFavoritesStore } from '@/stores/favorites'
+import { MOBILE_QUERY } from '@/utils/breakpoints'
 
 // 构建期注入的产品版本号（见 vite.config.js 的 define）；未注入时回落空串，宁可不显示也不编造。
 const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
@@ -119,7 +120,6 @@ const sitesStore = useSitesStore()
 const favoritesStore = useFavoritesStore()
 
 // 移动端（≤768px）侧栏是 off-canvas 抽屉，此时忽略桌面折叠态，始终展开显示完整内容
-const MOBILE_QUERY = '(max-width: 768px)'
 const isMobile = ref(false)
 let mq = null
 function syncIsMobile(e) { isMobile.value = e.matches }

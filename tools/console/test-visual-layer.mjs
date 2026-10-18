@@ -242,6 +242,40 @@ const durUndef = [...durRef].filter(k => !rootVars[k])
 ok(durRef.size >= 3 && durUndef.length === 0,
   `被引用的 ${durRef.size} 个时长令牌全部有定义`, durUndef.join(' ') || '')
 
+/* ---------------- ⑥ 响应式断点 ---------------- */
+
+console.log('\n── ⑥ 响应式断点：值必须来自登记档位 ──')
+
+// 真值从 src/utils/breakpoints.js 读（单一事实来源）—— 不在门禁里再抄一份。
+const { LOCKED_VALUES } = await import(new URL('../../src/utils/breakpoints.js', import.meta.url).href)
+
+// 6a. CSS @media 的宽度值必须在登记档位内（新增断点必须先登记）
+const mediaUnknown = []
+for (const f of layerFiles) {
+  const src = readFileSync(f, 'utf8')
+  for (const m of src.matchAll(/@media[^{]*?\((max|min)-width:\s*([\d.]+)px\)/g)) {
+    const v = Number(m[2])
+    if (!LOCKED_VALUES.has(v)) {
+      mediaUnknown.push(`${f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')}: ${v}px`)
+    }
+  }
+}
+ok(mediaUnknown.length === 0,
+  `CSS 媒体查询断点全部来自登记档位（${LOCKED_VALUES.size} 个）`,
+  mediaUnknown.length ? `\n      ${mediaUnknown.join('\n      ')}` : '')
+
+// 6b. JS 侧不得硬编码断点数字（一律走 breakpoints.js 的查询串 / helper）
+const bpHard = []
+for (const f of layerFiles) {
+  if (f.endsWith('breakpoints.js')) continue
+  const src = readFileSync(f, 'utf8')
+  for (const m of src.matchAll(/matchMedia\(\s*['"`][^'"`]*\d+px|innerWidth\s*[<>]=\s*\d+/g)) {
+    bpHard.push(`${f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')}: ${m[0]}`)
+  }
+}
+ok(bpHard.length === 0, 'JS 侧无硬编码断点（走 utils/breakpoints）',
+  bpHard.length ? `\n      ${bpHard.join('\n      ')}` : '')
+
 /* ---------------- 契约文档 ---------------- */
 
 console.log('\n── 契约文档 ──')
@@ -256,6 +290,7 @@ if (!existsSync(contract)) {
   ok(/硬编码/.test(doc), '契约说明了硬编码政策')
   ok(/层级|z-index/.test(doc), '契约说明了层级（z-index）体系')
   ok(/动效时长|--dur/.test(doc), '契约说明了动效时长体系')
+  ok(/断点|breakpoints/.test(doc), '契约说明了响应式断点体系')
 }
 
 /* ---------------- 结果 ---------------- */

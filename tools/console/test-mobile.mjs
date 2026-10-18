@@ -69,7 +69,8 @@ const MIN_TAP = 44
   ok(/addEventListener\(\s*'popstate'/.test(app), 'App.vue 监听 popstate（消费原生返回以关闭抽屉）')
   ok(/history\.pushState\(\s*\{\s*navDrawer/.test(app), '抽屉打开时压一条哨兵历史记录')
   ok(/drawerClosedByPop/.test(app), "区分「popstate 关闭」与「UI 关闭」，避免多退一次历史")
-  ok(/matchMedia\(\s*'\(max-width:\s*768px\)'/.test(app), '只在窄屏压历史（桌面侧栏常驻，不该被牵连）')
+  ok(/safeMatchMedia\(\s*MOBILE_QUERY\)|matchMedia\(\s*'\(max-width:\s*768px\)'/.test(app),
+    '只在窄屏压历史（桌面侧栏常驻，不该被牵连）')
   // 反模式：自实现边缘 touch 手势会与浏览器原生返回抢事件
   ok(!/touchstart[\s\S]{0,80}clientX\s*<\s*30/.test(app), '没有自实现左缘滑动返回（会与原生手势冲突）')
 }

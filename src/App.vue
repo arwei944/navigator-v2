@@ -141,6 +141,7 @@
 <script setup>
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { MOBILE_QUERY, isMobileWidth, safeMatchMedia } from '@/utils/breakpoints'
 import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSitesStore } from '@/stores/sites'
@@ -272,9 +273,7 @@ let autoAddSeq = 0
  * 正常后退（popstate 里判到抽屉没开就不消费）。
  */
 const drawerOpen = computed(() => sidebarStore.open || Boolean(sidebarStore.detailSheetSite))
-const isNarrowViewport = () => typeof window !== 'undefined'
-  && typeof window.matchMedia === 'function'
-  && window.matchMedia('(max-width: 768px)').matches
+const isNarrowViewport = () => safeMatchMedia(MOBILE_QUERY)
 
 function closeDrawers() {
   if (sidebarStore.open) sidebarStore.close()
@@ -488,7 +487,7 @@ function openBookmarkImport() {
    窄屏没有浮标（会被底部 tab 栏压住），一律走便签墙。 */
 
 function isNarrow() {
-  return typeof window !== 'undefined' && window.innerWidth <= 768
+  return isMobileWidth()
 }
 
 function openNotes() {

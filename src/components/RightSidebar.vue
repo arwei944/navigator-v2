@@ -56,6 +56,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSitesStore } from '@/stores/sites'
+import { NARROW_QUERY } from '@/utils/breakpoints'
 import SiteDetailPanel from '@/components/right/SiteDetailPanel.vue'
 import { defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
@@ -101,7 +102,6 @@ const emptyLines = computed(() => (prefs.rightPanelMode === 'hover'
 // ≤1024px 面板收起不占宽度，≤768px 直接隐藏 —— 触屏无 hover，详情面板在此区间没有入口。
 // 宽度改由内联样式下发后，这个断点必须同时由 JS 判断，否则内联宽度会盖掉媒体查询。
 // 同步初始化（而非等到 onMounted）是为了避免窄视口下先按默认宽度闪一帧。
-const NARROW_QUERY = '(max-width: 1024px)'
 const mq = window.matchMedia(NARROW_QUERY)
 const isNarrow = ref(mq.matches)
 function syncIsNarrow(e) { isNarrow.value = e.matches }

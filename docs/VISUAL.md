@@ -101,6 +101,37 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 
 ---
 
+## 响应式断点 —— 第五套「不能做成 CSS 变量」的真值
+
+**技术约束**：媒体查询条件里**不能用 `var()`**（CSS 自定义属性在 `@media` 中无效），
+所以断点无法像颜色/时长那样令牌化。统一方式是**两条腿**：
+
+| 腿 | 做法 |
+|---|---|
+| **JS 侧** | 一律 `import { MOBILE_QUERY, NARROW_QUERY, isMobileWidth, safeMatchMedia } from '@/utils/breakpoints'`，**不在组件里写死数字** |
+| **CSS 侧** | `@media` 的值必须来自 `src/utils/breakpoints.js` 的 `LOCKED_VALUES`（门禁 ⑥ 守卫）——**新增断点必须先登记** |
+
+真值来源 `src/utils/breakpoints.js` 的档位清单（值 = 现有在用值，纯登记）：
+
+| 值 | 语义名 | 归属 |
+|---|---|---|
+| 520 | `xs` | AdminLogin 窄屏表单 |
+| 560 | `sm` | AboutView 窄屏排版 |
+| **768** | `md` | **主断点**：移动端切换（全局 20+ 处） |
+| 820 | `md-alt` | AdminView 双栏折叠 |
+| 900 | `lg` | 后台三栏折叠（AdminInsights / InsightsView 等） |
+| 1024 | `xl` | 右栏折叠 + MainToolbar 换挡 |
+| 1300 / 1360 / 1500 | `tb-1/2/3` | MainToolbar 间距微调 |
+| 769 | — | **互补表达**：`min-width:769px ≡ 非移动端`（与 768 同一档，登记防误判为新断点） |
+
+- 此前 JS 侧有 **4 处硬编码 `768`**（`App.vue` ×2、`StickyBoard.vue`、`sidebar.js`），
+  且 `MOBILE_QUERY` / `NARROW_QUERY` 是 `Sidebar.vue` / `RightSidebar.vue` **各定义一份**。
+  现已全部收敛到 `breakpoints.js`，JS 侧硬编码清零。
+- **`RightSidebar` 的 `NARROW_QUERY` 是承重墙**：右栏宽度由内联样式下发，内联宽度会盖掉
+  媒体查询，所以这个断点**必须同时**由 JS 判断 —— 改它前先读该组件注释。
+
+---
+
 ## 改视觉该改哪（决策表）
 
 | 想改什么 | 改哪里 |
@@ -113,6 +144,7 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 | 首帧兜底 | 一般**不改**；真值变了才同步 `main.css`（门禁 ① 会验） |
 | **浮层叠放次序** | `main.css` 的 `:root` 里那 24 个 `--z-*`（**唯一真值**，组件只许引用） |
 | **动效时长** | `main.css` 的 `:root` 里那 3 个 `--dur-*`（**唯一真值**，组件只许引用） |
+| **响应式断点** | `src/utils/breakpoints.js`（JS 侧 import；CSS 侧新增值必须先登记） |
 
 ---
 
@@ -143,7 +175,7 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 | 门禁 | 守什么 |
 |---|---|
 | `test-visual-scheme` | 令牌登记表自洽、方案完整取值、合并与落变量的纯函数行为 |
-| `test-visual-layer` | ① 兜底 `==` 真值（防双源漂移）② 语义色明暗成对 ③ 硬编码不超基线 ④ **层级走令牌** ⑤ **动效时长走令牌** ⑥ 本契约存在 |
+| `test-visual-layer` | ① 兜底 `==` 真值（防双源漂移）② 语义色明暗成对 ③ 硬编码不超基线 ④ **层级走令牌** ⑤ **动效时长走令牌** ⑥ **响应式断点走登记档位** ⑦ 本契约存在 |
 | `test-theme` / `test-theme-boot` | 主题切换与首屏引导（防闪烁） |
 | `test-contrast` | 明暗两套对比度达 WCAG AA |
 

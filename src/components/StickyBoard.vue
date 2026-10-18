@@ -37,6 +37,7 @@
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useNotesStore } from '@/stores/notes'
 import { useToastStore } from '@/stores/toast'
+import { isMobileWidth } from '@/utils/breakpoints'
 /**
  * 卡片本体（含 Markdown-lite 解析）按需加载：这是便签里最重的一块，
  * 而便签墙/停靠区**没便签时根本不渲染它**，所以没必要进首屏分包。
@@ -73,7 +74,7 @@ function onKeydown(e) {
 }
 
 function syncViewport() {
-  mobile.value = typeof window !== 'undefined' && window.innerWidth <= 768
+  mobile.value = isMobileWidth()
 }
 
 onMounted(() => {
