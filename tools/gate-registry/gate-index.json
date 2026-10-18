@@ -1,6 +1,6 @@
 {
-  "total": 88,
-  "registered": 88,
+  "total": 89,
+  "registered": 89,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -92,7 +92,8 @@
     "tools/console/test-v10.mjs",
     "tools/mcp/test-mcp.mjs",
     "tools/gate-registry/cli.mjs",
-    "tools/console/test-deps.mjs"
+    "tools/console/test-deps.mjs",
+    "tools/console/test-release-please.mjs"
   ],
   "gates": [
     {
@@ -527,6 +528,13 @@
       "name": "test-purposes",
       "purpose": "shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。",
       "lines": 363,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-release-please.mjs",
+      "name": "test-release-please",
+      "purpose": "版本号与发布配置门禁（生产记录的可验证部分）。",
+      "lines": 96,
       "included": true
     },
     {
