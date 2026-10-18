@@ -122,6 +122,7 @@
     "workspace:scan": "node tools/workspace-doctor/cli.mjs scan",
     "workspace:clean": "node tools/workspace-doctor/cli.mjs clean --yes",
     "env:example": "node scripts/gen-env-example.mjs",
+    "env:doctor": "node scripts/env-doctor.mjs",
     "console:test:env": "node tools/console/test-env.mjs",
     "gate:index": "node tools/gate-registry/cli.mjs index",
     "console:test:gate-registry": "node tools/gate-registry/cli.mjs check",

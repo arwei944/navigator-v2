@@ -85,6 +85,15 @@ for (const v of ENV_VARS) {
   ok(typeof v.desc === 'string' && v.desc.length >= 6, `${v.name} 缺少一句话说明（desc）`)
 }
 
+// ⑤ 主链路必需项必须有 example —— 否则不会写进 .env.example，env:doctor 也无从提示
+const requiredNoExample = ENV_VARS.filter((v) => v.required && typeof v.example !== 'string')
+ok(
+  requiredNoExample.length === 0,
+  `以下 required 变量缺少 example（新人无从得知要配、env:doctor 也无法提示）：${
+    requiredNoExample.map((v) => v.name).join(', ') || '（无）'
+  }`,
+)
+
 console.log(`\n🔧 环境变量台账门禁：${pass} 通过 / ${failures.length} 失败`)
 console.log(`   台账 ${ENV_VARS.length} 项｜代码引用 ${used.size} 个变量`)
 if (failures.length) {

@@ -16,6 +16,7 @@
 | `check-sites.mjs` | 站点可用性检查（`--only-bad --report` 出报告） |
 | `fetch-favicons.mjs` | 图标抓取链：页面声明 → `/favicon.ico` → 第三方，三级回退 |
 | `gen-env-example.mjs` | 由 `shared/env-registry.mjs` 生成 `.env.example`（`--check` 校验一致性） |
+| `env-doctor.mjs` | 本机环境体检：对比 `.env.local` 与台账（必需缺失 / 可选未配 / 未登记项 / 平台注入） |
 
 ## 2. 部署与发布（运维级）
 

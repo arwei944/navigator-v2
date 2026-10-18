@@ -11,6 +11,7 @@
  *   - tools/console/lib/env.mjs#envSummary  从它读（后端概览，不泄露值）
  *   - scripts/gen-env-example.mjs           由它生成 .env.example
  *   - tools/console/test-env.mjs            用它校验「代码里用到的变量都已登记」
+ *   - scripts/env-doctor.mjs                用它体检「本机 .env.local 与台账的差距」
  *
  * 字段：
  *   name      变量名
