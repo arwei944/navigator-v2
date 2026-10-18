@@ -1,6 +1,6 @@
 {
-  "total": 94,
-  "registered": 94,
+  "total": 95,
+  "registered": 95,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -66,6 +66,7 @@
     "tools/console/test-deploy-resume.mjs",
     "tools/console/test-schedule-publish.mjs",
     "tools/console/test-alert-rules.mjs",
+    "tools/console/test-alert-notify.mjs",
     "tools/console/test-admin-tools.mjs",
     "tools/console/test-filter-chips.mjs",
     "tools/console/test-uptime.mjs",
@@ -127,6 +128,15 @@
       "lines": 218,
       "included": true,
       "durationMs": 554
+    },
+    {
+      "file": "tools/console/test-alert-notify.mjs",
+      "name": "test-alert-notify",
+      "purpose": "告警站外出口门禁（G3 / L1-3）。",
+      "category": "服务端与运行时",
+      "lines": 78,
+      "included": true,
+      "durationMs": null
     },
     {
       "file": "tools/console/test-alert-rules.mjs",

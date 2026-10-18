@@ -30,6 +30,7 @@ import { get, put } from '#store'
 import { buildHealthPayload, toIncoming } from '#shared/health-rules.mjs'
 import { evaluateAlerts } from '#shared/alert-rules.mjs'
 import { probeChain, runProbe } from '#shared/probe-engine.mjs'
+import { alertNotifications, webhookBody, parseWebhookUrls } from '#shared/ops/alert-notify.mjs'
 
 const PATHNAME = 'ops/health.json'
 const SITES_PATHNAME = 'sites.json'
@@ -40,6 +41,8 @@ const TIMEOUT_MS = 6000
 /** 每几批落一次库：300 站跑完可能要几分钟，增量落库让健康角标早早就动起来 */
 const FLUSH_EVERY_CHUNKS = 5
 const MAX_SITES = 400
+/** 告警 webhook 单次发送超时：渠道失联时不能让巡检卡住 */
+const ALERT_TIMEOUT_MS = 8000
 const UA = 'Mozilla/5.0 (compatible; NavigatorHealthBot/1.0; +https://navigator.local)'
 
 async function readJson(pathname) {
@@ -263,6 +266,10 @@ export async function tickOnDemand({ budget = DEFAULT_BUDGET } = {}) {
   // 也不引入新的定时器（沙箱里进程内定时器根本不触发）。异常一律吞掉，不影响巡检本身。
   try { await autoArchiveFailing(base, snapshot.sites) } catch (e) { console.warn('[cron] 自动归档跳过：', String((e && e.message) || e)) }
 
+  // 告警站外出口（G3）：判据与站内同源（alert-rules），这里只是多一个「推出去」的动作。
+  // 没配 NAV_ALERT_WEBHOOK_URL 时函数直接返回，不产生任何网络请求。
+  try { await sendAlertWebhooks(base, snapshot.sites) } catch (e) { console.warn('[cron] 告警推送跳过：', String((e && e.message) || e)) }
+
   // 一轮跑完时记一个历史点：可用性曲线（ok/limited/down 计数）与响应时间趋势的**唯一数据来源**
   if (cursor >= sites.length) {
     try { await appendHistoryPoint(base) } catch (e) { console.warn('[cron] 历史点写入跳过：', String((e && e.message) || e)) }
@@ -373,4 +380,49 @@ export async function autoArchiveFailing(health, sites = []) {
   })
   console.log(`[cron] 自动归档：${changed} 个站点连续 ${AUTO_ARCHIVE_FAILS} 轮不可达 → 移入归档（可一键取回）`)
   return changed
+}
+
+/* ══════════════════════ 告警站外出口（Webhook，G3） ══════════════════════
+ *
+ * 巡检判出「连续 N 次不可达」的站点后，除站内展示外还能推到你配的 webhook。
+ *
+ * 三条约束（这是会**主动对外发请求**的动作，必须有边界）：
+ *   ① **没配就不发** —— `NAV_ALERT_WEBHOOK_URL` 为空时直接返回，零网络请求；
+ *   ② **失败不阻塞巡检** —— 告警是旁路，渠道失联只记日志，绝不让它拖垮巡检；
+ *   ③ **凭据只留服务端** —— URL 与格式只从环境变量读，不进前端产物、不落库。
+ *
+ * 多渠道 = 逗号分隔多个 URL，逐渠道独立发送、独立失败。
+ * 节流交给巡检本身的 6h 节奏 —— 比在内存里再记一份冷却状态更不容易出错。
+ */
+async function sendAlertWebhooks(payload, sites = []) {
+  const urls = parseWebhookUrls(process.env.NAV_ALERT_WEBHOOK_URL)
+  if (!urls.length) return 0
+  const events = alertNotifications({
+    results: payload && payload.results, sites, config: await readAlertConfig(),
+  })
+  if (!events.length) return 0
+
+  const format = process.env.NAV_ALERT_WEBHOOK_FORMAT || 'json'
+  const contentType = format === 'text' ? 'text/plain; charset=utf-8' : 'application/json'
+  let sent = 0
+  for (const url of urls) {
+    for (const ev of events) {
+      const ctrl = new AbortController()
+      const timer = setTimeout(() => ctrl.abort(), ALERT_TIMEOUT_MS)
+      try {
+        const res = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': contentType },
+          body: webhookBody(ev, format), signal: ctrl.signal,
+        })
+        if (res && res.ok) sent++
+        else console.warn(`[cron] 告警 webhook 返回 ${res && res.status}：${url}`)
+      } catch (e) {
+        console.warn(`[cron] 告警 webhook 发送失败（不影响巡检）：${url} — ${String((e && e.message) || e)}`)
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+  }
+  if (sent) console.log(`[cron] 告警已推送 ${sent} 条 → ${urls.length} 个渠道`)
+  return sent
 }

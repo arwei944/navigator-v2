@@ -113,6 +113,8 @@ export const ENV_VARS = [
   { name: 'NAV_HEALTH_PROBES', scope: 'runtime', desc: '健康探针清单' },
   { name: 'NAV_AUTO_ARCHIVE_FAILS', scope: 'runtime', desc: '连续失效达到该次数时自动归档阈值' },
   { name: 'NAV_AUDIT_ACTOR', scope: 'runtime', desc: '审计日志的操作者标识' },
+  { name: 'NAV_ALERT_WEBHOOK_URL', scope: 'runtime', example: '""', desc: '告警站外出口（G3）：巡检判出连续不可达时 POST 到此地址；逗号分隔即多渠道；留空则完全不推送' },
+  { name: 'NAV_ALERT_WEBHOOK_FORMAT', scope: 'runtime', desc: '告警 webhook 载荷格式：json（默认，通用）/ text（飞书、钉钉文本机器人）' },
 
   // ── 旧平台遗留 ─────────────────────────────────────────────────────
   { name: 'VERCEL_TOKEN', scope: 'legacy', desc: 'Vercel 部署凭据（该通道 2026-10-11 已被平台停用，保留以备用）' },
@@ -151,7 +153,9 @@ export function toExampleFile() {
     '',
   ]
   const grouped = varsByScope()
-  for (const scope of ['admin', 'deploy', 'engine']) {
+  // runtime 也要遍历：台账契约是「有 example 即表示需要用户配置」，而告警 webhook 这类
+  // 运行时开关本就要用户去配 —— 漏了它就会出现「登了台账却不在示例里」的静默缺口。
+  for (const scope of ['admin', 'deploy', 'engine', 'runtime']) {
     const vars = (grouped[scope] || []).filter((v) => typeof v.example === 'string')
     if (!vars.length) continue
     lines.push(`# ── ${SCOPE_LABELS[scope]} ──`)
