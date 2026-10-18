@@ -1,6 +1,6 @@
 {
-  "total": 87,
-  "registered": 87,
+  "total": 88,
+  "registered": 88,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -91,7 +91,8 @@
     "tools/console/test-store.mjs",
     "tools/console/test-v10.mjs",
     "tools/mcp/test-mcp.mjs",
-    "tools/gate-registry/cli.mjs"
+    "tools/gate-registry/cli.mjs",
+    "tools/console/test-deps.mjs"
   ],
   "gates": [
     {
@@ -246,6 +247,13 @@
       "name": "test-deploy-status",
       "purpose": "部署状态接口用例：零依赖、不联网（读的是本机 store 与构建产物）。",
       "lines": 103,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-deps.mjs",
+      "name": "test-deps",
+      "purpose": "依赖 / 供应链门禁（来料检验）。",
+      "lines": 102,
       "included": true
     },
     {
