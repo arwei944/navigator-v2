@@ -55,7 +55,7 @@
 | 31 | `test-env` | 工作区治理 | 环境变量台账门禁（防「三套账」漂移回潮）。 | 104 | 0.4s |
 | 32 | `test-filter-chips` | 前端与体验 | 筛选条第二行取数：pickInlineChips。 | 87 | 0.2s |
 | 33 | `test-format` | 前端与体验 | 格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs` | 115 | — |
-| 34 | `test-frontend` | 前端与体验 | 第三批 · 序 18 / 20 / 23 的前端守卫。 | 224 | 4.5s |
+| 34 | `test-frontend` | 前端与体验 | 第三批 · 序 18 / 20 / 23 的前端守卫。 | 236 | 4.5s |
 | 35 | `test-glossary` | 数据与内容 | 离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。 | 188 | 0.6s |
 | 36 | `test-graph-layout` | 前端与体验 | 关系图布局用例：零依赖、不跑浏览器。 | 204 | 1.0s |
 | 37 | `test-gridnav` | 前端与体验 | src/utils/gridnav.js 用例：零依赖、不联网、纯函数穷举。 | 111 | 0.2s |

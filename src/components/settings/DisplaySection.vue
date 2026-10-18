@@ -72,6 +72,17 @@
         <option v-for="e in prefs.engines" :key="e.id" :value="e.id">{{ e.label }}</option>
       </select>
     </div>
+    <!-- 常访问加权（v11 就有的能力，此前只能靠命令面板开关，用户在设置里找不到）。
+       加权只在同一相关性档位内部生效，所以关掉它不会改变「谁命中」，只改变同档先后。
+       判据来自 utils/search.js#clickTier —— 刻意分档而非连续值，好让排序结果可解释。 -->
+    <div class="setting-row">
+      <label class="setting-toggle">
+        <span class="setting-label"><span class="setting-hint-row">常访问加权</span><small class="setting-hint">同等匹配下，你点得多的站排得更前；关掉即纯按相关性排序</small></span>
+        <input type="checkbox" :checked="prefs.clickBoost" @change="prefs.setClickBoost($event.target.checked)" />
+        <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      </label>
+    </div>
+    <div class="section-note">按「常访问」加权只影响同等匹配时的先后，不会让热门的挤掉精确命中的那条。</div>
 
     <!-- 壁纸 -->
     <div class="section-header sub">

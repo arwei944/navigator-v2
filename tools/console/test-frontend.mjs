@@ -209,6 +209,18 @@ try {
       offenders.map(f => f.split(/[\\/]/).slice(-2).join('/')).join(', '))
     ok(files.length > 50, `源码扫描确实扫到了文件（${files.length} 个）`, '防止扫了个空目录还判通过')
   }
+
+  // 常访问加权的设置入口（G1）：能力在 v11 就有，但此前只能靠命令面板开关——
+  // 用户在设置里找不到就会认为「这功能不存在」。守两件事：
+  // ① 设置面板里真有这行开关；② 开关走的是 store 的 setClickBoost（别让 UI 绕过状态层自存）。
+  {
+    const { readFileSync } = await import('node:fs')
+    const displaySrc = readFileSync(
+      new URL('../../src/components/settings/DisplaySection.vue', import.meta.url), 'utf-8')
+    ok(displaySrc.includes('常访问加权'), '设置面板「搜索」节有常访问加权开关')
+    ok(/:checked="prefs\.clickBoost"/.test(displaySrc), '开关绑定 prefs.clickBoost（显示真实状态）')
+    ok(/setClickBoost\(\$event\.target\.checked\)/.test(displaySrc), '开关走 store setter（不绕过状态层）')
+  }
 } finally {
   await server.close()
 }

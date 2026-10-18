@@ -403,7 +403,7 @@
       "name": "test-frontend",
       "purpose": "第三批 · 序 18 / 20 / 23 的前端守卫。",
       "category": "前端与体验",
-      "lines": 224,
+      "lines": 236,
       "included": true,
       "durationMs": 4468
     },
