@@ -14,6 +14,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { ROOT, getAdminKey } from './env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
+import { fmtDateTime } from '../../../shared/format.mjs'
 import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
 import { translateSiteFields } from '../../../shared/translate.mjs'
 import { normalizePurposes } from '../../../shared/purposes.mjs'
@@ -528,7 +529,7 @@ async function runSync(job, steps, opts) {
   }
 
   const local = loadSites()
-  jobs.log(job, `开始站点数据同步 · 本地 ${local.length} 条 · ${new Date().toLocaleString('zh-CN')}`, 'info')
+  jobs.log(job, `开始站点数据同步 · 本地 ${local.length} 条 · ${fmtDateTime(Date.now())}`, 'info')
 
   /* 1. 数据差异检查 */
   step('check', { status: 'running' })

@@ -157,6 +157,7 @@ import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../../shared/clicks-core.mjs'
 import { sparkline } from '@/utils/chartkit'
+import { fmtDateTimeCompact } from '@/utils/format'
 import { auditSites, DESC_ISSUE_LABEL, summarizeAudit, planGroupMerge } from '../../../shared/ops/data-quality.mjs'
 import { fetchHealthHistory } from '@/services/healthApi'
 
@@ -173,13 +174,7 @@ onMounted(() => {
 })
 
 /** 判定产出时间（本机探活那一刻，非页面打开时间） */
-const judgedAt = computed(() => {
-  const ts = healthStore.updatedAt
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-})
+const judgedAt = computed(() => fmtDateTimeCompact(healthStore.updatedAt))
 
 /** 分类分布（按站点数降序） */
 const categoryDistribution = computed(() => {
@@ -295,11 +290,7 @@ const avgMsText = computed(() => (lastPoint.value && lastPoint.value.avgMs ? `${
 const trendRange = computed(() => {
   const pts = histPoints.value
   if (pts.length < 2) return ''
-  const fmt = (iso) => {
-    const d = new Date(iso)
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-  }
-  return `${fmt(pts[0].t)} → ${fmt(pts[pts.length - 1].t)}`
+  return `${fmtDateTimeCompact(pts[0].t, '')} → ${fmtDateTimeCompact(pts[pts.length - 1].t, '')}`
 })
 </script>
 

@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
+import { fmtBytes } from '../../../shared/format.mjs'
 import { assertIndexesInRange, buildSubsetPatch, hunkStats, splitHunks } from '../../../shared/hunk-patch.mjs'
 
 const pExecFile = promisify(execFile)
@@ -141,7 +142,7 @@ function buildUntrackedDiff(relPath) {
   let size = 0
   try { size = statSync(abs).size } catch { return { text: '', truncated: false } }
   if (size > MAX_UNTRACKED_BYTES) {
-    return { text: `（未跟踪文件 ${(size / 1024).toFixed(1)} KB，超出展示上限，未生成 diff）`, truncated: true }
+    return { text: `（未跟踪文件 ${fmtBytes(size)}，超出展示上限，未生成 diff）`, truncated: true }
   }
   const raw = readFileSync(abs, 'utf-8')
   if (raw.includes('\0')) return { text: `Binary file ${relPath} (${size} bytes, untracked)`, truncated: false }

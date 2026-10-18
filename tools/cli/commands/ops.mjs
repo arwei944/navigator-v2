@@ -10,16 +10,11 @@ import * as notify from '../../console/lib/notify.mjs'
 import * as schedule from '../../console/lib/schedule.mjs'
 import { readSites } from '../../console/lib/data.mjs'
 import { record } from '../../console/lib/audit.mjs'
+import { fmtDateTimeShort } from '../../../shared/format.mjs'
 import { CliError, EXIT, buildOptions, note, parseCommandArgs, table } from '../lib/core.mjs'
 
 const SEV_MARK = { error: '✖', warn: '!', info: '·' }
 
-function fmtClock(ts) {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts || '')
-  const p = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
 
 /* ---------------- 发布历史 ---------------- */
 
@@ -45,12 +40,12 @@ const historyCmd = {
       data: r,
       render: d => [
         d.summary.total
-          ? `共 ${d.summary.total} 次 · 成功 ${d.summary.ok} / 失败 ${d.summary.failed} · 成功率 ${d.summary.successRate}% · 最近 ${fmtClock(d.summary.lastAt)}${d.summary.avgDuration ? ` · 平均耗时 ${(d.summary.avgDuration / 1000).toFixed(1)}s` : ''}`
+          ? `共 ${d.summary.total} 次 · 成功 ${d.summary.ok} / 失败 ${d.summary.failed} · 成功率 ${d.summary.successRate}% · 最近 ${fmtDateTimeShort(d.summary.lastAt)}${d.summary.avgDuration ? ` · 平均耗时 ${(d.summary.avgDuration / 1000).toFixed(1)}s` : ''}`
           : '暂无发布记录。跑一次 nav publish run 或控制台「一键发布」后就会有。',
         '',
         d.items.length
           ? table(['时间', '结果', '来源', '云端', '耗时', '说明'], d.items.map(x => [
-            fmtClock(x.ts),
+            fmtDateTimeShort(x.ts),
             x.ok ? '✓ 成功' : '✗ 失败',
             d.triggers[x.trigger] || x.trigger,
             x.cloud ? `v${x.cloud.version} · ${x.cloud.count}` : '-',
@@ -100,7 +95,7 @@ const notifyCmd = {
         '',
         d.items.length
           ? table(['时间', '级别', '类型', '标题', '目标'], d.items.map(n => [
-            fmtClock(n.ts), `${SEV_MARK[n.severity] || '·'} ${d.severities[n.severity] || n.severity}`,
+            fmtDateTimeShort(n.ts), `${SEV_MARK[n.severity] || '·'} ${d.severities[n.severity] || n.severity}`,
             n.kind, `${n.read ? '' : '[未读] '}${n.title || n.label}`, n.target || '-',
           ]))
           : '没有匹配的通知。',
@@ -246,7 +241,7 @@ const inspectCmd = {
       },
       error: c.down ? { code: 'UNHEALTHY', message: `${c.down} 个站点需处理（新增 ${r.fresh.length}）`, hint: '详见 data.fresh；可用 nav sites check --ids <id> 复验' } : null,
       render: d => [
-        `巡检 run ${d.run}（${fmtClock(d.ts)}）· ${d.total} 站点`,
+        `巡检 run ${d.run}（${fmtDateTimeShort(d.ts)}）· ${d.total} 站点`,
         `正常 ${d.counts.ok} / 可忽略 ${d.counts.limited} / 需处理 ${d.counts.down}`,
         d.fresh.length ? `\n新增失效（${d.fresh.length}）：\n` + table(['ID', 'HTTP', '名称'], d.fresh.map(x => [x.id, x.code, x.name])) : '',
         d.recovered.length ? `\n已恢复（${d.recovered.length}）：\n` + table(['ID', 'HTTP', '名称'], d.recovered.map(x => [x.id, x.code, x.name])) : '',

@@ -9,6 +9,7 @@ import { CliError, EXIT, buildOptions, note, parseCommandArgs, table } from '../
 import * as uptime from '../../console/lib/uptime.mjs'
 import * as notify from '../../console/lib/notify.mjs'
 import { KIND, KIND_LABEL, summarize, fmtDuration } from '../../../shared/uptime.mjs'
+import { fmtClockTime } from '../../../shared/format.mjs'
 
 
 /** 从日志尾部折叠出「最近一段掉线」——恢复通知要报的是**真实掉线时长**，不是两次采样的间隔 */
@@ -46,24 +47,12 @@ function notifyTransition(ev, prev, silent) {
   } catch { return null }
 }
 
-function fmtClock(ts) {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts || '')
-  const p = n => String(n).padStart(2, '0')
-  return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
-}
 
-function fmtFull(ts) {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return String(ts || '')
-  const p = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
 
 const mark = k => (k === KIND.OK ? '✅' : k === KIND.EDGE ? '⚠️' : '❌')
 
 function lineFor(ev) {
-  const bits = [`${mark(ev.kind)} ${fmtClock(ev.at)}`, KIND_LABEL[ev.kind] || ev.kind]
+  const bits = [`${mark(ev.kind)} ${fmtClockTime(ev.at)}`, KIND_LABEL[ev.kind] || ev.kind]
   if (ev.status) bits.push(`HTTP ${ev.status}`)
   if (ev.ms != null) bits.push(`${ev.ms}ms`)
   if (ev.error) bits.push(ev.error)
@@ -151,17 +140,17 @@ const watchCmd = {
           if (changed) {
             if (ev.kind !== KIND.OK) {
               if (!downSince) { downSince = ev.at; outages++ }
-              console.log(`${mark(ev.kind)} ${fmtClock(ev.at)}  掉线 —— ${KIND_LABEL[ev.kind]}${ev.status ? `（HTTP ${ev.status}）` : ''}${ev.body ? `\n              ${ev.body}` : ''}`)
+              console.log(`${mark(ev.kind)} ${fmtClockTime(ev.at)}  掉线 —— ${KIND_LABEL[ev.kind]}${ev.status ? `（HTTP ${ev.status}）` : ''}${ev.body ? `\n              ${ev.body}` : ''}`)
             } else if (downSince) {
-              console.log(`\x1b[1m✅ ${fmtClock(ev.at)}  已恢复 —— 掉线 ${fmtDuration(ev.at - downSince)}\x1b[0m`)
+              console.log(`\x1b[1m✅ ${fmtClockTime(ev.at)}  已恢复 —— 掉线 ${fmtDuration(ev.at - downSince)}\x1b[0m`)
               downSince = 0
             } else {
-              console.log(`✅ ${fmtClock(ev.at)}  正常（HTTP ${ev.status} · ${ev.ms}ms）`)
+              console.log(`✅ ${fmtClockTime(ev.at)}  正常（HTTP ${ev.status} · ${ev.ms}ms）`)
             }
             // 只在**真的发生变化**时推通知；首次样本（prev 为空）不推，否则每次重启都报一次
             if (notifyTransition(ev, prev, silent)) notified++
           } else if (n % every === 0) {
-            console.log(`· ${fmtClock(ev.at)}  ${ev.ok ? 'ok' : KIND_LABEL[ev.kind]}  ${ev.ms}ms  （第 ${n} 次${fails ? ` · 异常 ${fails} 次` : ''}）`)
+            console.log(`· ${fmtClockTime(ev.at)}  ${ev.ok ? 'ok' : KIND_LABEL[ev.kind]}  ${ev.ms}ms  （第 ${n} 次${fails ? ` · 异常 ${fails} 次` : ''}）`)
           }
           if (ev.kind !== KIND.OK) fails++
         },
@@ -221,13 +210,13 @@ const reportCmd = {
       render: d => {
         const pct = d.availability == null ? '—' : (d.availability * 100).toFixed(3) + '%'
         const head = [
-          `窗口：最近 ${d.window.hours}h（${fmtFull(d.window.since)} → 现在）`,
+          `窗口：最近 ${d.window.hours}h（${fmtDateTimeShort(d.window.since)} → 现在）`,
           `样本 ${d.samples} 次（正常 ${d.okCount} / 异常 ${d.failCount}）· 可用率 ${pct}`,
           `掉线 ${d.outages.length} 段 · 累计 ${fmtDuration(d.downMs)}${d.outages.length ? `（平台边缘 ${d.edgeOutages} 段 / 应用 ${d.appOutages} 段）` : ''}`,
         ]
         if (!d.outages.length) return head.join('\n') + '\n\n窗口内没有掉线。'
         const rows = listed.map(o => [
-          fmtFull(o.startAt),
+          fmtDateTimeShort(o.startAt),
           o.ongoing ? '进行中' : fmtDuration(o.durationMs),
           KIND_LABEL[o.kind] || o.kind,
           String(o.samples),

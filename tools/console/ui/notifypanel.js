@@ -1,5 +1,6 @@
 /** 通知中心：把巡检 / 发布 / 批量操作 / 回滚的事件收敛成「现在需要我处理什么」，并管理定时巡检与 Webhook */
 import { $, api, openStream, appendLocal, isBusy } from './core.js'
+import { fmtDateTimeCompact } from '/shared/format.mjs'
 
 const SEV_MARK = { error: '●', warn: '◆', info: '·' }
 const SEV_ORDER = { error: 0, warn: 1, info: 2 }
@@ -24,12 +25,6 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtClock(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
 
 function fillSelect(sel, options) {
   const want = options.map(o => o.value).join('\u0000')
@@ -56,7 +51,7 @@ function renderSummary() {
   box.append(el('span', `chip ${s.error ? 'err' : ''}`, `严重 ${s.error}`))
   box.append(el('span', `chip ${s.warn ? 'warn' : ''}`, `注意 ${s.warn}`))
   box.append(el('span', 'chip', `提示 ${s.info}`))
-  box.append(el('span', 'chip', `最近 ${s.latestAt ? fmtClock(s.latestAt) : '—'}`))
+  box.append(el('span', 'chip', `最近 ${s.latestAt ? fmtDateTimeCompact(s.latestAt) : '—'}`))
 }
 
 function renderSchedule() {
@@ -67,9 +62,9 @@ function renderSchedule() {
   box.append(el('span', `chip ${st.enabled ? 'ok' : ''}`, st.enabled ? '已启用' : '已停用'))
   box.append(el('span', 'chip', `间隔 ${st.intervalLabel}`))
   box.append(el('span', `chip ${st.running ? 'ok' : ''}`, st.running ? '调度中' : '未调度'))
-  if (st.enabled && st.nextRunAt) box.append(el('span', 'chip', `下次 ${fmtClock(st.nextRunAt)}`))
+  if (st.enabled && st.nextRunAt) box.append(el('span', 'chip', `下次 ${fmtDateTimeCompact(st.nextRunAt)}`))
   if (st.lastRun) {
-    box.append(el('span', 'chip', `上轮 ${fmtClock(st.lastRunAt)}`))
+    box.append(el('span', 'chip', `上轮 ${fmtDateTimeCompact(st.lastRunAt)}`))
     box.append(el('span', `chip ${st.lastRun.counts.down ? 'err' : 'ok'}`,
       `需处理 ${st.lastRun.counts.down} · 新增 ${st.lastRun.fresh} · 恢复 ${st.lastRun.recovered}`))
   } else {
@@ -108,7 +103,7 @@ function renderList() {
     row.append(main)
 
     const side = el('div', 'notify-side')
-    side.append(el('span', 'notify-ts', fmtClock(n.ts)))
+    side.append(el('span', 'notify-ts', fmtDateTimeCompact(n.ts)))
     if (n.link) {
       const a = el('a', 'link small', '打开')
       a.href = n.link

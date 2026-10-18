@@ -20,8 +20,8 @@
     <div v-else class="snap-list">
       <div v-for="s in items" :key="s.pathname" class="snap-row">
         <span class="snap-ver">v{{ s.version }}</span>
-        <span class="snap-ts">{{ fmt(s.ts) }}</span>
-        <span class="snap-size">{{ kb(s.size) }}</span>
+        <span class="snap-ts">{{ fmtDateTime(s.ts) }}</span>
+        <span class="snap-size">{{ fmtBytes(s.size) }}</span>
         <button class="mini-btn danger" :disabled="rolling === s.pathname" @click="rollback(s)">
           {{ rolling === s.pathname ? '回滚中…' : '回滚到此版本' }}
         </button>
@@ -35,6 +35,7 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue'
 import { opsApi } from '@/services/opsApi'
+import { fmtDateTime, fmtBytes } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['rolled'])
@@ -48,15 +49,6 @@ const error = ref('')
 const rolling = ref('')
 const msg = ref('')
 const msgBad = ref(false)
-
-function fmt(ts) {
-  const d = new Date(ts)
-  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString('zh-CN')
-}
-
-function kb(size) {
-  return size >= 1024 ? `${(size / 1024).toFixed(1)} KB` : `${size || 0} B`
-}
 
 async function load() {
   if (!props.adminKey) { items.value = []; loaded.value = false; return }
@@ -76,7 +68,7 @@ async function load() {
 }
 
 async function rollback(snap) {
-  if (!window.confirm(`回滚到 v${snap.version}（${fmt(snap.ts)}）？\n\n云端数据将被替换为该快照内容，版本号会继续递增。`)) return
+  if (!window.confirm(`回滚到 v${snap.version}（${fmtDateTime(snap.ts)}）？\n\n云端数据将被替换为该快照内容，版本号会继续递增。`)) return
   rolling.value = snap.pathname
   msg.value = ''
   try {

@@ -132,6 +132,39 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 
 ---
 
+## 展示格式（时间 / 字节 / 时长）—— 真值在 `shared/format.mjs`
+
+数字怎么显示也是视觉的一部分：同一个时间在侧栏、后台、控制台里格式各样，观感就散了。
+全项目**唯一实现**是 `shared/format.mjs`，三边都从它取（与 `host.mjs` 同一套路）：
+
+| 侧 | import 写法 |
+|---|---|
+| 前端组件 | `import { fmtDateTime } from '@/utils/format'` —— `src/utils/format.js` 只做**转发** |
+| 控制台 UI | `import { fmtDateTimeCompact } from '/shared/format.mjs'`（服务器有 `/shared/` 静态路由） |
+| CLI | `import { fmtDateTimeShort } from '../../../shared/format.mjs'` |
+
+| 函数 | 输出 |
+|---|---|
+| `fmtDateTime(ts)` | `2026/10/19 17:23:49`；非法值**回落原值** |
+| `fmtDateTimeSec(ts, fb)` | 同上 + 24 小时制；空 / 非法 → `fb`（默认 `—`） |
+| `fmtDateTimeShort(ts, fb)` | `2026-10-19 17:23` |
+| `fmtDateTimeCompact(ts, fb)` | 年内 `10/19 17:23`，跨年补 `2025/` 前缀 |
+| `fmtClockTime(ts, fb)` | `17:23:49` |
+| `fmtRelative(ts, { fallback })` | 刚刚 / N 分钟前 / N 小时前 / N 天前；超 30 天走 `fallback` |
+| `fmtBytes(n)` | `953.7 KB` / `1.0 MB`（一位小数） |
+| `fmtDurationZh(sec)` | `5 分 12 秒`（**入参是秒**） |
+| `fmtMillis(ms, fb)` | `85ms` / `1.2s` |
+
+**刻意不在这里**（同名或近名，但语义不同，别混）：
+
+- `shared/uptime.mjs#fmtDuration(ms)` —— CLI 的监控停机时长，英文缩写（`5m12s`）、
+  **入参是毫秒**。所以中文版命名为 `fmtDurationZh`，避免同名不同义。
+- `src/utils/bgmScore.js#fmtClock(sec)` —— 音乐播放进度 `mm:ss`，是 `test-bgm` 的契约。
+- `shared/host.mjs#hostOf` / `siteDraft.rawHostOf` / `search.hostMainOf` —— 三种域名口径
+  （小写去 www / 保留原文 / 只取主体），**各有用途不是重复**，别合并。
+
+---
+
 ## 改视觉该改哪（决策表）
 
 | 想改什么 | 改哪里 |
@@ -145,6 +178,7 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 | **浮层叠放次序** | `main.css` 的 `:root` 里那 24 个 `--z-*`（**唯一真值**，组件只许引用） |
 | **动效时长** | `main.css` 的 `:root` 里那 3 个 `--dur-*`（**唯一真值**，组件只许引用） |
 | **响应式断点** | `src/utils/breakpoints.js`（JS 侧 import；CSS 侧新增值必须先登记） |
+| **时间 / 字节 / 时长的显示** | `shared/format.mjs`（**唯一实现**；前端经 `@/utils/format` 转发） |
 
 ---
 
@@ -176,6 +210,7 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 |---|---|
 | `test-visual-scheme` | 令牌登记表自洽、方案完整取值、合并与落变量的纯函数行为 |
 | `test-visual-layer` | ① 兜底 `==` 真值（防双源漂移）② 语义色明暗成对 ③ 硬编码不超基线 ④ **层级走令牌** ⑤ **动效时长走令牌** ⑥ **响应式断点走登记档位** ⑦ 本契约存在 |
+| `test-format` | 格式化实现只住在 `shared/format.mjs`（`src/` 与 `tools/` 运行代码内无散落指纹） |
 | `test-theme` / `test-theme-boot` | 主题切换与首屏引导（防闪烁） |
 | `test-contrast` | 明暗两套对比度达 WCAG AA |
 

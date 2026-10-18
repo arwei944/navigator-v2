@@ -46,7 +46,7 @@
             <div v-if="n.body" class="notify-body">{{ n.body }}</div>
             <div v-if="n.action" class="notify-action">建议：{{ n.action }}</div>
           </div>
-          <span class="notify-ts">{{ fmt(n.ts) }}</span>
+          <span class="notify-ts">{{ fmtDateTime(n.ts) }}</span>
         </div>
       </div>
     </template>
@@ -58,6 +58,7 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
 import { opsApi } from '@/services/opsApi'
+import { fmtDateTime } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['badge'])
@@ -69,11 +70,6 @@ const error = ref('')
 const msg = ref('')
 const msgBad = ref(false)
 const filter = reactive({ severity: '', q: '', unread: false })
-
-function fmt(ts) {
-  const d = new Date(ts)
-  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString('zh-CN')
-}
 
 async function load() {
   if (!props.adminKey) { items.value = []; summary.value = null; emit('badge', 0); return }

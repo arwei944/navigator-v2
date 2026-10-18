@@ -40,7 +40,7 @@
         <p v-else class="dp-muted">这次部署没有带构建信息（本地开发，或发布包早于本功能）。</p>
 
         <p v-if="status.version.subject" class="dp-subject">{{ status.version.subject }}</p>
-        <p class="dp-muted">构建于 {{ fmtTime(status.version.builtAt) }}</p>
+        <p class="dp-muted">构建于 {{ fmtDateTimeShort(status.version.builtAt) }}</p>
 
         <div v-if="upstream" class="dp-upstream" :class="{ good: upstream.behind === 0 }">
           <template v-if="upstream.behind === 0">
@@ -70,7 +70,7 @@
           <div><dt>端口</dt><dd>{{ status.runtime.port || '—' }}</dd></div>
           <div>
             <dt>运行时长</dt>
-            <dd>{{ status.runtime.persistent ? fmtDur(status.runtime.uptimeSec) : '请求驱动（无常驻进程）' }}</dd>
+            <dd>{{ status.runtime.persistent ? fmtDurationZh(status.runtime.uptimeSec) : '请求驱动（无常驻进程）' }}</dd>
           </div>
           <div><dt>内存 RSS</dt><dd>{{ status.runtime.rssMb }} MB</dd></div>
           <div><dt>堆占用</dt><dd>{{ status.runtime.heapUsedMb }} MB</dd></div>
@@ -84,7 +84,7 @@
           <template v-if="status.data.available">
             <div><dt>站点数</dt><dd>{{ status.data.siteCount }}</dd></div>
             <div><dt>数据版本</dt><dd>{{ status.data.version }}</dd></div>
-            <div class="wide"><dt>数据更新时间</dt><dd>{{ fmtTime(status.data.updatedAt) }}</dd></div>
+            <div class="wide"><dt>数据更新时间</dt><dd>{{ fmtDateTimeShort(status.data.updatedAt) }}</dd></div>
           </template>
           <div v-else class="wide"><dt>站点库</dt><dd>读不到（可能是首次启动，或存储未就绪）</dd></div>
           <div><dt>数据目录</dt><dd>{{ fmtBytes(status.storage.bytes) }}</dd></div>
@@ -102,7 +102,7 @@
           <span v-else>
             {{ status.cron.running ? `正在巡检（${status.cron.phase}）` : '待下一轮' }}
             · 上次
-            <template v-if="status.cron.lastRunAgoSec != null">{{ fmtDur(status.cron.lastRunAgoSec) }}前</template>
+            <template v-if="status.cron.lastRunAgoSec != null">{{ fmtDurationZh(status.cron.lastRunAgoSec) }}前</template>
             <template v-else>从未</template>
             · 本轮 {{ status.cron.lastCount }} 个
           </span>
@@ -110,7 +110,7 @@
         <p v-if="status.cron.lastError" class="dp-error sm">最近一次出错：{{ status.cron.lastError }}</p>
       </section>
 
-      <p class="dp-foot">状态读取于 {{ fmtTime(status.checkedAt) }}</p>
+      <p class="dp-foot">状态读取于 {{ fmtDateTimeShort(status.checkedAt) }}</p>
     </template>
   </div>
 </template>
@@ -118,6 +118,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { fetchStatus, checkUpstream } from '@/services/deployApi'
+import { fmtDateTimeShort, fmtDurationZh, fmtBytes } from '@/utils/format'
 
 /**
  * 后台「部署」面板。
@@ -180,29 +181,6 @@ async function check() {
     upstream.value = null
   }
   checking.value = false
-}
-
-function fmtTime(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  const p = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
-}
-
-function fmtDur(sec) {
-  const s = Number(sec) || 0
-  if (s < 60) return `${s} 秒`
-  if (s < 3600) return `${Math.floor(s / 60)} 分 ${s % 60} 秒`
-  if (s < 86400) return `${Math.floor(s / 3600)} 小时 ${Math.floor((s % 3600) / 60)} 分`
-  return `${Math.floor(s / 86400)} 天 ${Math.floor((s % 86400) / 3600)} 小时`
-}
-
-function fmtBytes(n) {
-  const b = Number(n) || 0
-  if (b < 1024) return `${b} B`
-  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`
-  return `${(b / 1048576).toFixed(1)} MB`
 }
 
 onMounted(load)

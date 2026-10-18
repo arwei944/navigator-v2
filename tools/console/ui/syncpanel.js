@@ -1,5 +1,6 @@
 /** 同步面板：云端版本对比 + 全链路发布时间线（步骤状态 / 耗时 / 详情） */
 import { $, api, openStream, appendLocal, isBusy } from './core.js'
+import { fmtDateTimeSec, fmtBytes, fmtMillis } from '/shared/format.mjs'
 
 const STATUS_LABEL = { pending: '待执行', running: '进行中', success: '完成', failed: '失败', skipped: '跳过' }
 const state = { status: null, steps: [], deployment: null, gate: null, snapshots: null }
@@ -11,15 +12,7 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtDur(ms) {
-  if (ms === null || ms === undefined) return ''
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-}
 
-function fmtClock(ts) {
-  if (!ts) return '—'
-  return new Date(ts).toLocaleString('zh-CN', { hour12: false })
-}
 
 /* ---------- 概览 ---------- */
 
@@ -60,7 +53,7 @@ function renderCloud() {
   if (c.ok) {
     cloud.append(el('div', 'cc-count', String(c.count)))
     cloud.append(el('div', 'cc-sub', `站点数 · version ${c.version ?? '—'} · 含图标 ${c.withIcons}`))
-    cloud.append(el('div', 'cc-meta', `读取于 ${fmtClock(c.fetchedAt)}`))
+    cloud.append(el('div', 'cc-meta', `读取于 ${fmtDateTimeSec(c.fetchedAt)}`))
   } else {
     cloud.append(el('div', 'cc-count err', '—'))
     cloud.append(el('div', 'cc-sub', `读取失败：${c.error}`))
@@ -105,7 +98,7 @@ function renderTimeline() {
     li.append(el('span', 'tl-label', s.label))
 
     const meta = el('span', 'tl-meta')
-    if (s.duration) meta.append(el('span', 'tl-dur', fmtDur(s.duration)))
+    if (s.duration) meta.append(el('span', 'tl-dur', fmtMillis(s.duration)))
     meta.append(el('span', `tl-state ${s.status}`, STATUS_LABEL[s.status] || s.status))
     li.append(meta)
 
@@ -215,8 +208,8 @@ function renderSnapshots() {
   for (const s of r.snapshots.slice(0, 20)) {
     const row = el('div', 'snap-row')
     row.append(el('span', 'snap-ver', `v${s.version}`))
-    row.append(el('span', 'snap-ts', new Date(s.ts).toLocaleString('zh-CN', { hour12: false })))
-    row.append(el('span', 'snap-size', `${(s.size / 1024).toFixed(1)}KB`))
+    row.append(el('span', 'snap-ts', fmtDateTimeSec(s.ts)))
+    row.append(el('span', 'snap-size', fmtBytes(s.size)))
     const btn = el('button', 'btn ghost', '回滚到此')
     btn.addEventListener('click', () => doRollback(s))
     row.append(btn)
@@ -267,10 +260,6 @@ async function doRollback(snap) {
 
 const histState = { items: [], summary: null, triggers: {}, built: false }
 
-function fmtSec(ms) {
-  if (ms === null || ms === undefined) return ''
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-}
 
 function renderPubHistory() {
   const box = $('#pubhist-list')
@@ -284,7 +273,7 @@ function renderPubHistory() {
       sum.append(el('span', `chip ${s.ok ? 'ok' : ''}`, `成功 ${s.ok}`))
       sum.append(el('span', `chip ${s.failed ? 'err' : ''}`, `失败 ${s.failed}`))
       if (s.successRate !== null && s.successRate !== undefined) sum.append(el('span', 'chip', `成功率 ${s.successRate}%`))
-      if (s.avgDuration) sum.append(el('span', 'chip', `平均 ${fmtSec(s.avgDuration)}`))
+      if (s.avgDuration) sum.append(el('span', 'chip', `平均 ${fmtMillis(s.avgDuration)}`))
     }
   }
   const count = $('#pubhist-count')
@@ -303,10 +292,10 @@ function renderPubHistory() {
 
     const main = el('div', 'audit-main')
     const head = el('div', 'audit-head')
-    head.append(el('span', 'audit-action', fmtClock(r.ts)))
+    head.append(el('span', 'audit-action', fmtDateTimeSec(r.ts)))
     head.append(el('span', 'audit-actor', histState.triggers[r.trigger] || r.trigger))
     if (r.cloud) head.append(el('span', 'audit-key', `v${r.cloud.version} · ${r.cloud.count} 站点`))
-    if (r.duration) head.append(el('span', 'audit-key', fmtSec(r.duration)))
+    if (r.duration) head.append(el('span', 'audit-key', fmtMillis(r.duration)))
     main.append(head)
     if (!r.ok && r.reason) main.append(el('div', 'audit-detail', `失败：${r.reason}`))
     if (r.note) main.append(el('div', 'audit-detail', r.note))

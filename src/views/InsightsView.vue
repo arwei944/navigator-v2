@@ -156,6 +156,7 @@ import { useHealthStore } from '@/stores/health'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSidebarStore } from '@/stores/sidebar'
 import { rankByClicks, seriesOf, dayKey } from '../../shared/clicks-core.mjs'
+import { fmtDateTimeCompact } from '@/utils/format'
 import { sparkline, donut, heatstrip, barTrack } from '@/utils/chartkit'
 
 /**
@@ -290,9 +291,8 @@ const abnormalSites = computed(() =>
 const judgedAt = computed(() => {
   const ts = healthStore.updatedAt
   if (!ts) return '尚未体检'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '尚未体检'
-  return `体检于 ${d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+  const text = fmtDateTimeCompact(ts, '')
+  return text ? `体检于 ${text}` : '尚未体检'
 })
 
 function showDetail(site) {

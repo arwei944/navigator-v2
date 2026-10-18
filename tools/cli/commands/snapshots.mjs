@@ -5,6 +5,7 @@
 import * as gate from '../../console/lib/gate.mjs'
 import * as snapshots from '../../console/lib/snapshots.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, parseCommandArgs, table } from '../lib/core.mjs'
+import { fmtBytes } from '../../../shared/format.mjs'
 
 const preflightCmd = {
   path: 'publish preflight',
@@ -50,10 +51,10 @@ const snapshotsCmd = {
       data: { keep: cloud.keep, cloudCount: cloud.count, snapshots: items, local },
       render: d => [
         `云端快照 ${d.cloudCount} 份（保留最近 ${d.keep} 份）：`,
-        table(['版本', '时间', '大小', 'pathname'], d.snapshots.map(s => [`v${s.version}`, s.ts, `${(s.size / 1024).toFixed(1)}KB`, s.pathname])),
+        table(['版本', '时间', '大小', 'pathname'], d.snapshots.map(s => [`v${s.version}`, s.ts, fmtBytes(s.size), s.pathname])),
         '',
         `本机 backups/ ${d.local.count} 份（不上云，仅本机对照）：`,
-        table(['文件', '大小'], d.local.items.map(x => [x.name, `${(x.size / 1024).toFixed(1)}KB`])),
+        table(['文件', '大小'], d.local.items.map(x => [x.name, fmtBytes(x.size)])),
       ].join('\n'),
     }
   },

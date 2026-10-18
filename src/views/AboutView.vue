@@ -19,7 +19,7 @@
 
       <p v-if="version.subject" class="ab-subject">{{ version.subject }}</p>
       <dl class="ab-grid">
-        <div><dt>构建于</dt><dd>{{ version.builtAt ? fmt(version.builtAt) : '—' }}</dd></div>
+        <div><dt>构建于</dt><dd>{{ fmtDateTimeSec(version.builtAt) }}</dd></div>
         <div><dt>站点数</dt><dd>{{ data.siteCount ?? '—' }}</dd></div>
         <div><dt>数据版本</dt><dd>{{ data.version ?? '—' }}</dd></div>
         <div><dt>运行时</dt><dd>{{ runtime.node ? `Node ${runtime.node}` : '—' }}</dd></div>
@@ -94,6 +94,7 @@
  */
 import { onMounted, reactive, ref } from 'vue'
 import { fetchStatus } from '@/services/deployApi'
+import { fmtDateTimeSec } from '@/utils/format'
 
 // 构建期注入的产品版本号（vite.config.js 的 define）；未注入时回落空串，不显示假的版本号。
 const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
@@ -102,13 +103,6 @@ const loading = ref(true)
 const version = reactive({ available: false, sha: '', shortSha: '', branch: '', subject: '', builtAt: null, dirty: false })
 const data = reactive({ siteCount: null, version: null })
 const runtime = reactive({ node: '' })
-
-function fmt(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false })
-}
 
 async function load() {
   const r = await fetchStatus()

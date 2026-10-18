@@ -1,5 +1,7 @@
 /** 控制台前端共享能力：API 调用、SSE 实时日志、状态徽标 */
 
+import { fmtClockTime } from '/shared/format.mjs'
+
 export const $ = sel => document.querySelector(sel)
 export const $$ = sel => [...document.querySelectorAll(sel)]
 
@@ -34,9 +36,6 @@ export function renderKv(el, rows) {
   }
 }
 
-export function fmtTime(ts) {
-  return new Date(ts).toTimeString().slice(0, 8)
-}
 
 /* ---------- 实时日志控制台 ---------- */
 
@@ -117,7 +116,7 @@ function buildLine(entry, ranges) {
   line.className = `log-line ${entry.stream}`
   const t = document.createElement('span')
   t.className = 'ts'
-  t.textContent = fmtTime(entry.t)
+  t.textContent = fmtClockTime(entry.t)
   const txt = document.createElement('span')
   txt.className = 'txt'
   if (ranges && ranges.length) {
@@ -249,7 +248,7 @@ function renderJobSelect() {
   for (const job of items) {
     const opt = document.createElement('option')
     opt.value = job.id
-    opt.textContent = `${MARK[job.status] || '·'} ${fmtTime(job.startedAt)} ${job.title}`
+    opt.textContent = `${MARK[job.status] || '·'} ${fmtClockTime(job.startedAt)} ${job.title}`
     sel.append(opt)
   }
   sel.value = JOBS.has(viewJobId) ? viewJobId : items[0].id
@@ -350,7 +349,7 @@ export async function killCurrent() {
 async function copyVisible() {
   const job = JOBS.get(viewJobId)
   const lines = (job?.lines || []).filter(entry => hitRanges(entry) !== false)
-  const text = lines.map(entry => `${fmtTime(entry.t)} ${entry.text}`).join('\n')
+  const text = lines.map(entry => `${fmtClockTime(entry.t)} ${entry.text}`).join('\n')
   if (!text) { appendLocal('当前没有可复制的日志行。', 'warn'); return }
   try {
     await navigator.clipboard.writeText(text)

@@ -106,7 +106,7 @@
       </div>
     </div>
 
-    <div v-if="lastRunAt" class="pf-ran">最近预检 {{ fmt(lastRunAt) }}</div>
+    <div v-if="lastRunAt" class="pf-ran">最近预检 {{ fmtDateTime(lastRunAt) }}</div>
   </div>
 </template>
 
@@ -117,6 +117,7 @@ import { FIELD_LABEL } from '../../../shared/ops/site-ops.mjs'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { recordAudit } from '@/services/auditLog'
+import { fmtDateTime } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['verdict'])
@@ -177,10 +178,6 @@ const modifiedRows = computed(() => {
     }
   })
 })
-
-function fmt(ts) {
-  return new Date(ts).toLocaleString('zh-CN')
-}
 
 /** 预检是只读动作：结果实时随数据变化，审计只在显式点击时留痕 */
 function runPreflight() {

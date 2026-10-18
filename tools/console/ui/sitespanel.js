@@ -1,6 +1,7 @@
 /** 站点面板：站点增删改 + 元信息抓取 + 图标下载 + 云端数据实时同步 */
 import { $, api, openStream, appendLocal, isBusy } from './core.js'
 import { hostOf } from '/shared/host.mjs'
+import { fmtMillis } from '/shared/format.mjs'
 
 const STATUS_LABEL = { pending: '待执行', running: '进行中', success: '完成', failed: '失败', skipped: '跳过' }
 
@@ -22,10 +23,6 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtDur(ms) {
-  if (ms === null || ms === undefined) return ''
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-}
 
 function setResult(sel, cls, text) {
   const box = $(sel)
@@ -498,7 +495,7 @@ function renderTimeline() {
     li.append(el('span', 'tl-label', s.label))
 
     const meta = el('span', 'tl-meta')
-    if (s.duration) meta.append(el('span', 'tl-dur', fmtDur(s.duration)))
+    if (s.duration) meta.append(el('span', 'tl-dur', fmtMillis(s.duration)))
     meta.append(el('span', `tl-state ${s.status}`, STATUS_LABEL[s.status] || s.status))
     li.append(meta)
 

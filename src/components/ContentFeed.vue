@@ -25,7 +25,7 @@
           </div>
           <div class="feed-item-info">
             <span class="feed-item-name">{{ item.site.name }}</span>
-            <span class="feed-item-time">{{ formatTime(item.timestamp) }}</span>
+            <span class="feed-item-time">{{ fmtRelative(item.timestamp) }}</span>
           </div>
           <svg class="feed-item-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
@@ -118,6 +118,7 @@ import { useHistoryStore } from '@/stores/history'
 import { useCategoriesStore } from '@/stores/categories'
 import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../shared/clicks-core.mjs'
+import { fmtRelative } from '@/utils/format'
 
 const sitesStore = useSitesStore()
 const favoritesStore = useFavoritesStore()
@@ -196,17 +197,6 @@ const hasData = computed(() => {
 })
 
 /** 格式化相对时间 */
-function formatTime(timestamp) {
-  const diff = Date.now() - timestamp
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes} 分钟前`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} 小时前`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days} 天前`
-  return new Date(timestamp).toLocaleDateString('zh-CN')
-}
 
 /** 记录访问 */
 function onVisit(siteId) {

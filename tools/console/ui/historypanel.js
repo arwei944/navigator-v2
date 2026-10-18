@@ -1,5 +1,6 @@
 /** 历史面板：提交记录 + 「已推送 / 仅本地」标注 + Vercel 部署状态关联 */
 import { $, api, appendLocal } from './core.js'
+import { fmtDateTimeCompact } from '/shared/format.mjs'
 
 const state = { data: null, loading: false }
 
@@ -10,12 +11,6 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtClock(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
 
 /* ---------- 概览 ---------- */
 
@@ -50,7 +45,7 @@ function renderLatest() {
   const row = el('div', 'db-row')
   row.append(el('span', 'db-title', '当前生产部署'))
   row.append(el('span', `chip ${cls}`, l.stateLabel))
-  row.append(el('span', 'db-time', fmtClock(l.createdAt)))
+  row.append(el('span', 'db-time', fmtDateTimeCompact(l.createdAt)))
   if (l.url) {
     const a = el('a', 'link', l.url.replace(/^https:\/\//, ''))
     a.href = l.url
@@ -119,8 +114,8 @@ function renderList() {
 
     const meta = el('div', 'ci-meta')
     meta.append(el('span', 'ci-author', c.author))
-    meta.append(el('span', 'ci-date', fmtClock(c.date)))
-    if (c.deployment?.createdAt) meta.append(el('span', 'ci-deploy-at', `部署于 ${fmtClock(c.deployment.createdAt)}`))
+    meta.append(el('span', 'ci-date', fmtDateTimeCompact(c.date)))
+    if (c.deployment?.createdAt) meta.append(el('span', 'ci-deploy-at', `部署于 ${fmtDateTimeCompact(c.deployment.createdAt)}`))
     item.append(meta)
 
     box.append(item)

@@ -14,7 +14,7 @@
       <div v-if="summary" class="audit-summary">
         <span class="as-item">总计 <b>{{ summary.total }}</b></span>
         <span class="as-item" :class="{ bad: summary.failures > 0 }">异常 <b>{{ summary.failures }}</b></span>
-        <span class="as-item" v-if="summary.lastAt">最近 <b>{{ fmt(summary.lastAt) }}</b></span>
+        <span class="as-item" v-if="summary.lastAt">最近 <b>{{ fmtDateTime(summary.lastAt) }}</b></span>
         <span class="as-item" v-if="summary.lastApprove">最近放行 <b>{{ summary.lastApprove.target || summary.lastApprove.action }}</b></span>
       </div>
 
@@ -46,7 +46,7 @@
               <div class="audit-line1">
                 <span class="audit-action">{{ labelOf(e.action) }}</span>
                 <span v-if="e.target" class="audit-target">{{ e.target }}</span>
-                <span class="audit-ts">{{ fmt(e.ts) }}</span>
+                <span class="audit-ts">{{ fmtDateTime(e.ts) }}</span>
               </div>
               <div v-if="e.detail" class="audit-detail">{{ e.detail }}</div>
             </div>
@@ -67,6 +67,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { opsApi } from '@/services/opsApi'
+import { fmtDateTime } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 
@@ -96,11 +97,6 @@ const paged = computed(() => {
 
 function labelOf(key) {
   return actionLabels.value[key] || key
-}
-
-function fmt(ts) {
-  const d = new Date(ts)
-  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString('zh-CN')
 }
 
 async function load() {

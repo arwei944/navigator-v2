@@ -162,7 +162,7 @@
                   <span class="admin-cred-dot"></span>
                   已登录为 <b>{{ authUser }}</b>
                   <span v-if="authVia === 'key'">（管理密钥直连，无有效期）</span>
-                  <span v-else-if="authExpiresAt">· 会话有效至 {{ fmtTime(authExpiresAt) }}</span>
+                  <span v-else-if="authExpiresAt">· 会话有效至 {{ fmtDateTime(authExpiresAt) }}</span>
                 </div>
                 <button class="admin-btn" @click="publishToCloud" :disabled="publishState === 'loading' || !preflightOk">
                   {{ publishState === 'loading' ? '发布中...' : '发布到云端' }}
@@ -220,6 +220,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { fmtDateTime, fmtDateTimeSec } from '@/utils/format'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
@@ -468,7 +469,7 @@ async function runAction(kind) {
           ['可忽略', String(c.limited ?? 0)],
           ['需处理', String(c.down ?? 0)],
         ],
-        hint: r.updatedAt ? `最近一轮 ${fmtTime(new Date(r.updatedAt).getTime())}` : '还没有巡检快照',
+        hint: r.updatedAt ? `最近一轮 ${fmtDateTime(new Date(r.updatedAt).getTime())}` : '还没有巡检快照',
       }
     }
   } catch (e) {
@@ -547,10 +548,6 @@ const loginNotice = ref('')
 const preflight = ref(null)
 const preflightOk = computed(() => Boolean(preflight.value?.ok))
 const preflightBlockers = computed(() => (preflight.value?.blockers || []).map(b => b.message).join('；'))
-
-function fmtTime(ts) {
-  return new Date(ts).toLocaleString('zh-CN')
-}
 
 function onPreflight(result) {
   preflight.value = result
@@ -632,7 +629,7 @@ async function loadVersion() {
     versionTitle.value = [
       `${j.version.branch || ''} ${j.version.shortSha}`,
       j.version.subject || '',
-      j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+      j.version.builtAt ? `构建于 ${fmtDateTimeSec(j.version.builtAt)}` : '',
     ].filter(Boolean).join('\n')
   }
 }

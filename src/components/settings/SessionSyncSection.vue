@@ -59,6 +59,7 @@ import { useTodosStore } from '@/stores/todos'
 import { useHistoryStore } from '@/stores/history'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSiteNotesStore } from '@/stores/siteNotes'
+import { fmtDateTimeSec } from '@/utils/format'
 import { useNotesStore } from '@/stores/notes'
 import { getStoredKey, storeKey, fetchSession, pushSession, snapshotFromStores, applySnapshotToStores } from '@/services/session'
 
@@ -127,7 +128,7 @@ async function upload() {
   try {
     storeKey(key)
     const res = await pushSession(key, snapshot())
-    lastSyncInfo.value = `上次上传：${new Date(res.updatedAt).toLocaleString()} · 版本 v${res.version}`
+    lastSyncInfo.value = `上次上传：${fmtDateTimeSec(res.updatedAt, '-')} · 版本 v${res.version}`
   } catch (e) {
     syncError.value = true
     syncMsg.value = e.message
@@ -148,7 +149,7 @@ async function download() {
     if (res.data) {
       applyLocal(res.data)
       syncMsg.value = `已合并云端数据（版本 v${res.version}）`
-      lastSyncInfo.value = `云端版本 v${res.version} · 更新于 ${res.updatedAt ? new Date(res.updatedAt).toLocaleString() : '-'}`
+      lastSyncInfo.value = `云端版本 v${res.version} · 更新于 ${fmtDateTimeSec(res.updatedAt, '-')}`
     } else {
       syncMsg.value = '云端暂无该密钥的数据，可先上传'
     }

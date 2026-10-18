@@ -1,5 +1,6 @@
 /** 可用性看板：站点状态徽标 + 响应时间趋势 + 探活轮次（口径与 nav sites check 同源） */
 import { $, api, openStream, appendLocal, isBusy } from './core.js'
+import { fmtDateTimeCompact, fmtMillis } from '/shared/format.mjs'
 
 const SEVERITY = { down: 0, limited: 1, unknown: 2, ok: 3 }
 const SCOPE_LABEL = { problems: '需处理 + 可忽略', all: '全部站点' }
@@ -16,17 +17,7 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtMs(ms) {
-  if (ms === null || ms === undefined) return '—'
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
-}
 
-function fmtClock(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
 
 function statusOf(id) {
   return state.latest?.results?.[id]?.status || 'unknown'
@@ -44,7 +35,7 @@ function renderSummary() {
     return
   }
   const c = l.counts
-  box.append(el('span', 'chip', `最近一轮 ${fmtClock(l.ts)}`))
+  box.append(el('span', 'chip', `最近一轮 ${fmtDateTimeCompact(l.ts)}`))
   box.append(el('span', `chip ${c.ok === c.total ? 'ok' : ''}`, `正常 ${c.ok}`))
   box.append(el('span', `chip ${c.limited ? 'warn' : ''}`, `可忽略 ${c.limited}`))
   box.append(el('span', `chip ${c.down ? 'err' : 'ok'}`, `需处理 ${c.down}`))
@@ -63,7 +54,7 @@ function renderOverview() {
   }
   const c = l.counts
   const chips = el('div', 'chips')
-  chips.append(el('span', 'chip', `最近一轮 ${fmtClock(l.ts)}`))
+  chips.append(el('span', 'chip', `最近一轮 ${fmtDateTimeCompact(l.ts)}`))
   chips.append(el('span', `chip ${c.ok === c.total ? 'ok' : ''}`, `正常 ${c.ok}`))
   chips.append(el('span', `chip ${c.limited ? 'warn' : ''}`, `可忽略 ${c.limited}`))
   chips.append(el('span', `chip ${c.down ? 'err' : 'ok'}`, `需处理 ${c.down}`))
@@ -78,7 +69,7 @@ function renderRuns() {
   for (const r of state.runs) {
     const row = el('div', 'run-row')
     row.append(el('span', 'run-id', r.run))
-    row.append(el('span', 'run-ts', fmtClock(r.ts)))
+    row.append(el('span', 'run-ts', fmtDateTimeCompact(r.ts)))
     const chips = el('div', 'chips')
     chips.append(el('span', 'chip', `共 ${r.total}`))
     chips.append(el('span', `chip ${r.ok === r.total ? 'ok' : ''}`, `正常 ${r.ok}`))
@@ -102,7 +93,7 @@ function trendNode(id) {
   // 接口按新 → 旧返回，这里反转成「左旧右新」，符合时间轴直觉
   for (const p of [...series].reverse()) {
     const bar = el('span', `trend-bar ${p.status}`)
-    bar.title = `${fmtClock(p.ts)} · HTTP ${p.code} · ${fmtMs(p.ms)}`
+    bar.title = `${fmtDateTimeCompact(p.ts)} · HTTP ${p.code} · ${fmtMillis(p.ms)}`
     box.append(bar)
   }
   return box
@@ -142,7 +133,7 @@ function renderList() {
     row.append(main)
 
     row.append(trendNode(r.id))
-    row.append(el('span', 'health-ms', h ? fmtMs(h.ms) : '—'))
+    row.append(el('span', 'health-ms', h ? fmtMillis(h.ms) : '—'))
     box.append(row)
   }
   if (rows.length > cap) box.append(el('div', 'dim', `另有 ${rows.length - cap} 个站点未展示，可切换筛选或缩小范围。`))

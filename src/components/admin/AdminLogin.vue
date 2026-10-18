@@ -75,6 +75,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { authApi } from '@/services/authApi'
 import { fetchStatus, fetchLocalKey } from '@/services/deployApi'
+import { fmtDateTimeSec } from '@/utils/format'
 
 const emit = defineEmits(['success'])
 
@@ -105,7 +106,7 @@ async function loadVersion() {
     versionTitle.value = [
       `${j.version.branch || ''} ${j.version.shortSha}`,
       j.version.subject || '',
-      j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+      j.version.builtAt ? `构建于 ${fmtDateTimeSec(j.version.builtAt)}` : '',
     ].filter(Boolean).join('\n')
   }
 }

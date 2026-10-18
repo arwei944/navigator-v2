@@ -15,6 +15,7 @@
  * 勾了就发到勾中的那几个，且**逐个端点回报成功/失败**（一个挂了不影响其余）。
  */
 import { $, api, renderKv, openStream } from './core.js'
+import { fmtDateTimeCompact } from '/shared/format.mjs'
 
 const state = { data: null, loading: false }
 
@@ -28,12 +29,6 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtClock(iso) {
-  if (!iso) return '—'
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
 
 function ago(iso) {
   if (!iso) return ''
@@ -78,7 +73,7 @@ function renderVersions() {
   renderKv($('#deploy-versions'), [
     ['本地源码', `${s.shortSha || '—'}${s.dirty ? '（有未提交改动）' : ''} · ${s.branch || ''}`],
     ['上次构建', b.available ? `${b.shortSha || '—'}${b.dirty ? '（含未提交改动）' : ''} · ${ago(b.builtAt)}` : '没有构建产物'],
-    ['线上运行', d.remote?.available ? `${String(r.shortSha || '—')}${r.dirty ? '（含未提交改动）' : ''} · 构建于 ${fmtClock(r.builtAt)}` : '不可达'],
+    ['线上运行', d.remote?.available ? `${String(r.shortSha || '—')}${r.dirty ? '（含未提交改动）' : ''} · 构建于 ${fmtDateTimeCompact(r.builtAt)}` : '不可达'],
   ])
 
   const notes = []
@@ -119,7 +114,7 @@ function renderHistory() {
     const row = el('div', 'result-row')
     row.append(el('span', `chip ${h.ok ? 'ok' : 'fail'}`, h.ok ? '成功' : '失败'))
     row.append(el('span', 'mono', h.shortSha || '—'))
-    row.append(el('span', 'dim', `${fmtClock(h.at)} · ${h.seconds || 0}s${h.online ? ` · 上线 ${h.online}` : ''}`))
+    row.append(el('span', 'dim', `${fmtDateTimeCompact(h.at)} · ${h.seconds || 0}s${h.online ? ` · 上线 ${h.online}` : ''}`))
     row.append(el('span', 'grow', h.error || h.subject || ''))
     box.append(row)
   }

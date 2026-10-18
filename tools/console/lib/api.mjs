@@ -7,6 +7,7 @@ import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as changes from './changes.mjs'
 import * as sync from './sync.mjs'
+import { fmtBytes } from '../../../shared/format.mjs'
 import * as history from './history.mjs'
 import * as data from './data.mjs'
 import * as sites from './sites.mjs'
@@ -108,7 +109,7 @@ function startIconFetch(id, faviconUrl) {
     try {
       const r = await sites.downloadIcon(id, { faviconUrl })
       jobs.emitEvent(job, 'icon', r)
-      jobs.log(job, `✅ 已保存 ${r.icon}（${(r.bytes / 1024).toFixed(1)} KB，来源 ${r.source}）`, 'success')
+      jobs.log(job, `✅ 已保存 ${r.icon}（${fmtBytes(r.bytes)}，来源 ${r.source}）`, 'success')
       jobs.finish(job, 0)
     } catch (e) {
       jobs.log(job, `❌ ${e.message}`, 'stderr')

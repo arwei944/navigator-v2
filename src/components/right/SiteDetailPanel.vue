@@ -143,7 +143,7 @@
             </span>
             <div class="timeline-content">
               <span class="timeline-label">添加时间</span>
-              <span class="timeline-date">{{ formatDate(site.createdAt) }}</span>
+              <span class="timeline-date">{{ fmtDateTimeCompact(site.createdAt) }}</span>
             </div>
           </div>
           <div class="timeline-item">
@@ -152,7 +152,7 @@
             </span>
             <div class="timeline-content">
               <span class="timeline-label">更新时间</span>
-              <span class="timeline-date">{{ formatDate(site.updatedAt) }}</span>
+              <span class="timeline-date">{{ fmtDateTimeCompact(site.updatedAt) }}</span>
             </div>
           </div>
         </div>
@@ -192,6 +192,7 @@ import { useHistoryStore } from '@/stores/history'
 import { useClicksStore } from '@/stores/clicks'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useSidebarStore } from '@/stores/sidebar'
+import { fmtDateTimeCompact, fmtRelative } from '@/utils/format'
 import { usePreferencesStore } from '@/stores/preferences'
 import PurposeTags from '@/components/PurposeTags.vue'
 import { normalizePurposes, MAX_PURPOSES } from '../../../shared/purposes.mjs'
@@ -367,31 +368,11 @@ const lastVisit = computed(() => {
   if (!props.site) return '—'
   const last = historyStore.getLastVisitTime(props.site.id)
   if (!last) return '从未访问'
-  const diff = Date.now() - toTs(last)
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return '刚刚'
-  if (mins < 60) return mins + ' 分钟前'
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return hours + ' 小时前'
-  const days = Math.floor(hours / 24)
-  if (days < 30) return days + ' 天前'
-  return formatDate(last)
+  return fmtRelative(last, { fallback: (t) => fmtDateTimeCompact(t) })
 })
 
 function toTs(ts) {
   return typeof ts === 'number' ? ts : new Date(ts).getTime()
-}
-function formatDate(ts) {
-  if (!ts) return '—'
-  const d = new Date(toTs(ts))
-  const now = new Date()
-  const isThisYear = d.getFullYear() === now.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hour = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  if (isThisYear) return `${month}/${day} ${hour}:${min}`
-  return `${d.getFullYear()}/${month}/${day} ${hour}:${min}`
 }
 function formatDomain(url) {
   if (!url) return ''

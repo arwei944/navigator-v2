@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import { ROOT, getAdminKey } from './env.mjs'
 import { SITE_URL, fetchCloud } from './cloud.mjs'
 import { resolvePublisher } from '../../../shared/publisher.mjs'
+import { fmtDateTime } from '../../../shared/format.mjs'
 import * as jobs from './jobs.mjs'
 import * as git from './git.mjs'
 import * as vercel from './vercel.mjs'
@@ -219,7 +220,7 @@ async function runPipeline(job, steps, opts) {
     finishPublish(job, steps, code, opts, detail)
   }
 
-  jobs.log(job, `开始一键发布 · ${new Date().toLocaleString('zh-CN')}`, 'info')
+  jobs.log(job, `开始一键发布 · ${fmtDateTime(Date.now())}`, 'info')
 
   /* 1. 本地改动检查 */
   mark('check', { status: 'running' })

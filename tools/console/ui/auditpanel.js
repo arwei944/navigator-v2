@@ -1,5 +1,6 @@
 /** 审计面板：关键操作的持久化留痕（提交 / 推送 / 发布 / 放行 / 拒绝 / 回滚 / 站点增删改） */
 import { $, api, appendLocal } from './core.js'
+import { fmtDateTimeCompact } from '/shared/format.mjs'
 
 const MARK = { ok: '✓', fail: '✖', rejected: '⊘' }
 const RESULT_LABEL = { ok: '成功', fail: '失败', rejected: '拒绝' }
@@ -14,12 +15,6 @@ function el(tag, cls, text) {
   return node
 }
 
-function fmtClock(ts) {
-  if (!ts) return '—'
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false, month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
 
 /** 动作 / 结果下拉只在取值集合变化时重建，避免刷新打断用户当前筛选 */
 function fillSelect(sel, options) {
@@ -59,11 +54,11 @@ function renderSummary() {
 
   box.append(el('span', 'chip', `累计 ${s.total} 条`))
   box.append(el('span', `chip ${s.failures ? 'warn' : 'ok'}`, `非成功 ${s.failures}`))
-  box.append(el('span', 'chip', `最近 ${s.lastAt ? fmtClock(s.lastAt) : '—'}`))
+  box.append(el('span', 'chip', `最近 ${s.lastAt ? fmtDateTimeCompact(s.lastAt) : '—'}`))
   if (s.lastApprove) {
     const a = s.lastApprove
     box.append(el('span', `chip ${a.action === 'gate.bypass' ? 'warn' : 'ok'}`,
-      `最近放行 ${RESULT_LABEL[a.action === 'gate.bypass' ? 'rejected' : 'ok']} · ${fmtClock(a.ts)}`))
+      `最近放行 ${RESULT_LABEL[a.action === 'gate.bypass' ? 'rejected' : 'ok']} · ${fmtDateTimeCompact(a.ts)}`))
   } else {
     box.append(el('span', 'chip warn', '尚无放行记录'))
   }
@@ -75,7 +70,7 @@ function renderLastApprove() {
   if (!a) return
   const note = el('div', `audit-approve ${a.action === 'gate.bypass' ? 'warn' : 'ok'}`)
   note.append(el('span', 'audit-approve-k', '最近一次放行'))
-  note.append(el('span', 'audit-approve-v', `${a.action === 'gate.bypass' ? '绕过门禁' : '凭证核销'} · ${a.target || '(无目标)'} · ${fmtClock(a.ts)}`))
+  note.append(el('span', 'audit-approve-v', `${a.action === 'gate.bypass' ? '绕过门禁' : '凭证核销'} · ${a.target || '(无目标)'} · ${fmtDateTimeCompact(a.ts)}`))
   if (a.detail) note.append(el('span', 'audit-approve-d', a.detail))
   box.prepend(note)
 }
@@ -107,7 +102,7 @@ function renderList() {
     if (it.detail) main.append(el('div', 'audit-detail', it.detail))
     row.append(main)
 
-    row.append(el('span', 'audit-ts', fmtClock(it.ts)))
+    row.append(el('span', 'audit-ts', fmtDateTimeCompact(it.ts)))
     box.append(row)
   }
 

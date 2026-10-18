@@ -15,7 +15,7 @@
         <span class="hs-item ok">成功 <b>{{ summary.ok }}</b></span>
         <span class="hs-item bad">失败 <b>{{ summary.failed }}</b></span>
         <span class="hs-item" v-if="summary.successRate !== null">成功率 <b>{{ summary.successRate }}%</b></span>
-        <span class="hs-item" v-if="summary.avgDuration">平均耗时 <b>{{ sec(summary.avgDuration) }}</b></span>
+        <span class="hs-item" v-if="summary.avgDuration">平均耗时 <b>{{ fmtMillis(summary.avgDuration) }}</b></span>
       </div>
 
       <div class="hist-filters">
@@ -41,10 +41,10 @@
           <span class="hist-mark" :class="r.ok ? 'ok' : 'bad'">{{ r.ok ? '✓' : '✗' }}</span>
           <div class="hist-main">
             <div class="hist-line1">
-              <span class="hist-ts">{{ fmt(r.ts) }}</span>
+              <span class="hist-ts">{{ fmtDateTime(r.ts) }}</span>
               <span class="hist-trigger">{{ triggers[r.trigger] || r.trigger }}</span>
               <span v-if="r.cloud" class="hist-cloud">v{{ r.cloud.version }} · {{ r.cloud.count }} 站点</span>
-              <span v-if="r.duration" class="hist-dur">{{ sec(r.duration) }}</span>
+              <span v-if="r.duration" class="hist-dur">{{ fmtMillis(r.duration) }}</span>
             </div>
             <div v-if="!r.ok && r.reason" class="hist-reason">失败：{{ r.reason }}</div>
             <div v-if="r.note" class="hist-note">{{ r.note }}</div>
@@ -61,6 +61,7 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
 import { opsApi } from '@/services/opsApi'
+import { fmtDateTime, fmtMillis } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['loaded'])
@@ -73,14 +74,6 @@ const error = ref('')
 const msg = ref('')
 const msgBad = ref(false)
 const filter = reactive({ ok: '', trigger: '', q: '' })
-
-function fmt(ts) {
-  const d = new Date(ts)
-  return Number.isNaN(d.getTime()) ? ts : d.toLocaleString('zh-CN')
-}
-function sec(ms) {
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`
-}
 
 async function load() {
   if (!props.adminKey) { items.value = []; summary.value = null; return }
