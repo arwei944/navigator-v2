@@ -5,6 +5,7 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { ENV_VARS } from '../../../shared/env-registry.mjs'
 
 // tools/console/lib/ -> 项目根
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
@@ -30,22 +31,21 @@ export function getAdminKey() {
   return process.env.SITES_ADMIN_KEY || ''
 }
 
-/** 环境变量配置概览（仅暴露是否已配置，不泄露值） */
+/**
+ * 环境变量配置概览（仅暴露是否已配置，不泄露值）。
+ * 清单来自 shared/env-registry.mjs（唯一事实来源）—— 不再本地硬编码，
+ * 避免「台账 7 条、代码 200+ 处」的两套账。
+ */
 export function envSummary() {
   loadEnv()
-  const names = [
-    // 当前主链路真正需要这两组 —— 缺了 doctor 会说「未配置」，必须如实列出来
-    'SITES_ADMIN_KEY', // 数据热更新 / 云端发布
-    'BOTKEEP_API_KEY', // 部署到自有服务器（release run / deploy-botkeep）
-    'BOTKEEP_WORKLOAD_ID',
-    // 保留的旧通道 / 旧平台凭据（缺失不影响主流程，doctor 里恒为 ok）
-    'BLOB_READ_WRITE_TOKEN',
-    'VERCEL_TOKEN',
-    'VERCEL_ORG_ID',
-    'VERCEL_PROJECT_ID',
-  ]
   return {
     envFileExists: existsSync(ENV_FILE),
-    vars: names.map(name => ({ name, configured: Boolean(process.env[name]) })),
+    vars: ENV_VARS.map(v => ({
+      name: v.name,
+      scope: v.scope,
+      required: Boolean(v.required),
+      desc: v.desc,
+      configured: Boolean(process.env[v.name]),
+    })),
   }
 }
