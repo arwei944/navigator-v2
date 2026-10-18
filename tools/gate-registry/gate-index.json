@@ -1,12 +1,13 @@
 {
-  "total": 90,
-  "registered": 90,
+  "total": 91,
+  "registered": 91,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
     "tools/console/test-infer.mjs",
     "tools/console/test-purposes.mjs",
     "tools/console/test-visual-scheme.mjs",
+    "tools/console/test-visual-layer.mjs",
     "tools/console/test-url.mjs",
     "tools/console/test-url-preview.mjs",
     "tools/console/test-preview-translate.mjs",
@@ -888,6 +889,15 @@
       "lines": 193,
       "included": true,
       "durationMs": 325
+    },
+    {
+      "file": "tools/console/test-visual-layer.mjs",
+      "name": "test-visual-layer",
+      "purpose": "视觉层门禁（统一视觉层）",
+      "category": "前端与体验",
+      "lines": 203,
+      "included": true,
+      "durationMs": null
     },
     {
       "file": "tools/console/test-visual-scheme.mjs",

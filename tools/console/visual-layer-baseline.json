@@ -1,0 +1,8 @@
+{
+  "note": "组件里「不透明实色（hex / rgb()）」的存量基线。视觉真值源（src/utils/visualScheme.js、src/utils/themeSchema.js、src/styles/main.css）本身就在定义颜色，不计入。新颜色请走令牌（见 docs/VISUAL.md）；确属布局必需（如纯色遮罩）者更新此数并在 commit 里补一句备注。",
+  "opaqueColors": {
+    "total": 187,
+    "files": 41,
+    "measuredAt": "2026-10-18"
+  }
+}
