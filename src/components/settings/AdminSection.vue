@@ -30,7 +30,7 @@ defineEmits(['open-admin'])
 .data-info { display: flex; flex-direction: column; gap: 2px; }
 .data-info-label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .data-info-value { font-size: 11px; color: var(--text-secondary); }
-.data-btn { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; font-family: var(--font); flex-shrink: 0; }
+.data-btn { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; font-family: var(--font); flex-shrink: 0; }
 .data-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .data-btn svg { width: 16px; height: 16px; }
 </style>

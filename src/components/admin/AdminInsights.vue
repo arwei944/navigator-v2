@@ -339,7 +339,7 @@ const trendRange = computed(() => {
 .cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .cat-bar-label { width: 120px; flex-shrink: 0; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cat-bar-track { flex: 1; height: 10px; background: var(--border-light); border-radius: 5px; overflow: hidden; }
-.cat-bar-fill { height: 100%; border-radius: 5px; transition: width .3s ease; }
+.cat-bar-fill { height: 100%; border-radius: 5px; transition: width var(--dur-slow) ease; }
 .cat-bar-count { width: 28px; text-align: right; font-size: 12px; font-weight: 600; color: var(--text-secondary); flex-shrink: 0; }
 .top-list { list-style: none; margin: 0; padding: 0; }
 .top-list li { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--border-light); }

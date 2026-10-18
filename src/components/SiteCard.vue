@@ -322,7 +322,7 @@ function onHover() {
 /* 卡片大小：内容整体缩放（图标、字号、控件），间距另有 --card-padding 与 --grid-gap 管。
    --card-scale 是无单位乘数，来自「卡片设置 → 卡片大小」。 */
 .card { --cs: var(--card-scale, 1); }
-.card-favicon { width: calc(38px * var(--cs)); height: calc(38px * var(--cs)); border-radius: calc(10px * var(--cs)); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(15px * var(--cs)); color: var(--color-on-solid); transition: transform .2s ease; position: relative; overflow: hidden; }
+.card-favicon { width: calc(38px * var(--cs)); height: calc(38px * var(--cs)); border-radius: calc(10px * var(--cs)); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: calc(15px * var(--cs)); color: var(--color-on-solid); transition: transform var(--dur-base) ease; position: relative; overflow: hidden; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: var(--bg-white); box-sizing: border-box; }
 .card:hover .card-favicon { transform: scale(1.05); }
@@ -477,17 +477,17 @@ function onHover() {
   justify-content: center;
   cursor: pointer;
   transition:
-    background-color .2s cubic-bezier(.4,0,.2,1),
-    border-color .2s cubic-bezier(.4,0,.2,1),
-    color .2s cubic-bezier(.4,0,.2,1),
-    transform .2s cubic-bezier(.4,0,.2,1);
+    background-color var(--dur-base) cubic-bezier(.4,0,.2,1),
+    border-color var(--dur-base) cubic-bezier(.4,0,.2,1),
+    color var(--dur-base) cubic-bezier(.4,0,.2,1),
+    transform var(--dur-base) cubic-bezier(.4,0,.2,1);
   color: var(--text-secondary);
 }
 .card-visit:hover { background: var(--accent); border-color: var(--accent); color: var(--color-on-solid); transform: scale(1.1); }
 .card-fav-btn:hover { color: var(--color-favorite); border-color: var(--color-favorite-border); transform: scale(1.1); }
 .card-fav-btn.favorited { color: var(--color-favorite); border-color: var(--color-favorite-border); background: var(--color-favorite-bg); }
 .card-fav-btn:active { transform: scale(0.9); }
-.card-fav-btn svg, .card-visit svg { width: 14px; height: 14px; transition: transform .2s ease; }
+.card-fav-btn svg, .card-visit svg { width: 14px; height: 14px; transition: transform var(--dur-base) ease; }
 .card-fav-btn.favorited svg { animation: heartPop 0.3s ease; }
 .card-visit { text-decoration: none; }
 .drag-handle { cursor: grab; color: var(--text-secondary); opacity: 0.5; display: flex; align-items: center; padding: 4px; border-radius: 4px; transition: opacity var(--transition); flex-shrink: 0; }
@@ -522,7 +522,7 @@ function onHover() {
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid var(--border); background: var(--bg-white);
   display: flex; align-items: center; justify-content: center;
-  transition: background-color .15s ease, border-color .15s ease;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
 .card-checkbox.checked { background: var(--accent); border-color: var(--accent); }
 .card-checkbox svg { width: 12px; height: 12px; color: var(--color-on-solid); }

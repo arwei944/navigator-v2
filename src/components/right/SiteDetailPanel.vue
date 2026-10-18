@@ -430,7 +430,7 @@ watch(() => props.site, () => {
 .detail-name { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-domain { font-size: 12px; color: var(--text-secondary); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* 编辑入口：与折叠把手同样是"低存在感"控件 —— 常态淡、悬停才显形，别跟内容抢焦点 */
-.detail-edit-btn { width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-secondary); opacity: .45; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s ease; }
+.detail-edit-btn { width: 26px; height: 26px; flex-shrink: 0; padding: 0; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-secondary); opacity: .45; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all var(--dur-fast) ease; }
 .detail-edit-btn:hover { opacity: 1; border-color: var(--border); background: var(--border-light); color: var(--text-primary); }
 .detail-edit-btn svg { width: 13px; height: 13px; }
 .detail-category { display: flex; }
@@ -449,23 +449,23 @@ watch(() => props.site, () => {
 .form-group { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
 .form-hint { font-weight: 400; font-size: 10px; color: var(--text-secondary); opacity: 0.75; }
-.form-input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; line-height: 1.5; outline: none; transition: border-color .15s ease; }
+.form-input { width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; line-height: 1.5; outline: none; transition: border-color var(--dur-fast) ease; }
 .form-input:focus { border-color: var(--accent); }
 .form-textarea { resize: vertical; min-height: 56px; }
 .form-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
 .edit-actions { display: flex; justify-content: flex-end; gap: 6px; padding-top: 4px; border-top: 1px solid var(--border-light); }
-.edit-btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s ease; }
+.edit-btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--dur-fast) ease; }
 .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
 .edit-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .edit-btn.primary:hover { opacity: 0.9; color: #fff; }
 
 .note-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.note-pin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; opacity: 1; margin: 0; transition: all 0.15s ease; }
+.note-pin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; opacity: 1; margin: 0; transition: all var(--dur-fast) ease; }
 .note-pin svg { width: 11px; height: 11px; }
 .note-pin:hover:not(:disabled) { border-color: var(--color-note); color: var(--color-note); }
 .note-pin.on { border-color: var(--color-note); color: var(--color-note); background: var(--color-note-bg); }
 .note-pin:disabled { opacity: 0.4; cursor: not-allowed; }
-.note-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; line-height: 1.6; resize: vertical; outline: none; transition: border-color 0.15s ease; }
+.note-input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; line-height: 1.6; resize: vertical; outline: none; transition: border-color var(--dur-fast) ease; }
 .note-input:focus { border-color: var(--color-note); }
 .note-input::placeholder { color: var(--text-secondary); opacity: 0.6; }
 .note-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
@@ -487,7 +487,7 @@ watch(() => props.site, () => {
 .timeline-label { font-size: 11px; color: var(--text-secondary); opacity: 0.7; }
 .timeline-date { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .detail-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; padding-top: 4px; border-top: 1px solid var(--border-light); }
-.action-btn { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; text-decoration: none; font-family: var(--font); }
+.action-btn { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 11px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; text-decoration: none; font-family: var(--font); }
 .action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 .action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }

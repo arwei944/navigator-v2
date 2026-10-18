@@ -60,7 +60,7 @@ defineEmits(['confirm', 'cancel'])
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .btn-cancel { background: var(--border-light); color: var(--text-secondary); }
 .btn-cancel:hover { background: var(--border); }

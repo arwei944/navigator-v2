@@ -143,7 +143,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .cs-close {
   width: 30px; height: 30px; border: none; border-radius: 8px; background: transparent;
   color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .cs-close:hover { background: var(--accent-light); color: var(--accent); }
 .cs-close svg { width: 16px; height: 16px; }
@@ -184,7 +184,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .cs-reset {
   width: 100%; padding: 8px; font-size: 12px; font-weight: 500; font-family: var(--font);
   border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white);
-  color: var(--text-primary); cursor: pointer; transition: all .15s ease;
+  color: var(--text-primary); cursor: pointer; transition: all var(--dur-fast) ease;
 }
 .cs-reset:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .cs-reset:disabled { opacity: .45; cursor: not-allowed; }

@@ -420,9 +420,9 @@ function domainOf(url) {
 .gp-svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
 .gp-svg:active { cursor: grabbing; }
 
-.gp-edge { transition: stroke-opacity .12s ease; }
+.gp-edge { transition: stroke-opacity var(--dur-fast) ease; }
 .gp-node { cursor: pointer; }
-.gp-node circle { transition: opacity .12s ease; }
+.gp-node circle { transition: opacity var(--dur-fast) ease; }
 .gp-node.dim { opacity: .22; }
 .gp-label {
   font-size: 11px; fill: var(--text-secondary); pointer-events: none;

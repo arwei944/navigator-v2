@@ -109,7 +109,7 @@ function openCardSettings() {
 .settings-close {
   width: 32px; height: 32px; border: none; background: transparent; border-radius: 8px;
   color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .settings-close:hover { background: var(--accent-light); color: var(--accent); }
 .settings-close svg { width: 18px; height: 18px; }

@@ -10,6 +10,17 @@
   --radius-lg: 16px;
   --transition: 0.15s ease;
 
+  /* ── 动效时长（durations）──────────────────────────────
+     transition 的时长**档位**。此前组件里散落 ~80 处硬编码时长
+     （.1s/.12s/.15s/.18s/.2s/.24s/.25s/.28s/.3s/.35s），想整体调「手感」
+     得改 80 处、还只改得动一半（另一半走 var(--transition)）。
+     归并到 3 档 —— 各档与原值的偏差都 ≤ 0.07s，观感一致，维护只需改这里。
+     `--transition`（= 0.15s ease）是「时长 + 缓动」的完整值，58 处按完整值用，
+     且门禁 ① 要它与 visualScheme 真值逐一相等，故**保持字面量**、不写成 var()。 */
+  --dur-fast: 0.15s;   /* 悬停 / 颜色 / 边框 —— 主力档 */
+  --dur-base: 0.2s;    /* 出现 / 消失 / 位移 */
+  --dur-slow: 0.28s;   /* 面板展开收起 / 布局变化 */
+
   /* Light Theme */
   --bg-primary: #f5f5f7;
   --bg-white: #ffffff;
@@ -306,7 +317,7 @@ button { font-family: inherit; }
   animation: fadeInUp calc(0.2s * var(--card-anim, 1)) ease reverse both;
 }
 .card-move {
-  transition: transform 0.3s ease;
+  transition: transform var(--dur-slow) ease;
 }
 
 /* 页面过渡 */

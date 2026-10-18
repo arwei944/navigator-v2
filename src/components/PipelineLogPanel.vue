@@ -370,7 +370,7 @@ function togglePin() {
   min-width: 0;
 }
 .pipeline-run-ms { font-size: 11px; color: var(--text-secondary); flex-shrink: 0; }
-.pipeline-caret { color: var(--text-secondary); transition: transform 0.15s; flex-shrink: 0; }
+.pipeline-caret { color: var(--text-secondary); transition: transform var(--dur-fast); flex-shrink: 0; }
 .pipeline-caret.open { transform: rotate(180deg); }
 .pipeline-run-summary {
   margin: 6px 0 0;

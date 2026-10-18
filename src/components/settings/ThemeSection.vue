@@ -146,12 +146,12 @@ async function onImport(e) {
 .data-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .data-info-label { font-size: 12px; font-weight: 500; color: var(--text-primary); }
 .data-info-value { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
-.data-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; font-family: var(--font); flex-shrink: 0; }
+.data-btn { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; font-family: var(--font); flex-shrink: 0; }
 .data-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .data-btn svg { width: 16px; height: 16px; }
 .file-hidden { display: none; }
 .theme-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 10px 0 14px; }
-.theme-card { position: relative; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-white); cursor: pointer; text-align: left; transition: all .15s ease; font-family: var(--font); }
+.theme-card { position: relative; display: flex; flex-direction: column; gap: 4px; align-items: flex-start; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-white); cursor: pointer; text-align: left; transition: all var(--dur-fast) ease; font-family: var(--font); }
 .theme-card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .theme-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
 .theme-swatches { display: flex; gap: 3px; margin-bottom: 2px; }

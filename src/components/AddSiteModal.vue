@@ -680,7 +680,7 @@ loadSuggestCategory().catch(() => {})
   color: var(--text-primary);
   background: var(--bg-white);
   outline: none;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur-fast) ease;
 }
 .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 .form-textarea { resize: vertical; min-height: 60px; }
@@ -695,7 +695,7 @@ loadSuggestCategory().catch(() => {})
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .btn-cancel { background: var(--border-light); color: var(--text-secondary); }
 .btn-cancel:hover { background: var(--border); }

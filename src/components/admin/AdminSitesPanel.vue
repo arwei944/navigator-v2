@@ -513,7 +513,7 @@ function confirmImport() {
   background: var(--bg-white);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  transition: border-color .15s ease, box-shadow .15s ease;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 .site-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(0, 0, 0, .07); }
 .site-card.is-selected { border-color: var(--accent); background: var(--accent-light); }

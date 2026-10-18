@@ -53,7 +53,7 @@ function runAction(t) {
   gap: 8px;
   pointer-events: none;
   max-width: 96vw;
-  transition: bottom .18s ease;
+  transition: bottom var(--dur-base) ease;
 }
 /* 批量栏在下方时抬到它之上：59px（批量栏自身高度 = 14 上下内边距 + 31 控件）＋ 12 间隙 ＋ 原 24 */
 .toast-host.above-batch-bar { bottom: calc(95px + env(safe-area-inset-bottom)); }
@@ -90,7 +90,7 @@ function runAction(t) {
   background: var(--accent);
   color: #fff;
   cursor: pointer;
-  transition: opacity .15s ease;
+  transition: opacity var(--dur-fast) ease;
 }
 .toast-action:hover { opacity: .85; }
 .toast-close {
@@ -107,9 +107,9 @@ function runAction(t) {
 }
 .toast-close:hover { color: var(--text-primary); }
 
-.toast-enter-active, .toast-leave-active { transition: all .25s ease; }
+.toast-enter-active, .toast-leave-active { transition: all var(--dur-base) ease; }
 .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(12px); }
-.toast-move { transition: transform .25s ease; }
+.toast-move { transition: transform var(--dur-base) ease; }
 
 /* 移动端抬到 tab 栏与批量栏之上，否则会被盖住 */
 @media (max-width: 768px) {

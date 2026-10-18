@@ -975,7 +975,7 @@ async function notifyWebhook(version, count) {
   z-index: var(--z-inline);
   cursor: col-resize;
   background: transparent;
-  transition: background .15s ease;
+  transition: background var(--dur-fast) ease;
 }
 .ar-resize:hover, .ar-resize:active { background: var(--accent); opacity: .3; }
 .admin-rail-toggle { padding: 6px 10px; font-size: 12px; }
@@ -1121,7 +1121,7 @@ async function notifyWebhook(version, count) {
   color: var(--text-primary);
   background: var(--bg-white);
   outline: none;
-  transition: border-color .15s ease;
+  transition: border-color var(--dur-fast) ease;
 }
 .admin-key-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 .admin-publish-msg {

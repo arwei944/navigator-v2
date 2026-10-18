@@ -485,7 +485,7 @@ function onDragChange() {
 .batch-btn {
   padding: 7px 16px; font-size: 13px; font-weight: 500; border-radius: var(--radius-sm);
   border: 1px solid var(--border); background: var(--bg-white); color: var(--text-primary); cursor: pointer;
-  transition: all .15s ease; display: inline-flex; align-items: center; gap: 6px;
+  transition: all var(--dur-fast) ease; display: inline-flex; align-items: center; gap: 6px;
 }
 .batch-btn:hover { border-color: var(--accent); color: var(--accent); }
 .batch-btn-danger { color: var(--color-danger); border-color: #fca5a5; }
@@ -532,7 +532,7 @@ function onDragChange() {
 .trash-empty-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500;
   border: 1px solid #fca5a5; border-radius: var(--radius-sm); background: #fef2f2; color: #ef4444;
-  cursor: pointer; transition: all .15s ease;
+  cursor: pointer; transition: all var(--dur-fast) ease;
 }
 .trash-empty-btn:hover { background: #fee2e2; }
 .trash-empty-btn svg { width: 14px; height: 14px; }
@@ -540,7 +540,7 @@ function onDragChange() {
 .trash-item {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 18px; background: var(--bg-white); border: 1px solid var(--border);
-  border-radius: var(--radius); transition: all .15s ease;
+  border-radius: var(--radius); transition: all var(--dur-fast) ease;
 }
 .trash-item:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); }
 .trash-item-left { display: flex; align-items: center; gap: 14px; flex: 1; min-width: 0; }
@@ -548,7 +548,7 @@ function onDragChange() {
 .trash-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .trash-restore-btn, .trash-delete-btn {
   display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; font-size: 12px; font-weight: 500;
-  border-radius: var(--radius-sm); cursor: pointer; transition: all .15s ease; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); cursor: pointer; transition: all var(--dur-fast) ease; border: 1px solid var(--border);
   background: var(--bg-white); color: var(--text-primary);
 }
 .trash-restore-btn:hover { border-color: var(--accent); color: var(--accent); }
@@ -567,7 +567,7 @@ function onDragChange() {
 .trash-item-info .trash-item-desc { margin-bottom: 0; }
 
 /* 动画 */
-.slide-up-enter-active, .slide-up-leave-active { transition: all .25s ease; }
+.slide-up-enter-active, .slide-up-leave-active { transition: all var(--dur-base) ease; }
 .slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); opacity: 0; }
 
 /* 列数由视觉方案的 --grid-cols 决定（769px 以上全权生效）。

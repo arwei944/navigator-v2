@@ -137,19 +137,19 @@ if (collapseOptions.length !== RIGHT_COLLAPSE_POLICIES.length) {
 .setting-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
 .section-note { font-size: 11px; line-height: 1.6; color: var(--text-secondary); opacity: 0.7; padding: 2px 0 4px; }
 .theme-toggle-wrapper { display: flex; gap: 4px; background: var(--border-light); padding: 3px; border-radius: 8px; }
-.theme-toggle-btn { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: none; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; font-family: var(--font); white-space: nowrap; }
+.theme-toggle-btn { display: flex; align-items: center; gap: 5px; padding: 5px 10px; border: none; border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 12px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; font-family: var(--font); white-space: nowrap; }
 .theme-toggle-btn.active { background: var(--bg-white); color: var(--text-primary); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .setting-select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 12px; font-family: var(--font); cursor: pointer; outline: none; min-width: 150px; }
 .setting-select:focus { border-color: var(--accent); }
 .width-row { display: flex; align-items: center; gap: 8px; }
 .width-value { font-size: 12px; color: var(--text-primary); font-family: monospace; min-width: 54px; text-align: right; }
-.mini-btn { padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-white); color: var(--text-secondary); font-size: 12px; font-family: var(--font); cursor: pointer; transition: all 0.15s ease; }
+.mini-btn { padding: 4px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-white); color: var(--text-secondary); font-size: 12px; font-family: var(--font); cursor: pointer; transition: all var(--dur-fast) ease; }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .mini-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .setting-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; cursor: pointer; }
 .setting-toggle input { display: none; }
-.toggle-track { width: 38px; height: 22px; background: var(--border); border-radius: 11px; position: relative; transition: background 0.2s ease; flex-shrink: 0; }
+.toggle-track { width: 38px; height: 22px; background: var(--border); border-radius: 11px; position: relative; transition: background var(--dur-base) ease; flex-shrink: 0; }
 .setting-toggle input:checked + .toggle-track { background: var(--accent); }
-.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform var(--dur-base) ease; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .setting-toggle input:checked + .toggle-track .toggle-thumb { transform: translateX(16px); }
 </style>

@@ -214,7 +214,7 @@ onUnmounted(() => {
   z-index: var(--z-bar);
   position: relative;
   border-right: 1px solid var(--border);
-  transition: width .28s cubic-bezier(.4,0,.2,1), min-width .28s cubic-bezier(.4,0,.2,1), transform .28s cubic-bezier(.4,0,.2,1);
+  transition: width var(--dur-slow) cubic-bezier(.4,0,.2,1), min-width var(--dur-slow) cubic-bezier(.4,0,.2,1), transform var(--dur-slow) cubic-bezier(.4,0,.2,1);
 }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -230,7 +230,7 @@ onUnmounted(() => {
   font-size: 11px;
   letter-spacing: .3px;
   opacity: .55;
-  transition: opacity .18s ease;
+  transition: opacity var(--dur-base) ease;
 }
 .sidebar-nav-item:hover .nav-version,
 .sidebar-nav-item.active .nav-version { opacity: .9; }
@@ -281,7 +281,7 @@ onUnmounted(() => {
   gap: 12px;
   padding: 18px 20px 16px;
   border-bottom: 1px solid var(--border);
-  transition: padding .28s ease;
+  transition: padding var(--dur-slow) ease;
 }
 .sidebar-logo {
   width: 36px;
@@ -371,7 +371,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   opacity: .3;
   cursor: pointer;
-  transition: width .18s ease, opacity .18s ease, background .18s ease, color .18s ease;
+  transition: width var(--dur-base) ease, opacity var(--dur-base) ease, background var(--dur-base) ease, color var(--dur-base) ease;
 }
 .sidebar-collapse-toggle:hover {
   width: 18px;
@@ -382,7 +382,7 @@ onUnmounted(() => {
 .sidebar-collapse-toggle svg {
   width: 12px;
   height: 12px;
-  transition: transform .28s ease;
+  transition: transform var(--dur-slow) ease;
 }
 
 /* 拖拽调节宽度手柄 */
@@ -396,7 +396,7 @@ onUnmounted(() => {
   /* 低于折叠把手(20)：两者都贴右边缘，让把手在被它覆盖的那 64px 里仍可点，拖拽可从上下两侧进行 */
   z-index: var(--z-handle);
   background: transparent;
-  transition: background .15s ease;
+  transition: background var(--dur-fast) ease;
 }
 .sidebar-resize-handle.collapsed { width: 10px; }
 .sidebar-resize-handle:hover,
@@ -420,7 +420,7 @@ onUnmounted(() => {
     z-index: var(--z-float);
     border-right: none;
     box-shadow: 0 0 40px rgba(0, 0, 0, .28);
-    transition: transform .28s cubic-bezier(.4, 0, .2, 1);
+    transition: transform var(--dur-slow) cubic-bezier(.4, 0, .2, 1);
   }
   .sidebar.open { transform: translateX(0); }
   .sidebar-resize-handle,

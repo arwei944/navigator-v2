@@ -110,7 +110,7 @@ function rotate() {
 .smart-btn:hover { background: var(--border-light); opacity: 1; color: var(--accent); }
 .smart-btn svg { width: 13px; height: 13px; }
 .smart-list { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
-.smart-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 132px; flex-shrink: 0; padding: 8px; border: 1px solid var(--border-light); border-radius: 10px; background: var(--bg); cursor: pointer; text-align: left; transition: all .15s ease; font-family: var(--font); }
+.smart-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 132px; flex-shrink: 0; padding: 8px; border: 1px solid var(--border-light); border-radius: 10px; background: var(--bg); cursor: pointer; text-align: left; transition: all var(--dur-fast) ease; font-family: var(--font); }
 .smart-card:hover { border-color: var(--accent); transform: translateY(-1px); }
 .smart-favicon { width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; position: relative; color: var(--color-on-solid); font-weight: 700; font-size: 12px; }
 .smart-favicon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--bg-white); }

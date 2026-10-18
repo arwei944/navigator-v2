@@ -75,8 +75,8 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 /* SiteDetailPanel 自带 48px 顶距是为右侧面板的折叠按钮让位，抽屉里不需要 */
 .detail-sheet-body :deep(.site-detail-panel) { padding-top: 12px; }
 
-.detail-sheet-enter-active, .detail-sheet-leave-active { transition: opacity .2s ease; }
-.detail-sheet-enter-active .detail-sheet-panel, .detail-sheet-leave-active .detail-sheet-panel { transition: transform .24s cubic-bezier(.4, 0, .2, 1); }
+.detail-sheet-enter-active, .detail-sheet-leave-active { transition: opacity var(--dur-base) ease; }
+.detail-sheet-enter-active .detail-sheet-panel, .detail-sheet-leave-active .detail-sheet-panel { transition: transform var(--dur-base) cubic-bezier(.4, 0, .2, 1); }
 .detail-sheet-enter-from, .detail-sheet-leave-to { opacity: 0; }
 .detail-sheet-enter-from .detail-sheet-panel, .detail-sheet-leave-to .detail-sheet-panel { transform: translateY(100%); }
 @media (prefers-reduced-motion: reduce) {

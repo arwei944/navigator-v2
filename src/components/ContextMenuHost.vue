@@ -166,7 +166,7 @@ onUnmounted(() => {
   font-family: inherit;
   text-align: left;
   color: var(--text-primary);
-  transition: background .1s ease;
+  transition: background var(--dur-fast) ease;
 }
 .context-menu-item:hover { background: var(--border-light); }
 .context-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }

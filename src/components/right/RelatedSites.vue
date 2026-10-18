@@ -85,7 +85,7 @@ function go(id) {
   width: 100%; display: flex; align-items: flex-start; gap: 8px;
   padding: 6px 8px; text-align: left; cursor: pointer;
   border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white);
-  transition: border-color .15s ease, background .15s ease;
+  transition: border-color var(--dur-fast) ease, background var(--dur-fast) ease;
 }
 .rel-item:hover { border-color: var(--accent); background: var(--border-light); }
 .rel-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }

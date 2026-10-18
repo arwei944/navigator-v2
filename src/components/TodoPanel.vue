@@ -208,7 +208,7 @@ function addTodo() {
   height: 100%;
   background: var(--accent);
   border-radius: 3px;
-  transition: width 0.35s ease;
+  transition: width var(--dur-slow) ease;
 }
 
 /* 分类筛选 */
@@ -453,7 +453,7 @@ function addTodo() {
 /* 列表动画 */
 .todo-item-enter-active,
 .todo-item-leave-active {
-  transition: all 0.25s ease;
+  transition: all var(--dur-base) ease;
 }
 
 .todo-item-enter-from {
@@ -467,6 +467,6 @@ function addTodo() {
 }
 
 .todo-item-move {
-  transition: transform 0.25s ease;
+  transition: transform var(--dur-base) ease;
 }
 </style>

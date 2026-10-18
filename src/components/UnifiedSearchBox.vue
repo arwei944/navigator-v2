@@ -331,7 +331,7 @@ onUnmounted(() => {
   border-radius: var(--radius);
   padding: 0 14px 0 0;
   height: 40px;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
   max-width: 600px;
   margin: 0 auto;
   position: relative;
@@ -409,7 +409,7 @@ onUnmounted(() => {
   color: var(--text-secondary);
   cursor: pointer;
   flex-shrink: 0;
-  transition: color .15s ease;
+  transition: color var(--dur-fast) ease;
 }
 .search-go:hover { color: var(--accent); }
 .search-go svg { width: 16px; height: 16px; }
@@ -444,7 +444,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .search-clear:hover { background: var(--text-secondary); color: var(--bg-white); }
 .search-clear svg { width: 12px; height: 12px; }
@@ -460,7 +460,7 @@ onUnmounted(() => {
   flex-shrink: 0;
   opacity: .6;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .search-palette-hint:hover { opacity: 1; border-color: var(--accent); color: var(--accent); }
 

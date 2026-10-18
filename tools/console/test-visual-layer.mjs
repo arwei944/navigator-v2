@@ -219,6 +219,29 @@ for (const k of zDefined) {
 }
 ok(zDup.length === 0, '层级令牌取值互不重复', zDup.join('; ') || '')
 
+/* ---------------- ⑤ 动效时长走令牌 ---------------- */
+
+console.log('\n── ⑤ 动效时长：transition 一律走档位令牌 ──')
+
+// lookbehind 排除 `--transition:` 定义行（它是完整值，门禁 ① 要它与真值相等）
+const durHard = []
+for (const f of layerFiles) {
+  const src = readFileSync(f, 'utf8')
+  const m = src.match(/(?<![-\w])transition:[^;{}]*\d+\.?\d*s/g)
+  if (m) durHard.push(`${f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')}: ${m.join(' | ')}`)
+}
+ok(durHard.length === 0, 'transition 内无硬编码时长（一律 var(--dur-*)）',
+  durHard.length ? `\n      ${durHard.join('\n      ')}` : '')
+
+const durRef = new Set()
+for (const f of layerFiles) {
+  const src = readFileSync(f, 'utf8')
+  for (const m of src.matchAll(/var\((--dur-[a-z]+)\)/g)) durRef.add(m[1])
+}
+const durUndef = [...durRef].filter(k => !rootVars[k])
+ok(durRef.size >= 3 && durUndef.length === 0,
+  `被引用的 ${durRef.size} 个时长令牌全部有定义`, durUndef.join(' ') || '')
+
 /* ---------------- 契约文档 ---------------- */
 
 console.log('\n── 契约文档 ──')
@@ -232,6 +255,7 @@ if (!existsSync(contract)) {
   ok(/令牌/.test(doc), '契约说明了令牌体系')
   ok(/硬编码/.test(doc), '契约说明了硬编码政策')
   ok(/层级|z-index/.test(doc), '契约说明了层级（z-index）体系')
+  ok(/动效时长|--dur/.test(doc), '契约说明了动效时长体系')
 }
 
 /* ---------------- 结果 ---------------- */

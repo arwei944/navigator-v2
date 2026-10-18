@@ -65,7 +65,7 @@ function toggle(id) {
   font-family: inherit;
   line-height: 1.5;
   cursor: pointer;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
 }
 .purpose-chip:hover:not(.disabled) { border-color: var(--accent); color: var(--accent); }
 .purpose-chip.active { color: #fff; }

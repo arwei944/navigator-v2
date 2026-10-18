@@ -168,10 +168,10 @@ async function download() {
 .section-header svg { width: 16px; height: 16px; color: var(--accent); opacity: 0.8; }
 .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; gap: 16px; }
 .setting-label { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
-.setting-input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 12px; font-family: var(--font); outline: none; transition: border-color 0.15s ease; }
+.setting-input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 12px; font-family: var(--font); outline: none; transition: border-color var(--dur-fast) ease; }
 .setting-input:focus { border-color: var(--accent); }
 .setting-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
-.data-btn { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s ease; font-family: var(--font); }
+.data-btn { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; font-family: var(--font); }
 .data-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .data-btn svg { width: 16px; height: 16px; }
 .data-info { display: flex; flex-direction: column; gap: 2px; }

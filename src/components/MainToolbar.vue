@@ -143,7 +143,7 @@ function toggleViewMode() {
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
-  transition: all .15s ease;
+  transition: all var(--dur-fast) ease;
   white-space: nowrap;
 }
 .view-toggle { width: 32px; padding: 0; }
