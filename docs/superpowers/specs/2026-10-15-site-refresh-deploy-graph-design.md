@@ -226,3 +226,10 @@
 2. **探针的假阴性**：探针没调 `Runtime.enable`/`Page.enable`，于是
    「没有异常」是一句什么都没验证的话。已修，并给控制台加了启动期错误留痕
    （`window.__navBootError`），这类「静默不执行」的故障以后一眼可见。
+
+---
+
+## 相关文档
+
+- [保存即部署（watch → Vercel 生产）— 设计规格](./2026-10-09-watch-deploy-design.md)
+- [开发流水线](./2026-10-16-dev-pipeline-design.md)

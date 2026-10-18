@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded-by: docs/NAV-v4-upgrade-plan.md
+---
+
 # Navigator V2 → V3 升级方案
 
 > 基于完整代码调研的下一大版本规划。目标版本 **V3**。

@@ -118,3 +118,10 @@
 - 改 `api/sites-data.json`（如加一个站点）确认云端 `/api/sites` 的 `version` 递增。
 
 **环境备注（非项目问题）**：本轮会话的 PTY 环境下 Node `child_process` 带管道输出的 spawn 一律 `EBUSY`（连 spawn node 自身都失败），导致 `publish.mjs` 第 4 步（`execFileSync('curl.exe', …, {encoding:'utf8'})` 捕获输出）无法在此环境完成；用户自有终端无此限制。`publish.mjs` 未因此改动。
+
+---
+
+## 相关文档
+
+- [站点信息重新获取 · 部署管理模块 · 网站关联图谱](./2026-10-15-site-refresh-deploy-graph-design.md)
+- [开发流水线](./2026-10-16-dev-pipeline-design.md)

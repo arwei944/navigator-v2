@@ -1217,3 +1217,9 @@ cd 'c:\work\solo work\new\nav-v2' ; git status --short
 - `AddSitePreviewCard` 的 props `state` 形状 `{ phase, url, site? }` —— Task 7 三处赋值全部符合。
 - `preferences.autoAddOnUrl` / `setAutoAdd` —— Task 4 定义，Task 7 与 Task 8 消费。
 - `sitesStore.undoAdd(id)` —— Task 3 定义并导出，Task 6 消费。
+
+---
+
+## 相关文档
+
+- [搜索栏自动执行添加 + 预览卡片 + 后台开关 — 设计规格](../specs/2026-10-08-auto-add-preview-card-design.md)

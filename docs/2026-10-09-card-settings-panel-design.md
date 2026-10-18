@@ -74,3 +74,9 @@
 新增：`src/components/CardSettingsPanel.vue`、本文件
 
 修改：`src/utils/visualScheme.js`（令牌 + `CARD_PANEL` + CSS 变量）、`src/stores/preferences.js`（`cardLayoutMode` / `cardDisplay`）、`src/components/CardsContainer.vue`（三种排列的 CSS、瀑布流下禁用拖拽）、`src/components/SiteCard.vue`（元素显隐 + `--card-scale` 缩放）、`src/components/settings/VisualSchemeSection.vue`（过滤 `panel:'card'`）、`src/components/MainToolbar.vue`（入口按钮 + 瀑布流下置灰拖拽）、`src/App.vue`（渲染面板）
+
+---
+
+## 相关文档
+
+- [右边栏设置面板：显示模式 · 区块显隐 · 内联编辑](./superpowers/specs/2026-10-13-right-sidebar-panel-design.md)

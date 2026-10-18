@@ -190,3 +190,12 @@ session 同步现在是静默合并式回填，用户不知道同步了没、有
 - 首屏体积不超 600/230（`console:test:bundle`，缺产物用 `--strict`）。
 - 真机：`probe/v8-verify-ui.mjs`（29 项）不回归；`/insights` 走 `probe/verify-static-standalone.mjs` 验直达与刷新。
 - 键盘：纯键盘完成「聚焦搜索 → 方向键选卡 → 打开 → 关浮层焦点归还」全链路。
+
+---
+
+## 相关文档
+
+- [v8 升级方案：智能化 + 主题体系 + 便利贴 / 实时备注](./2026-10-11-v8-smart-theme-notes-design.md)
+- [v9 设计方案：数据回归 —— 在自建服务上重建后端，补全智能闭环](./2026-10-11-v9-data-return-design.md)
+- [v10 设计方案：后台全量复活 + 常驻巡检自愈](./2026-10-11-v10-data-revival-design.md)
+- [v11-P1 设计方案：A1 更新提示 / I3 自然语言命令 / E4 批量补全与撤销](./2026-10-12-v11-p1-design.md)

@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # nav-console 下一版升级方向调研（M8+）
 
 > 调研日期：2026-09-25 · 调研对象：`tools/console/`（服务端 `lib/*.mjs` + 前端 `ui/*.js`）、`scripts/publish.mjs`、`scripts/check-sites.mjs`，以及 Vercel / GitHub / Jupyter / lazygit / Dozzle 等外部资料

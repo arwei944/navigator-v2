@@ -144,3 +144,11 @@ OpenAI 兼容接口（`baseURL + key` 均为服务端环境变量），能力限
   拒绝应用云端数据，`applyIfNewer` 的单调递增判据会把它当成回滚）。
 - 巡检与封面抓取一律 `fetchCapped` + net-guard，并发与超时封顶；`/api/metadata` 限流同批落地。
 - 管理后台不得进入口静态图（`/admin` 是 `isStandalone` 独立路由）；封面组件挂 `rich` 档。
+
+---
+
+## 相关文档
+
+- [v8 升级方案：智能化 + 主题体系 + 便利贴 / 实时备注](./2026-10-11-v8-smart-theme-notes-design.md)
+- [v10 设计方案：后台全量复活 + 常驻巡检自愈](./2026-10-11-v10-data-revival-design.md)
+- [v11 设计方案：看得见 · 更懂你 · 更顺手](./2026-10-12-v11-roadmap-design.md)

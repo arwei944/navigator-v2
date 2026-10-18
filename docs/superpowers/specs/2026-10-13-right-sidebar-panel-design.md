@@ -157,3 +157,10 @@ persistedstate 在 store setup 返回后才回填）+ 一条 watch 让改设置�
 - **不做"输入即存"**（理由见 2.4）。
 - **不动窄屏（≤768）的底部抽屉**：触屏没有 hover，`pin`/`click` 在那边语义不同，本次不碰。
 - **不新增第二套偏好存储**：一切走 `preferences` store，与「卡片设置」同源。
+
+---
+
+## 相关文档
+
+- [管理后台：三栏化 · 缺省值补全 · 视觉统一](./2026-10-16-admin-3col-redesign-design.md)
+- [卡片设置面板 — 设计说明](../../2026-10-09-card-settings-panel-design.md)

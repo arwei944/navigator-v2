@@ -270,3 +270,10 @@ dismiss(id) / clear()
 删除：
 
 - `src/components/AddSitePreviewCard.vue`（职责被列表卡片 + Toast + 高亮取代）
+
+---
+
+## 相关文档
+
+- [搜索栏一键添加 + 自动分类（无弹窗）Implementation Plan](../plans/2026-10-09-search-one-click-add-auto-category.md)
+- [搜索栏自动执行添加 + 预览卡片 + 后台开关 — 设计规格](./2026-10-08-auto-add-preview-card-design.md)

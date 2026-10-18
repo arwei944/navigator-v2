@@ -1,3 +1,7 @@
+---
+status: superseded
+---
+
 # Navigator V5 升级方案 — 智能体驱动 · 发布可回退
 
 > 调研日期：2026-09-25 · 调研对象：`tools/cli/`（M9 新交付）、`tools/console/`、`scripts/`、`api/`、git 仓库现状，以及 MCP / Vercel / Uptime Kuma / Gatus / git 官方能力

@@ -63,3 +63,11 @@ v9-P0 只复活了 `sites` / `session` / `metadata` 三个接口，**其余四�
 - 线上：`/api/ops`（带 `X-Nav-Key`）返回审计与历史；`/api/clicks` GET/POST 往返；`/api/health` GET 有判定；
   管理后台 `/admin` 打开即有数据（登录闸门可用）
 - 真机：首轮巡检完成后，卡片出现健康角标
+
+---
+
+## 相关文档
+
+- [v8 升级方案：智能化 + 主题体系 + 便利贴 / 实时备注](./2026-10-11-v8-smart-theme-notes-design.md)
+- [v9 设计方案：数据回归 —— 在自建服务上重建后端，补全智能闭环](./2026-10-11-v9-data-return-design.md)
+- [v11 设计方案：看得见 · 更懂你 · 更顺手](./2026-10-12-v11-roadmap-design.md)

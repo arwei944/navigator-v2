@@ -187,3 +187,11 @@ async 结果被序列化成 `{}`。改用 `evalJs`（带 `awaitPromise`）+ 页�
 | `probe/admin-shell-verify.mjs` | 25 条，本地 + 线上全绿 |
 | 关联度性能断言 | 56 条通过（阈值调整后本地稳定） |
 | 全量回归 | 61 脚本 0 失败（并确认过前一版的失败是并发争抢，非本次改动） |
+
+---
+
+## 相关文档
+
+- [管理后台：三栏化 · 缺省值补全 · 视觉统一](./2026-10-16-admin-3col-redesign-design.md)
+- [后台功能扩展 21 项 —— 设计文档](./2026-10-16-admin-expansion-21-design.md)
+- [管理后台模块导航升级 —— 设计文档](./2026-10-16-admin-tabnav-upgrade-design.md)

@@ -1323,3 +1323,9 @@ git commit -m "test: 自动分类测试接入全量链并跑通构建"
 - `pnpm run console:test:all` 11 个套件全过；`pnpm run build` 通过。
 - Playwright E2E（脚本验证后已删）：① 新建分类「其他/qt」刷新后标签保留、无裸 id；
   ② 抓取延迟下同步连发两次回车只入库 1 条；③ 撤销后站点与新建分类一并回收、刷新不复活。
+
+---
+
+## 相关文档
+
+- [搜索栏一键添加 + 自动分类（无弹窗）— 设计规格](../specs/2026-10-08-search-one-click-add-auto-category-design.md)

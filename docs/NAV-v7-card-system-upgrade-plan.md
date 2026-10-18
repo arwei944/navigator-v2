@@ -1,3 +1,7 @@
+---
+status: archived
+---
+
 # nav-v2 卡片体系升级迭代方案
 
 - 日期：2026-10-09
@@ -302,3 +306,10 @@ P3：`src/components/SiteCard.vue`、`src/components/CardsContainer.vue`、`scri
 ### 9.4 验证手段沉淀
 
 本轮新增的零依赖 CDP 客户端（`cdp.mjs`：`seq` 单会话跑「设视口 → 导航 → 评估 → 截图」）是**当前环境唯一能做的真实渲染回归手段**，因为项目既无浏览器探针 harness，装 playwright/agent-browser 又要额外下载数百 MB。它放在系统临时目录、不进仓库；若后续要常驻，建议落到 `probe/` 下并补一份用法说明。
+
+---
+
+## 相关文档
+
+- [Navigator V5 升级方案 — 智能体驱动 · 发布可回退](./NAV-v5-upgrade-plan.md)
+- [卡片设置面板 — 设计说明](./2026-10-09-card-settings-panel-design.md)

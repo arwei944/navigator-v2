@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded-by: docs/NAV-v5-upgrade-plan.md
+---
+
 # Navigator V4 升级方案 — 智能 · 透明 · 可视化 · 自动化
 
 > 基于外部技术调研 + 本仓库体检的下一版本规划。目标版本 **V4**。
@@ -302,3 +307,11 @@ const blob = await get(PATHNAME, { access: 'private', useCache: false })
 - 本机约束：Node `fetch` 不走系统代理，HTTP 调用一律用 `curl.exe`（沿用现有约定）
 - `api/sites.js`：Blob 为**私有**存储，`get()` 未传 `useCache: false`（即 M6 修复点）
 - 组件超 250 行者：`ContentFeed` 433 / `TodoPanel` 415 / `Sidebar` 355 / `CardsContainer` 329 / `WeatherWidget` 315 / `SiteCard` 310 / `SiteSearchBar` 301
+
+---
+
+## 相关文档
+
+- [Navigator V2 → V3 升级方案](./NAV-v3-upgrade-plan.md)
+- [Navigator V5 升级方案 — 智能体驱动 · 发布可回退](./NAV-v5-upgrade-plan.md)
+- [nav-v2 卡片体系升级迭代方案](./NAV-v7-card-system-upgrade-plan.md)

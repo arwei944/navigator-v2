@@ -128,3 +128,10 @@
 - `src/stores/sites.js`（`addSite` 返回值 + `undoAdd`）
 - `src/stores/preferences.js`（新开关 + 持久化白名单）
 - `src/views/AdminView.vue`（新增「偏好设置」Tab）
+
+---
+
+## 相关文档
+
+- [搜索栏自动执行添加 + 预览卡片 + 后台开关 实施计划](../plans/2026-10-08-auto-add-preview-card.md)
+- [搜索栏一键添加 + 自动分类（无弹窗）— 设计规格](./2026-10-08-search-one-click-add-auto-category-design.md)

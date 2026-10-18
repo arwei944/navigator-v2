@@ -191,3 +191,10 @@ function externalSearch() {
 
 - `npm run build` 通过。
 - `npm run console:test:all` 全绿（本次不触碰 `shared/*` 与 `utils/*`，应无影响；用于确认没有意外波及）。
+
+---
+
+## 相关文档
+
+- [全能框（OmniBox）设计](./2026-10-10-omnibox-design.md)
+- [搜索框网址预览卡片：输入网址即出卡片 · 三个刻意的不一致](./2026-10-15-url-preview-card-design.md)

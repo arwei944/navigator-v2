@@ -63,3 +63,10 @@ CDP `Page.windowOpen` 的 `windowFeatures` 对**普通锚点点击**也会填一
 
 该区分**只能**靠源码级保证（即上面 test-frontend 的两条）。探针里保留了 windowFeatures 的
 诊断输出，但明确标注为诊断而非断言 —— 免得后来者以为这里验过了。
+
+---
+
+## 相关文档
+
+- [全能框（OmniBox）设计](./2026-10-10-omnibox-design.md)
+- [站内搜索 + 站外搜索合并为统一搜索框 — 设计规格](./2026-10-09-unified-search-box-design.md)
