@@ -1,6 +1,6 @@
 {
-  "total": 95,
-  "registered": 95,
+  "total": 96,
+  "registered": 96,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -73,6 +73,7 @@
     "tools/console/test-side-width.mjs",
     "tools/console/test-bgm.mjs",
     "tools/console/test-bundle-size.mjs",
+    "tools/console/test-share-target.mjs",
     "tools/console/test-search.mjs",
     "tools/console/test-desc-junk.mjs",
     "tools/console/test-site-aliases.mjs",
@@ -767,6 +768,15 @@
       "lines": 174,
       "included": true,
       "durationMs": 192
+    },
+    {
+      "file": "tools/console/test-share-target.mjs",
+      "name": "test-share-target",
+      "purpose": "分享目标门禁（G4 / L0-2）。",
+      "category": "未分类",
+      "lines": 59,
+      "included": true,
+      "durationMs": null
     },
     {
       "file": "tools/console/test-side-width.mjs",

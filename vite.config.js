@@ -41,6 +41,15 @@ export default defineConfig({
         theme_color: '#0f172a',
         background_color: '#f1f5f9',
         display: 'standalone',
+        // PWA 分享目标（G4 / L0-2）：移动端从任意 App「分享 → 导航站」，直接把网址收录。
+        // 用 GET 而非 POST multipart：GET 零 SW 介入（不碰那条出过白屏事故的 fetch 处理器），
+        // 参数落在 query 上，落地页自己解析即可。iOS Safari 对 share_target 支持有限 ——
+        // 属平台能力差异，如实标注，不做额外兜底。
+        share_target: {
+          action: '/share',
+          method: 'GET',
+          params: { title: 'title', text: 'text', url: 'url' },
+        },
         icons: [
           { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' }
@@ -79,7 +88,7 @@ export default defineConfig({
           // 主题市场 / 书签导入 / 拼音引擎 / 更新提示 / 中文别名表 / 自动归类。
           // 这些界面多数访客一辈子都不打开，却会让 SW 安装期替每个访客多下 ~470 KB。
           // 改走运行时缓存（下方 lazy-chunks），谁真被打开到就缓存谁。
-          '**/{AdminView,AdminAside,InsightsView,chartkit,GraphView,affinity,AboutView,NotFoundView,translateFields,browserTranslate,aiApi,PipelineLogPanel,pipelineTrace,bgmScore,BgmPlayer,StickyBoard,StickyNote,ThemeEditor,bookmark-import,pinyin,swRefresh,phraseAliases,auto-category,siteRefresh,sites-data}-*.{js,css}',
+          '**/{AdminView,AdminAside,InsightsView,chartkit,GraphView,affinity,AboutView,NotFoundView,ShareView,translateFields,browserTranslate,aiApi,PipelineLogPanel,pipelineTrace,bgmScore,BgmPlayer,StickyBoard,StickyNote,ThemeEditor,bookmark-import,pinyin,swRefresh,phraseAliases,auto-category,siteRefresh,sites-data}-*.{js,css}',
         ],
         runtimeCaching: [
           {

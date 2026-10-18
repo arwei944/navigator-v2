@@ -19,6 +19,9 @@ const routes = [
   { path: '/graph', name: 'Graph', component: () => import('@/views/GraphView.vue') },
   // 关于：同样套壳（带侧边栏），懒加载
   { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue') },
+  // PWA 分享目标（share_target）：系统分享面板把网址发到这里，直接走秒加链路收录。
+  // 不套侧边栏 —— 分享落地页就该是一张干净的卡片，不是半个首页。
+  { path: '/share', name: 'Share', component: () => import('@/views/ShareView.vue') },
   // 旧链接兼容：分类曾在路径里，统一重定向到 query 形式（保留范围与其余 query）
   {
     path: '/c/:id',
