@@ -37,11 +37,18 @@ function runScan(args) {
   console.log(`   全部占用 ${fmtBytes(totalAll)}｜其中可清运（未被 git 跟踪）${fmtBytes(totalClean)}`)
   console.log()
   for (const r of rows) {
-    console.log(`  [${r.autoClean ? '可清运' : '只体检'}] ${r.id} — ${r.label}`)
+    const tag = r.retain ? `保留${r.retain}份` : r.autoClean ? '可清运' : '只体检'
+    console.log(`  [${tag}] ${r.id} — ${r.label}`)
     console.log(
       `     命中 ${r.count} 项 / ${fmtBytes(r.bytes)}` +
         (r.trackedCount ? `（其中 ${r.trackedCount} 项被 git 跟踪，受保护）` : ''),
     )
+    if (r.retain) {
+      console.log(
+        `     ${r.policy}：超出 ${r.excessCount} 项 / ${fmtBytes(r.excessBytes)} 可清运` +
+          (r.trackedCount ? `，${r.trackedCount} 项受 git 保护` : ''),
+      )
+    }
     console.log(`     依据：${r.reason}`)
   }
   return 0

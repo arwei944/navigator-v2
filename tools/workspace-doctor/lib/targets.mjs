@@ -60,7 +60,9 @@ export const TARGETS = [
     re: /^backups$/,
     kind: 'dir',
     autoClean: false,
-    reason: '数据快照：应设保留策略（保留最近 N 份）而非直接删，故只体检不清运',
+    // 保留策略：快照要能回滚，所以不整体清空；只把「超出最近 N 份」的旧快照列为可清运。
+    retain: 5,
+    reason: '数据快照：保留最近 5 份以支持回滚，超出部分才可清运（护栏仍适用：被跟踪的永不删）',
   },
   {
     id: 'dist',

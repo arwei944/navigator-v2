@@ -12,7 +12,7 @@ node tools/workspace-doctor/cli.mjs scan [--json]
 # 清运演练（默认 dry-run，不会删任何东西）
 node tools/workspace-doctor/cli.mjs clean
 
-# 真正清运
+# 真正清运（backups 只清「超出最近 5 份」的旧快照，不会清空快照仓）
 node tools/workspace-doctor/cli.mjs clean --yes
 node tools/workspace-doctor/cli.mjs clean --yes --only chrome-profiles,api-icon-baks
 ```
@@ -33,7 +33,7 @@ node tools/workspace-doctor/cli.mjs clean --yes --only chrome-profiles,api-icon-
 | `api-icon-baks` | `api/sites-data.bak-*.json` | ✅ | `.gitignore` 第 50 行 |
 | `root-reports` | 根目录 `_chrome-report.json` / `_probe-report*.json` | ✅ | `.gitignore` 第 22-23 行 |
 | `perf-report` | `perf-report/` 性能基线目录 | ✅ | `.gitignore` 第 12 行 |
-| `backups` | 站点数据快照仓 | ❌ 只体检 | 数据类：需保留策略而非直接删 |
+| `backups` | 站点数据快照仓 | ⚖️ 保留最近 5 份 | 数据类：超出 5 份的旧快照方可清运，保留份数可用于回滚 |
 | `dist` | 构建产物 | ❌ 只体检 | 随 build 刷新，体积由 test-bundle-size 守护 |
 
 ## 门禁
@@ -43,6 +43,7 @@ node tools/workspace-doctor/cli.mjs clean --yes --only chrome-profiles,api-icon-
 1. 各类废料的条数/体积不超阈值（留 2-3 倍余量，只拦失控暴涨）
 2. `probe/` 里被 git 跟踪的文件不含 `.png/.json/.txt/.log`（防草稿误提交）
 3. 护栏自检：`可清运 + 受保护 = 命中总数`
+4. 保留策略不变量：`backups` 必须设 `retain > 0`，且 `命中 − 保留 = 超出`（防有人删掉策略让快照无限累积）
 
 ## 相关文档
 

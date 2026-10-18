@@ -46,6 +46,17 @@ for (const [id, lim] of Object.entries(LIMITS)) {
   }
 }
 
+// 保留策略不变量：快照仓必须有上限（防无限累积），且「超出份数」口径自洽
+const bk = byId.backups
+ok(bk && bk.retain > 0, 'backups 必须设保留策略（retain > 0），否则快照会无限累积')
+if (bk && bk.retain) {
+  ok(
+    bk.count - bk.retain === bk.excessCount,
+    `backups: 命中(${bk.count}) - 保留(${bk.retain}) 应等于超出(${bk.excessCount})`,
+  )
+  ok(bk.excessCount >= 0, `backups 超出份数应为非负，实为 ${bk.excessCount}`)
+}
+
 // probe/ 里只有脚本可以入库，草稿（截图 / json / txt / log）一律不行
 const tracked = gitTrackedSet(ROOT)
 const badTracked = [...tracked].filter((p) => /^probe\//.test(p) && /\.(png|json|txt|log)$/i.test(p))
@@ -55,7 +66,16 @@ ok(
 )
 
 // 护栏自检：可清运 + 受保护 = 命中总数（防统计口径漂移）
+// 带保留策略的目标多出「有意保留」这一档，等式相应扩为三项
 for (const r of rows) {
+  if (r.retain) {
+    const kept = r.count - r.excessCount
+    ok(
+      r.cleanableCount + r.trackedCount + kept === r.count,
+      `${r.id}: 可清运(${r.cleanableCount}) + 受保护(${r.trackedCount}) + 保留(${kept}) 应等于命中总数(${r.count})`,
+    )
+    continue
+  }
   ok(
     r.cleanableCount + r.trackedCount === r.count,
     `${r.id}: 可清运(${r.cleanableCount}) + 受保护(${r.trackedCount}) 应等于命中总数(${r.count})`,
