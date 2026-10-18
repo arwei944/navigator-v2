@@ -44,7 +44,7 @@
 | 20 | `test-deploy-manifest` | 部署与发布 | 门禁：增量上传的「产物指纹」与「增量集判据」。 | 77 | 0.2s |
 | 21 | `test-deploy-resume` | 部署与发布 | 断点续传判据守卫：纯函数，不联网、不落盘。 | 53 | 0.2s |
 | 22 | `test-deploy-status` | 部署与发布 | 部署状态接口用例：零依赖、不联网（读的是本机 store 与构建产物）。 | 103 | 0.3s |
-| 23 | `test-deps` | 工作区治理 | 依赖 / 供应链门禁（来料检验）。 | 102 | 0.2s |
+| 23 | `test-deps` | 工作区治理 | 依赖 / 供应链门禁（来料检验）。 | 195 | 0.2s |
 | 24 | `test-desc-junk` | 数据与内容 | desc「机器垃圾」形态检测用例：零依赖、不联网。 | 77 | 0.2s |
 | 25 | `test-doc-manager` | 文档治理 | doc-manager 自测（门禁） | 133 | 0.3s |
 | 26 | `test-dual-stack` | 服务端与运行时 | 双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主） | 76 | 0.2s |

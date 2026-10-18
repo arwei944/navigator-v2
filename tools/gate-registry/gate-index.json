@@ -300,7 +300,7 @@
       "name": "test-deps",
       "purpose": "依赖 / 供应链门禁（来料检验）。",
       "category": "工作区治理",
-      "lines": 102,
+      "lines": 195,
       "included": true,
       "durationMs": 181
     },
