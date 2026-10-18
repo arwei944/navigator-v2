@@ -131,3 +131,8 @@ tools/doc-manager/
     graph.mjs          # 关联图谱（含 Mermaid 导出）
   README.md
 ```
+
+## 相关文档
+
+- [工作区 5S 清运工具](../workspace-doctor/README.md) —— 姊妹工序：那边管「废料清运」，这边管「文档资产」
+- [门禁台账](../gate-registry/README.md) —— 量具清单：管全部门禁的接入状态与分类
