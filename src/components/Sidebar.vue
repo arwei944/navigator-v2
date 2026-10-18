@@ -219,10 +219,13 @@ onUnmounted(() => {
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-/* 版本号：紧跟在「关于」导航项右侧，靠 margin-left:auto 顶到行尾。
+/* 版本号：贴「关于」导航项右缘（绝对定位，理由同 .badge —— 内容居中后不能留在 flex 流里）。
    只作标识用，弱化到 55% 不透明度，不与导航文字抢注意力；hover / 选中该项时提升到可读。 */
 .nav-version {
-  margin-left: auto;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 11px;
   letter-spacing: .3px;
@@ -273,6 +276,8 @@ onUnmounted(() => {
 .sidebar-header {
   display: flex;
   align-items: center;
+  /* 品牌与导航文字统一居中：侧栏整列的排版左右对称，不再是「左对齐一条线」 */
+  justify-content: center;
   gap: 12px;
   padding: 18px 20px 16px;
   border-bottom: 1px solid var(--border);
@@ -308,6 +313,9 @@ onUnmounted(() => {
 .sidebar-nav-item {
   display: flex;
   align-items: center;
+  /* 图标 + 文字作为整体水平居中（与品牌名一致的居中口径）。
+     角标 / 版本号因此不能再靠 margin-left:auto 占位，改绝对定位贴右，见下 */
+  justify-content: center;
   gap: 10px;
   min-height: var(--nav-item-h, 40px);
   padding: 0 12px;
@@ -323,7 +331,16 @@ onUnmounted(() => {
 .sidebar-nav-item.active { background: var(--sidebar-active); color: var(--text-sidebar); }
 .sidebar-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: .7; }
 .sidebar-nav-item.active svg { opacity: 1; }
-.badge { margin-left: auto; font-size: 11px; font-weight: 600; background: var(--border-light); padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim); }
+/* 角标绝对定位贴右：内容居中后，它若还留在 flex 流里会被一起推到中间、
+   把「收藏 3」这类计数挤在文字旁边。贴右既保住居中，又不丢计数信息。 */
+.badge {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px; font-weight: 600; background: var(--border-light);
+  padding: 2px 8px; border-radius: 10px; color: var(--text-sidebar-dim);
+}
 
 /* 分隔「看站点」与「管站点」两类入口 */
 .sidebar-nav-divider {
