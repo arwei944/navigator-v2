@@ -57,7 +57,7 @@ const CATEGORY_RULES = [
   ['搜索与交互', /search|intent|command|omni|preview/i],
   [
     '前端与体验',
-    /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture|format|safeStorage/i,
+    /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture|format|safeStorage|share/i,
   ],
   ['部署与发布', /deploy|publish|release|botkeep|endpoint|manifest|schedule/i],
   ['安全与鉴权', /auth|security|netguard|session|secret|rate|token/i],

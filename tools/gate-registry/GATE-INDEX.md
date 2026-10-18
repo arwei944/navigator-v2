@@ -10,14 +10,13 @@
 | 分类 | 道数 | 最慢一道 | 耗时 |
 |---|---|---|---|
 | 文档治理 | 1 | `test-doc-manager` | 0.3s |
-| 未分类 | 1 | `test-share-target` | — |
 | 安全与鉴权 | 3 | `test-netguard` | 0.6s |
 | 搜索与交互 | 5 | `test-search` | 0.4s |
 | 工作区治理 | 7 | `test-hunks` | 4.2s |
 | 部署与发布 | 9 | `test-endpoints-run` | 2.6s |
-| 服务端与运行时 | 22 | `test-mcp` | 14.4s |
-| 前端与体验 | 23 | `test-frontend` | 4.5s |
-| 数据与内容 | 25 | `test-trust` | 0.7s |
+| 服务端与运行时 | 21 | `test-mcp` | 14.4s |
+| 数据与内容 | 22 | `test-trust` | 0.7s |
+| 前端与体验 | 28 | `test-frontend` | 4.5s |
 
 ## 清单
 
@@ -58,17 +57,17 @@
 | 33 | `test-filter-chips` | 前端与体验 | 筛选条第二行取数：pickInlineChips。 | 87 | 0.2s |
 | 34 | `test-format` | 前端与体验 | 格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs` | 115 | — |
 | 35 | `test-frontend` | 前端与体验 | 第三批 · 序 18 / 20 / 23 的前端守卫。 | 236 | 4.5s |
-| 36 | `test-glossary` | 数据与内容 | 离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。 | 188 | 0.6s |
+| 36 | `test-glossary` | 前端与体验 | 离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。 | 188 | 0.6s |
 | 37 | `test-graph-layout` | 前端与体验 | 关系图布局用例：零依赖、不跑浏览器。 | 204 | 1.0s |
 | 38 | `test-gridnav` | 前端与体验 | src/utils/gridnav.js 用例：零依赖、不联网、纯函数穷举。 | 111 | 0.2s |
 | 39 | `test-guard` | 数据与内容 | api/metadata.js 的 SSRF 防护用例：确认内网 / 回环 / 链路本地地址一律被拒。 | 52 | 0.4s |
 | 40 | `test-health-fails` | 服务端与运行时 | 「连续不可达」计数与自动归档判据守卫：零依赖、不联网。 | 82 | 0.2s |
 | 41 | `test-health` | 服务端与运行时 | 健康判定的**合并口径**守卫（v10）。 | 112 | 0.3s |
-| 42 | `test-http-fetch` | 服务端与运行时 | `shared/http-fetch.mjs` 的**传输层**用例：零依赖，起本地服务器实测。 | 302 | 1.2s |
+| 42 | `test-http-fetch` | 前端与体验 | `shared/http-fetch.mjs` 的**传输层**用例：零依赖，起本地服务器实测。 | 302 | 1.2s |
 | 43 | `test-hunks` | 工作区治理 | hunk 级暂存 / 取消暂存用例。 | 281 | 4.2s |
 | 44 | `test-hygiene` | 工作区治理 | 工作区 5S 门禁（防废料失控回涨）。 | 92 | 0.6s |
 | 45 | `test-image-engine` | 服务端与运行时 | 图片提供者注册表（热拔插）自测：不联网。 | 261 | 0.2s |
-| 46 | `test-infer` | 数据与内容 | shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。 | 368 | 0.2s |
+| 46 | `test-infer` | 前端与体验 | shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。 | 368 | 0.2s |
 | 47 | `test-intent` | 搜索与交互 | 智能化的两个内核用例：意图解析与场景排序。零依赖、不联网。 | 232 | 0.2s |
 | 48 | `test-livesync` | 服务端与运行时 | 实时通道用例：零依赖、不联网。 | 90 | 0.4s |
 | 49 | `test-llm-engine` | 服务端与运行时 | LLM 后端注册表（热拔插）自测：不联网（端到端跑本地假 OpenAI 服务）。 | 187 | 0.5s |
@@ -87,7 +86,7 @@
 | 62 | `test-preview-translate` | 搜索与交互 | N1：搜索框网址预览卡片显示**译文**（`src/services/translateFields.js` + `useOmniBox` 的并卡逻辑）。 | 170 | 0.2s |
 | 63 | `test-probe-engine` | 服务端与运行时 | 探针注册表（热拔插）自测：不联网（除最后两条端到端跑本地回环）。 | 150 | 0.4s |
 | 64 | `test-publisher` | 部署与发布 | 发布通道注册表（热拔插）自测：不联网、不部署。 | 184 | 0.2s |
-| 65 | `test-purposes` | 数据与内容 | shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。 | 363 | 0.3s |
+| 65 | `test-purposes` | 前端与体验 | shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。 | 363 | 0.3s |
 | 66 | `test-release-please` | 部署与发布 | 版本号与发布配置门禁（生产记录的可验证部分）。 | 96 | 0.6s |
 | 67 | `test-release` | 部署与发布 | 开发流水线自测：纯函数为主，不联网、不起子进程。 | 175 | 1.5s |
 | 68 | `test-right-panel` | 前端与体验 | 右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+ | 265 | 0.2s |
@@ -97,7 +96,7 @@
 | 72 | `test-search` | 搜索与交互 | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 | 0.4s |
 | 73 | `test-session-merge` | 安全与鉴权 | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 | 0.2s |
 | 74 | `test-session` | 安全与鉴权 | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 174 | 0.2s |
-| 75 | `test-share-target` | 未分类 | 分享目标门禁（G4 / L0-2）。 | 59 | — |
+| 75 | `test-share-target` | 前端与体验 | 分享目标门禁（G4 / L0-2）。 | 59 | — |
 | 76 | `test-side-width` | 前端与体验 | 侧栏宽度取值范围：clampSideWidth。 | 60 | 0.2s |
 | 77 | `test-site-aliases` | 数据与内容 | 站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。 | 134 | 0.4s |
 | 78 | `test-site-dedupe` | 数据与内容 | 站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。 | 159 | 0.2s |

@@ -422,7 +422,7 @@
       "file": "tools/console/test-glossary.mjs",
       "name": "test-glossary",
       "purpose": "离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。",
-      "category": "数据与内容",
+      "category": "前端与体验",
       "lines": 188,
       "included": true,
       "durationMs": 616
@@ -476,7 +476,7 @@
       "file": "tools/console/test-http-fetch.mjs",
       "name": "test-http-fetch",
       "purpose": "`shared/http-fetch.mjs` 的**传输层**用例：零依赖，起本地服务器实测。",
-      "category": "服务端与运行时",
+      "category": "前端与体验",
       "lines": 302,
       "included": true,
       "durationMs": 1220
@@ -512,7 +512,7 @@
       "file": "tools/console/test-infer.mjs",
       "name": "test-infer",
       "purpose": "shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。",
-      "category": "数据与内容",
+      "category": "前端与体验",
       "lines": 368,
       "included": true,
       "durationMs": 195
@@ -683,7 +683,7 @@
       "file": "tools/console/test-purposes.mjs",
       "name": "test-purposes",
       "purpose": "shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。",
-      "category": "数据与内容",
+      "category": "前端与体验",
       "lines": 363,
       "included": true,
       "durationMs": 269
@@ -773,7 +773,7 @@
       "file": "tools/console/test-share-target.mjs",
       "name": "test-share-target",
       "purpose": "分享目标门禁（G4 / L0-2）。",
-      "category": "未分类",
+      "category": "前端与体验",
       "lines": 59,
       "included": true,
       "durationMs": null
