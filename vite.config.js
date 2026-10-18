@@ -2,8 +2,21 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resolve } from 'path'
+import { readFileSync } from 'fs'
+
+/**
+ * 产品版本号的**唯一事实来源**是 `package.json.version`。
+ *
+ * 构建期把它注入成编译常量 `__APP_VERSION__`，前端（侧栏版本标识 / 「关于」页）直接读。
+ * 这样版本号只有一处需要维护 —— 前端不再各存一份，也就不会出现「关于页说 3.0、侧栏说 3.1」的漂移。
+ * 未注入时（例如直接跑源码不做构建）前端回落空串，宁可不显示也不编造。
+ */
+const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'))
 
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+  },
   plugins: [
     vue(),
     VitePWA({

@@ -8,6 +8,7 @@
     <!-- 版本 -->
     <section class="ab-card">
       <h2>版本</h2>
+      <p v-if="appVersion" class="ab-product">Navigator <b>v{{ appVersion }}</b></p>
       <div v-if="version.sha" class="ab-version">
         <code class="ab-sha">{{ version.shortSha }}</code>
         <span v-if="version.dirty" class="ab-tag warn" title="构建时工作区有未提交改动 —— 这个版本号不对应任何一次提交">未提交改动</span>
@@ -93,6 +94,9 @@
  */
 import { onMounted, reactive, ref } from 'vue'
 
+// 构建期注入的产品版本号（vite.config.js 的 define）；未注入时回落空串，不显示假的版本号。
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
+
 const loading = ref(true)
 const version = reactive({ available: false, sha: '', shortSha: '', branch: '', subject: '', builtAt: null, dirty: false })
 const data = reactive({ siteCount: null, version: null })
@@ -135,6 +139,8 @@ onMounted(load)
   text-transform: uppercase; letter-spacing: .5px; opacity: .75;
 }
 
+.ab-product { margin: 0 0 10px; font-size: 14px; color: var(--text-secondary); }
+.ab-product b { color: var(--text-primary); font-family: var(--font-mono, ui-monospace, monospace); }
 .ab-version { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .ab-sha {
   font-family: var(--font-mono, ui-monospace, monospace); font-size: 15px;

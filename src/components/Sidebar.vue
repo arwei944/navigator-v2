@@ -70,6 +70,12 @@
       </div>
     </nav>
 
+    <!-- 版本标识：显式显示当前产品版本，一眼看清「跑的是哪一版」，报问题时不必先点进「关于」。
+         数据来自构建期注入的 package.json.version（见 vite.config.js 的 define）。
+         没注入（直接跑源码）时整块不渲染 —— 不编一个假的版本号出来。点击可进「关于」页看构建详情。 -->
+    <div v-if="appVersion && !iconOnly" class="sidebar-version" :title="`Navigator v${appVersion} · 点击查看构建详情`"
+         @click="navigate('About')" @keydown.enter="navigate('About')" tabindex="0" role="button">v{{ appVersion }}</div>
+
     <!-- 折叠/展开把手：贴视口左缘、垂直居中、窄长竖条，与右侧面板把手左右对称。
          折叠后按钮常驻，保证还能展开。「添加网站」在右上角工具栏；
          「管理后台」给了一级入口（原先只在「设置」面板内 —— 插件 / 部署这些 tab 因此很难找到） -->
@@ -103,6 +109,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSidebarStore } from '@/stores/sidebar'
 import { useSitesStore } from '@/stores/sites'
 import { useFavoritesStore } from '@/stores/favorites'
+
+// 构建期注入的产品版本号（见 vite.config.js 的 define）；未注入时回落空串，宁可不显示也不编造。
+const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
 
 const route = useRoute()
 const router = useRouter()
@@ -210,6 +219,24 @@ onUnmounted(() => {
 }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* 版本标识：贴在侧栏底部的小字。只作标识用，所以弱化到 45% 不透明度，不与导航项抢注意力。
+   margin-top:auto 让它在 flex 列容器里被推到底部（内容不足时不会飘在中间）。 */
+.sidebar-version {
+  margin-top: auto;
+  flex: 0 0 auto;
+  padding: 12px 20px 14px;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+  letter-spacing: .3px;
+  color: var(--text-sidebar);
+  opacity: .45;
+  cursor: pointer;
+  user-select: none;
+  transition: opacity .18s ease;
+}
+.sidebar-version:hover { opacity: .8; }
+.sidebar-version:focus-visible { opacity: 1; outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
 
 /* 纯图标状态：显式折叠，或宽度被拖到图标宽度以下 */
 .sidebar.icon-only .sidebar-header {
