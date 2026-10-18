@@ -28,7 +28,7 @@ const sidebarStore = useSidebarStore()
   border-bottom: 1px solid var(--border);
   color: var(--text-primary);
   flex-shrink: 0;
-  z-index: 60;
+  z-index: var(--z-header);
 }
 .hamburger {
   /* F4：触摸目标 ≥44px（WCAG 2.5.5）。图标仍 20px，扩大的是命中区 */

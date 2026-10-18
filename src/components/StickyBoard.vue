@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.board-root { position: fixed; inset: 0; z-index: 480; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.board-root { position: fixed; inset: 0; z-index: var(--z-board); background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 24px; }
 .board-panel { width: 100%; height: 100%; max-width: 1200px; background: var(--bg); border: 1px solid var(--border); border-radius: 14px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
 .board-head, .board-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; flex-shrink: 0; }
 .board-head { border-bottom: 1px solid var(--border); }

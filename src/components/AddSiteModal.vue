@@ -622,7 +622,7 @@ loadSuggestCategory().catch(() => {})
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 300;
+  z-index: var(--z-modal-sm);
 }
 .modal {
   background: var(--bg-white);

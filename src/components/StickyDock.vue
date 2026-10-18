@@ -71,7 +71,7 @@ defineExpose({ createAndOpen, open: () => { open.value = true } })
 </script>
 
 <style scoped>
-.dock { position: fixed; right: 18px; bottom: 18px; z-index: 420; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.dock { position: fixed; right: 18px; bottom: 18px; z-index: var(--z-dock); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
 .dock-fab { position: relative; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-white); color: var(--text-secondary); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 14px rgba(0,0,0,.14); }
 .dock-fab:hover { color: var(--color-note); border-color: var(--color-note); }
 .dock-fab svg { width: 18px; height: 18px; }

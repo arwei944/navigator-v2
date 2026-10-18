@@ -62,7 +62,41 @@
   --warn-fg: #b45309; --warn-bg: #fffbeb; --warn-border: #fde68a;
   --danger-fg: #dc2626; --danger-bg: #fef2f2; --danger-border: #fecaca;
   --info-fg: #1d4ed8; --info-bg: #dbeafe;
+
+  /* ── 层级（z-index）────────────────────────────────────────────────
+     全站浮层叠放次序的**单一真值来源**。此前 37 处 z-index 硬编码散落 27 个文件、
+     值域 1–9999，新增浮层只能从现有数字里「挑个差不多大的」——两个 1000 同值
+     就是例子（谁在上面取决于引入顺序）。
+     这些是**固定的架构层级**，不是用户可调项 —— 所以**不进 visualScheme 的 TOKENS**
+     （让用户把模态框调到卡片下面没有意义）。与「后台徽章语义色」同理：同属视觉、
+     但生命周期不同，刻意分开。
+     值与收敛前**逐一相等** —— 本次只做「命名化」，叠放次序零变化。 */
+  --z-content: 1;      /* 内容层：流式内容内的小元素 */
+  --z-card: 2;         /* 卡片内：盖在封面/缩略图上的角标 */
+  --z-inline: 5;       /* 局部：后台面板内的小层 */
+  --z-handle: 10;      /* 把手：侧栏/右栏拖拽柄 */
+  --z-pin: 20;         /* 栏内固定：右栏图钉、侧栏折叠 */
+  --z-dropdown: 40;    /* 下拉：后台选择器展开层 */
+  --z-rail: 50;        /* 右侧栏本体 */
+  --z-header: 60;      /* 顶栏：移动顶栏、BGM 播放器 */
+  --z-scrim: 90;       /* 遮罩：移动抽屉背后的暗层 */
+  --z-bar: 100;        /* 侧栏 / 搜索下拉 */
+  --z-tabbar: 150;     /* 移动底栏 */
+  --z-float: 200;      /* 浮层：卡片容器浮起层 */
+  --z-modal-sm: 300;   /* 小模态：添加/编辑站点 */
+  --z-dialog: 400;     /* 对话框：确认弹窗 */
+  --z-dock: 420;       /* 便签坞 */
+  --z-editor: 470;     /* 主题编辑器 */
+  --z-board: 480;      /* 便签板 */
+  --z-menu: 500;       /* 右键菜单 */
+  --z-toast: 700;      /* 轻提示 */
+  --z-sheet: 900;      /* 抽屉：移动详情、管道日志 */
+  --z-panel: 960;      /* 设置/卡片设置面板 */
+  --z-modal: 1000;     /* 顶层模态：设置、快捷键、书签导入 */
+  --z-command: 2000;   /* 命令面板 */
+  --z-top: 9999;       /* 最高：跳转链接、全局兜底 */
 }
+
 
 [data-theme="dark"] {
   --bg-primary: #1a1a1e;
@@ -148,7 +182,7 @@ button { font-family: inherit; }
   position: absolute;
   left: -9999px;
   top: 0;
-  z-index: 9999;
+  z-index: var(--z-top);
   padding: 10px 16px;
   /* 不拿 accent 当底：暗色主题 accent(#3b82f6) 上的白字实测只有 3.68:1 ——
      一个「给键盘用户看」的提示自己却看不清说不过去。改用主题表面色 + 正文色，
@@ -239,7 +273,7 @@ button { font-family: inherit; }
   display: none;
   position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: var(--z-scrim);
   background: rgba(0, 0, 0, 0.3);
 }
 .overlay.show { display: block; }

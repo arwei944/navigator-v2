@@ -100,7 +100,7 @@ onBeforeUnmount(() => { disarm?.(); pause() })
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 60;
+  z-index: var(--z-header);
   display: flex;
   align-items: center;
   gap: 8px;

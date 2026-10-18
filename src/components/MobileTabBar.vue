@@ -69,7 +69,7 @@ function go(name) {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 150;
+  z-index: var(--z-tabbar);
   height: calc(56px + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   background: var(--glass-bg);

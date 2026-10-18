@@ -48,7 +48,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </script>
 
 <style scoped>
-.detail-sheet { position: fixed; inset: 0; z-index: 900; display: flex; flex-direction: column; justify-content: flex-end; }
+.detail-sheet { position: fixed; inset: 0; z-index: var(--z-sheet); display: flex; flex-direction: column; justify-content: flex-end; }
 .detail-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .45); }
 .detail-sheet-panel {
   position: relative;

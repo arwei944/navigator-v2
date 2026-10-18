@@ -238,7 +238,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.editor-root { position: fixed; inset: 0; z-index: 470; background: rgba(15, 23, 42, .35); display: flex; justify-content: flex-end; }
+.editor-root { position: fixed; inset: 0; z-index: var(--z-editor); background: rgba(15, 23, 42, .35); display: flex; justify-content: flex-end; }
 .editor-panel { width: 380px; max-width: 92vw; height: 100%; background: var(--bg-white); border-left: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: -8px 0 30px rgba(0,0,0,.18); }
 .editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid var(--border-light); }
 .editor-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); }

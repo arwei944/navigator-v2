@@ -210,7 +210,7 @@ function togglePin() {
   position: fixed;
   left: 16px;
   bottom: 16px;
-  z-index: 900;
+  z-index: var(--z-sheet);
   font-family: var(--font);
 }
 

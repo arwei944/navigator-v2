@@ -172,6 +172,53 @@ if (!existsSync(baselinePath)) {
   }
 }
 
+/* ---------------- ④ 层级（z-index）走令牌 ---------------- */
+
+console.log('\n── ④ 层级：z-index 一律走令牌 ──')
+
+// ④ 的遍历必须**含 main.css**（③ 的 walk 排除了它 —— 那里是颜色定义处）：
+// 否则 main.css 里的 z-index 不被检查，等于门禁留了个口子。
+function walkAll(dir, out = []) {
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const p = join(dir, e.name)
+    if (e.isDirectory()) walkAll(p, out)
+    else if (/\.(vue|css|js)$/.test(e.name)) out.push(p)
+  }
+  return out
+}
+const layerFiles = walkAll(join(ROOT, 'src'))
+
+// 4a. 组件与全局样式里不得再出现硬编码 z-index 数字
+const zHard = []
+for (const f of layerFiles) {
+  const src = readFileSync(f, 'utf8')
+  const m = src.match(/z-index:\s*\d+/g)
+  if (m) zHard.push(`${f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')}: ${m.join(', ')}`)
+}
+ok(zHard.length === 0, 'src/ 内无硬编码 z-index 数字（一律 var(--z-*)）',
+  zHard.length ? `\n      ${zHard.join('\n      ')}` : '')
+
+// 4b. 被引用的 --z-* 必须都有定义（防拼错/漏定义）
+const zDefined = Object.keys(rootVars).filter(k => k.startsWith('--z-'))
+const zReferenced = new Set()
+for (const f of layerFiles) {
+  const src = readFileSync(f, 'utf8')
+  for (const m of src.matchAll(/var\((--z-[a-z-]+)\)/g)) zReferenced.add(m[1])
+}
+const zUndef = [...zReferenced].filter(k => !rootVars[k])
+ok(zDefined.length >= 20, `层级令牌已建立（${zDefined.length} 个）`)
+ok(zReferenced.size >= 20 && zUndef.length === 0,
+  `被引用的 ${zReferenced.size} 个层级令牌全部有定义`, zUndef.join(' ') || '')
+
+// 4c. 令牌取值互不重复（同值 = 层序由引入顺序决定，而非设计）
+const zVals = {}, zDup = []
+for (const k of zDefined) {
+  const v = norm(rootVars[k])
+  if (zVals[v] !== undefined) zDup.push(`${k} 与 ${zVals[v]} 同为 ${rootVars[k]}`)
+  else zVals[v] = k
+}
+ok(zDup.length === 0, '层级令牌取值互不重复', zDup.join('; ') || '')
+
 /* ---------------- 契约文档 ---------------- */
 
 console.log('\n── 契约文档 ──')
@@ -184,6 +231,7 @@ if (!existsSync(contract)) {
   ok(/真值来源|唯一事实来源/.test(doc), '契约写明了真值来源')
   ok(/令牌/.test(doc), '契约说明了令牌体系')
   ok(/硬编码/.test(doc), '契约说明了硬编码政策')
+  ok(/层级|z-index/.test(doc), '契约说明了层级（z-index）体系')
 }
 
 /* ---------------- 结果 ---------------- */

@@ -46,7 +46,7 @@ function runAction(t) {
   left: 50%;
   bottom: calc(24px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  z-index: 700;
+  z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   align-items: center;

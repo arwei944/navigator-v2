@@ -211,7 +211,7 @@ onUnmounted(() => {
   padding: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  z-index: 100;
+  z-index: var(--z-bar);
   position: relative;
   border-right: 1px solid var(--border);
   transition: width .28s cubic-bezier(.4,0,.2,1), min-width .28s cubic-bezier(.4,0,.2,1), transform .28s cubic-bezier(.4,0,.2,1);
@@ -358,7 +358,7 @@ onUnmounted(() => {
   top: 50%;
   right: 0;
   transform: translateY(-50%);
-  z-index: 20;
+  z-index: var(--z-pin);
   width: 12px;
   height: 48px;
   padding: 0;
@@ -394,7 +394,7 @@ onUnmounted(() => {
   width: 6px;
   cursor: col-resize;
   /* 低于折叠把手(20)：两者都贴右边缘，让把手在被它覆盖的那 64px 里仍可点，拖拽可从上下两侧进行 */
-  z-index: 10;
+  z-index: var(--z-handle);
   background: transparent;
   transition: background .15s ease;
 }
@@ -417,7 +417,7 @@ onUnmounted(() => {
     width: min(82vw, 320px) !important;
     min-width: 0 !important;
     transform: translateX(-100%);
-    z-index: 200;
+    z-index: var(--z-float);
     border-right: none;
     box-shadow: 0 0 40px rgba(0, 0, 0, .28);
     transition: transform .28s cubic-bezier(.4, 0, .2, 1);

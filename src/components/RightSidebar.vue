@@ -157,7 +157,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* 宽度由 store 的 rightWidth 经内联样式下发（默认 280px），这里不再写死宽度，避免两个来源打架 */
-.right-sidebar { background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur, 20px)); -webkit-backdrop-filter: blur(var(--glass-blur, 20px)); color: var(--text-sidebar); display: flex; flex-direction: column; padding: 0; overflow-y: auto; overflow-x: hidden; z-index: 50; position: relative; border-left: 1px solid var(--border); transition: width .28s cubic-bezier(.4,0,.2,1), min-width .28s cubic-bezier(.4,0,.2,1); }
+.right-sidebar { background: var(--glass-bg); backdrop-filter: blur(var(--glass-blur, 20px)); -webkit-backdrop-filter: blur(var(--glass-blur, 20px)); color: var(--text-sidebar); display: flex; flex-direction: column; padding: 0; overflow-y: auto; overflow-x: hidden; z-index: var(--z-rail); position: relative; border-left: 1px solid var(--border); transition: width .28s cubic-bezier(.4,0,.2,1), min-width .28s cubic-bezier(.4,0,.2,1); }
 /* 折叠态：不裁剪 —— 面板宽度归零后，把手靠 right: 0 仍然露在视口右缘。
    宽度本身由 panelWidth 下发，这里只管裁剪与边框。 */
 .right-sidebar.collapsed { border-left: none; overflow: visible; }
@@ -167,14 +167,14 @@ onUnmounted(() => {
    默认极淡（无边框、无底色、30% 不透明度），只在悬停时显形，避免抢视觉焦点。
    折叠态面板宽度归零，left: 0 会把把手推到视口外，所以改锚右缘：此时中间内容区已铺满到视口右缘，
    把手依旧贴在它的右侧。两种状态的形状都遵循「贴分界线那侧是平的、探出来那侧是圆的」。 */
-.right-collapse-toggle { position: absolute; top: 50%; left: 0; transform: translateY(-50%); z-index: 20; width: 12px; height: 48px; padding: 0; border: none; border-radius: 0 6px 6px 0; background: transparent; color: var(--text-secondary); opacity: .3; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: width .18s ease, opacity .18s ease, background .18s ease, color .18s ease; }
+.right-collapse-toggle { position: absolute; top: 50%; left: 0; transform: translateY(-50%); z-index: var(--z-pin); width: 12px; height: 48px; padding: 0; border: none; border-radius: 0 6px 6px 0; background: transparent; color: var(--text-secondary); opacity: .3; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: width .18s ease, opacity .18s ease, background .18s ease, color .18s ease; }
 .right-collapse-toggle:hover { width: 18px; opacity: 1; background: var(--border-light); color: var(--text-primary); }
 .right-collapse-toggle svg { width: 12px; height: 12px; transition: transform .28s ease; }
 .right-collapse-toggle.collapsed svg { transform: rotate(180deg); }
 .right-collapse-toggle.collapsed { left: auto; right: 0; border-radius: 6px 0 0 6px; }
 /* 图钉（仅 pin 模式）：面板右上角。走「有底色但不抢焦点」的调子 ——
    它是那个模式里唯一的"拔掉"入口，不能像折叠把手那样淡到几乎看不见。 */
-.right-pin-toggle { position: absolute; top: 10px; right: 10px; z-index: 20; width: 26px; height: 26px; padding: 0; border: none; border-radius: 8px; background: var(--border-light); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s ease; }
+.right-pin-toggle { position: absolute; top: 10px; right: 10px; z-index: var(--z-pin); width: 26px; height: 26px; padding: 0; border: none; border-radius: 8px; background: var(--border-light); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s ease; }
 .right-pin-toggle:hover { background: var(--accent-light); color: var(--accent); }
 .right-pin-toggle svg { width: 13px; height: 13px; }
 .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; text-align: center; gap: 8px; }
@@ -185,7 +185,7 @@ onUnmounted(() => {
 
 /* 拖拽调节宽度手柄：贴在面板左边缘（与中间栏的分界线上），向左拖变宽。
    z-index 低于折叠把手(20)：两者都贴左边缘，让把手在被覆盖的那 64px 里仍可点。 */
-.right-resize-handle { position: absolute; top: 0; left: 0; bottom: 0; width: 6px; z-index: 10; cursor: col-resize; background: transparent; transition: background .15s ease; }
+.right-resize-handle { position: absolute; top: 0; left: 0; bottom: 0; width: 6px; z-index: var(--z-handle); cursor: col-resize; background: transparent; transition: background .15s ease; }
 .right-resize-handle:hover,
 .right-resize-handle:active { background: var(--accent); opacity: .3; }
 

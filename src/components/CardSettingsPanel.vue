@@ -123,7 +123,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
   top: 0; right: 0; bottom: 0;
   width: 380px;
   max-width: 92vw;
-  z-index: 960;
+  z-index: var(--z-panel);
   display: flex;
   flex-direction: column;
   background: var(--bg-white);

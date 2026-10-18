@@ -972,7 +972,7 @@ async function notifyWebhook(version, count) {
   right: 0;
   bottom: 0;
   width: 6px;
-  z-index: 5;
+  z-index: var(--z-inline);
   cursor: col-resize;
   background: transparent;
   transition: background .15s ease;
@@ -1141,7 +1141,7 @@ async function notifyWebhook(version, count) {
 }
 .admin-search-input:focus { border-color: var(--accent); }
 .admin-search-panel {
-  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 40;
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: var(--z-dropdown);
   background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius);
   box-shadow: 0 8px 24px rgba(0, 0, 0, .12); max-height: 320px; overflow-y: auto; padding: 4px;
 }

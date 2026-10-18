@@ -372,7 +372,7 @@ function onVisit(siteId) {
 .feed-card:hover {
   background: var(--accent-light);
   box-shadow: var(--shadow-hover);
-  z-index: 1;
+  z-index: var(--z-content);
   position: relative;
 }
 .feed-card-favicon {

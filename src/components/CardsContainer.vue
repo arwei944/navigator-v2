@@ -475,7 +475,7 @@ function onDragChange() {
 
 /* 批量操作浮动栏 */
 .batch-bar {
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 200;
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: var(--z-float);
   display: flex; align-items: center; justify-content: center; gap: 16px;
   padding: 14px 24px; background: var(--bg-white); border-top: 1px solid var(--border);
   box-shadow: 0 -4px 20px rgba(0,0,0,.1);

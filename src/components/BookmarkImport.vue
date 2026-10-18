@@ -33,7 +33,7 @@ const activeTab = ref('import')
 </script>
 
 <style scoped>
-.bm-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
+.bm-overlay { position: fixed; inset: 0; z-index: var(--z-modal); background: rgba(0, 0, 0, 0.45); display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s ease; }
 .bm-modal { background: var(--bg-white); border-radius: var(--radius-lg); width: 520px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15); animation: slideUp 0.25s ease; }
 .bm-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
 .bm-header h3 { font-size: 16px; font-weight: 600; color: var(--text-primary); }

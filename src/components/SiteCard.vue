@@ -339,7 +339,7 @@ function onHover() {
   border-radius: 50%;
   border: 2px solid var(--bg-white);
   box-shadow: 0 0 2px rgba(0,0,0,.35);
-  z-index: 2;
+  z-index: var(--z-card);
 }
 .health-ok   { background: var(--color-ok); }
 .health-limited { background: var(--color-warn); }
@@ -518,7 +518,7 @@ function onHover() {
   .card.card-highlight { transform: none; }
 }
 .card-checkbox {
-  position: absolute; top: 12px; right: 12px; z-index: 2;
+  position: absolute; top: 12px; right: 12px; z-index: var(--z-card);
   width: 22px; height: 22px; border-radius: 50%;
   border: 2px solid var(--border); background: var(--bg-white);
   display: flex; align-items: center; justify-content: center;

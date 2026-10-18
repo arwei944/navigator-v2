@@ -481,7 +481,7 @@ onUnmounted(() => {
   border-top: none;
   border-radius: 0 0 var(--radius) var(--radius);
   box-shadow: 0 8px 24px rgba(0,0,0,.12);
-  z-index: 100;
+  z-index: var(--z-bar);
 }
 /* 动画只动 transform、不动 opacity：预览/自动化环境里动画时钟可能不推进，
    用 opacity:0 起帧会让下拉被永久定格成透明。 */
