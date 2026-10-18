@@ -93,6 +93,7 @@
  * 报问题时第一句要说的就是「你跑的是哪一版」。
  */
 import { onMounted, reactive, ref } from 'vue'
+import { fetchStatus } from '@/services/deployApi'
 
 // 构建期注入的产品版本号（vite.config.js 的 define）；未注入时回落空串，不显示假的版本号。
 const appVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : ''
@@ -110,15 +111,14 @@ function fmt(iso) {
 }
 
 async function load() {
-  try {
-    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
-    const j = await res.json()
+  const r = await fetchStatus()
+  if (r.ok) {
+    const j = r.status
     Object.assign(version, j.version || {})
     Object.assign(data, j.data || {})
     Object.assign(runtime, j.runtime || {})
-  } catch { /* 读不到就显示「没有构建信息」，不编造 */ } finally {
-    loading.value = false
   }
+  loading.value = false
 }
 
 onMounted(load)

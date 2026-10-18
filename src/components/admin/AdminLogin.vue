@@ -74,6 +74,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { authApi } from '@/services/authApi'
+import { fetchStatus, fetchLocalKey } from '@/services/deployApi'
 
 const emit = defineEmits(['success'])
 
@@ -96,18 +97,17 @@ const version = ref('')
 const versionTitle = ref('')
 
 async function loadVersion() {
-  try {
-    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
-    const j = await res.json()
-    if (j && j.version && j.version.available && j.version.shortSha) {
-      version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
-      versionTitle.value = [
-        `${j.version.branch || ''} ${j.version.shortSha}`,
-        j.version.subject || '',
-        j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
-      ].filter(Boolean).join('\n')
-    }
-  } catch { /* 读不到就不显示 */ }
+  const r = await fetchStatus()
+  if (!r.ok) return
+  const j = r.status
+  if (j && j.version && j.version.available && j.version.shortSha) {
+    version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
+    versionTitle.value = [
+      `${j.version.branch || ''} ${j.version.shortSha}`,
+      j.version.subject || '',
+      j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+    ].filter(Boolean).join('\n')
+  }
 }
 
 /**
@@ -206,10 +206,7 @@ function isLoopbackHost() {
 async function tryLocalAutoLogin() {
   if (!isLoopbackHost()) return false
   try {
-    const res = await fetch('/api/_local-key', { headers: { Accept: 'application/json' } })
-    if (!res.ok) return false
-    const j = await res.json().catch(() => null)
-    const key = String((j && j.key) || '').trim()
+    const key = await fetchLocalKey()
     if (!key) return false
     const r = await authApi.verify(key)
     if (!r.valid) return false

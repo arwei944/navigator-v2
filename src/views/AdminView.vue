@@ -241,6 +241,7 @@ import AdminPreferences from '@/components/admin/AdminPreferences.vue'
 import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
 import { pluginApi } from '@/services/pluginApi'
 import { fetchStatus as fetchDeployStatus, checkUpstream } from '@/services/deployApi'
+import { fetchHealth } from '@/services/healthApi'
 import { clampRailWidth, DEFAULT_RAIL_W } from '@/utils/sideWidth'
 import { safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
 import { aiApi } from '@/services/aiApi'
@@ -457,7 +458,7 @@ async function runAction(kind) {
         hint: '文件已开始下载',
       }
     } else if (kind === 'health') {
-      const r = await fetch('/api/health', { headers: { Accept: 'application/json' } }).then(x => x.json())
+      const r = await fetchHealth()
       const c = r.counts || {}
       actionResult.value = {
         ok: true,
@@ -623,18 +624,17 @@ function onLogin({ token, username, via, expiresAt, auto }) {
  * 失败就留空（旧部署包没有 build-info.json），**绝不编一个假的出来** —— 版本号编错比不显示更糟。
  */
 async function loadVersion() {
-  try {
-    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
-    const j = await res.json()
-    if (j && j.version && j.version.available && j.version.shortSha) {
-      version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
-      versionTitle.value = [
-        `${j.version.branch || ''} ${j.version.shortSha}`,
-        j.version.subject || '',
-        j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
-      ].filter(Boolean).join('\n')
-    }
-  } catch { /* 读不到就不显示，不打扰 */ }
+  const r = await fetchDeployStatus()
+  if (!r.ok) return
+  const j = r.status
+  if (j && j.version && j.version.available && j.version.shortSha) {
+    version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
+    versionTitle.value = [
+      `${j.version.branch || ''} ${j.version.shortSha}`,
+      j.version.subject || '',
+      j.version.builtAt ? `构建于 ${new Date(j.version.builtAt).toLocaleString('zh-CN', { hour12: false })}` : '',
+    ].filter(Boolean).join('\n')
+  }
 }
 
 function logout() {

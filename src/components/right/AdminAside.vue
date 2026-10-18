@@ -53,6 +53,7 @@ import { useRouter } from 'vue-router'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
+import { fetchStatus } from '@/services/deployApi'
 
 const props = defineProps({ tab: { type: String, default: 'overview' } })
 
@@ -155,13 +156,12 @@ const tabCount = Object.keys(TAB_META).length
 /** 版本：只在「部署」模块下拉一次（公开只读接口），别为右栏增加常驻请求 */
 const version = ref('')
 onMounted(async () => {
-  try {
-    const res = await fetch('/api/deploy-status', { headers: { Accept: 'application/json' } })
-    const j = await res.json()
-    if (j && j.version && j.version.available && j.version.shortSha) {
-      version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
-    }
-  } catch { /* 读不到就不显示 */ }
+  const r = await fetchStatus()
+  if (!r.ok) return
+  const j = r.status
+  if (j && j.version && j.version.available && j.version.shortSha) {
+    version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
+  }
 })
 
 const stats = computed(() => {

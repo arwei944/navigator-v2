@@ -82,3 +82,18 @@ function summarize(c) {
     author: c.commit?.author?.name || '',
   }
 }
+
+/**
+ * 取本机自动登录密钥（`/api/_local-key`，仅回环地址可用，服务端会再校验来源）。
+ * 失败或没有时返回空串 —— 调用方据此判断「本机自动登录」是否可用。
+ */
+export async function fetchLocalKey() {
+  try {
+    const res = await fetch('/api/_local-key', { headers: { Accept: 'application/json' } })
+    if (!res.ok) return ''
+    const j = await res.json().catch(() => null)
+    return String((j && j.key) || '').trim()
+  } catch {
+    return ''
+  }
+}

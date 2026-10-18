@@ -158,6 +158,7 @@ import { useClicksStore } from '@/stores/clicks'
 import { rankByClicks } from '../../../shared/clicks-core.mjs'
 import { sparkline } from '@/utils/chartkit'
 import { auditSites, DESC_ISSUE_LABEL, summarizeAudit, planGroupMerge } from '../../../shared/ops/data-quality.mjs'
+import { fetchHealthHistory } from '@/services/healthApi'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -270,11 +271,7 @@ const histLoaded = ref(false)
  * 拿不到就当作「还没有历史」，不报错、不造数据 —— 这是要靠时间积累的东西。
  */
 async function loadHistory() {
-  try {
-    const res = await fetch('/api/health-history')
-    const j = await res.json().catch(() => ({}))
-    if (res.ok && j.ok) histPoints.value = j.points || []
-  } catch { /* 忽略：无历史时面板照常显示其余卡片 */ }
+  histPoints.value = await fetchHealthHistory()
   histLoaded.value = true
 }
 
