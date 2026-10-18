@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **89** 道门禁，其中已接入 `console:test:all` 的 **89** 道。
+> 共 **90** 道门禁，其中已接入 `console:test:all` 的 **90** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -76,25 +76,26 @@
 | 65 | `test-right-panel` | 右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+ | 265 |
 | 66 | `test-robust` | 第三批 · 序 20 / 29 / 30 的守卫：跨端共享的**纯函数**不变量。 | 146 |
 | 67 | `test-schedule-publish` | 定时发布判据守卫：纯函数，不起定时器、不落盘。 | 54 |
-| 68 | `test-search` | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 |
-| 69 | `test-session-merge` | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 |
-| 70 | `test-session` | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 174 |
-| 71 | `test-side-width` | 侧栏宽度取值范围：clampSideWidth。 | 60 |
-| 72 | `test-site-aliases` | 站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。 | 134 |
-| 73 | `test-site-dedupe` | 站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。 | 159 |
-| 74 | `test-site-refresh` | 「重新获取信息」用例：零依赖、不联网（抓取 / 翻译 / 写回都是注入的）。 | 166 |
-| 75 | `test-site-store` | 站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。 | 278 |
-| 76 | `test-sites-cas` | 第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。 | 287 |
-| 77 | `test-store` | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 |
-| 78 | `test-sw-refresh` | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 |
-| 79 | `test-theme-boot` | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 |
-| 80 | `test-theme` | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 |
-| 81 | `test-translate-engine` | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 |
-| 82 | `test-trust` | nav-console 来源校验用例（零依赖）。 | 112 |
-| 83 | `test-undo` | E4b 守卫：撤销栈内核。 | 192 |
-| 84 | `test-uptime` | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 |
-| 85 | `test-url-preview` | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 |
-| 86 | `test-url` | src/utils/url.js 用例：零依赖、不联网。 | 127 |
-| 87 | `test-v10` | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 |
-| 88 | `test-visual-scheme` | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 |
-| 89 | `test-mcp` | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 270 |
+| 68 | `test-scripts` | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 51 |
+| 69 | `test-search` | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 |
+| 70 | `test-session-merge` | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 |
+| 71 | `test-session` | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 174 |
+| 72 | `test-side-width` | 侧栏宽度取值范围：clampSideWidth。 | 60 |
+| 73 | `test-site-aliases` | 站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。 | 134 |
+| 74 | `test-site-dedupe` | 站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。 | 159 |
+| 75 | `test-site-refresh` | 「重新获取信息」用例：零依赖、不联网（抓取 / 翻译 / 写回都是注入的）。 | 166 |
+| 76 | `test-site-store` | 站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。 | 278 |
+| 77 | `test-sites-cas` | 第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。 | 287 |
+| 78 | `test-store` | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 |
+| 79 | `test-sw-refresh` | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 |
+| 80 | `test-theme-boot` | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 |
+| 81 | `test-theme` | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 |
+| 82 | `test-translate-engine` | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 |
+| 83 | `test-trust` | nav-console 来源校验用例（零依赖）。 | 112 |
+| 84 | `test-undo` | E4b 守卫：撤销栈内核。 | 192 |
+| 85 | `test-uptime` | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 |
+| 86 | `test-url-preview` | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 |
+| 87 | `test-url` | src/utils/url.js 用例：零依赖、不联网。 | 127 |
+| 88 | `test-v10` | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 |
+| 89 | `test-visual-scheme` | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 |
+| 90 | `test-mcp` | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 270 |

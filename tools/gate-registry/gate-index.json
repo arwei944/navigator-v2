@@ -1,6 +1,6 @@
 {
-  "total": 89,
-  "registered": 89,
+  "total": 90,
+  "registered": 90,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -93,7 +93,8 @@
     "tools/mcp/test-mcp.mjs",
     "tools/gate-registry/cli.mjs",
     "tools/console/test-deps.mjs",
-    "tools/console/test-release-please.mjs"
+    "tools/console/test-release-please.mjs",
+    "tools/console/test-scripts.mjs"
   ],
   "gates": [
     {
@@ -563,6 +564,13 @@
       "name": "test-schedule-publish",
       "purpose": "定时发布判据守卫：纯函数，不起定时器、不落盘。",
       "lines": 54,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-scripts.mjs",
+      "name": "test-scripts",
+      "purpose": "仓库脚本台账门禁（`scripts/` 的生命周期管理）。",
+      "lines": 51,
       "included": true
     },
     {
