@@ -46,3 +46,35 @@ export function linesOf(file) {
     return 0
   }
 }
+
+/**
+ * 门禁分类规则（名称 + 用途关键词 → 域）。首个命中即归类，末位兜底「未分类」。
+ *
+ * 为什么按「域」分：台账原本只能逐条看，答不了「哪个域的守卫最薄」。
+ * 分类让「某域只有 1 道门禁」这类结构性缺口一眼可见。
+ */
+const CATEGORY_RULES = [
+  ['搜索与交互', /search|intent|command|omni|preview/i],
+  [
+    '前端与体验',
+    /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture/i,
+  ],
+  ['部署与发布', /deploy|publish|release|botkeep|endpoint|manifest|schedule/i],
+  ['安全与鉴权', /auth|security|netguard|session|secret|rate|token/i],
+  ['文档治理', /doc|readme/i],
+  ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust/i],
+  [
+    '数据与内容',
+    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url/i,
+  ],
+  [
+    '服务端与运行时',
+    /server|api|store|cron|health|mcp|v10|stack|offline|sync|engine|ops|uptime|poll|http|image|llm|probe|alert|admin|net/i,
+  ],
+]
+
+export function categoryOf(name, purpose = '') {
+  const text = `${name} ${purpose}`
+  for (const [label, re] of CATEGORY_RULES) if (re.test(text)) return label
+  return '未分类'
+}
