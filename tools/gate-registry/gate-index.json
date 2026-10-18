@@ -1,0 +1,707 @@
+{
+  "total": 87,
+  "registered": 87,
+  "unregistered": [],
+  "order": [
+    "tools/console/test-trust.mjs",
+    "tools/console/test-infer.mjs",
+    "tools/console/test-purposes.mjs",
+    "tools/console/test-visual-scheme.mjs",
+    "tools/console/test-url.mjs",
+    "tools/console/test-url-preview.mjs",
+    "tools/console/test-preview-translate.mjs",
+    "tools/console/test-site-refresh.mjs",
+    "tools/console/test-affinity.mjs",
+    "tools/console/test-graph-layout.mjs",
+    "tools/console/test-deploy-status.mjs",
+    "tools/console/test-auto-add.mjs",
+    "tools/console/test-auto-category.mjs",
+    "tools/console/test-guard.mjs",
+    "tools/console/test-hunks.mjs",
+    "tools/console/test-ops.mjs",
+    "tools/console/test-api-ops.mjs",
+    "tools/console/test-netguard.mjs",
+    "tools/console/test-robust.mjs",
+    "tools/console/test-frontend.mjs",
+    "tools/console/test-session.mjs",
+    "tools/console/test-sites-cas.mjs",
+    "tools/console/test-notes.mjs",
+    "tools/console/test-livesync.mjs",
+    "tools/console/test-theme.mjs",
+    "tools/console/test-theme-boot.mjs",
+    "tools/console/test-intent.mjs",
+    "tools/console/test-http-fetch.mjs",
+    "tools/console/test-glossary.mjs",
+    "tools/console/test-browser-translate.mjs",
+    "tools/console/test-meta-fast.mjs",
+    "tools/console/test-meta-fetch.mjs",
+    "tools/console/test-local-meta.mjs",
+    "tools/console/test-meta-upgrade.mjs",
+    "tools/console/test-pipeline-trace.mjs",
+    "tools/console/test-cloud-poll.mjs",
+    "tools/console/test-bundle.mjs",
+    "tools/console/test-gridnav.mjs",
+    "tools/console/test-chartkit.mjs",
+    "tools/console/test-sw-refresh.mjs",
+    "tools/console/test-command-phrases.mjs",
+    "tools/console/test-undo.mjs",
+    "tools/console/test-right-panel.mjs",
+    "tools/console/test-engine.mjs",
+    "tools/console/test-translate-engine.mjs",
+    "tools/console/test-probe-engine.mjs",
+    "tools/console/test-llm-engine.mjs",
+    "tools/console/test-image-engine.mjs",
+    "tools/console/test-category-source.mjs",
+    "tools/console/test-site-store.mjs",
+    "tools/console/test-publisher.mjs",
+    "tools/console/test-plugin-registry.mjs",
+    "tools/console/test-release.mjs",
+    "tools/console/test-local-key.mjs",
+    "tools/console/test-site-dedupe.mjs",
+    "tools/console/test-health-fails.mjs",
+    "tools/console/test-deploy-resume.mjs",
+    "tools/console/test-schedule-publish.mjs",
+    "tools/console/test-alert-rules.mjs",
+    "tools/console/test-admin-tools.mjs",
+    "tools/console/test-filter-chips.mjs",
+    "tools/console/test-uptime.mjs",
+    "tools/console/test-side-width.mjs",
+    "tools/console/test-bgm.mjs",
+    "tools/console/test-bundle-size.mjs",
+    "tools/console/test-search.mjs",
+    "tools/console/test-desc-junk.mjs",
+    "tools/console/test-site-aliases.mjs",
+    "tools/console/test-category-consistency.mjs",
+    "tools/console/test-dual-stack.mjs",
+    "tools/console/test-data-quality.mjs",
+    "tools/console/test-a11y.mjs",
+    "tools/console/test-mobile.mjs",
+    "tools/console/test-offline-queue.mjs",
+    "tools/console/test-endpoints.mjs",
+    "tools/console/test-endpoints-run.mjs",
+    "tools/console/test-session-merge.mjs",
+    "tools/console/test-contrast.mjs",
+    "tools/console/test-deploy-manifest.mjs",
+    "tools/console/test-doc-manager.mjs",
+    "tools/doc-manager/cli.mjs",
+    "tools/console/test-hygiene.mjs",
+    "tools/console/test-env.mjs",
+    "tools/console/test-cron.mjs",
+    "tools/console/test-health.mjs",
+    "tools/console/test-store.mjs",
+    "tools/console/test-v10.mjs",
+    "tools/mcp/test-mcp.mjs",
+    "tools/gate-registry/cli.mjs"
+  ],
+  "gates": [
+    {
+      "file": "tools/console/test-a11y.mjs",
+      "name": "test-a11y",
+      "purpose": "无障碍（a11y）守卫（F3）：零依赖、静态检查、不联网。",
+      "lines": 100,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-admin-tools.mjs",
+      "name": "test-admin-tools",
+      "purpose": "后台快捷键与全局搜索守卫：纯函数，不碰 DOM。",
+      "lines": 91,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-affinity.mjs",
+      "name": "test-affinity",
+      "purpose": "网站关联度用例：零依赖、不联网。",
+      "lines": 218,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-alert-rules.mjs",
+      "name": "test-alert-rules",
+      "purpose": "告警规则引擎守卫：纯函数，不联网。",
+      "lines": 88,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-api-ops.mjs",
+      "name": "test-api-ops",
+      "purpose": "线上运维面 `api/ops.js` 的用例：鉴权、查询分支、写入动作。",
+      "lines": 205,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-auto-add.mjs",
+      "name": "test-auto-add",
+      "purpose": "站点草稿工具：自动添加管道与「添加站点」弹窗共用的判据。",
+      "lines": 138,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-auto-category.mjs",
+      "name": "test-auto-category",
+      "purpose": "自动分类决策：6 条优先级分支 + label 归一 + id 派生与冲突自增。",
+      "lines": 111,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-bgm.mjs",
+      "name": "test-bgm",
+      "purpose": "背景音乐的音符生成：noteFreq / chordAt / notesForBar / barSeconds / clampVolume / fmtClock。",
+      "lines": 109,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-browser-translate.mjs",
+      "name": "test-browser-translate",
+      "purpose": "浏览器本地翻译（L2，`src/services/browserTranslate.js`）用例：零依赖、不联网。",
+      "lines": 267,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-bundle-size.mjs",
+      "name": "test-bundle-size",
+      "purpose": "产物体积门禁（NAV-v8 · 任务 4pnj9g）",
+      "lines": 116,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-bundle.mjs",
+      "name": "test-bundle",
+      "purpose": "第三批 · 序 23 的守卫：首屏分包**产物**断言（不是源码断言）。",
+      "lines": 259,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-category-consistency.mjs",
+      "name": "test-category-consistency",
+      "purpose": "归类一致性体检用例（F5①）：零依赖、不联网。",
+      "lines": 76,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-category-source.mjs",
+      "name": "test-category-source",
+      "purpose": "分类表来源注册表（热拔插）自测：不联网。",
+      "lines": 155,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-chartkit.mjs",
+      "name": "test-chartkit",
+      "purpose": "src/utils/chartkit.js 用例：零依赖、不联网、纯字符串断言。",
+      "lines": 119,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-cloud-poll.mjs",
+      "name": "test-cloud-poll",
+      "purpose": "云端轮询的**节奏语义**用例：零依赖、不联网（假时钟 + 打桩 fetch）。",
+      "lines": 333,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-command-phrases.mjs",
+      "name": "test-command-phrases",
+      "purpose": "I3 守卫：自然语言 → 命令。",
+      "lines": 209,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-contrast.mjs",
+      "name": "test-contrast",
+      "purpose": "对比度守卫（F3）：从 `src/styles/main.css` 的变量**实算** WCAG 2.1 对比度并断言。",
+      "lines": 239,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-cron.mjs",
+      "name": "test-cron",
+      "purpose": "`server/cron.mjs` 巡检路径守卫（v10 第三批）。",
+      "lines": 88,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-data-quality.mjs",
+      "name": "test-data-quality",
+      "purpose": "数据质量体检用例（F1）：零依赖、不联网。",
+      "lines": 123,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-deploy-manifest.mjs",
+      "name": "test-deploy-manifest",
+      "purpose": "门禁：增量上传的「产物指纹」与「增量集判据」。",
+      "lines": 77,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-deploy-resume.mjs",
+      "name": "test-deploy-resume",
+      "purpose": "断点续传判据守卫：纯函数，不联网、不落盘。",
+      "lines": 53,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-deploy-status.mjs",
+      "name": "test-deploy-status",
+      "purpose": "部署状态接口用例：零依赖、不联网（读的是本机 store 与构建产物）。",
+      "lines": 103,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-desc-junk.mjs",
+      "name": "test-desc-junk",
+      "purpose": "desc「机器垃圾」形态检测用例：零依赖、不联网。",
+      "lines": 77,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-doc-manager.mjs",
+      "name": "test-doc-manager",
+      "purpose": "doc-manager 自测（门禁）",
+      "lines": 133,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-dual-stack.mjs",
+      "name": "test-dual-stack",
+      "purpose": "双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主）",
+      "lines": 76,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-endpoints-run.mjs",
+      "name": "test-endpoints-run",
+      "purpose": "部署多端点发布链路用例（N2 补齐）：零依赖、不联网、**绝不触发真实上传**。",
+      "lines": 226,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-endpoints.mjs",
+      "name": "test-endpoints",
+      "purpose": "部署端点注册表用例（N2）：零依赖、不联网、不触发真实发布会。",
+      "lines": 115,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-engine.mjs",
+      "name": "test-engine",
+      "purpose": "抓取引擎（热拔插）自测：不联网、不依赖 siteprobe 在线。",
+      "lines": 100,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-env.mjs",
+      "name": "test-env",
+      "purpose": "环境变量台账门禁（防「三套账」漂移回潮）。",
+      "lines": 95,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-filter-chips.mjs",
+      "name": "test-filter-chips",
+      "purpose": "筛选条第二行取数：pickInlineChips。",
+      "lines": 87,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-frontend.mjs",
+      "name": "test-frontend",
+      "purpose": "第三批 · 序 18 / 20 / 23 的前端守卫。",
+      "lines": 224,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-glossary.mjs",
+      "name": "test-glossary",
+      "purpose": "离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。",
+      "lines": 188,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-graph-layout.mjs",
+      "name": "test-graph-layout",
+      "purpose": "关系图布局用例：零依赖、不跑浏览器。",
+      "lines": 204,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-gridnav.mjs",
+      "name": "test-gridnav",
+      "purpose": "src/utils/gridnav.js 用例：零依赖、不联网、纯函数穷举。",
+      "lines": 111,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-guard.mjs",
+      "name": "test-guard",
+      "purpose": "api/metadata.js 的 SSRF 防护用例：确认内网 / 回环 / 链路本地地址一律被拒。",
+      "lines": 52,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-health-fails.mjs",
+      "name": "test-health-fails",
+      "purpose": "「连续不可达」计数与自动归档判据守卫：零依赖、不联网。",
+      "lines": 82,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-health.mjs",
+      "name": "test-health",
+      "purpose": "健康判定的**合并口径**守卫（v10）。",
+      "lines": 112,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-http-fetch.mjs",
+      "name": "test-http-fetch",
+      "purpose": "`shared/http-fetch.mjs` 的**传输层**用例：零依赖，起本地服务器实测。",
+      "lines": 302,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-hunks.mjs",
+      "name": "test-hunks",
+      "purpose": "hunk 级暂存 / 取消暂存用例。",
+      "lines": 281,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-hygiene.mjs",
+      "name": "test-hygiene",
+      "purpose": "工作区 5S 门禁（防废料失控回涨）。",
+      "lines": 72,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-image-engine.mjs",
+      "name": "test-image-engine",
+      "purpose": "图片提供者注册表（热拔插）自测：不联网。",
+      "lines": 261,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-infer.mjs",
+      "name": "test-infer",
+      "purpose": "shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。",
+      "lines": 368,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-intent.mjs",
+      "name": "test-intent",
+      "purpose": "智能化的两个内核用例：意图解析与场景排序。零依赖、不联网。",
+      "lines": 232,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-livesync.mjs",
+      "name": "test-livesync",
+      "purpose": "实时通道用例：零依赖、不联网。",
+      "lines": 90,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-llm-engine.mjs",
+      "name": "test-llm-engine",
+      "purpose": "LLM 后端注册表（热拔插）自测：不联网（端到端跑本地假 OpenAI 服务）。",
+      "lines": 187,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-local-key.mjs",
+      "name": "test-local-key",
+      "purpose": "本机密钥端点（`api/_local-key.js`）的闸门自测：不联网、不起服务。",
+      "lines": 82,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-local-meta.mjs",
+      "name": "test-local-meta",
+      "purpose": "本地推断兜底（`src/services/localMeta.js`）用例：零依赖、不联网。",
+      "lines": 153,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-meta-fast.mjs",
+      "name": "test-meta-fast",
+      "purpose": "`/api/metadata` 的**快路径**用例：抓取早断、预算收紧、默认不翻译、同域缓存。",
+      "lines": 404,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-meta-fetch.mjs",
+      "name": "test-meta-fetch",
+      "purpose": "站点元信息抓取的**响应容错**用例：零依赖、不联网（打桩 globalThis.fetch）。",
+      "lines": 230,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-meta-upgrade.mjs",
+      "name": "test-meta-upgrade",
+      "purpose": "「秒加之后的真实补全」（`src/services/metaUpgrade.js`）用例：零依赖、不联网。",
+      "lines": 246,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-mobile.mjs",
+      "name": "test-mobile",
+      "purpose": "移动端触摸目标守卫（F4）：零依赖、静态检查。",
+      "lines": 84,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-netguard.mjs",
+      "name": "test-netguard",
+      "purpose": "第三批 · 序 17 的守卫：SSRF 防线的**连接层**部分。",
+      "lines": 282,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-notes.mjs",
+      "name": "test-notes",
+      "purpose": "便利贴 / 站点备注的同步内核用例：零依赖、不联网、不起浏览器。",
+      "lines": 189,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-offline-queue.mjs",
+      "name": "test-offline-queue",
+      "purpose": "离线编辑队列用例（F8）：零依赖、不联网、不碰 DOM（localStorage 用内存桩）。",
+      "lines": 130,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-ops.mjs",
+      "name": "test-ops",
+      "purpose": "发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。",
+      "lines": 996,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-pipeline-trace.mjs",
+      "name": "test-pipeline-trace",
+      "purpose": "管线日志总线（`src/utils/pipelineTrace.js`）用例：零依赖、不联网、不碰 UI。",
+      "lines": 164,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-plugin-registry.mjs",
+      "name": "test-plugin-registry",
+      "purpose": "插件目录（统一注册表视图）自测：不联网。",
+      "lines": 208,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-preview-translate.mjs",
+      "name": "test-preview-translate",
+      "purpose": "N1：搜索框网址预览卡片显示**译文**（`src/services/translateFields.js` + `useOmniBox` 的并卡逻辑）。",
+      "lines": 170,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-probe-engine.mjs",
+      "name": "test-probe-engine",
+      "purpose": "探针注册表（热拔插）自测：不联网（除最后两条端到端跑本地回环）。",
+      "lines": 150,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-publisher.mjs",
+      "name": "test-publisher",
+      "purpose": "发布通道注册表（热拔插）自测：不联网、不部署。",
+      "lines": 184,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-purposes.mjs",
+      "name": "test-purposes",
+      "purpose": "shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。",
+      "lines": 363,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-release.mjs",
+      "name": "test-release",
+      "purpose": "开发流水线自测：纯函数为主，不联网、不起子进程。",
+      "lines": 175,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-right-panel.mjs",
+      "name": "test-right-panel",
+      "purpose": "右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+",
+      "lines": 265,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-robust.mjs",
+      "name": "test-robust",
+      "purpose": "第三批 · 序 20 / 29 / 30 的守卫：跨端共享的**纯函数**不变量。",
+      "lines": 146,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-schedule-publish.mjs",
+      "name": "test-schedule-publish",
+      "purpose": "定时发布判据守卫：纯函数，不起定时器、不落盘。",
+      "lines": 54,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-search.mjs",
+      "name": "test-search",
+      "purpose": "检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。",
+      "lines": 103,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-session-merge.mjs",
+      "name": "test-session-merge",
+      "purpose": "会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。",
+      "lines": 134,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-session.mjs",
+      "name": "test-session",
+      "purpose": "第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。",
+      "lines": 174,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-side-width.mjs",
+      "name": "test-side-width",
+      "purpose": "侧栏宽度取值范围：clampSideWidth。",
+      "lines": 60,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-site-aliases.mjs",
+      "name": "test-site-aliases",
+      "purpose": "站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。",
+      "lines": 134,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-site-dedupe.mjs",
+      "name": "test-site-dedupe",
+      "purpose": "站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。",
+      "lines": 159,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-site-refresh.mjs",
+      "name": "test-site-refresh",
+      "purpose": "「重新获取信息」用例：零依赖、不联网（抓取 / 翻译 / 写回都是注入的）。",
+      "lines": 166,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-site-store.mjs",
+      "name": "test-site-store",
+      "purpose": "站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。",
+      "lines": 278,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-sites-cas.mjs",
+      "name": "test-sites-cas",
+      "purpose": "第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。",
+      "lines": 287,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-store.mjs",
+      "name": "test-store",
+      "purpose": "`server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。",
+      "lines": 147,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-sw-refresh.mjs",
+      "name": "test-sw-refresh",
+      "purpose": "A1 守卫：PWA 新版本提示不许自动刷新。",
+      "lines": 112,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-theme-boot.mjs",
+      "name": "test-theme-boot",
+      "purpose": "主题「启动时序」守卫：持久化回填 → 补应用的那一段。",
+      "lines": 282,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-theme.mjs",
+      "name": "test-theme",
+      "purpose": "主题模型用例：零依赖、不联网、不起浏览器。",
+      "lines": 192,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-translate-engine.mjs",
+      "name": "test-translate-engine",
+      "purpose": "翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。",
+      "lines": 212,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-trust.mjs",
+      "name": "test-trust",
+      "purpose": "nav-console 来源校验用例（零依赖）。",
+      "lines": 112,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-undo.mjs",
+      "name": "test-undo",
+      "purpose": "E4b 守卫：撤销栈内核。",
+      "lines": 192,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-uptime.mjs",
+      "name": "test-uptime",
+      "purpose": "本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。",
+      "lines": 152,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-url-preview.mjs",
+      "name": "test-url-preview",
+      "purpose": "网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。",
+      "lines": 141,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-url.mjs",
+      "name": "test-url",
+      "purpose": "src/utils/url.js 用例：零依赖、不联网。",
+      "lines": 127,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-v10.mjs",
+      "name": "test-v10",
+      "purpose": "v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。",
+      "lines": 193,
+      "included": true
+    },
+    {
+      "file": "tools/console/test-visual-scheme.mjs",
+      "name": "test-visual-scheme",
+      "purpose": "src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。",
+      "lines": 257,
+      "included": true
+    },
+    {
+      "file": "tools/mcp/test-mcp.mjs",
+      "name": "test-mcp",
+      "purpose": "nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。",
+      "lines": 270,
+      "included": true
+    }
+  ]
+}
