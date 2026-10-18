@@ -9,6 +9,8 @@
  * 不该让「看一眼部署状态」这件事跟着一起坏掉。
  */
 
+import { safeSetItem } from '../utils/safeStorage.js'
+
 const BASE = '/api/deploy-status'
 
 /**
@@ -65,7 +67,7 @@ export async function checkUpstream(sha) {
         // 线上版本比这 40 条都旧（或不是这个仓库的提交）：只能说「至少这么多」
         : { behind: list.length, more: true, commits: list.slice(0, 10).map(summarize) }
 
-    try { localStorage.setItem(cacheKey, JSON.stringify({ at: Date.now(), data })) } catch { /* 存不下就算了 */ }
+    safeSetItem(cacheKey, JSON.stringify({ at: Date.now(), data }))  // 存不下时仅告警，不影响返回
     return { ok: true, ...data }
   } catch {
     return { ok: false, error: '连不上 GitHub（网络或浏览器拦截）' }

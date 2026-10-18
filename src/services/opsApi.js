@@ -24,6 +24,8 @@
  *     不做迁移 —— 那和现在的 token 不是一回事。
  */
 
+import { safeSetItem, safeRemoveItem } from '../utils/safeStorage.js'
+
 const TOKEN_STORE = 'nav_admin_token'
 const EXPIRES_STORE = 'nav_admin_token_exp'
 /** 旧版遗留：localStorage 里的共享密钥明文，读到就删 */
@@ -33,7 +35,7 @@ const LEGACY_KEY_STORE = 'nav_admin_key'
 export function getAdminKey() {
   try {
     if (localStorage.getItem(LEGACY_KEY_STORE) !== null) {
-      localStorage.removeItem(LEGACY_KEY_STORE)
+      safeRemoveItem(LEGACY_KEY_STORE)
     }
   } catch { /* 无痕模式下 localStorage 可能抛，忽略 */ }
   let token = ''
@@ -43,9 +45,9 @@ export function getAdminKey() {
     if (!token) {
       const legacy = sessionStorage.getItem(TOKEN_STORE) || ''
       if (legacy) {
-        localStorage.setItem(TOKEN_STORE, legacy)
+        safeSetItem(TOKEN_STORE, legacy)
         const legacyExp = sessionStorage.getItem(EXPIRES_STORE)
-        if (legacyExp) localStorage.setItem(EXPIRES_STORE, legacyExp)
+        if (legacyExp) safeSetItem(EXPIRES_STORE, legacyExp)
         sessionStorage.removeItem(TOKEN_STORE)
         sessionStorage.removeItem(EXPIRES_STORE)
         token = legacy
@@ -63,10 +65,10 @@ export function getAdminKey() {
 /** 写入凭据（登录签发的会话 token，或未配置口令登录时的密钥兜底） */
 export function setAdminKey(key, expiresAt) {
   try {
-    if (key) localStorage.setItem(TOKEN_STORE, key)
-    else localStorage.removeItem(TOKEN_STORE)
-    if (key && expiresAt) localStorage.setItem(EXPIRES_STORE, String(expiresAt))
-    else localStorage.removeItem(EXPIRES_STORE)
+    if (key) safeSetItem(TOKEN_STORE, key)
+    else safeRemoveItem(TOKEN_STORE)
+    if (key && expiresAt) safeSetItem(EXPIRES_STORE, String(expiresAt))
+    else safeRemoveItem(EXPIRES_STORE)
     // 顺带清掉旧位置，别在两处各留一份
     sessionStorage.removeItem(TOKEN_STORE)
     sessionStorage.removeItem(EXPIRES_STORE)
@@ -75,8 +77,8 @@ export function setAdminKey(key, expiresAt) {
 
 export function clearAdminKey() {
   try {
-    localStorage.removeItem(TOKEN_STORE)
-    localStorage.removeItem(EXPIRES_STORE)
+    safeRemoveItem(TOKEN_STORE)
+    safeRemoveItem(EXPIRES_STORE)
     sessionStorage.removeItem(TOKEN_STORE)
     sessionStorage.removeItem(EXPIRES_STORE)
   } catch { /* 同上 */ }

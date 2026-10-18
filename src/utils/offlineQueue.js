@@ -37,6 +37,8 @@
  * LWW 合并规则打架，反而制造第二套真相。
  */
 
+import { safeSetItem, safeRemoveItem } from './safeStorage.js'
+
 const KEY = 'nav-offline-edits'
 
 /** 队列上限：超出的丢最旧，防止长期离线无限膨胀 */
@@ -72,7 +74,7 @@ function readRaw() {
 }
 
 function write(list) {
-  try { localStorage.setItem(KEY, JSON.stringify(list)) } catch { /* 隐私模式 / 配额满：不记也能用 */ }
+  safeSetItem(KEY, JSON.stringify(list))  // 隐私模式 / 配额满：失败仅告警，内存态仍正确
 }
 
 /** 读取队列（最新在后）。任何情况下返回数组，不抛 */
@@ -97,7 +99,7 @@ export function enqueueEdit(op) {
 
 /** 清空队列（同步成功后调用） */
 export function clearOffline() {
-  try { localStorage.removeItem(KEY) } catch { /* 忽略 */ }
+  safeRemoveItem(KEY)
   return []
 }
 

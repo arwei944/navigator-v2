@@ -11,6 +11,8 @@
  * 去重按大小写不敏感：`GitHub` 与 `github` 是同一条，重复搜索只把它置顶。
  */
 
+import { safeSetItem, safeRemoveItem } from './safeStorage.js'
+
 const KEY = 'nav-search-history'
 
 /** 最多保留几条。太多会把下拉塞满，反而挡住在找的东西 */
@@ -45,12 +47,12 @@ export function rememberSearch(q) {
   const lower = s.toLowerCase()
   // 置顶 + 去重（大小写不敏感）：重复搜同一个词不会在列表里出现两次
   const next = [s, ...read().filter(x => x.toLowerCase() !== lower)].slice(0, HISTORY_MAX)
-  try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* 隐私模式 / 配额满：不记也能用 */ }
+  safeSetItem(KEY, JSON.stringify(next))  // 隐私模式 / 配额满：失败仅告警，搜索照常
   return next
 }
 
 /** 清空历史，返回空数组 */
 export function clearSearchHistory() {
-  try { localStorage.removeItem(KEY) } catch { /* 忽略 */ }
+  safeRemoveItem(KEY)
   return []
 }

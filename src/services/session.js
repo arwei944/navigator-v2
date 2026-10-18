@@ -6,6 +6,8 @@
  * key 一律走 `Authorization: Bearer`，不走 query string —— query 会进 Vercel 函数日志、
  * CDN 日志、浏览器历史与 Referer，而它是这份数据的唯一凭证。服务端已停用旧的 `?key=`。
  */
+import { safeSetItem, safeRemoveItem } from '../utils/safeStorage.js'
+
 const API = '/api/session'
 const KEY_KEY = 'nav-session-key'
 
@@ -13,8 +15,8 @@ export function getStoredKey() {
   return localStorage.getItem(KEY_KEY) || ''
 }
 export function storeKey(k) {
-  if (k) localStorage.setItem(KEY_KEY, k)
-  else localStorage.removeItem(KEY_KEY)
+  if (k) safeSetItem(KEY_KEY, k)
+  else safeRemoveItem(KEY_KEY)
 }
 
 function authHeaders(key, extra) {

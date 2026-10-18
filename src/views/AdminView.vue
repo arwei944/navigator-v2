@@ -242,6 +242,7 @@ import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsA
 import { pluginApi } from '@/services/pluginApi'
 import { fetchStatus as fetchDeployStatus, checkUpstream } from '@/services/deployApi'
 import { clampRailWidth, DEFAULT_RAIL_W } from '@/utils/sideWidth'
+import { safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
 import { aiApi } from '@/services/aiApi'
 import { alertApi } from '@/services/alertApi'
 import { authApi } from '@/services/authApi'
@@ -389,11 +390,9 @@ const railBusy = ref('')
 const actionResult = ref(null)
 
 watch([railW, railCollapsed, railSel], () => {
-  try {
-    localStorage.setItem('nav_admin_rail_w', String(railW.value))
-    localStorage.setItem('nav_admin_rail_collapsed', railCollapsed.value ? '1' : '0')
-    localStorage.setItem('nav_admin_rail_sel', railSel.value)
-  } catch { /* 隐私模式写不了，忽略 */ }
+  safeSetItem('nav_admin_rail_w', String(railW.value))
+  safeSetItem('nav_admin_rail_collapsed', railCollapsed.value ? '1' : '0')
+  safeSetItem('nav_admin_rail_sel', railSel.value)
 })
 
 // 栏内右侧的状态数字：复用卡片那套取值，取紧凑写法
@@ -779,8 +778,8 @@ onBeforeUnmount(() => {
 })
 
 watch(webhookUrl, (v) => {
-  if (v) localStorage.setItem('nav_admin_webhook', v)
-  else localStorage.removeItem('nav_admin_webhook')
+  if (v) safeSetItem('nav_admin_webhook', v)
+  else safeRemoveItem('nav_admin_webhook')
 })
 
 /** 回滚成功：先丢弃未发布的本地分类新建（与站点覆盖层同口径），再把响应回填为云端基底后清覆盖层 —— 顺序反了，自动建的分类会被重新叠进旧表 */
