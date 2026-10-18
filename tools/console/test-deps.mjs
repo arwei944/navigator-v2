@@ -6,8 +6,12 @@
  * 有没有写死 `*`/`latest` 导致装不出可复现的版本 —— 全靠人眼。
  *
  * 零依赖：只用文本解析 pnpm-lock.yaml，不引 yaml 库。
+ *
+ * 升级（2026-10-18）：补两环 —— ⑦ license 白名单（防引入传染性/受限许可）；
+ * ⑧ 未使用依赖（声明了但源码从不引用，纯增负担）。
+ * ⑧ 的引用语料必须含 package.json 与 vite.config.js 本身，否则误报。
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -92,10 +96,99 @@ for (const name of Object.keys(pkg.dependencies || {})) {
   ok(existsSync(join(ROOT, 'node_modules', name)), `依赖 ${name} 未安装（node_modules 下找不到）`)
 }
 
+const allDeclared = [
+  ...new Set([...Object.keys(pkg.dependencies || {}), ...Object.keys(pkg.devDependencies || {})]),
+]
+
+// ⑦ 依赖 license 必须在白名单内（防引入传染性 / 受限许可）
+const ALLOWED_LICENSES = new Set([
+  'MIT',
+  'ISC',
+  'Apache-2.0',
+  'BSD-2-Clause',
+  'BSD-3-Clause',
+  '0BSD',
+  'CC0-1.0',
+  'Unlicense',
+  'BlueOak-1.0.0',
+])
+function licenseOf(name) {
+  try {
+    const meta = JSON.parse(readFileSync(join(ROOT, 'node_modules', name, 'package.json'), 'utf-8'))
+    const lic = meta.license ?? meta.licenses
+    if (typeof lic === 'string') return lic
+    if (Array.isArray(lic)) return lic.map((l) => l && l.type).filter(Boolean).join(' OR ')
+    if (lic && typeof lic === 'object') return lic.type || ''
+    return ''
+  } catch {
+    return ''
+  }
+}
+function licenseOk(expr) {
+  return String(expr)
+    .split(/\s+(?:OR|AND)\s+|[()]/i)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .some((t) => ALLOWED_LICENSES.has(t))
+}
+const badLicense = allDeclared.filter((name) => !licenseOk(licenseOf(name))).map((n) => `${n}（${licenseOf(n) || '未知'}）`)
+ok(badLicense.length === 0, `以下依赖 license 不在白名单，需先评审：${badLicense.join(', ') || '（无）'}`)
+
+// ⑧ 未使用依赖：声明了但源码中从不引用（语料含 package.json 与 vite.config.js，否则误报）
+function buildCorpus() {
+  let text = ''
+  const roots = [
+    'package.json',
+    'vite.config.js',
+    'src',
+    'api',
+    'server',
+    'shared',
+    'tools',
+    'scripts',
+    '.github',
+  ]
+  const walk = (p) => {
+    let st
+    try {
+      st = statSync(p)
+    } catch {
+      return
+    }
+    if (st.isDirectory()) {
+      for (const n of readdirSync(p)) {
+        if (n === 'node_modules' || n === '.git') continue
+        walk(join(p, n))
+      }
+      return
+    }
+    if (!/\.(mjs|js|cjs|ts|vue|json|yml|yaml|md)$/.test(p)) return
+    if (st.size > 2 * 1024 * 1024) return
+    try {
+      text += readFileSync(p, 'utf-8')
+    } catch {
+      /* 忽略不可读 */
+    }
+  }
+  for (const r of roots) walk(join(ROOT, r))
+  return text
+}
+const corpus = buildCorpus()
+const unusedDeps = allDeclared.filter((name) => {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return !(
+    corpus.includes("'" + name) ||
+    corpus.includes('"' + name) ||
+    corpus.includes('/' + name + '/') ||
+    new RegExp('\\b' + esc + '\\b').test(corpus)
+  )
+})
+ok(unusedDeps.length === 0, `以下依赖声明了但源码未引用（未使用）：${unusedDeps.join(', ') || '（无）'}`)
+
 console.log(`\n📦 依赖门禁：${pass} 通过 / ${failures.length} 失败`)
 console.log(`   直接依赖 ${Object.keys(pkg.dependencies || {}).length} ｜ devDependencies ${Object.keys(pkg.devDependencies || {}).length} ｜ 锁文件解析 ${lockDeps.size} 项`)
 if (failures.length) {
   for (const f of failures) console.log(`   ❌ ${f}`)
   process.exit(1)
 }
-console.log('   ✅ 声明与锁文件同步｜specifier 一致｜imports/bin 指向真实文件｜依赖已安装')
+console.log('   ✅ 声明与锁文件同步｜specifier 一致｜imports/bin 指向真实文件｜依赖已安装｜license 合规｜无未使用依赖')
