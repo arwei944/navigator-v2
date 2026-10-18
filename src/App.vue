@@ -87,7 +87,7 @@
 
   <!-- 设置面板 -->
   <SettingsPanel v-if="showSettings" @close="showSettings = false" @open-import="openBookmarkImport" @open-admin="openAdmin"
-                 @open-theme-editor="showThemeEditor = true" />
+                 @open-theme-editor="showThemeEditor = true" @open-card-settings="showCardSettings = true" />
 
   <!-- 主题编辑器：右侧抽屉，与卡片设置同形态 —— 改动即时可见 -->
   <ThemeEditor v-if="showThemeEditor" @close="showThemeEditor = false" />
