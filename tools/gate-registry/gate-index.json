@@ -1,6 +1,6 @@
 {
-  "total": 91,
-  "registered": 91,
+  "total": 94,
+  "registered": 94,
   "unregistered": [],
   "order": [
     "tools/console/test-trust.mjs",
@@ -8,6 +8,9 @@
     "tools/console/test-purposes.mjs",
     "tools/console/test-visual-scheme.mjs",
     "tools/console/test-visual-layer.mjs",
+    "tools/console/test-storage-guard.mjs",
+    "tools/console/test-api-layer.mjs",
+    "tools/console/test-format.mjs",
     "tools/console/test-url.mjs",
     "tools/console/test-url-preview.mjs",
     "tools/console/test-preview-translate.mjs",
@@ -133,6 +136,15 @@
       "lines": 88,
       "included": true,
       "durationMs": 179
+    },
+    {
+      "file": "tools/console/test-api-layer.mjs",
+      "name": "test-api-layer",
+      "purpose": "接口层门禁：组件层不得绕过 services 直连 /api",
+      "category": "服务端与运行时",
+      "lines": 71,
+      "included": true,
+      "durationMs": null
     },
     {
       "file": "tools/console/test-api-ops.mjs",
@@ -378,6 +390,15 @@
       "durationMs": 206
     },
     {
+      "file": "tools/console/test-format.mjs",
+      "name": "test-format",
+      "purpose": "格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs`",
+      "category": "前端与体验",
+      "lines": 115,
+      "included": true,
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-frontend.mjs",
       "name": "test-frontend",
       "purpose": "第三批 · 序 18 / 20 / 23 的前端守卫。",
@@ -562,7 +583,7 @@
       "name": "test-mobile",
       "purpose": "移动端触摸目标守卫（F4）：零依赖、静态检查。",
       "category": "前端与体验",
-      "lines": 84,
+      "lines": 85,
       "included": true,
       "durationMs": 245
     },
@@ -792,6 +813,15 @@
       "durationMs": 187
     },
     {
+      "file": "tools/console/test-storage-guard.mjs",
+      "name": "test-storage-guard",
+      "purpose": "存储安全门禁（localStorage 写入必须走 safeStorage）",
+      "category": "前端与体验",
+      "lines": 72,
+      "included": true,
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-store.mjs",
       "name": "test-store",
       "purpose": "`server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。",
@@ -895,7 +925,7 @@
       "name": "test-visual-layer",
       "purpose": "视觉层门禁（统一视觉层）",
       "category": "前端与体验",
-      "lines": 203,
+      "lines": 310,
       "included": true,
       "durationMs": null
     },
