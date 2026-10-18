@@ -131,7 +131,7 @@
               </div>
             </div>
             <div class="admin-section">
-              <AdminInsights />
+              <AdminInsights @open-ai="selectTab('ai')" />
             </div>
           </template>
 

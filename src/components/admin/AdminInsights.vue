@@ -136,11 +136,22 @@
           <span class="quality-names">{{ descLabel(d.issue) }}</span>
         </div>
         <div v-if="quality.weakDesc.length > 10" class="quality-hint">…另有 {{ quality.weakDesc.length - 10 }} 条</div>
+        <!-- 与「AI 助手 → 描述生成」联动：这里只报问题，改写是 AI 出候选、逐条勾选后才写入。
+             原先体检只报告、无去处，用户看到「描述待改进 N 条」却不知道该去哪改（G2 补的断点）。 -->
+        <div class="quality-block-foot">
+          <button type="button" class="quality-fix" @click="$emit('open-ai')">去 AI 助手生成候选描述 →</button>
+          <span class="quality-hint">AI 出候选，逐条勾选后才写入；未配置 AI 时会给出提示</span>
+        </div>
       </div>
 
       <div v-if="quality.missingIcon.length" class="quality-block">
         <div class="quality-block-title">缺 icon · {{ quality.missingIcon.length }} 条
           <span class="quality-hint">（前端退化为字母块，功能不受影响）</span>
+        </div>
+        <!-- 如实标注：图标是构建期批量补抓的产物（public/icons/*），线上容器没有抓取写盘的能力，
+             所以这里给指引而不是一个「点了没反应」的假按钮。 -->
+        <div class="quality-block-foot">
+          <span class="quality-hint">图标在本地构建期补抓：<code>npm run icons</code>（三级回退：页面声明 → /favicon.ico → favicon.im）。站点自身不可达时抓不到属正常。</span>
         </div>
       </div>
 
@@ -160,6 +171,8 @@ import { sparkline } from '@/utils/chartkit'
 import { fmtDateTimeCompact } from '@/utils/format'
 import { auditSites, DESC_ISSUE_LABEL, summarizeAudit, planGroupMerge } from '../../../shared/ops/data-quality.mjs'
 import { fetchHealthHistory } from '@/services/healthApi'
+
+const emit = defineEmits(['open-ai'])
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -311,6 +324,7 @@ const trendRange = computed(() => {
 .quality-block-title.warn { color: var(--warn-fg); }
 .quality-row { display: flex; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 12px; border-bottom: 1px solid var(--border-light); }
 .quality-row:last-child { border-bottom: none; }
+.quality-block-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .quality-host { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text-primary); flex-shrink: 0; }
 .quality-names { color: var(--text-secondary); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .quality-fix { border: 1px solid var(--accent); background: transparent; color: var(--accent); font-size: 11px; padding: 2px 10px; border-radius: 999px; cursor: pointer; flex-shrink: 0; font-family: var(--font); }
