@@ -57,6 +57,8 @@
     "console:test:server-routes": "node tools/console/test-server-routes.mjs",
     "console:test:dryrun-purity": "node tools/console/test-dryrun-purity.mjs",
     "console:test:api-routes": "node tools/console/test-api-routes-live.mjs",
+    "console:test:visits": "node tools/console/test-visit-tracking.mjs",
+    "console:test:visits-real": "node tools/console/test-visit-tracking-real.mjs",
     "console:test:color-tokens": "node tools/console/test-color-tokens-real.mjs",
     "console:test:data-quality": "node tools/console/test-data-quality.mjs",
     "console:test:a11y": "node tools/console/test-a11y.mjs",

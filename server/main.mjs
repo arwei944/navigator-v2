@@ -39,7 +39,27 @@ import { extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname } from 'node:path'
 
-const ROOT = dirname(fileURLToPath(import.meta.url))
+/**
+ * 服务根目录 —— 部署产物与源码树的布局**不同**，这里要同时兼容：
+ *
+ *   部署产物：  dist/server.js + dist/api/ + dist/shared/     → ROOT = dist/
+ *   源码直跑：  server/main.mjs  + api/ + shared/（仓库根）    → ROOT = 仓库根
+ *
+ * 判据是「同级有没有 api/」：产物里一定有；源码树里 main.mjs 在 server/ 下，
+ * 同级没有 api/，得往上一层。
+ *
+ * 这条兼容不能省：路由表是按 `ROOT/api` 派生的（见下方 loadApiRoutes），
+ * 只看产物会让 `node server/main.mjs` 直接 ENOENT 起不来 —— 而本地调试、
+ * 真机门禁都走这条路。
+ */
+function resolveRoot() {
+  const here = dirname(fileURLToPath(import.meta.url))
+  if (existsSync(join(here, 'api'))) return here
+  const parent = resolve(here, '..')
+  if (existsSync(join(parent, 'api'))) return parent
+  return here
+}
+const ROOT = resolveRoot()
 // HIVE 平台约定不一：Vercel / WorkBuddy 沙箱注入 PORT，BotKeep 注入 SERVER_PORT —— 两个都认。
 const PORT = Number(process.env.PORT || process.env.SERVER_PORT) || 3000
 const HOST = process.env.HOST || '0.0.0.0'

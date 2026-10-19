@@ -7,7 +7,7 @@
  *  - Pinia (pinia-plugin-persistedstate)：persist: versionedPersist('key'[, ['field',...]])
  *  - 手动持久化（如数组数据）：encodeStored(data) / decodeStored(key, raw, fallback)
  */
-export const STORE_VERSION = 2
+export const STORE_VERSION = 3
 export const V_KEY = '__navDataVersion'
 
 /**
@@ -24,7 +24,35 @@ const MIGRATIONS = {
     delete next.open
     delete next.hoveredSite
     return next
-  }]]
+  }]],
+
+  /*
+   * v2 → v3：把「访问记录」从两份存储收敛成一份。
+   *
+   * 旧结构：`records: [{ siteId, timestamp }, ...]`（按 siteId 去重、最新在前）。
+   * 新结构：`visits: { [siteId]: { count, lastAt } }`。
+   *
+   * 旧结构里**没有 count**（次数存在 overlay 的 visits 里，是另一个 key）。
+   * 这里只能先把历史记录转成 `count: 1`，真实计数由 history store 首启动时
+   * 从 overlay 合并补齐 —— 跨 key 的合并不可能在一个迁移函数里完成。
+   */
+  history: [[2, (old) => {
+    const raw = Array.isArray(old?.records) ? old.records : []
+    const visits = {}
+    for (const r of raw) {
+      const id = r?.siteId
+      if (id === undefined || id === null || id === '') continue
+      const ts = typeof r.timestamp === 'number' ? r.timestamp : new Date(r.timestamp).getTime()
+      const lastAt = Number.isFinite(ts) ? ts : Date.now()
+      const key = String(id)
+      // 同一站点若有多条（旧数据未去重），保留最晚时间、计数累加
+      const prev = visits[key]
+      visits[key] = prev
+        ? { count: prev.count + 1, lastAt: Math.max(prev.lastAt, lastAt) }
+        : { count: 1, lastAt }
+    }
+    return { ...old, visits, records: undefined }
+  }]],
 }
 
 function stripVersion(d) {

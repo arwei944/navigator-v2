@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **106** 道门禁，其中已接入 `console:test:all` 的 **106** 道。
+> 共 **108** 道门禁，其中已接入 `console:test:all` 的 **108** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -15,7 +15,7 @@
 | 工作区治理 | 8 | `test-hunks` | 4.5s |
 | 部署与发布 | 9 | `test-endpoints-run` | 2.8s |
 | 服务端与运行时 | 23 | `test-mcp` | 34.6s |
-| 数据与内容 | 23 | `test-trust` | 0.8s |
+| 数据与内容 | 25 | `test-trust` | 0.8s |
 | 前端与体验 | 30 | `test-frontend` | 3.9s |
 
 ## 清单
@@ -101,7 +101,7 @@
 | 77 | `test-schedule-publish` | 部署与发布 | 定时发布判据守卫：纯函数，不起定时器、不落盘。 | 54 | 0.3s |
 | 78 | `test-scripts` | 工作区治理 | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 143 | 0.3s |
 | 79 | `test-search` | 搜索与交互 | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 | 0.4s |
-| 80 | `test-server-routes` | 服务端与运行时 | 服务端路由门禁：`api/` 目录 ↔ 构建产物 ↔ 路由表 三者同源 | 85 | — |
+| 80 | `test-server-routes` | 服务端与运行时 | 服务端路由门禁：`api/` 目录 ↔ 构建产物 ↔ 路由表 三者同源 | 98 | — |
 | 81 | `test-session-merge` | 安全与鉴权 | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 | 0.2s |
 | 82 | `test-session` | 安全与鉴权 | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 176 | 0.2s |
 | 83 | `test-share-target` | 前端与体验 | 分享目标门禁（G4 / L0-2）。 | 59 | 0.2s |
@@ -125,6 +125,8 @@
 | 101 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
 | 102 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
 | 103 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 104 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
-| 105 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 106 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 327 | 34.6s |
+| 104 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 163 | — |
+| 105 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
+| 106 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
+| 107 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
+| 108 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 327 | 34.6s |

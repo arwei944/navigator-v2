@@ -38,12 +38,24 @@ export function loadOverlay() {
     edits: d?.edits && typeof d.edits === 'object' ? d.edits : {},
     deletes: Array.isArray(d?.deletes) ? d.deletes.filter((x) => typeof x === 'string' && x) : [],
     order: Array.isArray(d?.order) ? d.order.filter((x) => typeof x === 'string' && x) : [],
+    /**
+     * 旧版把访问计数存在这里，与 `history.records` 各记一半。
+     * v3 起唯一存储是 `history.visits`，本字段**只在迁移时读一次**：
+     * `history.js#mergeLegacyOverlayCounts` 直接从 localStorage 读原始值，
+     * 不走这里 —— 但保留解析是为了「旧数据还在盘上时不要因为字段消失而报错」。
+     */
     visits: d?.visits && typeof d.visits === 'object' ? d.visits : {},
   }
 }
 
-/** 写盘（带 schema 版本号）。所有 overlay 改动最终都汇到这里，不散在各函数里。 */
-export function saveOverlay({ adds, edits, deletes, order, visits }) {
+/**
+ * 写盘（带 schema 版本号）。所有 overlay 改动最终都汇到这里，不散在各函数里。
+ *
+ * **不再写 `visits`**：访问计数已归 history store 唯一管理。若继续写，
+ * 下次启动 `mergeLegacyOverlayCounts` 会读到一份过时副本并合并进来，
+ * 相当于把已删除的访问记录又复活一次。
+ */
+export function saveOverlay({ adds, edits, deletes, order }) {
   safeSetItem(
     OVERLAY_KEY,
     encodeStored({
@@ -51,7 +63,6 @@ export function saveOverlay({ adds, edits, deletes, order, visits }) {
       edits,
       deletes,
       order,
-      visits,
     }),
   )
 }

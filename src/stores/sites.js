@@ -57,7 +57,23 @@ export const useSitesStore = defineStore('sites', () => {
   const localEdits = ref(overlay.edits)
   const localDeletes = ref(overlay.deletes)
   const localOrder = ref(overlay.order)
-  const visitCounts = ref(overlay.visits)
+
+  /**
+   * 本机访问计数：**从 history store 派生，不再单独持久化**。
+   *
+   * 此前它是 overlay 里的第二个 `visits` 副本，与 `history.records` 各记一半
+   * （一个记次数、一个记时间），`recordVisit` 必须同时写两处才能保持一致。
+   * 现在唯一存储是 `history.visits`，这里只是把它投影成 `{ [id]: count }`
+   * 给 rebuild 用 —— 一个只读视图，不可能再与记录漂移。
+   */
+  const visitCounts = computed(() => {
+    const out = {}
+    for (const [id, v] of Object.entries(historyStore.visits)) {
+      const n = Number(v?.count) || 0
+      if (n > 0) out[id] = n
+    }
+    return out
+  })
 
   const cloudVersion = ref(0)
   const cloudLoaded = ref(false)
@@ -154,7 +170,7 @@ export const useSitesStore = defineStore('sites', () => {
       edits: localEdits.value,
       deletes: localDeletes.value,
       order: localOrder.value,
-      visits: visitCounts.value,
+      // visits 已迁到 history store（唯一存储），这里不再写第二份
     })
   }
 
@@ -178,7 +194,7 @@ function rebuild() {
     localEdits: localEdits.value,
     localDeletes: localDeletes.value,
     localOrder: localOrder.value,
-    visits: visitCounts.value,
+    visits: visitCounts.value,  // computed 投影，见上方 visitCounts 定义
     prevMemo: rebuildMemo,
     prevList: sites.value,
   })
@@ -189,7 +205,7 @@ function rebuild() {
   /* 单站 / 批量改动、删除、访问、排序的实现在 sitesMutations.js（工厂，注入 ref 与提交动作）。
    * 它把「补丁落在 localAdds 还是 localEdits」这条判断收成唯一一处 —— 此前五个函数各写一遍。 */
   const mut = createSiteMutations({
-    localAdds, localEdits, localDeletes, localOrder, visitCounts, trash, selectedIds, sites, cloudSites,
+    localAdds, localEdits, localDeletes, localOrder, historyStore, trash, selectedIds, sites, cloudSites,
     rebuild, saveOverlay, saveTrash,
   })
   const {
@@ -197,7 +213,7 @@ function rebuild() {
     removeLocally, deleteSite, reorderSites, applySortOrder, undoAdd,
   } = mut
 
-  /** 访问计数：本地口径落覆盖层，云端口径交给 clicks store */
+  /** 访问计数：本地口径落 history store（唯一存储），云端口径交给 clicks store */
   function recordVisit(id) {
     mut.recordVisit(id, clicksStore)
   }

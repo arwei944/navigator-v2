@@ -146,7 +146,7 @@ const CATEGORY_RULES = [
   ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size/i],
   [
     '数据与内容',
-    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url/i,
+    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url|visit|click/i,
   ],
   [
     '服务端与运行时',

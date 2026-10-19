@@ -50,9 +50,21 @@ const SYNC_FIELDS = [
   },
   {
     key: 'history',
-    get: ({ history }) => (history ? history.records.slice(0, 100) : undefined),
+    /*
+     * 同步的是 `visits`（含 count），不是 `records`。
+     *
+     * `records` 是派生视图：只保留最近 50 条、且只有 { siteId, timestamp } ——
+     * 用它同步会丢掉「访问了多少次」这个本机事实，换一台设备同步过来计数就归零了。
+     * 直接发 visits 原始数据，`addRawRecord` 才能按「计数取大、时间取晚」正确合并。
+     */
+    get: ({ history }) => (history ? history.visits : undefined),
     apply: (value, { history }) => {
-      if (history && Array.isArray(value)) value.forEach(r => history.addRawRecord(r))
+      if (!history || !value || typeof value !== 'object') return
+      // 兼容旧版同步数据：早先发的是 [{ siteId, timestamp }] 数组
+      if (Array.isArray(value)) { value.forEach(r => history.addRawRecord(r)); return }
+      for (const [siteId, v] of Object.entries(value)) {
+        history.addRawRecord({ siteId, timestamp: v?.lastAt, count: v?.count })
+      }
     }
   },
   {

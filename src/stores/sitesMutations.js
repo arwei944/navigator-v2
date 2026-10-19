@@ -23,7 +23,7 @@
  * @param {object} deps.localEdits ref
  * @param {object} deps.localDeletes ref
  * @param {object} deps.localOrder ref
- * @param {object} deps.visitCounts ref
+ * @param {object} deps.historyStore 访问记录 store（唯一存储，recordVisit 写这里）
  * @param {object} deps.trash ref
  * @param {object} deps.selectedIds ref
  * @param {object} deps.sites ref（渲染列表，只读）
@@ -37,7 +37,7 @@ export function createSiteMutations({
   localEdits,
   localDeletes,
   localOrder,
-  visitCounts,
+  historyStore,
   trash,
   selectedIds,
   sites,
@@ -225,13 +225,18 @@ export function createSiteMutations({
     saveOverlay()
   }
 
+  /**
+   * 记一次访问：本机记录 + 云端口径上报。
+   *
+   * 改动前这里要写三处（visitCounts、site.visitCount、history.records），
+   * 因为「次数」和「时间」分属两份存储。现在本机只写 `historyStore` 一份：
+   * `visits[id] = { count, lastAt }` 同时承载计数与时间，`visitCounts` 是它的投影，
+   * rebuild 会自动跟上，不再需要就地改 `site.visitCount` 来「让角标立刻 +1」。
+   */
   function recordVisit(id, clicksStore) {
     const site = sites.value.find((s) => s.id === id)
     if (!site) return
-    const next = (visitCounts.value[id] ?? site.visitCount ?? 0) + 1
-    visitCounts.value[id] = next
-    // 直接改 out 对象让卡片角标立刻 +1；下一次 rebuild 会因 visits 变化而重建这一条
-    site.visitCount = next
+    historyStore.addRecord(id)
     saveOverlay()
     // 云端口径：所有访客的全局点击量（卡片角标 / 排行的权威来源），攒批后匿名上报
     clicksStore.record(id)

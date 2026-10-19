@@ -65,6 +65,19 @@ ok(/readdirSync\(API_DIR\)|readdirSync\([^)]*api[^)]*\)/.test(serverSrc),
 ok(!/const \w+Handler = \(await import\('\.\/api\//.test(serverSrc),
   'server/main.mjs 里没有逐个 import 接口的手抄残留')
 
+/*
+ * ROOT 必须同时兼容「部署产物」与「源码树」两种布局。
+ *
+ * 实测踩到过：路由改成按 `ROOT/api` 派生后，产物里 server.js 与 api/ 同级（没问题），
+ * 但源码树里 main.mjs 在 server/ 下、api/ 在仓库根 ——
+ * `node server/main.mjs` 直接 ENOENT 起不来，而本地调试与真机门禁都走这条路。
+ * 只测产物不测源码，这类回归不会被发现。
+ */
+ok(/resolveRoot|existsSync\(join\(here, 'api'\)\)/.test(serverSrc),
+  'ROOT 有布局兼容处理（产物同级 / 源码树上一级）')
+ok(!/^const ROOT = dirname\(fileURLToPath\(import\.meta\.url\)\)$/m.test(serverSrc),
+  'ROOT 不再是无条件取 main.mjs 所在目录（那会让源码直跑找不到 api/）')
+
 /* ---------------- ④ 构建脚本同样派生 ---------------- */
 
 const postSrc = readFileSync(join(ROOT, 'scripts', 'postbuild-spa-fallbacks.mjs'), 'utf8')

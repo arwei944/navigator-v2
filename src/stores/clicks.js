@@ -68,6 +68,13 @@ export const useClicksStore = defineStore('clicks', () => {
   let inflight = null
   let flushTimer = null
   let flushing = null
+  let retryTimer = null
+
+  /** 冲突后延迟重试：退避到 10s，避免服务端持续高并发时反复打 */
+  function scheduleRetry() {
+    if (retryTimer) return
+    retryTimer = setTimeout(() => { retryTimer = null; flush() }, 10000)
+  }
 
   function persistPending() {
     safeSetItem(PENDING_KEY, encodeStored(pending.value))
@@ -142,7 +149,15 @@ export const useClicksStore = defineStore('clicks', () => {
           body: payload,
           keepalive: true,
         })
-        if (!res.ok) return { ok: false, status: res.status }
+        if (!res.ok) {
+          /*
+           * 409 = 服务端 CAS 冲突（并发写，已重试过仍失败）。
+           * pending 保留着（这里没 dropSent），但光保留不够 —— 用户可能不再点击，
+           * 这批增量就要等到下次点击才补发。安排一次延迟重试，且避免无谓的密集重试。
+           */
+          if (res.status === 409) scheduleRetry()
+          return { ok: false, status: res.status }
+        }
         const j = await res.json().catch(() => null)
         dropSent(sent)
         // 服务端返回的是合并后的全量：直接采用，顺带把并发期间的他人点击也拉齐
