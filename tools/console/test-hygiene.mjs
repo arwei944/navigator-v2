@@ -26,12 +26,18 @@ const MB = 1024 * 1024
 const rows = scanAll(ROOT)
 const byId = Object.fromEntries(rows.map((r) => [r.id, r]))
 
+/**
+ * 阈值口径（2026-10-19 收紧）：
+ * 此前留 2-3 倍余量的结果是「实际占用涨到 148 MB 也没人发现」—— 门禁常年绿，废料常年堆。
+ * 现在按「一次正常测量/一次发布后应当回到的量级」设上限，只在**跑测量期间**允许短暂越界，
+ * 收尾必须清运。判定依据见 workspace-doctor 的 scan 输出。
+ */
 const LIMITS = {
-  'chrome-profiles': { count: 24, bytes: 512 * MB },
-  'api-icon-baks': { count: 60, bytes: 8 * MB },
-  'root-reports': { count: 8, bytes: 1 * MB },
-  'probe-drafts': { cleanableCount: 250, bytes: 32 * MB },
-  backups: { bytes: 128 * MB },
+  'chrome-profiles': { count: 3, bytes: 48 * MB },
+  'api-icon-baks': { count: 4, bytes: 1 * MB },
+  'root-reports': { count: 2, bytes: 256 * 1024 },
+  'probe-drafts': { cleanableCount: 40, bytes: 8 * MB },
+  backups: { bytes: 24 * MB },
 }
 
 for (const [id, lim] of Object.entries(LIMITS)) {
