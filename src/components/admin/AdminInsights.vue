@@ -25,7 +25,20 @@
         </div>
       </div>
       <div class="insight-card">
-        <h3 class="insight-title">点击量 TOP 10</h3>
+        <h3 class="insight-title">
+          点击量 TOP 10
+          <!--
+            清空入口放在这里而不是设置页：清空是「看到脏数据后立刻处理」的动作，
+            和数据在同一屏才顺手。二次确认是必须的 —— 不可撤销。
+          -->
+          <button
+            v-if="clicksStore.total > 0"
+            class="insight-reset"
+            :disabled="resetting"
+            :title="`清空全网 ${clicksStore.total.toLocaleString('zh-CN')} 次点击统计（不可撤销）`"
+            @click="onResetClicks"
+          >{{ resetting ? '清空中…' : '清空统计' }}</button>
+        </h3>
         <ol v-if="topSites.length" class="top-list">
           <li v-for="(s, i) in topSites" :key="s.id">
             <span class="top-rank" :class="{ hot: i < 3 }">{{ i + 1 }}</span>
@@ -171,6 +184,8 @@ import { sparkline } from '@/utils/chartkit'
 import { fmtDateTimeCompact } from '@/utils/format'
 import { auditSites, DESC_ISSUE_LABEL, summarizeAudit, planGroupMerge } from '../../../shared/ops/data-quality.mjs'
 import { fetchHealthHistory } from '@/services/healthApi'
+import { resetClicks } from '@/services/clicksApi'
+import { useToastStore } from '@/stores/toast'
 
 const emit = defineEmits(['open-ai'])
 
@@ -178,6 +193,30 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const healthStore = useHealthStore()
 const clicksStore = useClicksStore()
+const toast = useToastStore()
+
+/**
+ * 清空全网点击统计。
+ *
+ * 二次确认用原生 confirm：这是不可撤销的破坏性操作，且没有「撤销」的后端支持。
+ * 确认后调 DELETE，成功则刷新 store —— 不本地清零，因为要拿到服务端真实的空态
+ * （多端并发时本地清零会和服务端不一致）。
+ */
+const resetting = ref(false)
+async function onResetClicks() {
+  const n = clicksStore.total
+  if (!window.confirm(`确定清空全网点击统计吗？\n\n将删除 ${n} 次点击记录（${clicksStore.sites} 个站点），不可撤销。`)) return
+  resetting.value = true
+  try {
+    await resetClicks()
+    await clicksStore.refresh()
+    toast.push({ message: `已清空全网点击统计（原有 ${n} 次）`, tone: 'ok', duration: 4000 })
+  } catch (e) {
+    toast.push({ message: `清空失败：${e.message}`, tone: 'error', duration: 6000 })
+  } finally {
+    resetting.value = false
+  }
+}
 
 // 进入后台即拉取云端判定与点击统计（都只读云端结果，不在浏览器里重新探测 / 计数）
 onMounted(() => {
@@ -338,6 +377,15 @@ const trendRange = computed(() => {
 .dead-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
 .insight-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; }
 .insight-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+/* 破坏性操作：默认低调，hover 才显出危险色 —— 平时不抢注意力，但不会被误点 */
+.insight-reset {
+  margin-left: auto; padding: 3px 10px; font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border); border-radius: 6px;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+  transition: color var(--dur-fast), border-color var(--dur-fast), background var(--dur-fast);
+}
+.insight-reset:hover:not(:disabled) { color: var(--color-danger, #ef4444); border-color: var(--color-danger, #ef4444); background: var(--color-danger-bg, rgba(239,68,68,.08)); }
+.insight-reset:disabled { opacity: .55; cursor: not-allowed; }
 .cat-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .cat-bar-label { width: 120px; flex-shrink: 0; font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cat-bar-track { flex: 1; height: 10px; background: var(--border-light); border-radius: 5px; overflow: hidden; }

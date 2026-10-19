@@ -1,6 +1,6 @@
 {
-  "total": 108,
-  "registered": 108,
+  "total": 110,
+  "registered": 110,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -20,6 +20,8 @@
     "tools/console/test-category-consistency.mjs",
     "tools/console/test-category-source.mjs",
     "tools/console/test-chartkit.mjs",
+    "tools/console/test-clicks-reset-ui.mjs",
+    "tools/console/test-clicks-reset.mjs",
     "tools/console/test-cloud-poll.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
@@ -322,6 +324,30 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 236
+    },
+    {
+      "file": "tools/console/test-clicks-reset-ui.mjs",
+      "name": "test-clicks-reset-ui",
+      "purpose": "点击清空按钮的真机验证：登录后台 → 找到按钮 → 点击 → 数据归零。",
+      "category": "前端与体验",
+      "lines": 145,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-clicks-reset.mjs",
+      "name": "test-clicks-reset",
+      "purpose": "点击清空端点守卫：真实启动服务，验证 DELETE /api/clicks 的鉴权与行为。",
+      "category": "数据与内容",
+      "lines": 117,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-cloud-poll.mjs",
