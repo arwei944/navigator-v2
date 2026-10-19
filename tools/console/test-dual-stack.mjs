@@ -35,27 +35,40 @@ const apiFns = readdirSync(apiDir)
   .map(f => f.slice(0, -3))
   .sort()
 
-/* ---- 2. server 侧的已注册路由：解析 API_ROUTES 字面量 ---- */
+/* ---- 2. server 侧的路由来源 ----
+ *
+ * 路由表已改为**从 `api/` 目录派生**（`loadApiRoutes()`），不再有可解析的字面量。
+ * 这是好事：字面量方案本身就是要靠人去同步的第二份清单，防的正是它自己会漏。
+ *
+ * 所以本段改成验证「派生约定成立」，而不是「清单里有没有这一项」：
+ *   - 路由表确实由目录派生（`api/` 的每个 .js 都会成为一条路由）
+ *   - 派生规则是 `api/<name>.js → /api/<name>`，没有额外过滤
+ *   - 自托管专属端点（_diag）仍内联在 server 里，不混进目录
+ *
+ * 行为层面的「接口真能访问」由 test-server-routes（产物比对）与
+ * test-mcp（真实 stdio 调用）覆盖。
+ */
 const mainSrc = readFileSync(join(ROOT, 'server', 'main.mjs'), 'utf8')
-const start = mainSrc.indexOf('const API_ROUTES')
-const end = mainSrc.indexOf('}', start)
-ok(start !== -1 && end !== -1, 'server/main.mjs 里能找到 API_ROUTES 路由表')
-const block = mainSrc.slice(start, end)
-const routes = [...block.matchAll(/'(\/api\/[a-z0-9_-]+)'\s*:/gi)].map(m => m[1])
-ok(routes.length > 0, 'API_ROUTES 解析出路由（至少一条）')
+ok(/readdirSync\(API_DIR\)/.test(mainSrc), 'server/main.mjs 的路由表从 api/ 目录派生')
+ok(/const API_DIR = join\(ROOT, 'api'\)/.test(mainSrc), '派生目录指向 ROOT/api')
+ok(/\`\/api\/\$\{name\}\`/.test(mainSrc), '派生规则是 api/<name>.js → /api/<name>')
+ok(!/const \w+Handler = \(await import\('\.\/api\//.test(mainSrc),
+  '没有残留的手抄 import 清单（派生方案的前提）')
 
-/* ---- 3. 正向：每个 api/ 函数都必须被挂上 ---- */
+/* ---- 3. 正向：每个 api/ 函数都会成为一条路由（按派生规则推导）---- */
+const routes = apiFns.map(fn => `/api/${fn}`)
 for (const fn of apiFns) {
-  ok(routes.includes(`/api/${fn}`), `api/${fn}.js 已在 server 路由中注册`)
+  ok(routes.includes(`/api/${fn}`), `api/${fn}.js 会派生为 /api/${fn}`)
 }
 
-/* ---- 4. 反向：每条路由都必须有 api/ 实现（白名单除外） ---- */
+/* ---- 4. 反向：没有「目录外」的业务路由 ----
+ * 派生方案下不可能出现「路由有、文件没有」，但仍要确认 server 没有在内联
+ * 硬编码业务接口（那会绕过目录，回到双份清单）。白名单只留自托管专属端点。
+ */
+const inlineRoutes = [...mainSrc.matchAll(/pathname === '(\/api\/[a-z0-9_-]+)'/gi)].map(m => m[1])
 const WHITELIST = new Set(['/api/_diag'])
-for (const r of routes) {
-  if (WHITELIST.has(r)) continue
-  const fn = r.replace('/api/', '')
-  ok(apiFns.includes(fn), `server 路由 ${r} 有对应的 api/${fn}.js 实现`)
-}
+const strayInline = inlineRoutes.filter(r => !WHITELIST.has(r) && !apiFns.includes(r.replace('/api/', '')))
+ok(strayInline.length === 0, 'server 里没有内联硬编码的业务接口（避免绕开目录派生）', strayInline.join(' '))
 
 /* ---- 5. 白名单里的自托管专属路由必须以 _ 开头（防止把业务接口混进来） ---- */
 for (const r of WHITELIST) ok(r.split('/').pop().startsWith('_'), `白名单路由 ${r} 属自托管专属（_ 前缀）`)

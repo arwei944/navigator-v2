@@ -30,9 +30,9 @@
  */
 import http from 'node:http'
 import { createHash } from 'node:crypto'
-import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs'
+import { createReadStream, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { extname, join, normalize, resolve, sep } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname } from 'node:path'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
@@ -57,51 +57,47 @@ if (!process.env.ADMIN_PASSWORD_HASH) {
 
 /* ---------------- /api/* 处理器 ---------------- */
 
-const metadataHandler = (await import('./api/metadata.js')).default
-const translateHandler = (await import('./api/translate.js')).default
-const sitesHandler = (await import('./api/sites.js')).default
-const sessionHandler = (await import('./api/session.js')).default
-const clicksHandler = (await import('./api/clicks.js')).default
-const opsHandler = (await import('./api/ops.js')).default
-const authHandler = (await import('./api/auth.js')).default
-const healthHandler = (await import('./api/health.js')).default
-const backupHandler = (await import('./api/backup.js')).default
-const coverHandler = (await import('./api/cover.js')).default
-const aiHandler = (await import('./api/ai.js')).default
-// 部署状态：公开只读，后台「部署」面板与页面角标都读它（见 api/deploy-status.js 头部的边界说明）
-const deployStatusHandler = (await import('./api/deploy-status.js')).default
-// 插件管理：9 个引擎注册表的聚合视图 + 运行期配置（后台「插件」面板）
-const pluginsMod = await import('./api/plugins.js')
-const pluginsHandler = pluginsMod.default
-// 告警规则：后台「偏好设置」里可配的阈值表（连续几次不可达才报警 / 自动归档）
-const alertRulesHandler = (await import('./api/alert-rules.js')).default
-// 可用性 / 响应时间历史：公开只读（聚合计数，无站点内容），供趋势图
-const healthHistoryHandler = (await import('./api/health-history.js')).default
-// 本机自动登录端点：只在请求确实来自回环时才返回密钥（线上域名一律 404，见文件头说明）
-const localKeyHandler = (await import('./api/_local-key.js')).default
+/**
+ * 路由表**从 `api/` 目录派生**，不再逐个手抄。
+ *
+ * 此前这里是 16 组「import 一行 + 表里一行」，而 `api/` 下正好是同样 16 个文件；
+ * 新增一个端点要改三处（接口文件、这里的 import、这里的表，另加构建脚本的复制清单），
+ * 漏一处就是运行时 404 —— 而 404 在我们的约定里**有业务含义**（前端据此判定
+ * 「本部署没有该接口」并停止轮询），所以漏掉会表现成「后台某面板静默不工作」，
+ * 不是报错。这类漂移靠人记不住，只能靠结构消掉。
+ *
+ * 约定：`api/<name>.js` ↔ `/api/<name>`；只认 `.js`，`_` 前缀同样保留
+ * （`_local-key` 是端点名的一部分，其回环判定在接口内部）。非接口文件
+ * （`sites-data.json`、`data/` 目录）自然被过滤掉。
+ *
+ * 启动即全量 import：与改造前逐一等价 —— 原先也是启动时把所有 handler
+ * 静态拉起来。接口模块的顶层代码必须保持无副作用（现有 16 个都满足）。
+ */
+const API_DIR = join(ROOT, 'api')
+const apiFiles = readdirSync(API_DIR).filter(f => f.endsWith('.js')).sort()
+
+/** 文件名 → 路由 + 导出模块。失败时把文件名带进错误，别让人对着空栈猜 */
+async function loadApiRoutes() {
+  const routes = {}
+  const mods = {}
+  for (const f of apiFiles) {
+    const name = f.slice(0, -3)
+    const mod = await import(pathToFileURL(join(API_DIR, f)).href)
+    if (typeof mod.default !== 'function') {
+      throw new Error(`api/${f} 没有 default 导出的处理函数 —— 它不该放在 api/ 下（路由表由目录派生）`)
+    }
+    routes[`/api/${name}`] = mod.default
+    mods[name] = mod
+  }
+  return { routes, mods }
+}
+
+const { routes: API_ROUTES, mods: API_MODS } = await loadApiRoutes()
+// 插件管理多一个启动期动作（把 9 个引擎注册表落成运行期配置），仍从同一份模块表取
+const pluginsMod = API_MODS.plugins
 const { etagOf } = await import('./store.mjs')
 const cronMod = await import('./cron.mjs')
 const { startHealthCron } = cronMod
-
-/** 路由表：一个接口文件一个 handler，语义零改动（v10 清单第一条） */
-const API_ROUTES = {
-  '/api/metadata': metadataHandler,
-  '/api/translate': translateHandler,
-  '/api/sites': sitesHandler,
-  '/api/session': sessionHandler,
-  '/api/clicks': clicksHandler,
-  '/api/ops': opsHandler,
-  '/api/auth': authHandler,
-  '/api/health': healthHandler,
-  '/api/backup': backupHandler,
-  '/api/cover': coverHandler,
-  '/api/ai': aiHandler,
-  '/api/deploy-status': deployStatusHandler,
-  '/api/plugins': pluginsHandler,
-  '/api/alert-rules': alertRulesHandler,
-  '/api/health-history': healthHistoryHandler,
-  '/api/_local-key': localKeyHandler,
-}
 
 /** 给原生 res 补上 Vercel 风格的 `status().json()`，接口源码零改动 */
 function withHelpers(res) {

@@ -78,9 +78,14 @@ mkdirSync(join(DIST, 'shared'), { recursive: true })
 copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
 copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
-// v9-P0：sites/session 复活；v10：clicks/ops/auth/health 一起接回（管理后台、点击统计、健康角标、登录）
-// 本轮：translate 独立成接口（翻译不再串在抓取响应里，见 api/translate.js 的注释）
-for (const f of ['sites.js', 'session.js', 'metadata.js', 'translate.js', 'clicks.js', 'ops.js', 'auth.js', 'health.js', 'backup.js', 'cover.js', 'ai.js', 'deploy-status.js', 'plugins.js', 'alert-rules.js', 'health-history.js', '_local-key.js']) {
+// 复制 `api/` 下**全部** .js —— 与 server/main.mjs 的路由表同源（那边也是按目录派生）。
+//
+// 此处原先是逐个列文件名的白名单，与路由表构成两份必须同步的手工清单：
+// 新增接口时只加文件、忘了在这里登记，产物里就少一个 handler，而部署包的
+// `containerLooksHealthy()` 只查 `/api` 目录存在与否 —— 于是「构建成功、部署成功、
+// 线上那个接口 404」。改成目录派生后，加文件即生效，不存在第二个地方要记。
+const apiJs = readdirSync(join(root, 'api')).filter(f => f.endsWith('.js')).sort()
+for (const f of apiJs) {
   copyFileSync(join(root, 'api', f), join(DIST, 'api', f))
 }
 copyFileSync(join(root, 'api', 'sites-data.json'), join(DIST, 'api', 'sites-data.json'))

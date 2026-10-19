@@ -1,6 +1,6 @@
 {
-  "total": 102,
-  "registered": 102,
+  "total": 105,
+  "registered": 105,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -20,6 +20,7 @@
     "tools/console/test-category-source.mjs",
     "tools/console/test-chartkit.mjs",
     "tools/console/test-cloud-poll.mjs",
+    "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
     "tools/console/test-contrast.mjs",
     "tools/console/test-cron.mjs",
@@ -31,6 +32,7 @@
     "tools/console/test-desc-junk.mjs",
     "tools/console/test-doc-facts.mjs",
     "tools/console/test-doc-manager.mjs",
+    "tools/console/test-dryrun-purity.mjs",
     "tools/console/test-dual-stack.mjs",
     "tools/console/test-endpoints-run.mjs",
     "tools/console/test-endpoints.mjs",
@@ -79,6 +81,7 @@
     "tools/console/test-schedule-publish.mjs",
     "tools/console/test-scripts.mjs",
     "tools/console/test-search.mjs",
+    "tools/console/test-server-routes.mjs",
     "tools/console/test-session-merge.mjs",
     "tools/console/test-session.mjs",
     "tools/console/test-share-target.mjs",
@@ -318,6 +321,18 @@
       "durationMs": 2860
     },
     {
+      "file": "tools/console/test-color-tokens-real.mjs",
+      "name": "test-color-tokens-real",
+      "purpose": "真机守卫：令牌替换后**实际渲染出的颜色没变**。",
+      "category": "安全与鉴权",
+      "lines": 249,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": "需要本机 Chrome：cdp-driver 只探测 Windows 路径，CI 容器里没有浏览器；且依赖 dist/ 产物",
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-command-phrases.mjs",
       "name": "test-command-phrases",
       "purpose": "I3 守卫：自然语言 → 命令。",
@@ -450,11 +465,23 @@
       "durationMs": 264
     },
     {
+      "file": "tools/console/test-dryrun-purity.mjs",
+      "name": "test-dryrun-purity",
+      "purpose": "预演纯净性门禁：dryRun 分支不得产生外部副作用",
+      "category": "安全与鉴权",
+      "lines": 104,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-dual-stack.mjs",
       "name": "test-dual-stack",
       "purpose": "双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主）",
       "category": "服务端与运行时",
-      "lines": 76,
+      "lines": 89,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
@@ -1028,6 +1055,18 @@
       "durationMs": 411
     },
     {
+      "file": "tools/console/test-server-routes.mjs",
+      "name": "test-server-routes",
+      "purpose": "服务端路由门禁：`api/` 目录 ↔ 构建产物 ↔ 路由表 三者同源",
+      "category": "服务端与运行时",
+      "lines": 85,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-session-merge.mjs",
       "name": "test-session-merge",
       "purpose": "会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。",
@@ -1312,7 +1351,7 @@
       "name": "test-visual-layer",
       "purpose": "视觉层门禁（统一视觉层）",
       "category": "前端与体验",
-      "lines": 310,
+      "lines": 368,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

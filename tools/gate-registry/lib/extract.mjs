@@ -141,7 +141,7 @@ const CATEGORY_RULES = [
     /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture|format|safeStorage|share|inline-stability|split-wiring/i,
   ],
   ['部署与发布', /deploy|publish|release|botkeep|endpoint|manifest|schedule/i],
-  ['安全与鉴权', /auth|security|netguard|session|secret|rate|token/i],
+  ['安全与鉴权', /auth|security|netguard|session|secret|rate|token|dryrun/i],
   ['文档治理', /doc|readme/i],
   ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size/i],
   [
@@ -150,7 +150,7 @@ const CATEGORY_RULES = [
   ],
   [
     '服务端与运行时',
-    /server|api|store|cron|health|mcp|v10|stack|offline|sync|engine|ops|uptime|poll|http|image|llm|probe|alert|admin|net/i,
+    /server|route|api|store|cron|health|mcp|v10|stack|offline|sync|engine|ops|uptime|poll|http|image|llm|probe|alert|admin|net/i,
   ],
 ]
 

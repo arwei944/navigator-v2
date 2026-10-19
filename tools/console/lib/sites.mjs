@@ -427,7 +427,20 @@ export async function downloadIcon(id, { faviconUrl = '', dryRun = false } = {})
   const host = hostOf(site.url)
   const candidates = []
   if (faviconUrl) candidates.push(faviconUrl)
-  if (!candidates.length) {
+
+  /*
+   * 预演**不发网络请求**。
+   *
+   * 原先 dryRun 分支写在 fetchMeta 之后，于是「预演」仍会真实抓取目标站点页面
+   * 来探测 `<link rel=icon>` —— 实测单次 3.2s，且是唯一会访问外网的写操作预演。
+   * 这和闸门的语义冲突：预演的承诺是「只看不动」，不该有外部副作用，也不该
+   * 让 MCP 的每次预演变成一个可能超时的网络调用（CI 冷环境下正是它把
+   * test-mcp 推到 60s 超时线上）。
+   *
+   * 预演给出的候选列表因此是**确定性的兜底来源**，并显式说明
+   * 「页面声明的 favicon 未探测」。真实执行时仍按原顺序探测。
+   */
+  if (!dryRun && !candidates.length) {
     try {
       const m = await fetchMeta(site.url)
       if (m.faviconUrl) candidates.push(m.faviconUrl)
@@ -435,7 +448,16 @@ export async function downloadIcon(id, { faviconUrl = '', dryRun = false } = {})
   }
   candidates.push(`https://${host}/favicon.ico`, `https://favicon.im/${host}?format=png&size=128`)
 
-  if (dryRun) return { dryRun: true, icon: site.icon || null, candidates }
+  if (dryRun) {
+    return {
+      dryRun: true,
+      icon: site.icon || null,
+      candidates,
+      // 让调用方知道「预演没去探测页面声明」，不至于把候选列表当成完整清单
+      pageProbeSkipped: !faviconUrl,
+      note: '预演不访问网络：以上为确定的兜底来源；实际执行时会先探测页面声明的 favicon',
+    }
+  }
 
   const errors = []
   for (const c of candidates) {
