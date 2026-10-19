@@ -134,7 +134,7 @@ async function restore() {
 .ops-msg.ok { color: var(--ok-fg); }
 .ops-msg.err { color: var(--danger-fg); }
 .mini-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 13px; }
-.mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
-.mini-btn.danger { background: var(--danger-fg); color: #fff; border-color: transparent; }
+.mini-btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.mini-btn.danger { background: var(--danger-fg); color: var(--on-accent); border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }
 </style>

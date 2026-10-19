@@ -531,7 +531,7 @@ function onDragChange() {
 .trash-count { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
 .trash-empty-btn {
   display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; font-weight: 500;
-  border: 1px solid #fca5a5; border-radius: var(--radius-sm); background: #fef2f2; color: #ef4444;
+  border: 1px solid #fca5a5; border-radius: var(--radius-sm); background: #fef2f2; color: var(--color-danger);
   cursor: pointer; transition: all var(--dur-fast) ease;
 }
 .trash-empty-btn:hover { background: #fee2e2; }
@@ -552,7 +552,7 @@ function onDragChange() {
   background: var(--bg-white); color: var(--text-primary);
 }
 .trash-restore-btn:hover { border-color: var(--accent); color: var(--accent); }
-.trash-delete-btn:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+.trash-delete-btn:hover { border-color: var(--color-danger); color: var(--color-danger); background: #fef2f2; }
 .trash-restore-btn svg, .trash-delete-btn svg { width: 14px; height: 14px; }
 
 /* 回收站行自有的图标/标题/描述样式。

@@ -293,7 +293,7 @@ onUnmounted(() => {
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
-  color: #fff;
+  color: var(--on-accent);
   letter-spacing: 1px;
   flex-shrink: 0;
 }

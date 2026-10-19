@@ -131,8 +131,8 @@ onBeforeUnmount(() => { disarm?.(); pause() })
   transition: background var(--transition), color var(--transition);
 }
 .bgm-icon:hover { background: var(--border-light); color: var(--text-primary); }
-.bgm-main { background: var(--accent); color: #fff; font-size: 11px; }
-.bgm-main:hover { background: var(--accent); color: #fff; opacity: .9; }
+.bgm-main { background: var(--accent); color: var(--on-accent); font-size: 11px; }
+.bgm-main:hover { background: var(--accent); color: var(--on-accent); opacity: .9; }
 .bgm-icon.sm { width: 22px; height: 22px; font-size: 10px; }
 .bgm-title { display: inline-flex; align-items: center; gap: 5px; color: var(--text-primary); white-space: nowrap; }
 .bgm-note { color: var(--accent); }

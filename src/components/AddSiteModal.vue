@@ -703,7 +703,7 @@ loadSuggestCategory().catch(() => {})
 .ai-btn { padding: 4px 10px; font-size: 12px; border-radius: 6px; border: 1px solid var(--color-border); background: transparent; color: var(--text-primary); cursor: pointer; }
 .ai-btn:disabled { opacity: .6; cursor: default; }
 .ai-hint { font-size: 11px; color: var(--color-muted); }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover { filter: brightness(1.1); }
 .btn-small { padding: 4px 12px; font-size: 11px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-white); color: var(--text-secondary); cursor: pointer; white-space: nowrap; }
 .btn-small:hover { border-color: var(--accent); color: var(--accent); }

@@ -214,7 +214,7 @@ onMounted(load)
 .dp-consistency.warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-fg); }
 .dp-dot.ok { background: #16a34a; }
 .dp-dot.warn { background: #d97706; }
-.dp-dot.info { background: #94a3b8; }
+.dp-dot.info { background: var(--color-muted); }
 
 .dp-card {
   border: 1px solid var(--border); border-radius: var(--radius-md);
@@ -245,7 +245,7 @@ onMounted(load)
 .dp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; background: currentColor; }
 .dp-dot.ok { background: #16a34a; }
 .dp-dot.warn { background: #d97706; }
-.dp-dot.off { background: #94a3b8; }
+.dp-dot.off { background: var(--color-muted); }
 .dp-commits { flex-basis: 100%; list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .dp-commits li { display: flex; gap: 8px; font-size: 11px; }
 .dp-commits code { font-family: ui-monospace, monospace; opacity: .8; flex-shrink: 0; }

@@ -290,8 +290,8 @@ function apply() {
 }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
-.mini-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
-.mini-btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: #fff; }
+.mini-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.mini-btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: var(--on-accent); }
 .batch-hint { margin-top: 8px; font-size: 12px; color: var(--text-secondary); }
 .batch-preview {
   margin-top: 8px;

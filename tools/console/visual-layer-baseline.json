@@ -1,8 +1,15 @@
 {
-  "note": "组件里「不透明实色（hex / rgb()）」的存量基线。视觉真值源（src/utils/visualScheme.js、src/utils/themeSchema.js、src/styles/main.css）本身就在定义颜色，不计入。新颜色请走令牌（见 docs/VISUAL.md）；确属布局必需（如纯色遮罩）者更新此数并在 commit 里补一句备注。",
+  "note": "组件里「不透明实色（hex / rgb()）」的存量基线。视觉真值源（src/utils/visualScheme.js、src/utils/themeSchema.js、src/styles/main.css）本身就在定义颜色，不计入。`var(--token, #fallback)` 里的兜底值也不计入 —— 它恰恰说明作者走了令牌。新颜色请走令牌（见 docs/VISUAL.md）；确属布局必需（如纯色遮罩）者更新基线并在 commit 里补一句备注。还有一条硬规则：**total 只许下调**，抬高基线等于放开闸门（门禁会拦）。",
   "opaqueColors": {
     "total": 187,
+    "target": 73,
+    "loweredFrom": 187,
     "files": 41,
-    "measuredAt": "2026-10-18"
+    "measuredAt": "2026-10-19",
+    "history": [
+      { "date": "2026-10-18", "total": 187, "note": "建立基线；此时按旧口径（含 var 兜底与彩色底白字）计数" },
+      { "date": "2026-10-19", "total": 117, "note": "口径修正 + 首轮偿还：40 处「彩色底上的前景色」收敛为 --on-accent，30 处 var() 兜底值不再计入（它们本就走了令牌）" },
+      { "date": "2026-10-19", "total": 73, "note": "第二轮偿还：22 处 #ef4444 → --color-danger，另 22 处状态色归并到 --color-ok/warn/muted/favorite/note。剩余 73 处多为组件局部语义色（便签六色、图表系列色、遮罩），需逐个判断是否值得令牌化" }
+    ]
   }
 }

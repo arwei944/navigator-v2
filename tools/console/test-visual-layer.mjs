@@ -143,12 +143,41 @@ function walk(dir, out) {
   return out
 }
 
+/**
+ * `var(--border, #e2e8f0)` 里的 `#e2e8f0` **不是硬编码**，是令牌的兜底值。
+ *
+ * 本门禁要抓的是「颜色绕过了令牌体系」。兜底值恰恰相反 —— 它是令牌存在、
+ * 且作者考虑了变量缺失时的表现。把它计入基线会让两件事同时失真：
+ *   ① 计数虚高（原 187 里有 30 处属于此类），基线数字不具备「还要还多少」的含义；
+ *   ② 真正该还的裸实色被兜底值稀释，看数字看不出问题。
+ *
+ * 判定方式：该颜色字面量之前、最近的未闭合 `var(` 之后没有 `)`，
+ * 即它位于 `var(name, <这里>)` 的兜底位。
+ */
+function isFallbackLiteral(src, index) {
+  const before = src.slice(Math.max(0, index - 160), index)
+  const open = before.lastIndexOf('var(')
+  if (open < 0) return false
+  const close = before.lastIndexOf(')')
+  if (close > open) return false
+  // var( 之后必须已经出现逗号，才是「第二参数」的位置
+  return /,/.test(before.slice(open))
+}
+
 let hardTotal = 0
+let fallbackTotal = 0
 const perFile = {}
 for (const f of walk(join(ROOT, 'src'), [])) {
-  const m = readFileSync(f, 'utf8').match(COLOR_RE)
-  if (m && m.length) { hardTotal += m.length; perFile[f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')] = m.length }
+  const src = readFileSync(f, 'utf8')
+  let n = 0
+  for (const m of src.matchAll(COLOR_RE)) {
+    if (isFallbackLiteral(src, m.index)) { fallbackTotal++; continue }
+    n++
+  }
+  hardTotal += n
+  if (n) perFile[f.replace(/\\/g, '/').replace(ROOT.replace(/\\/g, '/'), '')] = n
 }
+console.log(`     裸实色 ${hardTotal} 处｜var() 兜底值 ${fallbackTotal} 处（不计入基线）`)
 
 const baselinePath = join(HERE, 'visual-layer-baseline.json')
 if (!existsSync(baselinePath)) {
@@ -164,11 +193,40 @@ if (!existsSync(baselinePath)) {
     const top = Object.entries(perFile).sort((a, b) => b[1] - a[1]).slice(0, 8)
       .map(([k, v]) => `${v} ${k}`).join('\n      ')
     ok(hardTotal <= cap,
-      `硬编码实色 ${hardTotal} 处 ≤ 基线 ${cap} 处`,
+      `硬编码实色 ${hardTotal} 处 ≤ 存量上限 ${cap} 处`,
       hardTotal > cap
         ? `超 ${hardTotal - cap} 处 —— 新颜色请走令牌（见 docs/VISUAL.md）；确属布局必需（如纯色遮罩）则更新基线并补备注\n      主要来源：\n      ${top}`
         : '')
     console.log(`     主要来源：\n      ${top}`)
+
+    /*
+     * 递减闸：基线只拦增量时，187 会变成一个永久地板 ——
+     * 存量没人还，数字满格反而诱导「改基线」而不是「用令牌」。
+     *
+     * 两条规则：
+     *   ① 实际值必须 ≤ 目标（target）：目标只减不增，达成后要把新值写回。
+     *   ② 实际值必须真的在下降：若与目标持平，给出「本季还要还 N 处」的提示。
+     *      **不因此失败** —— 还债需要时间，硬逼会让改基线成为唯一出路。
+     * 但「基线被调高」必须失败：那是把闸门往回开。
+     */
+    const target = B.opaqueColors?.target
+    const raisedFrom = B.opaqueColors?.loweredFrom
+    if (typeof target === 'number') {
+      ok(hardTotal <= target,
+        `硬编码实色 ${hardTotal} 处 ≤ 递减目标 ${target} 处`,
+        hardTotal > target ? `距目标还差 ${hardTotal - target} 处（见 docs/VISUAL.md 的偿还计划）` : '')
+      if (hardTotal < target) {
+        console.log(`     🎯 已达成本季目标（${target} → ${hardTotal}）：请把 target 写回 ${hardTotal}，让闸门继续下压`)
+      } else if (hardTotal === target) {
+        console.log(`     ⏳ 尚未开始偿还：本季目标 ${target} 处，当前就是 ${hardTotal} 处`)
+      }
+    }
+    if (typeof raisedFrom === 'number') {
+      // 基线上调 = 往回开闸。允许的唯一方式是有记录的下调，不允许抬高。
+      ok(cap <= raisedFrom,
+        `存量上限没有被调高（${raisedFrom} → ${cap}）`,
+        cap > raisedFrom ? '抬高基线等于放开闸门：请改用递减目标，并在 docs/VISUAL.md 说明原因' : '')
+    }
   }
 }
 

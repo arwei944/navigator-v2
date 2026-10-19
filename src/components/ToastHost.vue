@@ -76,9 +76,9 @@ function runAction(t) {
   font-size: 13px;
   color: var(--text-primary);
 }
-.toast-ok { border-left-color: #22c55e; }
+.toast-ok { border-left-color: var(--color-ok); }
 .toast-info { border-left-color: var(--accent); }
-.toast-error { border-left-color: #ef4444; }
+.toast-error { border-left-color: var(--color-danger); }
 .toast-msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .toast-action {
   flex-shrink: 0;
@@ -88,7 +88,7 @@ function runAction(t) {
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
   transition: opacity var(--dur-fast) ease;
 }

@@ -245,7 +245,7 @@ async function refreshAll() {
 }
 .btn-cancel { background: var(--border-light); color: var(--text-secondary); }
 .btn-cancel:hover { background: var(--border); }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover { filter: brightness(1.1); }
 
 /* 「重新获取信息」这一组：取值对齐 AddSiteModal 的同类控件（那边有「自动补全」按钮），

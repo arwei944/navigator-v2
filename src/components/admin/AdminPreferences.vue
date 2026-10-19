@@ -242,7 +242,7 @@ onMounted(loadAlerts)
   background: var(--bg-white, #fff); font-size: 12.5px; cursor: pointer;
 }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent, #2563eb); color: var(--accent, #2563eb); }
-.mini-btn.primary { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: #fff; font-weight: 600; }
+.mini-btn.primary { background: var(--accent, #2563eb); border-color: var(--accent, #2563eb); color: var(--on-accent); font-weight: 600; }
 .mini-btn:disabled { opacity: .6; cursor: not-allowed; }
 .alert-saved { font-size: 12.5px; color: var(--ok-fg); }
 </style>

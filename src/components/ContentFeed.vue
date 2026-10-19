@@ -280,7 +280,7 @@ function onVisit(siteId) {
   justify-content: center;
   font-weight: 700;
   font-size: 13px;
-  color: #fff;
+  color: var(--on-accent);
   position: relative;
   overflow: hidden;
 }
@@ -375,7 +375,7 @@ function onVisit(siteId) {
   justify-content: center;
   font-weight: 700;
   font-size: 13px;
-  color: #fff;
+  color: var(--on-accent);
   position: relative;
   overflow: hidden;
 }

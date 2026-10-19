@@ -406,7 +406,7 @@ watch(() => props.site, () => {
 .detail-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px color-mix(in srgb, var(--site-color, #64748b) 30%, transparent); position: relative; overflow: hidden; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 3px; background: #fff; box-sizing: border-box; border-radius: 12px; }
-.detail-icon span { font-size: 18px; font-weight: 700; color: #fff; }
+.detail-icon span { font-size: 18px; font-weight: 700; color: var(--on-accent); }
 .detail-title-group { min-width: 0; flex: 1; }
 .detail-name { font-size: 16px; font-weight: 600; color: var(--text-primary); margin: 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .detail-domain { font-size: 12px; color: var(--text-secondary); display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -437,8 +437,8 @@ watch(() => props.site, () => {
 .edit-actions { display: flex; justify-content: flex-end; gap: 6px; padding-top: 4px; border-top: 1px solid var(--border-light); }
 .edit-btn { padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-family: var(--font); font-size: 12px; font-weight: 600; cursor: pointer; transition: all var(--dur-fast) ease; }
 .edit-btn:hover { border-color: var(--accent); color: var(--accent); }
-.edit-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.edit-btn.primary:hover { opacity: 0.9; color: #fff; }
+.edit-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.edit-btn.primary:hover { opacity: 0.9; color: var(--on-accent); }
 
 .note-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .note-pin { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--text-secondary); font-size: 10px; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; opacity: 1; margin: 0; transition: all var(--dur-fast) ease; }
@@ -471,7 +471,7 @@ watch(() => props.site, () => {
 .action-btn { display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-white); color: var(--text-primary); font-size: 11px; font-weight: 500; cursor: pointer; transition: all var(--dur-fast) ease; text-decoration: none; font-family: var(--font); }
 .action-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 .action-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
-.action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.action-btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .action-btn.primary:hover { opacity: 0.9; }
-.action-btn.favorited { color: #eab308; border-color: #eab308; background: #fefce8; }
+.action-btn.favorited { color: var(--color-favorite); border-color: var(--color-favorite); background: #fefce8; }
 </style>

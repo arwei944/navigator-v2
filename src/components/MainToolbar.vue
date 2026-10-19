@@ -148,13 +148,13 @@ function toggleViewMode() {
 }
 .view-toggle { width: 32px; padding: 0; }
 .toolbar-btn:hover, .view-toggle:hover { border-color: var(--accent); color: var(--accent); }
-.toolbar-btn.active, .view-toggle.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toolbar-btn.active, .view-toggle.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .toolbar-btn:disabled { opacity: .4; cursor: not-allowed; }
 .toolbar-btn svg, .view-toggle svg { width: 15px; height: 15px; flex-shrink: 0; }
 
 /* 添加站点：右上角主操作，用实心强调色与其余描边图标按钮拉开层级 */
-.add-site-btn { background: var(--accent); border-color: var(--accent); color: #fff; }
-.add-site-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; opacity: .9; }
+.add-site-btn { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.add-site-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); opacity: .9; }
 
 @media (max-width: 1024px) {
   .toolbar-btn { padding: 0 8px; }

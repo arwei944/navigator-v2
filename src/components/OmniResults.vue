@@ -226,7 +226,7 @@ watch(() => props.selectedIndex, async (v) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 11px;
   font-weight: 700;
   flex-shrink: 0;
@@ -256,7 +256,7 @@ watch(() => props.selectedIndex, async (v) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-accent);
   font-size: 15px;
   font-weight: 700;
   flex-shrink: 0;

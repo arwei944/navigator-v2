@@ -275,7 +275,7 @@ onMounted(() => {
 .foot-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--color-on-solid); }
 .foot-btn.primary:hover { opacity: .9; color: var(--color-on-solid); }
 .foot-btn.danger { color: var(--color-danger); border-color: var(--color-danger); }
-.foot-btn.danger:hover { background: var(--color-danger); color: var(--color-on-solid); }
+.foot-btn.danger:hover { background: var(--color-danger); color: var(--on-danger); }
 @media (max-width: 768px) {
   .editor-panel { width: 100%; }
 }

@@ -47,7 +47,7 @@ defineEmits(['confirm', 'cancel'])
   width: 48px;
   height: 48px;
   margin: 0 auto 16px;
-  color: #ef4444;
+  color: var(--color-danger);
 }
 .confirm-icon svg { width: 48px; height: 48px; }
 .confirm-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
@@ -64,6 +64,6 @@ defineEmits(['confirm', 'cancel'])
 }
 .btn-cancel { background: var(--border-light); color: var(--text-secondary); }
 .btn-cancel:hover { background: var(--border); }
-.btn-danger { background: #ef4444; color: #fff; }
+.btn-danger { background: var(--color-danger); color: var(--on-danger); }
 .btn-danger:hover { filter: brightness(1.1); }
 </style>

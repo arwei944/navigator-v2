@@ -134,7 +134,7 @@ watch(() => props.adminKey, load)
 .ops-head h3 { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .ops-head-right { display: flex; align-items: center; gap: 8px; }
 .notify-unread-badge {
-  font-size: 11px; font-weight: 700; color: #fff; background: #ef4444;
+  font-size: 11px; font-weight: 700; color: var(--on-danger); background: var(--color-danger);
   padding: 1px 8px; border-radius: 10px;
 }
 .ops-empty { font-size: 13px; color: var(--text-secondary); padding: 8px 0; }
@@ -164,20 +164,20 @@ watch(() => props.adminKey, load)
 }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
-.mini-btn.danger:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+.mini-btn.danger:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
 .notify-list { display: flex; flex-direction: column; max-height: 360px; overflow-y: auto; }
 .notify-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border-light); }
 .notify-row:last-child { border-bottom: none; }
 .notify-row.read { opacity: .55; }
 .notify-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex-shrink: 0; }
-.notify-dot.error { background: #ef4444; }
-.notify-dot.warn { background: #f59e0b; }
+.notify-dot.error { background: var(--color-danger); }
+.notify-dot.warn { background: var(--color-warn); }
 .notify-dot.info { background: var(--accent); }
 .notify-main { flex: 1; min-width: 0; }
 .notify-line1 { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
 .notify-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 .notify-kind { font-size: 11px; color: var(--text-secondary); background: var(--border-light); padding: 1px 7px; border-radius: 10px; }
-.notify-new { font-size: 10px; font-weight: 700; color: #fff; background: #ef4444; padding: 1px 6px; border-radius: 8px; }
+.notify-new { font-size: 10px; font-weight: 700; color: var(--on-danger); background: var(--color-danger); padding: 1px 6px; border-radius: 8px; }
 .notify-body { margin-top: 3px; font-size: 12px; color: var(--text-secondary); word-break: break-all; }
 .notify-action { margin-top: 3px; font-size: 11.5px; color: var(--accent); }
 .notify-ts { font-size: 11.5px; color: var(--text-secondary); flex-shrink: 0; }

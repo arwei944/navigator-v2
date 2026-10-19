@@ -567,8 +567,8 @@ watch(webhookUrl, (v) => {
   margin-left: 6px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #ef4444;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--on-danger);
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -599,7 +599,7 @@ watch(webhookUrl, (v) => {
   font-size: 12.5px;
   color: var(--text-secondary);
 }
-.admin-user-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.admin-user-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-ok); }
 .admin-user-name { font-weight: 600; color: var(--text-primary); }
 .admin-user-via { font-size: 11.5px; color: var(--text-disabled); }
 .admin-auth-check { font-size: 13px; color: var(--text-secondary); padding: 40px 0; text-align: center; }
@@ -632,7 +632,7 @@ watch(webhookUrl, (v) => {
   border: none;
   border-radius: var(--radius-sm);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -667,7 +667,7 @@ watch(webhookUrl, (v) => {
   font-size: 12.5px; color: var(--text-secondary);
 }
 .admin-cred-line b { color: var(--text-primary); }
-.admin-cred-dot { width: 7px; height: 7px; border-radius: 50%; background: #22c55e; }
+.admin-cred-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-ok); }
 .admin-webhook-input { margin-top: 10px; display: block; width: 100%; box-sizing: border-box; }
 .admin-link-btn { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; padding: 0; text-decoration: underline; }
 .admin-key-input {

@@ -107,7 +107,7 @@ async function applySuggestion(row) {
   }
   if (row.kind === 'new' && row.label) {
     const cid = `ai-${Date.now().toString(36)}`
-    const r = categoriesStore.addCategory(row.groupId || 'tools', { id: cid, label: row.label, dotColor: '#8b5cf6' })
+    const r = categoriesStore.addCategory(row.groupId || 'tools', { id: cid, label: row.label, dotColor: 'var(--color-note)' })
     if (!r.ok) { say('新建分类失败：' + (r.error || ''), 'err'); return }
     sitesStore.updateSiteField(row.id, 'categoryId', cid)
   }
@@ -350,7 +350,7 @@ const dedupe = computed(() => auditSites(sitesStore.sites))
 .ops-msg.ok { color: var(--ok-fg); }
 .ops-msg.err { color: var(--danger-fg); }
 .mini-btn { padding: 5px 10px; border-radius: 6px; border: 1px solid var(--border); background: transparent; cursor: pointer; font-size: 12px; }
-.mini-btn.primary { background: var(--accent); color: #fff; border-color: transparent; }
+.mini-btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .mini-btn:disabled { opacity: .6; cursor: default; }
 
 /* F5 三项：一致性体检 / 描述生成 / 去重建议 */

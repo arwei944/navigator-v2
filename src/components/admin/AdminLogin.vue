@@ -288,9 +288,9 @@ onMounted(async () => {
   padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-white);
   font-size: 13px; color: var(--text-primary); cursor: pointer;
 }
-.mini-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.mini-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.mini-btn.primary:hover:not(:disabled) { color: #fff; opacity: .92; }
+.mini-btn.primary:hover:not(:disabled) { color: var(--on-accent); opacity: .92; }
 .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
 .link-btn {
   background: none; border: none; padding: 0; font-size: 12.5px; color: var(--text-secondary);

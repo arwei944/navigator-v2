@@ -385,7 +385,7 @@ onUnmounted(() => {
 .chip.active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .chip-count { font-size: 10px; font-weight: 600; opacity: .6; }

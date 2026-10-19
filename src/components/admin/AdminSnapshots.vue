@@ -158,5 +158,5 @@ watch(() => props.adminKey, load)
 }
 .mini-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .mini-btn:disabled { opacity: .5; cursor: not-allowed; }
-.mini-btn.danger:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+.mini-btn.danger:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
 </style>

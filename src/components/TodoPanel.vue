@@ -111,13 +111,13 @@ const filterTabs = [
   { key: 'all', label: '全部' },
   { key: 'work', label: '工作', color: '#3b82f6' },
   { key: 'personal', label: '个人', color: '#10b981' },
-  { key: 'study', label: '学习', color: '#8b5cf6' },
+  { key: 'study', label: '学习', color: 'var(--color-note)' },
 ]
 
 const categories = [
   { key: 'work', label: '工作', color: '#3b82f6' },
   { key: 'personal', label: '个人', color: '#10b981' },
-  { key: 'study', label: '学习', color: '#8b5cf6' },
+  { key: 'study', label: '学习', color: 'var(--color-note)' },
 ]
 
 const filteredTodos = computed(() => {
@@ -126,8 +126,8 @@ const filteredTodos = computed(() => {
 })
 
 function categoryColor(cat) {
-  const m = { work: '#3b82f6', personal: '#10b981', study: '#8b5cf6' }
-  return m[cat] || '#94a3b8'
+  const m = { work: '#3b82f6', personal: '#10b981', study: 'var(--color-note)' }
+  return m[cat] || 'var(--color-muted)'
 }
 
 function addTodo() {
@@ -316,7 +316,7 @@ function addTodo() {
 
 .delete-btn:hover {
   background: #fef2f2;
-  color: #ef4444;
+  color: var(--color-danger);
 }
 
 /* checkbox */

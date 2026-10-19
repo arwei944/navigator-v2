@@ -186,5 +186,5 @@ async function download() {
 .data-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .data-btn:disabled:hover { border-color: var(--border); color: var(--text-primary); background: var(--bg-white); }
 .sync-status { font-size: 11px; color: var(--accent); line-height: 1.5; }
-.sync-status.error { color: #ef4444; }
+.sync-status.error { color: var(--color-danger); }
 </style>

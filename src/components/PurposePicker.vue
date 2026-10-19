@@ -68,7 +68,7 @@ function toggle(id) {
   transition: all var(--dur-fast) ease;
 }
 .purpose-chip:hover:not(.disabled) { border-color: var(--accent); color: var(--accent); }
-.purpose-chip.active { color: #fff; }
+.purpose-chip.active { color: var(--on-accent); }
 .purpose-chip.disabled { opacity: .45; cursor: not-allowed; }
 .purpose-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 </style>

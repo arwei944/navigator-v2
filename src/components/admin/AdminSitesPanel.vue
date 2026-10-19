@@ -427,12 +427,12 @@ function confirmImport() {
 .admin-head-actions { display: flex; gap: 8px; }
 .admin-btn {
   padding: 7px 16px; border: none; border-radius: var(--radius-sm);
-  background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+  background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .admin-btn:hover { filter: brightness(1.1); }
 .admin-btn.ghost { background: var(--bg-white); color: var(--text-primary); border: 1px solid var(--border); }
 .admin-btn.ghost:hover { border-color: var(--accent); color: var(--accent); filter: none; }
-.admin-btn.ghost.warn { border-color: #f59e0b; color: var(--warn-fg); }
+.admin-btn.ghost.warn { border-color: var(--color-warn); color: var(--warn-fg); }
 .admin-btn.ghost.active { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
 .admin-btn:disabled { opacity: .6; cursor: not-allowed; }
 
@@ -524,7 +524,7 @@ function confirmImport() {
 .card-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .site-name-text { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .site-url { color: var(--text-secondary); font-family: monospace; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.site-favicon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: #fff; flex-shrink: 0; position: relative; overflow: hidden; }
+.site-favicon { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: var(--on-accent); flex-shrink: 0; position: relative; overflow: hidden; }
 .favicon-fallback { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .favicon-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; padding: 2px; background: #fff; box-sizing: border-box; }
 .card-desc {
@@ -546,7 +546,7 @@ function confirmImport() {
   font-size: 12px; color: var(--text-secondary);
 }
 .action-btn:hover { border-color: var(--accent); color: var(--accent); }
-.action-btn.danger:hover { border-color: #ef4444; color: #ef4444; }
+.action-btn.danger:hover { border-color: var(--color-danger); color: var(--color-danger); }
 .empty-cards {
   grid-column: 1 / -1;
   text-align: center; color: var(--text-secondary); padding: 40px 16px;

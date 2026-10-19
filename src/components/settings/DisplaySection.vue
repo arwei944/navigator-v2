@@ -151,7 +151,7 @@ function updateBlur() {
 .setting-input:focus { border-color: var(--accent); }
 .setting-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
 .wallpaper-clear { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-white); color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all var(--dur-fast) ease; }
-.wallpaper-clear:hover { border-color: #ef4444; color: #ef4444; background: #fef2f2; }
+.wallpaper-clear:hover { border-color: var(--color-danger); color: var(--color-danger); background: #fef2f2; }
 .wallpaper-clear svg { width: 12px; height: 12px; }
 .setting-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; cursor: pointer; }
 .setting-toggle input { display: none; }

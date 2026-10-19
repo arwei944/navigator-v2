@@ -230,8 +230,8 @@ onMounted(load)
 }
 .pl-btn:hover { border-color: var(--accent); color: var(--accent); }
 .pl-btn:disabled { opacity: .5; cursor: not-allowed; }
-.pl-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pl-btn.primary:hover { opacity: .9; color: #fff; }
+.pl-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pl-btn.primary:hover { opacity: .9; color: var(--on-accent); }
 .pl-link { border: none; background: none; padding: 0; font-size: 11px; color: var(--accent); cursor: pointer; }
 
 .pl-error { margin: 0 0 12px; font-size: 12px; color: #b91c1c; }

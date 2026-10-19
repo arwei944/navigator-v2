@@ -51,7 +51,7 @@ const sidebarStore = useSidebarStore()
 const TOP_N = 5
 
 const colorOf = computed(() =>
-  Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.dotColor || '#94a3b8'])))
+  Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.dotColor || 'var(--color-muted)'])))
 const categoryLabels = computed(() =>
   Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.label])))
 const purposeLabels = computed(() =>
@@ -66,7 +66,7 @@ const items = computed(() => relatedTo(props.site, sitesStore.sites || [], {
   name: r.site.name || r.site.url,
   score: r.score,
   reasons: r.reasons,
-  color: colorOf.value[r.site.categoryId] || '#94a3b8',
+  color: colorOf.value[r.site.categoryId] || 'var(--color-muted)',
 })))
 
 function go(id) {

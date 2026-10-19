@@ -159,7 +159,7 @@ const categoryLabels = computed(() =>
 const purposeLabels = computed(() =>
   Object.fromEntries(PURPOSE_TAGS.map(t => [t.id, t.label])))
 const colorOf = computed(() =>
-  Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.dotColor || '#94a3b8'])))
+  Object.fromEntries(categoriesStore.categories.map(c => [c.id, c.dotColor || 'var(--color-muted)'])))
 
 const graph = computed(() => {
   const all = sitesStore.sites || []
@@ -204,12 +204,12 @@ const selected = computed(() => {
   return {
     site,
     domain: domainOf(site.url),
-    color: colorOf.value[site.categoryId] || '#94a3b8',
+    color: colorOf.value[site.categoryId] || 'var(--color-muted)',
     categoryLabel: categoryLabels.value[site.categoryId] || '',
     purposes: (site.purposes || []).map(p => ({
       id: p,
       label: purposeLabels.value[p] || p,
-      color: PURPOSE_TAGS.find(t => t.id === p)?.color || '#94a3b8',
+      color: PURPOSE_TAGS.find(t => t.id === p)?.color || 'var(--color-muted)',
     })),
     neighbors: nb.map(e => {
       const s = graph.value.nodes.find(x => x.id === e.id)
@@ -218,7 +218,7 @@ const selected = computed(() => {
         name: s?.name || s?.url || e.id,
         score: e.score,
         reasons: e.reasons,
-        color: colorOf.value[s?.categoryId] || '#94a3b8',
+        color: colorOf.value[s?.categoryId] || 'var(--color-muted)',
       }
     }),
   }
@@ -269,7 +269,7 @@ const renderedNodes = computed(() => {
       x: p.x,
       y: p.y,
       r: 4.5 + Math.min(degree, 9) * 0.85,
-      color: colorOf.value[s.categoryId] || '#94a3b8',
+      color: colorOf.value[s.categoryId] || 'var(--color-muted)',
       // 尺寸太小的话，高亮环反而看不清；给激活节点加一圈描边
       stroke: isActive ? '#0f172a' : 'rgba(255,255,255,.75)',
       degree,
@@ -297,7 +297,7 @@ const renderedEdges = computed(() => {
       key: `${e.source}|${e.target}`,
       x1: a.x, y1: a.y, x2: b.x, y2: b.y,
       width: touching ? 1.4 + (e.score / 100) * 2.6 : 0.6 + (e.score / 100) * 1.8,
-      color: touching ? '#1e40af' : '#94a3b8',
+      color: touching ? '#1e40af' : 'var(--color-muted)',
       opacity: touching ? 0.85 : active ? 0.12 : 0.3,
       dash: touching ? null : null,
     })
