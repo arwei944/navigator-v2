@@ -9,7 +9,7 @@
  * 做的），rollup 会因为「同一模块既有静态引用又有动态引用」而把整个模块提升进首屏，
  * 实测首屏 591.6 → 608.4 KiB，越过 600 KiB 预算。
  *
- * 拆开后：`siteDraft.js` 只引这个 ~30 行的小模块，site-infer 只剩
+ * 拆开后：`siteDraft.js` 只引这个纯函数小模块（不含任何推断链依赖），site-infer 只剩
  * `services/localMeta.js` 的动态 import 一条到达路径，稳稳落在异步 chunk 里。
  * 守卫：`test-bundle` 的 LAZY_PARTS 里有 site-infer 的点名断言。
  */

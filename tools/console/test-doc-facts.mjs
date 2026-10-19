@@ -34,7 +34,7 @@
  * 只对**明确句式**生效（「聚合 N+ 优质站点」「N 个子分类」…），不做模糊语义判断：
  * 门禁宁可漏，不可误报 —— 误报一次就会被人加进白名单，然后就永远失效了。
  */
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { categoryList, domainList } from '../../shared/categories.mjs'
@@ -237,6 +237,72 @@ const headEnd = handover.search(/^## /m)
 const handoverHead = headEnd === -1 ? handover : handover.slice(0, headEnd)
 
 assertNumbers('HANDOVER.md 当前状态区', handoverHead, NUMBER_RULES)
+
+/* ---------------- 代码注释里的「N 行」 ---------------- */
+
+/*
+ * 注释写死行数必然过期。
+ *
+ * 实测两处：`site-store.mjs` 写「362 行的接口文件」（实际 314 行）、
+ * `html-text.mjs` 写「852 行的单文件引擎」（实际 692 行）。这类漂移没人报错，
+ * 但读代码的人会默认注释可信。
+ *
+ * 判定口径：形如 `<文件名> 是 N 行的` 或 `N 行的 <文件名>` 时，核对被引文件的真实行数。
+ * 「约 / ~ / 上千 / 几十」这类近似表述不算 —— 它们本来就不承诺精确值。
+ */
+{
+  /*
+   * 目标文件可能写成裸文件名（`site-infer.mjs`）而非仓库相对路径。
+   * 按「仓库根 → 常见源码目录」顺序解析；**都找不到时不算通过，而是跳过并计数**，
+   * 最后把「无法解析的引用」一起报出来 —— 静默 continue 会让整条校验形同虚设
+   * （第一次实现就踩了这个坑：裸文件名解析不到，全部被 continue 掉，永远绿）。
+   */
+  const SEARCH_DIRS = ['', 'shared', 'src', 'src/utils', 'src/components', 'src/composables',
+    'src/stores', 'src/views', 'src/services', 'server', 'api', 'scripts', 'tools/console/lib']
+  const resolveTarget = (name) => {
+    if (name.includes('/')) {
+      const p = join(ROOT, name)
+      return existsSync(p) ? p : null
+    }
+    for (const d of SEARCH_DIRS) {
+      const p = join(ROOT, d, name)
+      if (existsSync(p)) return p
+    }
+    return null
+  }
+
+  const owners = readdirSync(join(ROOT, 'shared')).filter((f) => f.endsWith('.mjs')).map((f) => `shared/${f}`)
+  const wrong = []
+  const unresolved = []
+  for (const rel of owners) {
+    const src = read(`./${rel}`)
+    const patterns = [
+      // `xxx.mjs` … N 行
+      { re: /`([\w./-]+\.(?:mjs|js|vue))`[^\n]{0,30}?(\d+)\s*行/g, name: 1, num: 2 },
+      // N 行的 `xxx.mjs`
+      { re: /(\d+)\s*行的\s*`([\w./-]+\.(?:mjs|js|vue))`/g, name: 2, num: 1 },
+    ]
+    for (const { re, name, num } of patterns) {
+      for (const m of src.matchAll(re)) {
+        const target = m[name]
+        const abs = resolveTarget(target)
+        if (!abs) { unresolved.push(`${rel} → ${target}`); continue }
+        const real = readFileSync(abs, 'utf-8').split(/\r?\n/).length
+        if (Number(m[num]) !== real) {
+          wrong.push(`${rel}: 说 \`${target}\` 是 ${m[num]} 行，实际 ${real} 行`)
+        }
+      }
+    }
+  }
+  ok(
+    unresolved.length === 0,
+    `代码注释引用了无法解析的文件（无法核对行数，不算通过）：\n      ${unresolved.join('\n      ')}`,
+  )
+  ok(
+    wrong.length === 0,
+    `代码注释里的行数与文件实际不符（行数会变，注释不要写死）：\n      ${wrong.join('\n      ')}`,
+  )
+}
 
 /* ---------------- 报告 ---------------- */
 
