@@ -7,6 +7,8 @@
  * 从而在本地把「鉴权 / 路由 / 落盘语义」跑通，不依赖任何网络或凭据。
  *
  * 运行：node --experimental-test-module-mocks tools/console/test-api-ops.mjs
+ *
+ * @node-flags --experimental-test-module-mocks
  */
 import { test, mock, after } from 'node:test'
 import assert from 'node:assert/strict'

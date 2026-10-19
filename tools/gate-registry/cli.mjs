@@ -15,19 +15,20 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { extractFromTestAll, purposeOf, linesOf, categoryOf } from './lib/extract.mjs'
+import { nodeFlagsOf, purposeOf, linesOf, categoryOf } from './lib/extract.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const INDEX_JSON = join(HERE, 'gate-index.json')
 const INDEX_MD = join(HERE, 'GATE-INDEX.md')
 
-/** 采集当前全部门禁脚本（tools/console/test-*.mjs + tools/mcp/test-*.mjs） */
+/**
+ * 采集当前全部门禁脚本（`tools/console/test-*.mjs` + `tools/mcp/test-*.mjs`）。
+ *
+ * 「接入」= 脚本出现在这个扫描范围内 —— 执行器（`tools/console/run-all-gates.mjs`）
+ * 读的就是本台账，台账读的就是这两个目录，因此不存在「写了脚本但没人跑」的中间态。
+ */
 function collect() {
-  const pkgText = readFileSync(join(ROOT, 'package.json'), 'utf-8')
-  const included = extractFromTestAll(pkgText)
-  const includedSet = new Set(included)
-
   const files = []
   for (const [dir, re] of [
     ['tools/console', /^test-.*\.mjs$/],
@@ -50,17 +51,20 @@ function collect() {
       purpose,
       category: categoryOf(name, purpose || ''),
       lines: linesOf(join(ROOT, file)),
-      included: includedSet.has(file),
+      included: true,
+      // 启动参数（如 --experimental-test-module-mocks）由脚本头注释 `@node-flags` 声明；
+      // 执行器原样传递，否则 mock 不生效、门禁会在真实环境里跑另一套语义。
+      nodeFlags: nodeFlagsOf(join(ROOT, file)),
     }
   })
-  return { gates, included }
+  return { gates, included: files }
 }
 
 /** 实跑一道门禁并计时（--timing 时使用；失败也返回耗时，耗时用于回答「哪道最慢」） */
-function timeGate(file) {
+function timeGate(file, nodeFlags = []) {
   const t0 = Date.now()
   try {
-    execFileSync(process.execPath, [join(ROOT, file)], {
+    execFileSync(process.execPath, [...nodeFlags, join(ROOT, file)], {
       cwd: ROOT,
       stdio: 'ignore',
       timeout: 180000,
@@ -80,7 +84,7 @@ function buildIndex({ timing = false } = {}) {
   const prev = existsSync(INDEX_JSON) ? JSON.parse(readFileSync(INDEX_JSON, 'utf-8')) : null
   const prevMs = new Map((prev?.gates || []).map((g) => [g.file, g.durationMs ?? null]))
   for (const g of gates) {
-    g.durationMs = timing ? timeGate(g.file) : (prevMs.get(g.file) ?? null)
+    g.durationMs = timing ? timeGate(g.file, g.nodeFlags) : (prevMs.get(g.file) ?? null)
   }
   return {
     total: gates.length,

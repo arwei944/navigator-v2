@@ -4,16 +4,39 @@
  */
 import { readFileSync } from 'node:fs'
 
-/** 从 package.json 文本提取 console:test:all 里已收录的脚本相对路径（保持链路顺序） */
-export function extractFromTestAll(pkgJsonText) {
-  const pkg = JSON.parse(pkgJsonText)
-  const chain = pkg.scripts['console:test:all'] || ''
-  const out = []
-  for (const seg of chain.split(' && ')) {
-    const m = seg.match(/node\s+(?:--\S+\s+)*([^\s]+\.mjs)/)
-    if (m) out.push(m[1])
+/**
+ * 门禁的「接入」判定口径。
+ *
+ * ## 为什么不再看 package.json 的长链
+ *
+ * 旧实现从 `console:test:all` 的 `&&` 链里正则抠脚本路径。2026-10 起这条链换成了
+ * `node tools/console/run-all-gates.mjs`（分组并行执行器），链里只有一个入口 ——
+ * 若继续用旧口径，台账会把 96 道门禁全判成「未接入」，而它们其实都在跑。
+ *
+ * 新口径只有一条：**脚本存在于 `tools/console/test-*.mjs` 或 `tools/mcp/test-*.mjs`**。
+ * 这正是执行器的扫描范围（它读台账、台账读目录），两边同源。
+ *
+ * ## 启动参数从哪来
+ *
+ * 执行器需要知道每个脚本要不要 `--experimental-test-module-mocks`，而长链已不再是载体。
+ * 改为**脚本自声明**：头注释里写一行
+ *
+ *     * @node-flags --experimental-test-module-mocks
+ *
+ * 这比藏在 package.json 的一条长命令里更靠近事实 —— 读脚本的人一眼能看到它依赖什么。
+ */
+const NODE_FLAGS_RE = /^\s*\*\s*@node-flags\s+(.+)$/m
+
+/** 从脚本头注释解析 `@node-flags`；没有则空数组 */
+export function nodeFlagsOf(file) {
+  let text
+  try {
+    text = readFileSync(file, 'utf-8')
+  } catch {
+    return []
   }
-  return out
+  const m = NODE_FLAGS_RE.exec(text)
+  return m ? m[1].trim().split(/\s+/).filter(Boolean) : []
 }
 
 /**

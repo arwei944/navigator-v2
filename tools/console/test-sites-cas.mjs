@@ -13,6 +13,8 @@
  *
  * 用 `node:test` 的模块 mock 顶掉 `#store`（存储适配层，含 ETag 与条件写语义），不联网、无凭据。
  * 运行：node --experimental-test-module-mocks tools/console/test-sites-cas.mjs
+ *
+ * @node-flags --experimental-test-module-mocks
  */
 import { test, mock, beforeEach, after } from 'node:test'
 import assert from 'node:assert/strict'

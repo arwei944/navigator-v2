@@ -1,106 +1,110 @@
 {
-  "total": 96,
-  "registered": 96,
+  "total": 102,
+  "registered": 102,
   "unregistered": [],
   "order": [
-    "tools/console/test-trust.mjs",
-    "tools/console/test-infer.mjs",
-    "tools/console/test-purposes.mjs",
-    "tools/console/test-visual-scheme.mjs",
-    "tools/console/test-visual-layer.mjs",
-    "tools/console/test-storage-guard.mjs",
-    "tools/console/test-api-layer.mjs",
-    "tools/console/test-format.mjs",
-    "tools/console/test-url.mjs",
-    "tools/console/test-url-preview.mjs",
-    "tools/console/test-preview-translate.mjs",
-    "tools/console/test-site-refresh.mjs",
+    "tools/console/test-a11y.mjs",
+    "tools/console/test-admin-tools.mjs",
     "tools/console/test-affinity.mjs",
-    "tools/console/test-graph-layout.mjs",
-    "tools/console/test-deploy-status.mjs",
+    "tools/console/test-alert-notify.mjs",
+    "tools/console/test-alert-rules.mjs",
+    "tools/console/test-api-layer.mjs",
+    "tools/console/test-api-ops.mjs",
     "tools/console/test-auto-add.mjs",
     "tools/console/test-auto-category.mjs",
-    "tools/console/test-guard.mjs",
-    "tools/console/test-hunks.mjs",
-    "tools/console/test-ops.mjs",
-    "tools/console/test-api-ops.mjs",
-    "tools/console/test-netguard.mjs",
-    "tools/console/test-robust.mjs",
-    "tools/console/test-frontend.mjs",
-    "tools/console/test-session.mjs",
-    "tools/console/test-sites-cas.mjs",
-    "tools/console/test-notes.mjs",
-    "tools/console/test-livesync.mjs",
-    "tools/console/test-theme.mjs",
-    "tools/console/test-theme-boot.mjs",
-    "tools/console/test-intent.mjs",
-    "tools/console/test-http-fetch.mjs",
-    "tools/console/test-glossary.mjs",
+    "tools/console/test-bgm.mjs",
     "tools/console/test-browser-translate.mjs",
+    "tools/console/test-bundle-size.mjs",
+    "tools/console/test-bundle.mjs",
+    "tools/console/test-category-consistency.mjs",
+    "tools/console/test-category-source.mjs",
+    "tools/console/test-chartkit.mjs",
+    "tools/console/test-cloud-poll.mjs",
+    "tools/console/test-command-phrases.mjs",
+    "tools/console/test-contrast.mjs",
+    "tools/console/test-cron.mjs",
+    "tools/console/test-data-quality.mjs",
+    "tools/console/test-deploy-manifest.mjs",
+    "tools/console/test-deploy-resume.mjs",
+    "tools/console/test-deploy-status.mjs",
+    "tools/console/test-deps.mjs",
+    "tools/console/test-desc-junk.mjs",
+    "tools/console/test-doc-facts.mjs",
+    "tools/console/test-doc-manager.mjs",
+    "tools/console/test-dual-stack.mjs",
+    "tools/console/test-endpoints-run.mjs",
+    "tools/console/test-endpoints.mjs",
+    "tools/console/test-engine.mjs",
+    "tools/console/test-env.mjs",
+    "tools/console/test-file-size.mjs",
+    "tools/console/test-filter-chips.mjs",
+    "tools/console/test-format.mjs",
+    "tools/console/test-frontend.mjs",
+    "tools/console/test-glossary.mjs",
+    "tools/console/test-graph-layout.mjs",
+    "tools/console/test-gridnav.mjs",
+    "tools/console/test-guard.mjs",
+    "tools/console/test-health-fails.mjs",
+    "tools/console/test-health.mjs",
+    "tools/console/test-http-fetch.mjs",
+    "tools/console/test-hunks.mjs",
+    "tools/console/test-hygiene.mjs",
+    "tools/console/test-image-engine.mjs",
+    "tools/console/test-infer.mjs",
+    "tools/console/test-inline-stability.mjs",
+    "tools/console/test-input-focus-real.mjs",
+    "tools/console/test-intent.mjs",
+    "tools/console/test-livesync.mjs",
+    "tools/console/test-llm-engine.mjs",
+    "tools/console/test-local-key.mjs",
+    "tools/console/test-local-meta.mjs",
     "tools/console/test-meta-fast.mjs",
     "tools/console/test-meta-fetch.mjs",
-    "tools/console/test-local-meta.mjs",
     "tools/console/test-meta-upgrade.mjs",
-    "tools/console/test-pipeline-trace.mjs",
-    "tools/console/test-cloud-poll.mjs",
-    "tools/console/test-bundle.mjs",
-    "tools/console/test-gridnav.mjs",
-    "tools/console/test-chartkit.mjs",
-    "tools/console/test-sw-refresh.mjs",
-    "tools/console/test-command-phrases.mjs",
-    "tools/console/test-undo.mjs",
-    "tools/console/test-right-panel.mjs",
-    "tools/console/test-engine.mjs",
-    "tools/console/test-translate-engine.mjs",
-    "tools/console/test-probe-engine.mjs",
-    "tools/console/test-llm-engine.mjs",
-    "tools/console/test-image-engine.mjs",
-    "tools/console/test-category-source.mjs",
-    "tools/console/test-site-store.mjs",
-    "tools/console/test-publisher.mjs",
-    "tools/console/test-plugin-registry.mjs",
-    "tools/console/test-release.mjs",
-    "tools/console/test-local-key.mjs",
-    "tools/console/test-site-dedupe.mjs",
-    "tools/console/test-health-fails.mjs",
-    "tools/console/test-deploy-resume.mjs",
-    "tools/console/test-schedule-publish.mjs",
-    "tools/console/test-alert-rules.mjs",
-    "tools/console/test-alert-notify.mjs",
-    "tools/console/test-admin-tools.mjs",
-    "tools/console/test-filter-chips.mjs",
-    "tools/console/test-uptime.mjs",
-    "tools/console/test-side-width.mjs",
-    "tools/console/test-bgm.mjs",
-    "tools/console/test-bundle-size.mjs",
-    "tools/console/test-share-target.mjs",
-    "tools/console/test-search.mjs",
-    "tools/console/test-desc-junk.mjs",
-    "tools/console/test-site-aliases.mjs",
-    "tools/console/test-category-consistency.mjs",
-    "tools/console/test-dual-stack.mjs",
-    "tools/console/test-data-quality.mjs",
-    "tools/console/test-a11y.mjs",
     "tools/console/test-mobile.mjs",
+    "tools/console/test-netguard.mjs",
+    "tools/console/test-notes.mjs",
     "tools/console/test-offline-queue.mjs",
-    "tools/console/test-endpoints.mjs",
-    "tools/console/test-endpoints-run.mjs",
-    "tools/console/test-session-merge.mjs",
-    "tools/console/test-contrast.mjs",
-    "tools/console/test-deploy-manifest.mjs",
-    "tools/console/test-doc-manager.mjs",
-    "tools/doc-manager/cli.mjs",
-    "tools/console/test-hygiene.mjs",
-    "tools/console/test-env.mjs",
-    "tools/console/test-cron.mjs",
-    "tools/console/test-health.mjs",
-    "tools/console/test-store.mjs",
-    "tools/console/test-v10.mjs",
-    "tools/mcp/test-mcp.mjs",
-    "tools/gate-registry/cli.mjs",
-    "tools/console/test-deps.mjs",
+    "tools/console/test-ops.mjs",
+    "tools/console/test-pipeline-trace.mjs",
+    "tools/console/test-plugin-registry.mjs",
+    "tools/console/test-preview-translate.mjs",
+    "tools/console/test-probe-engine.mjs",
+    "tools/console/test-publisher.mjs",
+    "tools/console/test-purposes.mjs",
     "tools/console/test-release-please.mjs",
-    "tools/console/test-scripts.mjs"
+    "tools/console/test-release.mjs",
+    "tools/console/test-right-panel.mjs",
+    "tools/console/test-robust.mjs",
+    "tools/console/test-schedule-publish.mjs",
+    "tools/console/test-scripts.mjs",
+    "tools/console/test-search.mjs",
+    "tools/console/test-session-merge.mjs",
+    "tools/console/test-session.mjs",
+    "tools/console/test-share-target.mjs",
+    "tools/console/test-side-width.mjs",
+    "tools/console/test-site-aliases.mjs",
+    "tools/console/test-site-dedupe.mjs",
+    "tools/console/test-site-refresh.mjs",
+    "tools/console/test-site-store.mjs",
+    "tools/console/test-sites-cas.mjs",
+    "tools/console/test-sites-split.mjs",
+    "tools/console/test-split-wiring.mjs",
+    "tools/console/test-storage-guard.mjs",
+    "tools/console/test-store.mjs",
+    "tools/console/test-sw-refresh.mjs",
+    "tools/console/test-theme-boot.mjs",
+    "tools/console/test-theme.mjs",
+    "tools/console/test-translate-engine.mjs",
+    "tools/console/test-trust.mjs",
+    "tools/console/test-undo.mjs",
+    "tools/console/test-uptime.mjs",
+    "tools/console/test-url-preview.mjs",
+    "tools/console/test-url.mjs",
+    "tools/console/test-v10.mjs",
+    "tools/console/test-visual-layer.mjs",
+    "tools/console/test-visual-scheme.mjs",
+    "tools/mcp/test-mcp.mjs"
   ],
   "gates": [
     {
@@ -110,7 +114,8 @@
       "category": "前端与体验",
       "lines": 100,
       "included": true,
-      "durationMs": 321
+      "nodeFlags": [],
+      "durationMs": 266
     },
     {
       "file": "tools/console/test-admin-tools.mjs",
@@ -119,7 +124,8 @@
       "category": "服务端与运行时",
       "lines": 91,
       "included": true,
-      "durationMs": 265
+      "nodeFlags": [],
+      "durationMs": 205
     },
     {
       "file": "tools/console/test-affinity.mjs",
@@ -128,7 +134,8 @@
       "category": "数据与内容",
       "lines": 218,
       "included": true,
-      "durationMs": 554
+      "nodeFlags": [],
+      "durationMs": 483
     },
     {
       "file": "tools/console/test-alert-notify.mjs",
@@ -137,7 +144,8 @@
       "category": "服务端与运行时",
       "lines": 78,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 181
     },
     {
       "file": "tools/console/test-alert-rules.mjs",
@@ -146,7 +154,8 @@
       "category": "服务端与运行时",
       "lines": 88,
       "included": true,
-      "durationMs": 179
+      "nodeFlags": [],
+      "durationMs": 173
     },
     {
       "file": "tools/console/test-api-layer.mjs",
@@ -155,16 +164,20 @@
       "category": "服务端与运行时",
       "lines": 71,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 191
     },
     {
       "file": "tools/console/test-api-ops.mjs",
       "name": "test-api-ops",
       "purpose": "线上运维面 `api/ops.js` 的用例：鉴权、查询分支、写入动作。",
       "category": "服务端与运行时",
-      "lines": 205,
+      "lines": 207,
       "included": true,
-      "durationMs": 220
+      "nodeFlags": [
+        "--experimental-test-module-mocks"
+      ],
+      "durationMs": 182
     },
     {
       "file": "tools/console/test-auto-add.mjs",
@@ -173,7 +186,8 @@
       "category": "数据与内容",
       "lines": 138,
       "included": true,
-      "durationMs": 224
+      "nodeFlags": [],
+      "durationMs": 180
     },
     {
       "file": "tools/console/test-auto-category.mjs",
@@ -182,7 +196,8 @@
       "category": "数据与内容",
       "lines": 111,
       "included": true,
-      "durationMs": 363
+      "nodeFlags": [],
+      "durationMs": 324
     },
     {
       "file": "tools/console/test-bgm.mjs",
@@ -191,7 +206,8 @@
       "category": "前端与体验",
       "lines": 109,
       "included": true,
-      "durationMs": 166
+      "nodeFlags": [],
+      "durationMs": 177
     },
     {
       "file": "tools/console/test-browser-translate.mjs",
@@ -200,7 +216,8 @@
       "category": "数据与内容",
       "lines": 267,
       "included": true,
-      "durationMs": 558
+      "nodeFlags": [],
+      "durationMs": 555
     },
     {
       "file": "tools/console/test-bundle-size.mjs",
@@ -209,7 +226,8 @@
       "category": "前端与体验",
       "lines": 116,
       "included": true,
-      "durationMs": 302
+      "nodeFlags": [],
+      "durationMs": 313
     },
     {
       "file": "tools/console/test-bundle.mjs",
@@ -218,7 +236,8 @@
       "category": "前端与体验",
       "lines": 259,
       "included": true,
-      "durationMs": 522
+      "nodeFlags": [],
+      "durationMs": 742
     },
     {
       "file": "tools/console/test-category-consistency.mjs",
@@ -227,7 +246,8 @@
       "category": "数据与内容",
       "lines": 76,
       "included": true,
-      "durationMs": 174
+      "nodeFlags": [],
+      "durationMs": 374
     },
     {
       "file": "tools/console/test-category-source.mjs",
@@ -236,7 +256,8 @@
       "category": "数据与内容",
       "lines": 155,
       "included": true,
-      "durationMs": 175
+      "nodeFlags": [],
+      "durationMs": 245
     },
     {
       "file": "tools/console/test-chartkit.mjs",
@@ -245,7 +266,8 @@
       "category": "前端与体验",
       "lines": 119,
       "included": true,
-      "durationMs": 168
+      "nodeFlags": [],
+      "durationMs": 236
     },
     {
       "file": "tools/console/test-cloud-poll.mjs",
@@ -254,7 +276,8 @@
       "category": "服务端与运行时",
       "lines": 333,
       "included": true,
-      "durationMs": 3312
+      "nodeFlags": [],
+      "durationMs": 2860
     },
     {
       "file": "tools/console/test-command-phrases.mjs",
@@ -263,7 +286,8 @@
       "category": "搜索与交互",
       "lines": 209,
       "included": true,
-      "durationMs": 283
+      "nodeFlags": [],
+      "durationMs": 203
     },
     {
       "file": "tools/console/test-contrast.mjs",
@@ -272,7 +296,8 @@
       "category": "前端与体验",
       "lines": 239,
       "included": true,
-      "durationMs": 406
+      "nodeFlags": [],
+      "durationMs": 199
     },
     {
       "file": "tools/console/test-cron.mjs",
@@ -281,7 +306,8 @@
       "category": "服务端与运行时",
       "lines": 88,
       "included": true,
-      "durationMs": 3884
+      "nodeFlags": [],
+      "durationMs": 1176
     },
     {
       "file": "tools/console/test-data-quality.mjs",
@@ -290,7 +316,8 @@
       "category": "数据与内容",
       "lines": 123,
       "included": true,
-      "durationMs": 189
+      "nodeFlags": [],
+      "durationMs": 190
     },
     {
       "file": "tools/console/test-deploy-manifest.mjs",
@@ -299,7 +326,8 @@
       "category": "部署与发布",
       "lines": 77,
       "included": true,
-      "durationMs": 212
+      "nodeFlags": [],
+      "durationMs": 232
     },
     {
       "file": "tools/console/test-deploy-resume.mjs",
@@ -308,7 +336,8 @@
       "category": "部署与发布",
       "lines": 53,
       "included": true,
-      "durationMs": 178
+      "nodeFlags": [],
+      "durationMs": 192
     },
     {
       "file": "tools/console/test-deploy-status.mjs",
@@ -317,7 +346,8 @@
       "category": "部署与发布",
       "lines": 103,
       "included": true,
-      "durationMs": 277
+      "nodeFlags": [],
+      "durationMs": 287
     },
     {
       "file": "tools/console/test-deps.mjs",
@@ -326,7 +356,8 @@
       "category": "工作区治理",
       "lines": 195,
       "included": true,
-      "durationMs": 181
+      "nodeFlags": [],
+      "durationMs": 392
     },
     {
       "file": "tools/console/test-desc-junk.mjs",
@@ -335,7 +366,18 @@
       "category": "数据与内容",
       "lines": 77,
       "included": true,
-      "durationMs": 166
+      "nodeFlags": [],
+      "durationMs": 178
+    },
+    {
+      "file": "tools/console/test-doc-facts.mjs",
+      "name": "test-doc-facts",
+      "purpose": "文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。",
+      "category": "文档治理",
+      "lines": 222,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": 357
     },
     {
       "file": "tools/console/test-doc-manager.mjs",
@@ -344,7 +386,8 @@
       "category": "文档治理",
       "lines": 133,
       "included": true,
-      "durationMs": 251
+      "nodeFlags": [],
+      "durationMs": 264
     },
     {
       "file": "tools/console/test-dual-stack.mjs",
@@ -353,7 +396,8 @@
       "category": "服务端与运行时",
       "lines": 76,
       "included": true,
-      "durationMs": 187
+      "nodeFlags": [],
+      "durationMs": 184
     },
     {
       "file": "tools/console/test-endpoints-run.mjs",
@@ -362,7 +406,8 @@
       "category": "部署与发布",
       "lines": 226,
       "included": true,
-      "durationMs": 2644
+      "nodeFlags": [],
+      "durationMs": 2808
     },
     {
       "file": "tools/console/test-endpoints.mjs",
@@ -371,7 +416,8 @@
       "category": "部署与发布",
       "lines": 115,
       "included": true,
-      "durationMs": 192
+      "nodeFlags": [],
+      "durationMs": 188
     },
     {
       "file": "tools/console/test-engine.mjs",
@@ -380,7 +426,8 @@
       "category": "数据与内容",
       "lines": 100,
       "included": true,
-      "durationMs": 261
+      "nodeFlags": [],
+      "durationMs": 255
     },
     {
       "file": "tools/console/test-env.mjs",
@@ -389,7 +436,18 @@
       "category": "工作区治理",
       "lines": 104,
       "included": true,
-      "durationMs": 418
+      "nodeFlags": [],
+      "durationMs": 456
+    },
+    {
+      "file": "tools/console/test-file-size.mjs",
+      "name": "test-file-size",
+      "purpose": "单文件体量守卫（防「拆完又长回去」）。",
+      "category": "未分类",
+      "lines": 125,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-filter-chips.mjs",
@@ -398,7 +456,8 @@
       "category": "前端与体验",
       "lines": 87,
       "included": true,
-      "durationMs": 206
+      "nodeFlags": [],
+      "durationMs": 173
     },
     {
       "file": "tools/console/test-format.mjs",
@@ -407,7 +466,8 @@
       "category": "前端与体验",
       "lines": 115,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 323
     },
     {
       "file": "tools/console/test-frontend.mjs",
@@ -416,7 +476,8 @@
       "category": "前端与体验",
       "lines": 236,
       "included": true,
-      "durationMs": 4468
+      "nodeFlags": [],
+      "durationMs": 3862
     },
     {
       "file": "tools/console/test-glossary.mjs",
@@ -425,7 +486,8 @@
       "category": "前端与体验",
       "lines": 188,
       "included": true,
-      "durationMs": 616
+      "nodeFlags": [],
+      "durationMs": 474
     },
     {
       "file": "tools/console/test-graph-layout.mjs",
@@ -434,7 +496,8 @@
       "category": "前端与体验",
       "lines": 204,
       "included": true,
-      "durationMs": 986
+      "nodeFlags": [],
+      "durationMs": 665
     },
     {
       "file": "tools/console/test-gridnav.mjs",
@@ -443,7 +506,8 @@
       "category": "前端与体验",
       "lines": 111,
       "included": true,
-      "durationMs": 212
+      "nodeFlags": [],
+      "durationMs": 183
     },
     {
       "file": "tools/console/test-guard.mjs",
@@ -452,7 +516,8 @@
       "category": "数据与内容",
       "lines": 52,
       "included": true,
-      "durationMs": 387
+      "nodeFlags": [],
+      "durationMs": 291
     },
     {
       "file": "tools/console/test-health-fails.mjs",
@@ -461,7 +526,8 @@
       "category": "服务端与运行时",
       "lines": 82,
       "included": true,
-      "durationMs": 171
+      "nodeFlags": [],
+      "durationMs": 172
     },
     {
       "file": "tools/console/test-health.mjs",
@@ -470,7 +536,8 @@
       "category": "服务端与运行时",
       "lines": 112,
       "included": true,
-      "durationMs": 258
+      "nodeFlags": [],
+      "durationMs": 164
     },
     {
       "file": "tools/console/test-http-fetch.mjs",
@@ -479,7 +546,8 @@
       "category": "前端与体验",
       "lines": 302,
       "included": true,
-      "durationMs": 1220
+      "nodeFlags": [],
+      "durationMs": 1108
     },
     {
       "file": "tools/console/test-hunks.mjs",
@@ -488,16 +556,18 @@
       "category": "工作区治理",
       "lines": 281,
       "included": true,
-      "durationMs": 4219
+      "nodeFlags": [],
+      "durationMs": 4541
     },
     {
       "file": "tools/console/test-hygiene.mjs",
       "name": "test-hygiene",
       "purpose": "工作区 5S 门禁（防废料失控回涨）。",
       "category": "工作区治理",
-      "lines": 92,
+      "lines": 98,
       "included": true,
-      "durationMs": 595
+      "nodeFlags": [],
+      "durationMs": 404
     },
     {
       "file": "tools/console/test-image-engine.mjs",
@@ -506,7 +576,8 @@
       "category": "服务端与运行时",
       "lines": 261,
       "included": true,
-      "durationMs": 212
+      "nodeFlags": [],
+      "durationMs": 189
     },
     {
       "file": "tools/console/test-infer.mjs",
@@ -515,7 +586,28 @@
       "category": "前端与体验",
       "lines": 368,
       "included": true,
-      "durationMs": 195
+      "nodeFlags": [],
+      "durationMs": 210
+    },
+    {
+      "file": "tools/console/test-inline-stability.mjs",
+      "name": "test-inline-stability",
+      "purpose": "「输入框所在切片不许被条件卸载」守卫。",
+      "category": "未分类",
+      "lines": 114,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-input-focus-real.mjs",
+      "name": "test-input-focus-real",
+      "purpose": "真机按键守卫：搜索框逐字符输入不得失焦。",
+      "category": "未分类",
+      "lines": 143,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-intent.mjs",
@@ -524,7 +616,8 @@
       "category": "搜索与交互",
       "lines": 232,
       "included": true,
-      "durationMs": 175
+      "nodeFlags": [],
+      "durationMs": 215
     },
     {
       "file": "tools/console/test-livesync.mjs",
@@ -533,7 +626,8 @@
       "category": "服务端与运行时",
       "lines": 90,
       "included": true,
-      "durationMs": 367
+      "nodeFlags": [],
+      "durationMs": 394
     },
     {
       "file": "tools/console/test-llm-engine.mjs",
@@ -542,7 +636,8 @@
       "category": "服务端与运行时",
       "lines": 187,
       "included": true,
-      "durationMs": 474
+      "nodeFlags": [],
+      "durationMs": 395
     },
     {
       "file": "tools/console/test-local-key.mjs",
@@ -551,7 +646,8 @@
       "category": "服务端与运行时",
       "lines": 82,
       "included": true,
-      "durationMs": 193
+      "nodeFlags": [],
+      "durationMs": 172
     },
     {
       "file": "tools/console/test-local-meta.mjs",
@@ -560,16 +656,20 @@
       "category": "数据与内容",
       "lines": 153,
       "included": true,
-      "durationMs": 294
+      "nodeFlags": [],
+      "durationMs": 229
     },
     {
       "file": "tools/console/test-meta-fast.mjs",
       "name": "test-meta-fast",
       "purpose": "`/api/metadata` 的**快路径**用例：抓取早断、预算收紧、默认不翻译、同域缓存。",
       "category": "数据与内容",
-      "lines": 404,
+      "lines": 406,
       "included": true,
-      "durationMs": 205
+      "nodeFlags": [
+        "--experimental-test-module-mocks"
+      ],
+      "durationMs": 178
     },
     {
       "file": "tools/console/test-meta-fetch.mjs",
@@ -578,7 +678,8 @@
       "category": "数据与内容",
       "lines": 230,
       "included": true,
-      "durationMs": 259
+      "nodeFlags": [],
+      "durationMs": 222
     },
     {
       "file": "tools/console/test-meta-upgrade.mjs",
@@ -587,7 +688,8 @@
       "category": "数据与内容",
       "lines": 246,
       "included": true,
-      "durationMs": 209
+      "nodeFlags": [],
+      "durationMs": 187
     },
     {
       "file": "tools/console/test-mobile.mjs",
@@ -596,7 +698,8 @@
       "category": "前端与体验",
       "lines": 85,
       "included": true,
-      "durationMs": 245
+      "nodeFlags": [],
+      "durationMs": 194
     },
     {
       "file": "tools/console/test-netguard.mjs",
@@ -605,7 +708,8 @@
       "category": "安全与鉴权",
       "lines": 282,
       "included": true,
-      "durationMs": 554
+      "nodeFlags": [],
+      "durationMs": 321
     },
     {
       "file": "tools/console/test-notes.mjs",
@@ -614,7 +718,8 @@
       "category": "前端与体验",
       "lines": 189,
       "included": true,
-      "durationMs": 242
+      "nodeFlags": [],
+      "durationMs": 187
     },
     {
       "file": "tools/console/test-offline-queue.mjs",
@@ -623,7 +728,8 @@
       "category": "服务端与运行时",
       "lines": 130,
       "included": true,
-      "durationMs": 333
+      "nodeFlags": [],
+      "durationMs": 238
     },
     {
       "file": "tools/console/test-ops.mjs",
@@ -632,7 +738,8 @@
       "category": "服务端与运行时",
       "lines": 996,
       "included": true,
-      "durationMs": 937
+      "nodeFlags": [],
+      "durationMs": 794
     },
     {
       "file": "tools/console/test-pipeline-trace.mjs",
@@ -641,7 +748,8 @@
       "category": "前端与体验",
       "lines": 164,
       "included": true,
-      "durationMs": 372
+      "nodeFlags": [],
+      "durationMs": 333
     },
     {
       "file": "tools/console/test-plugin-registry.mjs",
@@ -650,7 +758,8 @@
       "category": "工作区治理",
       "lines": 208,
       "included": true,
-      "durationMs": 314
+      "nodeFlags": [],
+      "durationMs": 295
     },
     {
       "file": "tools/console/test-preview-translate.mjs",
@@ -659,7 +768,8 @@
       "category": "搜索与交互",
       "lines": 170,
       "included": true,
-      "durationMs": 190
+      "nodeFlags": [],
+      "durationMs": 186
     },
     {
       "file": "tools/console/test-probe-engine.mjs",
@@ -668,7 +778,8 @@
       "category": "服务端与运行时",
       "lines": 150,
       "included": true,
-      "durationMs": 414
+      "nodeFlags": [],
+      "durationMs": 431
     },
     {
       "file": "tools/console/test-publisher.mjs",
@@ -677,7 +788,8 @@
       "category": "部署与发布",
       "lines": 184,
       "included": true,
-      "durationMs": 194
+      "nodeFlags": [],
+      "durationMs": 216
     },
     {
       "file": "tools/console/test-purposes.mjs",
@@ -686,7 +798,8 @@
       "category": "前端与体验",
       "lines": 363,
       "included": true,
-      "durationMs": 269
+      "nodeFlags": [],
+      "durationMs": 279
     },
     {
       "file": "tools/console/test-release-please.mjs",
@@ -695,7 +808,8 @@
       "category": "部署与发布",
       "lines": 96,
       "included": true,
-      "durationMs": 590
+      "nodeFlags": [],
+      "durationMs": 441
     },
     {
       "file": "tools/console/test-release.mjs",
@@ -704,16 +818,18 @@
       "category": "部署与发布",
       "lines": 175,
       "included": true,
-      "durationMs": 1514
+      "nodeFlags": [],
+      "durationMs": 1751
     },
     {
       "file": "tools/console/test-right-panel.mjs",
       "name": "test-right-panel",
       "purpose": "右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+",
       "category": "前端与体验",
-      "lines": 265,
+      "lines": 277,
       "included": true,
-      "durationMs": 197
+      "nodeFlags": [],
+      "durationMs": 200
     },
     {
       "file": "tools/console/test-robust.mjs",
@@ -722,7 +838,8 @@
       "category": "工作区治理",
       "lines": 146,
       "included": true,
-      "durationMs": 205
+      "nodeFlags": [],
+      "durationMs": 188
     },
     {
       "file": "tools/console/test-schedule-publish.mjs",
@@ -731,7 +848,8 @@
       "category": "部署与发布",
       "lines": 54,
       "included": true,
-      "durationMs": 284
+      "nodeFlags": [],
+      "durationMs": 287
     },
     {
       "file": "tools/console/test-scripts.mjs",
@@ -740,7 +858,8 @@
       "category": "工作区治理",
       "lines": 116,
       "included": true,
-      "durationMs": 415
+      "nodeFlags": [],
+      "durationMs": 323
     },
     {
       "file": "tools/console/test-search.mjs",
@@ -749,7 +868,8 @@
       "category": "搜索与交互",
       "lines": 103,
       "included": true,
-      "durationMs": 417
+      "nodeFlags": [],
+      "durationMs": 411
     },
     {
       "file": "tools/console/test-session-merge.mjs",
@@ -758,16 +878,20 @@
       "category": "安全与鉴权",
       "lines": 134,
       "included": true,
-      "durationMs": 180
+      "nodeFlags": [],
+      "durationMs": 178
     },
     {
       "file": "tools/console/test-session.mjs",
       "name": "test-session",
       "purpose": "第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。",
       "category": "安全与鉴权",
-      "lines": 174,
+      "lines": 176,
       "included": true,
-      "durationMs": 192
+      "nodeFlags": [
+        "--experimental-test-module-mocks"
+      ],
+      "durationMs": 196
     },
     {
       "file": "tools/console/test-share-target.mjs",
@@ -776,7 +900,8 @@
       "category": "前端与体验",
       "lines": 59,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 203
     },
     {
       "file": "tools/console/test-side-width.mjs",
@@ -785,7 +910,8 @@
       "category": "前端与体验",
       "lines": 60,
       "included": true,
-      "durationMs": 158
+      "nodeFlags": [],
+      "durationMs": 167
     },
     {
       "file": "tools/console/test-site-aliases.mjs",
@@ -794,7 +920,8 @@
       "category": "数据与内容",
       "lines": 134,
       "included": true,
-      "durationMs": 430
+      "nodeFlags": [],
+      "durationMs": 387
     },
     {
       "file": "tools/console/test-site-dedupe.mjs",
@@ -803,7 +930,8 @@
       "category": "数据与内容",
       "lines": 159,
       "included": true,
-      "durationMs": 205
+      "nodeFlags": [],
+      "durationMs": 218
     },
     {
       "file": "tools/console/test-site-refresh.mjs",
@@ -812,7 +940,8 @@
       "category": "数据与内容",
       "lines": 166,
       "included": true,
-      "durationMs": 308
+      "nodeFlags": [],
+      "durationMs": 320
     },
     {
       "file": "tools/console/test-site-store.mjs",
@@ -821,16 +950,40 @@
       "category": "数据与内容",
       "lines": 278,
       "included": true,
-      "durationMs": 332
+      "nodeFlags": [],
+      "durationMs": 322
     },
     {
       "file": "tools/console/test-sites-cas.mjs",
       "name": "test-sites-cas",
       "purpose": "第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。",
       "category": "数据与内容",
-      "lines": 287,
+      "lines": 289,
       "included": true,
-      "durationMs": 187
+      "nodeFlags": [
+        "--experimental-test-module-mocks"
+      ],
+      "durationMs": 194
+    },
+    {
+      "file": "tools/console/test-sites-split.mjs",
+      "name": "test-sites-split",
+      "purpose": "sites store 拆分后的纯函数守卫：覆盖层净化 / 回收站三道闸 / 云端错误分类。",
+      "category": "数据与内容",
+      "lines": 245,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-split-wiring.mjs",
+      "name": "test-split-wiring",
+      "purpose": "大文件拆分后的「接线」守卫。",
+      "category": "未分类",
+      "lines": 244,
+      "included": true,
+      "nodeFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-storage-guard.mjs",
@@ -839,7 +992,8 @@
       "category": "前端与体验",
       "lines": 72,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 211
     },
     {
       "file": "tools/console/test-store.mjs",
@@ -848,7 +1002,8 @@
       "category": "服务端与运行时",
       "lines": 147,
       "included": true,
-      "durationMs": 312
+      "nodeFlags": [],
+      "durationMs": 289
     },
     {
       "file": "tools/console/test-sw-refresh.mjs",
@@ -857,7 +1012,8 @@
       "category": "前端与体验",
       "lines": 112,
       "included": true,
-      "durationMs": 160
+      "nodeFlags": [],
+      "durationMs": 186
     },
     {
       "file": "tools/console/test-theme-boot.mjs",
@@ -866,7 +1022,8 @@
       "category": "前端与体验",
       "lines": 282,
       "included": true,
-      "durationMs": 3455
+      "nodeFlags": [],
+      "durationMs": 3222
     },
     {
       "file": "tools/console/test-theme.mjs",
@@ -875,7 +1032,8 @@
       "category": "前端与体验",
       "lines": 192,
       "included": true,
-      "durationMs": 183
+      "nodeFlags": [],
+      "durationMs": 215
     },
     {
       "file": "tools/console/test-translate-engine.mjs",
@@ -884,7 +1042,8 @@
       "category": "数据与内容",
       "lines": 212,
       "included": true,
-      "durationMs": 210
+      "nodeFlags": [],
+      "durationMs": 213
     },
     {
       "file": "tools/console/test-trust.mjs",
@@ -893,7 +1052,8 @@
       "category": "数据与内容",
       "lines": 112,
       "included": true,
-      "durationMs": 741
+      "nodeFlags": [],
+      "durationMs": 771
     },
     {
       "file": "tools/console/test-undo.mjs",
@@ -902,7 +1062,8 @@
       "category": "前端与体验",
       "lines": 192,
       "included": true,
-      "durationMs": 178
+      "nodeFlags": [],
+      "durationMs": 218
     },
     {
       "file": "tools/console/test-uptime.mjs",
@@ -911,7 +1072,8 @@
       "category": "服务端与运行时",
       "lines": 152,
       "included": true,
-      "durationMs": 379
+      "nodeFlags": [],
+      "durationMs": 387
     },
     {
       "file": "tools/console/test-url-preview.mjs",
@@ -920,7 +1082,8 @@
       "category": "搜索与交互",
       "lines": 141,
       "included": true,
-      "durationMs": 165
+      "nodeFlags": [],
+      "durationMs": 183
     },
     {
       "file": "tools/console/test-url.mjs",
@@ -929,7 +1092,8 @@
       "category": "数据与内容",
       "lines": 127,
       "included": true,
-      "durationMs": 163
+      "nodeFlags": [],
+      "durationMs": 184
     },
     {
       "file": "tools/console/test-v10.mjs",
@@ -938,7 +1102,8 @@
       "category": "服务端与运行时",
       "lines": 193,
       "included": true,
-      "durationMs": 325
+      "nodeFlags": [],
+      "durationMs": 297
     },
     {
       "file": "tools/console/test-visual-layer.mjs",
@@ -947,7 +1112,8 @@
       "category": "前端与体验",
       "lines": 310,
       "included": true,
-      "durationMs": null
+      "nodeFlags": [],
+      "durationMs": 423
     },
     {
       "file": "tools/console/test-visual-scheme.mjs",
@@ -956,7 +1122,8 @@
       "category": "前端与体验",
       "lines": 257,
       "included": true,
-      "durationMs": 177
+      "nodeFlags": [],
+      "durationMs": 192
     },
     {
       "file": "tools/mcp/test-mcp.mjs",
@@ -965,7 +1132,8 @@
       "category": "服务端与运行时",
       "lines": 270,
       "included": true,
-      "durationMs": 14406
+      "nodeFlags": [],
+      "durationMs": 34626
     }
   ]
 }

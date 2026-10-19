@@ -14,6 +14,8 @@
  *
  * 用 `node:test` 的模块 mock 顶掉 `#store`（v9 起 session 的存储适配层），把 handler 当普通函数调，不联网、无凭据。
  * 运行：node --experimental-test-module-mocks tools/console/test-session.mjs
+ *
+ * @node-flags --experimental-test-module-mocks
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'

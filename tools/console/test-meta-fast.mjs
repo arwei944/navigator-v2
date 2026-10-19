@@ -13,6 +13,8 @@
  * 不联网、不起服务。
  *
  * 运行：node --experimental-test-module-mocks tools/console/test-meta-fast.mjs
+ *
+ * @node-flags --experimental-test-module-mocks
  */
 import { mock } from 'node:test'
 import { createRequire } from 'node:module'
