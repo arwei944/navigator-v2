@@ -194,14 +194,26 @@ ok(/reduceRightPanel/.test(sidebarSrc), 'sidebar.js 的写入统一走 reduceRig
 ok(/frozen:\s*rightFrozen\.value/.test(sidebarSrc), 'sidebar.js 把 frozen 传进状态机')
 ok(/setRightFrozen/.test(sidebarSrc), 'sidebar.js 暴露 setRightFrozen')
 
-// 3.4 折叠策略的启动时机：必须在持久化回填之后（App.vue 的 onMounted），不能写在 store setup 主体
+// 3.4 折叠策略的启动时机：必须在持久化回填之后（App 启动时），不能写在 store setup 主体
+//
+// 2026-10-19：App.vue 的启动逻辑抽到 composables/useAppLifecycle.js，
+// 断言目标随之迁移。**强度不变** —— 仍要求「调用发生在 onMounted 回调体内」，
+// 只是改为在被抽出的文件里验证，否则这条守卫会因文件搬家而静默失效。
+const lifecycleSrc = read('src/composables/useAppLifecycle.js')
 ok(/applyCollapsePolicy\s*\(\)/.test(sidebarSrc), 'sidebar.js 定义 applyCollapsePolicy')
-ok(/applyCollapsePolicy\s*\(\)/.test(appSrc), 'App.vue 调用了 applyCollapsePolicy（启动时机）')
+ok(
+  /applyCollapsePolicy\s*\(\)/.test(lifecycleSrc) || /applyCollapsePolicy\s*\(\)/.test(appSrc),
+  '启动逻辑里调用了 applyCollapsePolicy（useAppLifecycle 或 App.vue）',
+)
 {
-  // 断言调用点在 onMounted 回调体内，而不是模块顶层
-  const idx = appSrc.indexOf('onMounted(() =>')
-  const callIdx = appSrc.indexOf('sidebarStore.applyCollapsePolicy()')
-  ok(idx !== -1 && callIdx > idx, 'applyCollapsePolicy 落在 onMounted 回调里（persistedstate 回填之后）')
+  // 断言调用点在 onMounted 回调体内，而不是模块顶层（两处任一满足即可）
+  const owners = [lifecycleSrc, appSrc]
+  const hasInMounted = owners.some((src) => {
+    const idx = src.indexOf('onMounted(() =>')
+    const callIdx = src.indexOf('applyCollapsePolicy()')
+    return idx !== -1 && callIdx > idx
+  })
+  ok(hasInMounted, 'applyCollapsePolicy 落在 onMounted 回调里（persistedstate 回填之后）')
   // store setup 主体里不得直接同步读持久化值来定折叠
   ok(!/rightCollapsed\.value\s*=\s*prefs\.rightCollapsePolicy/.test(sidebarSrc),
     'sidebar.js 不得在 setup 主体同步按策略写 rightCollapsed')

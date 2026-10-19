@@ -23,10 +23,10 @@ import { buildCommands } from '@/utils/commands'
 import { matchPhrase, describePhrase, PHRASE_MIN } from '@/utils/commandPhrases'
 import { useUndoActions } from '@/composables/useUndoActions'
 import { rankSites, matchAny, scoreText, scoreSite, clickTier } from '@/utils/search'
-import { extractUrl, hostOf } from '@/utils/url'
-import { shouldPreview, resolvePreviewState } from '@/utils/urlPreview'
-import { useUrlPreview } from '@/composables/useUrlPreview'
 import { openInNewTab } from '@/utils/open'
+import { GROUP_LABEL, commandScore, buildDefaultGroups, buildSiteActionItems } from '@/utils/omniViews'
+import { useOmniPreview } from '@/composables/useOmniPreview'
+import { useOmniPhrase } from '@/composables/useOmniPhrase'
 import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useClicksStore } from '@/stores/clicks'
@@ -39,21 +39,6 @@ const ORDER = {
   palette: ['preview', 'page', 'view', 'action', 'site', 'domain', 'category', 'purpose', 'external']
 }
 
-const GROUP_LABEL = {
-  preview: '网址预览',
-  page: '页面',
-  view: '视图',
-  action: '操作',
-  site: '站点',
-  domain: '方向',
-  category: '分类',
-  purpose: '用途',
-  external: '站外',
-  recent: '最近访问',
-  common: '常用命令',
-  siteAction: '站点操作',
-  phrase: '理解'
-}
 
 /** 前缀语义：> 只命令，@ 只站点，/ 只页面 */
 const PREFIX = { '>': 'command', '@': 'site', '/': 'page' }
@@ -66,11 +51,6 @@ const SITE_LIMIT = 8
  * 副标题是解释文案，不该和命令名平起平坐。
  */
 const SUB_WEIGHT = 0.5
-function commandScore(c, q) {
-  const main = matchAny([c.title, ...(c.keywords || [])], q)
-  const sub = scoreText(c.subtitle || '', q) * SUB_WEIGHT
-  return Math.max(main, sub)
-}
 
 export function useOmniBox({ mode = 'inline', onDone } = {}) {
   const router = useRouter()
@@ -172,130 +152,25 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
   // 输入变化时把选中项复位到第一条，否则上一条的高亮会落在新结果之外
   watch(query, () => { selectedIndex.value = 0 })
 
-  /* ---------- 网址候选（沿用搜索框既有的决策链） ---------- */
-
-  const domainCandidate = computed(() => {
-    const q = trimmed.value
-    if (!q) return null
-    // 整串是网址、或整段文本里含网址 —— 取其中那一个（`Figma - 设计工具 https://figma.com`）。
-    // url 用抽出的那一段而不是原串：后面抓取与添加都只要网址本身，不该把「设计工具」也带上。
-    const found = extractUrl(q)
-    if (!found) return null
-    const host = hostOf(found)
-    return host ? { host, url: found } : null
+  /* ---------- 网址候选与下拉预览卡 ----------
+   * 实现在 useOmniPreview.js：候选判定、是否已收录、抓取、译文补全，
+   * 以及与 shouldPreview 同源的预取触发都在那里。这里只取结果。 */
+  const { domainCandidate, collected, previewCardFinal } = useOmniPreview({
+    raw, trimmed, prefix, page, sites, categories,
   })
-
-  const collected = computed(() => {
-    const c = domainCandidate.value
-    if (!c) return null
-    return sites.sites.find(s => hostOf(s.url) === c.host) || null
-  })
-
-  /* ---------- 网址预览（下拉里的那张卡片） ---------- */
-
-  const urlPreview = useUrlPreview()
-
-  /**
-   * 已收录卡片的附加信息（收在哪 / 用它干什么 / 去过没有）。
-   * 分类标签与用途名都要按 id 查表 —— 纯函数拿不到 store，所以在这里算好再传下去。
-   * 访问次数直接用 `site.visitCount`：`recordVisit` 会同步维护它（卡片角标就靠这个字段），
-   * 不必再去够没有导出的 `visitCounts`。
-   */
-  const previewCardOpts = computed(() => {
-    const col = collected.value
-    if (!col) return {}
-    return {
-      categoryLabel: col.categoryId ? categories.getCategoryLabel(col.categoryId) : '',
-      categoryColor: col.categoryId ? categories.getCategoryColor(col.categoryId) : '',
-      purposes: (col.purposes || [])
-        .slice(0, 2)
-        .map(id => PURPOSE_TAGS.find(p => p.id === id)?.label || '')
-        .filter(Boolean),
-    }
-  })
-
-  /**
-   * 卡片状态。`url` 取**网址候选**而非 `urlPreview.url`：已收录时不发抓取请求，
-   * 后者会一直是空的 —— 那样连本地就有数据的卡片都会被判成 idle、整张卡消失。
-   */
-  const previewState = computed(() => resolvePreviewState({
-    url: domainCandidate.value?.url || '',
-    duplicate: collected.value,
-    loading: urlPreview.loading.value,
-    meta: urlPreview.meta.value,
-    error: urlPreview.error.value,
-    siteCardOpts: previewCardOpts.value,
-  }))
-
-  /* ---------- 预览卡片的中文译文（N1） ----------
-     卡片给的是站点原文名称与描述（多为英文）。这里**不阻塞首屏**地补一层译文：
-     先按原文出卡，译文异步到位后响应式替换；未命中（已是中文 / 词表与引擎都没结果）
-     或翻译失败，一律回落原文 —— 卡片不会因「译不出来」而空着。
-
-     为什么落在这里而非渲染层：译文要跟着 url / meta 变、要防竞态（用户快速改主意时
-     迟到的译文不能盖回新卡），这些与抓取侧是同一套状态，和 previewState 同源最稳。
-
-     translateFields 必须**动态 import**：它是懒加载链路（test-bundle.mjs 第 7 节点名了
-     「翻译编排」「离线词表」不许进首屏），静态 import 会把词表拖回首屏、顶穿首屏预算。 */
-  const previewTranslation = ref(null)
-  let previewTranslateSeq = 0
-  watch(
-    () => {
-      const st = previewState.value
-      if (!st.card) return ''
-      return JSON.stringify([st.kind, st.card.host, st.card.title, st.card.desc])
-    },
-    async (key) => {
-      previewTranslation.value = null
-      if (!key) return
-      const card = previewState.value.card
-      if (!card) return
-      const my = ++previewTranslateSeq
-      try {
-        const { translateFields } = await import('@/services/translateFields')
-        const res = await translateFields({ name: card.title, desc: card.desc })
-        if (my !== previewTranslateSeq) return
-        previewTranslation.value = {
-          title: res.translated.name ? res.name : '',
-          desc: res.translated.desc ? res.desc : '',
-          source: res.source || '',
-        }
-      } catch { /* 翻译整链不可用 → 静默回落原文 */ }
-    },
-    { immediate: true }
-  )
-
-  /** 把译文并进卡片（有译文才覆盖；没有就保持原文）。渲染层只看这个。 */
-  const previewCardFinal = computed(() => {
-    const st = previewState.value
-    const t = previewTranslation.value
-    if (!st.card || !t) return st
-    return {
-      ...st,
-      card: {
-        ...st.card,
-        titleTranslated: t.title || '',
-        descTranslated: t.desc || '',
-        translationSource: t.source,
-      },
-    }
-  })
-
-  /**
-   * 预取的触发条件，与卡片「该不该出现」共用同一把尺子（`shouldPreview`），
-   * 否则会出现「抓了却不显示」或「显示了却没抓」两种对不上的情况。
-   * 已收录时不抓：本地就有全部字段，联网纯属多余，还会让卡片白等一次往返。
-   */
-  watch(
-    () => {
-      if (!shouldPreview(trimmed.value, { prefix: prefix.value, hasPage: Boolean(page.value) })) return ''
-      if (collected.value) return ''
-      return domainCandidate.value?.url || ''
-    },
-    (target) => urlPreview.request(target)
-  )
 
   /* ---------- root 页结果 ---------- */
+
+  /**
+   * 命令评分的上下文（注入 matchAny / scoreText / 副标题权重）。
+   *
+   * ⚠️ 必须定义在**所有** `commandScore` 调用之前 —— `commandScore` 的第三个参数是
+   * 解构签名（`{ matchAny, scoreText, subWeight }`），漏传会直接抛
+   * `Cannot destructure property 'matchAny' of 'undefined'`，而该异常发生在
+   * 搜索框 render 期间的 computed 里，Vue 会把整棵子树卸掉重挂 → 输入框失焦、
+   * 后续字符全部丢失。这个顺序是「输入首字符即失焦」的真实根因。
+   */
+  const scoreCtx = { matchAny, scoreText, subWeight: SUB_WEIGHT }
 
   const commandResults = computed(() => {
     const q = trimmed.value
@@ -303,7 +178,7 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     const only = prefix.value
     if (only && only !== 'command') return []
     return commands.value
-      .map(c => ({ cmd: c, score: commandScore(c, q) }))
+      .map(c => ({ cmd: c, score: commandScore(c, q, scoreCtx) }))
       .filter(x => x.score > 0)
       .sort((a, b) => b.score - a.score)
       .map(x => ({
@@ -443,92 +318,21 @@ export function useOmniBox({ mode = 'inline', onDone } = {}) {
     }]
   })
 
-  /* ---------- 默认视图（palette 空输入） ---------- */
+  /* ---------- 默认视图 / 二级页 ----------
+   * 组装逻辑在 utils/omniViews.js（纯函数）：默认视图固定「最近访问 + 常用命令」，
+   * 二级页按关键词过滤并评分。这里只提供数据源与评分函数。
+   * `scoreCtx` 已提到 `commandResults` 之前定义，见那里的说明。 */
+  const defaultGroups = computed(() =>
+    buildDefaultGroups({ sites: sites.sites, commands: commands.value, getRecentSites: history.getRecentSites, openSite }),
+  )
+  const siteActionItems = computed(() =>
+    buildSiteActionItems({ pageSite: page.value?.site, commands: commands.value, query: trimmed.value, scoreCtx }),
+  )
 
-  const defaultGroups = computed(() => {
-    const groups = []
-    const recent = history.getRecentSites(sites.sites).slice(0, 5)
-    if (recent.length) {
-      groups.push({
-        type: 'recent',
-        label: GROUP_LABEL.recent,
-        items: recent.map(s => ({
-          key: `site:${s.id}`,
-          type: 'site',
-          title: s.name,
-          subtitle: s.url,
-          site: s,
-          icon: '',
-          run: () => openSite(s)
-        }))
-      })
-    }
-    const common = ['action.add', 'view.theme', 'page.favorites', 'page.recent', 'action.settings', 'action.card']
-      .map(id => commands.value.find(c => c.id === id))
-      .filter(Boolean)
-      .map(c => ({
-        key: `cmd:${c.id}`,
-        type: c.section,
-        title: c.title,
-        subtitle: c.subtitle,
-        icon: c.icon,
-        run: c.run
-      }))
-    if (common.length) groups.push({ type: 'common', label: GROUP_LABEL.common, items: common })
-    return groups
-  })
-
-  /* ---------- 二级页（站点操作） ---------- */
-
-  const siteActionItems = computed(() => {
-    const p = page.value
-    if (!p) return []
-    const all = commands.value.siteActions(p.site)
-    const q = trimmed.value
-    if (!q) return all.map(a => ({ ...a, key: `act:${a.id}`, type: 'action' }))
-    return all
-      .map(a => ({ a, score: commandScore(a, q) }))
-      .filter(x => x.score > 0)
-      .sort((x, y) => y.score - x.score)
-      .map(x => ({ ...x.a, key: `act:${x.a.id}`, type: 'action' }))
-  })
-
-  /* ---------- 自然语言 → 命令（I3） ---------- */
-
-  /**
-   * 一句话直接解析成一条命令：「切换到深色」→ 切换主题。
-   *
-   * 三条约束：
-   * 1. **只在无前缀时**：`>` / `@` / `/` 已有明确语义，不让自然语言插手；
-   * 2. **只在 root 页**：站点二级页里用户是在挑对某个站的操作，不是在下达全局命令；
-   * 3. **解析不出就返回 null**：猜错的代价是这条搜索结果整段消失，所以宁可不猜。
-   *
-   * 误命中怎么退：phrase 项是结果的第一项（默认选中），按一下 ↓ 就移到搜索结果，
-   * 不需要记特殊快捷键，也不与 Esc=关闭面板的既有语义冲突。
-   */
-  const phraseHint = computed(() => {
-    if (prefix.value || page.value) return null
-    const q = trimmed.value
-    if (q.length < PHRASE_MIN) return null
-    return matchPhrase(q, commands.value, phraseAliases.value)
-  })
-
-  const phraseItem = computed(() => {
-    const hit = phraseHint.value
-    if (!hit) return null
-    return {
-      key: `phrase:${hit.cmd.id}`,
-      type: 'phrase',
-      title: hit.cmd.title,
-      // 「理解为：深色 → 切换主题」—— 用户在按回车之前就能看到系统理解成了什么
-      subtitle: `理解为：${describePhrase(hit)} · ↓ 看其它结果`,
-      icon: hit.cmd.icon,
-      danger: false,
-      // 徽标用：明说这是系统猜的，不是用户搜出来的
-      phrase: true,
-      run: hit.cmd.run
-    }
-  })
+  /* ---------- 自然语言 → 命令（I3） ----------
+   * 实现在 useOmniPhrase.js：前缀 / 二级页 / 最短长度三重闸，解析不出就返回 null。
+   * 这里只接线，供分组输出与提示条使用。 */
+  const { phraseHint, phraseItem } = useOmniPhrase({ trimmed, prefix, page, commands, phraseAliases })
 
   /* ---------- 分组输出 ---------- */
 

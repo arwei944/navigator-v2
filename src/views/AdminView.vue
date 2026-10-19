@@ -218,13 +218,37 @@
 </template>
 
 <script setup>
+/**
+ * 管理后台外壳：登录闸门 + 左动作栏 + 模块 Tab + 面板挂载。
+ *
+ * ## 这里只留「布局与接线」
+ *
+ * 业务逻辑已经按职责拆到四个组合式函数，它们各自可单独读、单独测：
+ *   - `useAdminAuth`      登录态 / 凭据校验 / 版本标识
+ *   - `useAdminActions`   动作执行 / 动作栏拖宽 / g 前缀快捷键
+ *   - `useAdminDashboard` 仪表盘聚合请求与卡片取值
+ *   - `useAdminPublish`   发布与回滚的状态迁移顺序
+ * 导航表（TABS / RAIL_GROUPS / 快捷键指向）在 `utils/adminNav.js`，是纯数据。
+ *
+ * 拆分前这个文件 1175 行，改一个快捷键要滚过 300 行发布逻辑。
+ */
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fmtDateTime, fmtDateTimeSec } from '@/utils/format'
+import { fmtDateTime } from '@/utils/format'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useHistoryStore } from '@/stores/history'
+import { opsApi } from '@/services/opsApi'
+import { safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
+import { ADMIN_SHORTCUTS } from '../../shared/admin-shortcuts.mjs'
+import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
+import { TABS, TAB_IDS, DEFAULT_TAB, DASH_DESC, RAIL_GROUPS, RAIL_TITLE, RAIL_TIP, auditAdminNav } from '@/utils/adminNav'
+import { useAdminAuth } from '@/composables/useAdminAuth'
+import { useAdminActions } from '@/composables/useAdminActions'
+import { useAdminDashboard } from '@/composables/useAdminDashboard'
+import { useAdminPublish } from '@/composables/useAdminPublish'
+
 import AdminLogin from '@/components/admin/AdminLogin.vue'
 import AdminSitesPanel from '@/components/admin/AdminSitesPanel.vue'
 import AdminCategoryManager from '@/components/admin/AdminCategoryManager.vue'
@@ -239,18 +263,6 @@ import AdminAi from '@/components/admin/AdminAi.vue'
 import AdminDeploy from '@/components/admin/AdminDeploy.vue'
 import AdminPlugins from '@/components/admin/AdminPlugins.vue'
 import AdminPreferences from '@/components/admin/AdminPreferences.vue'
-import { opsApi, getAdminKey, setAdminKey, clearAdminKey } from '@/services/opsApi'
-import { pluginApi } from '@/services/pluginApi'
-import { fetchStatus as fetchDeployStatus, checkUpstream } from '@/services/deployApi'
-import { fetchHealth } from '@/services/healthApi'
-import { clampRailWidth, DEFAULT_RAIL_W } from '@/utils/sideWidth'
-import { safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
-import { aiApi } from '@/services/aiApi'
-import { alertApi } from '@/services/alertApi'
-import { authApi } from '@/services/authApi'
-import { recordAudit, setAuditActor } from '@/services/auditLog'
-import { ADMIN_SHORTCUTS, SHORTCUT_PREFIX, PREFIX_TTL_MS, matchShortcut, shouldIgnoreKey } from '../../shared/admin-shortcuts.mjs'
-import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
@@ -260,50 +272,18 @@ const historyStore = useHistoryStore()
 const todayCount = computed(() => {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  return historyStore.records.filter(r => r.timestamp >= today.getTime()).length
+  return historyStore.records.filter((r) => r.timestamp >= today.getTime()).length
 })
 
 const unreadBadge = ref(0)
-const adminKey = ref(getAdminKey())
 const webhookUrl = ref(localStorage.getItem('nav_admin_webhook') || '')
-const publishState = ref('idle')
-const publishMsg = ref('')
 
 /* ---------------- 模块 Tab ----------------
  * 后台从「一页瀑布流」改为 Tab：每个模块独立成页，不再靠长距离滚动找功能。
  * 选中的 Tab 写进 URL query（?tab=xxx），刷新 / 收藏 / 分享都能落回同一模块；
  * 未登记的 id 一律回落默认页，避免手改地址栏把页面切成空白。
- * 面板用 v-if 懒挂载：8 个面板里有一半在挂载时就会打接口，全量常驻会造成首屏并发请求。
+ * 面板用 v-if 懒挂载：13 个面板里有一半在挂载时就会打接口，全量常驻会造成首屏并发请求。
  */
-/* 模块导航的表结构（升级）：加了 group，并按「看 → 管 → 发 → 系统」重排。
-   原来 13 个模块平铺，没有分组 —— 找「发布相关」要在一条线上从左扫到右。
-   重排是这次升级的一部分（不是顺手改的）：分组必须对应一个连贯的顺序才有意义。 */
-const TAB_GROUPS = [
-  { id: 'overview', label: '总览' },
-  { id: 'data', label: '数据' },
-  { id: 'ops', label: '运维' },
-  { id: 'release', label: '发布' },
-  { id: 'system', label: '系统' },
-]
-
-const TABS = [
-  { id: 'overview', label: '仪表盘', group: 'overview' },
-  { id: 'sites', label: '站点管理', group: 'data' },
-  { id: 'categories', label: '分类体系', group: 'data' },
-  { id: 'deploy', label: '部署', group: 'ops' },
-  { id: 'plugins', label: '插件', group: 'ops' },
-  { id: 'backup', label: '备份与恢复', group: 'ops' },
-  { id: 'publish', label: '云端发布', group: 'release' },
-  { id: 'snapshots', label: '快照与回滚', group: 'release' },
-  { id: 'history', label: '发布历史', group: 'release' },
-  { id: 'preferences', label: '偏好设置', group: 'system' },
-  { id: 'notify', label: '通知中心', group: 'system' },
-  { id: 'audit', label: '操作审计', group: 'system' },
-  { id: 'ai', label: 'AI 助手', group: 'system' },
-]
-const DEFAULT_TAB = 'overview'
-const TAB_IDS = new Set(TABS.map(t => t.id))
-
 const route = useRoute()
 const router = useRouter()
 
@@ -323,6 +303,26 @@ function selectTab(id) {
   router.replace({ path: route.path, query })
 }
 
+/* ---------------- 组合式：登录 / 动作 / 仪表盘 / 发布 ---------------- */
+
+function onAuthed() {
+  loadUnread()
+  loadDash()
+}
+
+const auth = useAdminAuth({ onAuthed })
+const { adminKey, authed, authChecking, authUser, authVia, authAuto, authExpiresAt, loginNotice, version, versionTitle } = auth
+
+const actions = useAdminActions({ adminKey, onSelectTab: selectTab })
+const { railBusy, actionResult, activeAction, runAction, railW, railCollapsed, railSel, startRailResize, resetRailWidth, pickRail } =
+  actions
+
+const dash = useAdminDashboard({ adminKey, sitesStore, categoriesStore, unreadBadge, version })
+const { dashCards, railMetaOf, loadDash } = dash
+
+const publish = useAdminPublish({ adminKey, webhookUrl, sitesStore, categoriesStore, onPublished: loadUnread })
+const { publishState, publishMsg, preflight, preflightOk, preflightBlockers, onPreflight, publishToCloud, onRolled } = publish
+
 /* ---------------- 全局搜索（#21） ---------------- */
 
 const KIND_LABEL = { tab: '模块', setting: '设置', site: '站点', category: '分类', plugin: '插件' }
@@ -330,14 +330,18 @@ const KIND_LABEL = { tab: '模块', setting: '设置', site: '站点', category:
 const query = ref('')
 const activeIdx = ref(0)
 
-const adminIndex = computed(() => buildAdminIndex({
-  tabs: TABS,
-  sites: sitesStore.sites,
-  categories: categoriesStore.categories,
-}))
+const adminIndex = computed(() =>
+  buildAdminIndex({
+    tabs: TABS,
+    sites: sitesStore.sites,
+    categories: categoriesStore.categories,
+  }),
+)
 const results = computed(() => searchAdminIndex(adminIndex.value, query.value, 12))
 
-watch(results, () => { activeIdx.value = 0 })
+watch(results, () => {
+  activeIdx.value = 0
+})
 
 function moveResult(delta) {
   const n = results.value.length
@@ -351,207 +355,7 @@ function goResult(r) {
   query.value = ''
 }
 
-/* ---------------- 左动作栏（中间区） ----------------
- * 取代原来的「一排 tab + 卡片仪表盘」。用户的两条诉求直接决定这里的形状：
- *   ① 「层次感与重点」→ 栏里是**分组 + 主次分明**的动作与模块；模块的实时状态
- *      写在栏内右侧。不再需要一屏 12 个等大的状态卡 —— 等大就是没有重点。
- *   ② 「切换只需一次」→ 点栏内任一项即达；其中只读/安全的动作点一下就直接执行。
- * 栏本身可折叠（图标态）可拖宽，宽度与折叠态存本机。
- */
-const RAIL_GROUPS = [
-  { id: 'act', label: '常用动作', items: [
-    { id: 'publish', kind: 'tab', tab: 'publish', label: '发布到云端', icon: '⇪' },
-    { id: 'act:check', kind: 'act', action: 'check', label: '检查更新', icon: '⟳' },
-    { id: 'act:backup', kind: 'act', action: 'backup', label: '导出备份', icon: '⛁' },
-    { id: 'act:health', kind: 'act', action: 'health', label: '巡检结果', icon: '◎' },
-  ] },
-  { id: 'batch', label: '批量', items: [
-    { id: 'batch-sites', kind: 'tab', tab: 'sites', label: '批量刷新描述', icon: '✎' },
-    { id: 'batch-ai', kind: 'tab', tab: 'ai', label: 'AI 生成描述', icon: '✦' },
-  ] },
-  { id: 'mod', label: '模块', items: [
-    { id: 'overview', kind: 'tab', tab: 'overview', label: '概览', icon: '◱' },
-    { id: 'sites', kind: 'tab', tab: 'sites', label: '站点管理', icon: '☰' },
-    { id: 'categories', kind: 'tab', tab: 'categories', label: '分类体系', icon: '◇' },
-    { id: 'deploy', kind: 'tab', tab: 'deploy', label: '部署', icon: '⇪' },
-    { id: 'plugins', kind: 'tab', tab: 'plugins', label: '插件', icon: '◈' },
-    { id: 'snapshots', kind: 'tab', tab: 'snapshots', label: '快照与回滚', icon: '⟲' },
-    { id: 'history', kind: 'tab', tab: 'history', label: '发布历史', icon: '≡' },
-    { id: 'audit', kind: 'tab', tab: 'audit', label: '操作审计', icon: '▤' },
-    { id: 'notify', kind: 'tab', tab: 'notify', label: '通知中心', icon: '◔' },
-    { id: 'preferences', kind: 'tab', tab: 'preferences', label: '偏好设置', icon: '⚙' },
-    { id: 'backup', kind: 'tab', tab: 'backup', label: '备份与恢复', icon: '⛁' },
-  ] },
-]
-
-const railSel = ref(localStorage.getItem('nav_admin_rail_sel') || 'overview')
-const railW = ref(clampRailWidth(localStorage.getItem('nav_admin_rail_w')))
-const railCollapsed = ref(localStorage.getItem('nav_admin_rail_collapsed') === '1')
-const activeAction = ref('')          // 选中「动作」时的动作名；与 activeTab 互斥
-const railBusy = ref('')
-const actionResult = ref(null)
-
-watch([railW, railCollapsed, railSel], () => {
-  safeSetItem('nav_admin_rail_w', String(railW.value))
-  safeSetItem('nav_admin_rail_collapsed', railCollapsed.value ? '1' : '0')
-  safeSetItem('nav_admin_rail_sel', railSel.value)
-})
-
-// 栏内右侧的状态数字：复用卡片那套取值，取紧凑写法
-function railMetaOf(tabId) {
-  if (!tabId) return ''
-  const c = dashCards.value.find(x => x.id === tabId)
-  return c && c.short ? String(c.short) : ''
-}
-
-function pickRail(it) {
-  railSel.value = it.id
-  if (it.kind === 'act') {
-    activeAction.value = it.action
-    return runAction(it.action)
-  }
-  activeAction.value = ''
-  actionResult.value = null
-  selectTab(it.tab)
-}
-
-/* ---- 动作执行：点一下就跑 ----
- * 这里只放**只读或安全**的动作（检查更新 / 导出备份 / 看巡检结果）。
- * 发布、回滚、恢复备份这类不可逆动作**刻意不绑在导航点击上** —— 误触一次就是线上事故，
- * 它们仍然要求「进入面板 → 再点执行」这一层确认。 */
-async function runAction(kind) {
-  const key = adminKey.value.trim()
-  if (!key) return
-  railBusy.value = kind
-  actionResult.value = null
-  try {
-    if (kind === 'check') {
-      const st = await fetchDeployStatus()
-      if (!st.ok) throw new Error(st.error)
-      const sha = st.status.version?.shortSha || st.status.version?.sha || ''
-      const up = await checkUpstream(sha)
-      actionResult.value = {
-        ok: true,
-        title: '检查更新',
-        items: [
-          ['线上版本', sha || '—'],
-          ['构建状态', st.status.version?.dirty ? '含未提交改动' : '与提交一致'],
-          ['与上游', up.ok ? (up.behind ? `落后 ${up.behind} 个提交` : '已是最新') : (up.error || '查不到上游')],
-        ],
-      }
-    } else if (kind === 'backup') {
-      const data = await opsApi.backup(key)
-      if (!data || data.kind !== 'navigator-backup') throw new Error('备份接口没返回有效数据')
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `navigator-backup-${new Date().toISOString().slice(0, 10)}.json`
-      a.click()
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000)
-      actionResult.value = {
-        ok: true,
-        title: '导出备份',
-        items: [
-          ['站点', String(data.counts?.sites ?? 0)],
-          ['分类', String(data.counts?.categories ?? 0)],
-          ['文件体积', `${Math.max(1, Math.round(blob.size / 1024))} KB`],
-        ],
-        hint: '文件已开始下载',
-      }
-    } else if (kind === 'health') {
-      const r = await fetchHealth()
-      const c = r.counts || {}
-      actionResult.value = {
-        ok: true,
-        title: '巡检结果',
-        items: [
-          ['正常', String(c.ok ?? 0)],
-          ['可忽略', String(c.limited ?? 0)],
-          ['需处理', String(c.down ?? 0)],
-        ],
-        hint: r.updatedAt ? `最近一轮 ${fmtDateTime(new Date(r.updatedAt).getTime())}` : '还没有巡检快照',
-      }
-    }
-  } catch (e) {
-    actionResult.value = { ok: false, title: '执行失败', items: [['原因', String(e?.message || e)]] }
-  } finally {
-    railBusy.value = ''
-  }
-}
-
-/* ---- 拖宽 / 复位 ---- */
-let railUnlisten = null
-function startRailResize(e) {
-  e.preventDefault()
-  const startX = e.clientX
-  const startW = railW.value
-  let pendingX = startX
-  let raf = 0
-  const flush = () => { raf = 0; railW.value = clampRailWidth(startW + (pendingX - startX)) }
-  const onMove = (ev) => { pendingX = ev.clientX; if (!raf) raf = requestAnimationFrame(flush) }
-  const onUp = () => {
-    document.removeEventListener('mousemove', onMove)
-    document.removeEventListener('mouseup', onUp)
-    if (raf) { cancelAnimationFrame(raf); raf = 0 }
-    railW.value = clampRailWidth(startW + (pendingX - startX))
-    document.body.style.cursor = ''
-    document.body.style.userSelect = ''
-    railUnlisten = null
-  }
-  document.addEventListener('mousemove', onMove)
-  document.addEventListener('mouseup', onUp)
-  document.body.style.cursor = 'col-resize'
-  document.body.style.userSelect = 'none'
-  railUnlisten = onUp
-}
-function resetRailWidth() { railW.value = DEFAULT_RAIL_W }
-
-/* ---------------- 快捷键（#19）：g 前缀序列 ---------------- */
-
-let prefixAt = 0
-function onShortcutKey(e) {
-  // 输入框里 / 带修饰键时一律不响应 —— 否则在搜索框打「gs」就会跳面板
-  if (shouldIgnoreKey(e)) { prefixAt = 0; return }
-  const k = String(e.key || '').toLowerCase()
-  const now = Date.now()
-  if (k === SHORTCUT_PREFIX) { prefixAt = now; return }
-  if (prefixAt && now - prefixAt < PREFIX_TTL_MS) {
-    const hit = matchShortcut(SHORTCUT_PREFIX, k)
-    prefixAt = 0
-    if (hit) {
-      e.preventDefault()
-      selectTab(hit.tab)
-    }
-  }
-}
-
-// 地址栏改动（含浏览器前进/后退）也要跟着切
-watch(() => route.query.tab, () => {
-  const id = tabFromRoute()
-  if (id !== activeTab.value) activeTab.value = id
-})
-
-/* ---------------- 登录态 ---------------- */
-
-const authed = ref(false)
-const authChecking = ref(true)
-const authUser = ref('')
-const authVia = ref('')
-/** 'local' = 本机自动登录（服务端回环端点给的密钥），空 = 人工登录 */
-const authAuto = ref('')
-/** 版本标识：读 /api/deploy-status（公开只读），未登录时也显示 */
-const version = ref('')
-const versionTitle = ref('')
-const authExpiresAt = ref(0)
-const loginNotice = ref('')
-
-const preflight = ref(null)
-const preflightOk = computed(() => Boolean(preflight.value?.ok))
-const preflightBlockers = computed(() => (preflight.value?.blockers || []).map(b => b.message).join('；'))
-
-function onPreflight(result) {
-  preflight.value = result
-}
+/* ---------------- 通知角标 ---------------- */
 
 /**
  * 通知角标：通知中心面板是懒加载的，只靠它自己 emit 要等用户点开那个 Tab 才会上报，
@@ -559,7 +363,10 @@ function onPreflight(result) {
  */
 async function loadUnread() {
   const key = adminKey.value.trim()
-  if (!key) { unreadBadge.value = 0; return }
+  if (!key) {
+    unreadBadge.value = 0
+    return
+  }
   try {
     const r = await opsApi.notifications(key, { limit: 1 })
     unreadBadge.value = r.summary?.unread || 0
@@ -568,300 +375,56 @@ async function loadUnread() {
   }
 }
 
-/**
- * 仪表盘摘要：三个请求并行发出，拿不到就留空。
- * 为什么是三次而不是一次大接口：这三份数据分属三个端点（运维面 / 插件清单 / 快照），
- * 而它们各自的读者就在自己那侧 —— 为了"一次请求"去跨层拼一个聚合接口，
- * 代价是把数据面和运维面又搅在一起（`api/ops.js` 头部专门解释过为什么要分开）。
- * 三次并行 GET 换来分层清楚，值。
- */
-const dashOps = ref(null)
-const dashPlugins = ref(null)
-const dashSnapshots = ref(null)
-const dashBackup = ref(null)
-const dashAlerts = ref(null)
-const dashAi = ref(null)
+/* ---------------- 登录 ---------------- */
 
-async function loadDash() {
-  const key = adminKey.value.trim()
-  if (!key) return
-  const [ops, plug, snaps, bak, alerts, ai] = await Promise.all([
-    opsApi.dashboardSummary(key).catch(() => null),
-    pluginApi.light(key).catch(() => null),
-    opsApi.snapshots(key).catch(() => null),
-    opsApi.backupMeta(key).catch(() => null),
-    alertApi.load(key).catch(() => null),
-    aiApi.probe().catch(() => null),
-  ])
-  dashOps.value = ops && ops.ok ? ops : null
-  dashPlugins.value = plug && plug.ok ? plug : null
-  dashSnapshots.value = snaps && snaps.ok !== false && Number.isFinite(snaps.count) ? snaps : null
-  dashBackup.value = bak && bak.ok ? bak : null
-  dashAlerts.value = alerts && alerts.ok ? alerts : null
-  dashAi.value = ai && ai.ok !== false ? ai : null
+function onLogin(payload) {
+  auth.onLogin(payload)
 }
 
-function onLogin({ token, username, via, expiresAt, auto }) {
-  adminKey.value = token
-  // expiresAt 一并存下：前端据此在过期时就地清掉凭据，不必等一次 401 往返
-  setAdminKey(token, expiresAt)
-  authUser.value = username || 'admin'
-  authVia.value = via || 'session'
-  authAuto.value = auto || ''
-  authExpiresAt.value = expiresAt || 0
-  setAuditActor(username || '')
-  loginNotice.value = ''
-  authed.value = true
-  loadUnread()
-  loadDash()
-}
-
-/**
- * 版本标识：读线上自述的构建信息。
- * 失败就留空（旧部署包没有 build-info.json），**绝不编一个假的出来** —— 版本号编错比不显示更糟。
- */
-async function loadVersion() {
-  const r = await fetchDeployStatus()
-  if (!r.ok) return
-  const j = r.status
-  if (j && j.version && j.version.available && j.version.shortSha) {
-    version.value = j.version.shortSha + (j.version.dirty ? '+未提交' : '')
-    versionTitle.value = [
-      `${j.version.branch || ''} ${j.version.shortSha}`,
-      j.version.subject || '',
-      j.version.builtAt ? `构建于 ${fmtDateTimeSec(j.version.builtAt)}` : '',
-    ].filter(Boolean).join('\n')
-  }
-}
-
+/** 退出时一并清掉上一次会话留下的发布态 */
 function logout() {
-  const key = adminKey.value.trim()
-  if (key) authApi.logout(key)
-  adminKey.value = ''
-  clearAdminKey()
-  authed.value = false
-  authUser.value = ''
-  authVia.value = ''
-  authExpiresAt.value = 0
-  publishState.value = 'idle'
-  publishMsg.value = ''
-  preflight.value = null
+  auth.logout()
+  publish.resetPublishState()
   unreadBadge.value = 0
-  setAuditActor('')
 }
 
-/** 任一面板拿到 401 即广播失效，这里统一退回登录闸门 */
 function onAuthExpired() {
   if (!authed.value) return
   logout()
   loginNotice.value = '登录状态已失效，请重新登录'
 }
 
-/* ---------------- 仪表盘卡片 ---------------- */
-
-// 一句话说明：让「这个模块是干什么的」在进去之前就能读到
-const DASH_DESC = {
-  sites: '增删改、批量操作、书签导入',
-  categories: '全部方向下的分类表',
-  deploy: '本地 / 上次构建 / 线上三方对照',
-  plugins: '九个引擎模块的统一管理面',
-  backup: '备份与恢复站点库',
-  publish: '把站点库推到线上，30 秒内热更新',
-  snapshots: '发布前快照与一键回滚',
-  history: '发布记录与结果',
-  preferences: '主题、卡片、告警规则',
-  notify: '需要你处理的事',
-  audit: '谁在何时做了什么',
-  ai: '分类、摘要、描述这些对话能力',
-}
-
-const dashCards = computed(() => TABS
-  .filter(t => t.id !== 'overview')
-  .map(t => {
-    const c = { id: t.id, label: t.label, desc: DASH_DESC[t.id] || '', value: '', unit: '', short: '' }
-    const ops = dashOps.value
-    const pl = dashPlugins.value
-    const sn = dashSnapshots.value
-    // 只放手头真有的数：拿不到就留空（宁可不显示，也不编一个好看的数）。
-    // 备份与恢复 / 偏好设置 / AI 助手 没有「数字型」的实时状态，所以它们永远只有说明 ——
-    // 硬塞一个数只会是假信息。
-    if (t.id === 'sites') { c.value = sitesStore.sites.length; c.unit = '条' }
-    else if (t.id === 'categories') { c.value = categoriesStore.categories.length; c.unit = '个' }
-    else if (t.id === 'deploy') c.value = version.value || ''
-    else if (t.id === 'plugins') { if (pl) { c.value = pl.groups.length; c.unit = '个引擎' } }
-    else if (t.id === 'publish') { if (sitesStore.cloudVersion) { c.value = 'v' + sitesStore.cloudVersion; c.unit = '云端' } }
-    else if (t.id === 'snapshots') { if (sn) { c.value = sn.count; c.unit = '个可回滚' } }
-    else if (t.id === 'history') {
-      if (ops) {
-        c.value = ops.history.total
-        c.unit = ops.history.successRate == null ? '次' : `次 · 成功率 ${ops.history.successRate}%`
-      }
-    } else if (t.id === 'audit') {
-      if (ops) {
-        c.value = ops.audit.total
-        c.unit = ops.audit.failures ? `条 · 异常 ${ops.audit.failures}` : '条'
-      }
-    } else if (t.id === 'notify') {
-      // 0 也要显示（「0 未读」是信息，「什么都不显示」不是）
-      if (ops) { c.value = ops.notify.unread; c.unit = '未读' }
-      else if (unreadBadge.value) { c.value = unreadBadge.value; c.unit = '未读' }
-    } else if (t.id === 'backup') {
-      // 备份没有「最近一次」的时间戳（服务端不记备份历史），所以给的是
-      // 「一次备份会带走什么」—— 条目数 + 真实序列化体积，都是现算的
-      if (dashBackup.value) {
-        const m = dashBackup.value
-        c.value = m.counts.sites
-        c.unit = `站点可导出 · 约 ${Math.max(1, Math.round(m.bytes / 1024))} KB`
-      }
-    } else if (t.id === 'preferences') {
-      if (dashAlerts.value) {
-        const rules = dashAlerts.value.config?.rules || []
-        c.value = rules.length
-        c.unit = rules.length ? '条告警规则' : '条告警规则 · 用全局阈值'
-      }
-    } else if (t.id === 'ai') {
-      // AI 的「状态」就是「能不能用 + 用的是哪个后端」，比任何数字都有用
-      if (dashAi.value) {
-        c.value = dashAi.value.ready ? (dashAi.value.model || '已配置') : '未配置'
-        c.unit = dashAi.value.ready ? '就绪' : '需要配置后端'
-      }
-    }
-    // 动作栏右侧只放一个紧凑数字/短串，长单位留给面板自己
-    c.short = c.value === '' ? '' : String(c.value)
-    return c
-  }))
-
-const RAIL_TITLE = { check: '检查更新', backup: '导出备份', health: '巡检结果' }
-const RAIL_TIP = {
-  check: '对比线上版本与上游仓库。只读检查，点一下即执行。',
-  backup: '把当前站点库与分类打包下载到本机，点一下即开始下载。',
-  health: '最近一轮服务端巡检的结果。巡检由服务端按间隔自动跑，这里只读快照。',
-}
+/* ---------------- 生命周期 ---------------- */
 
 onMounted(async () => {
+  // 导航表自检：动作栏 / 快捷键指向未登记的 tab 时，开发期立刻可见
+  const navProblems = auditAdminNav(ADMIN_SHORTCUTS)
+  if (navProblems.length) console.warn('[admin-nav] 导航表不一致：\n  ' + navProblems.join('\n  '))
+
   window.addEventListener('nav-auth-expired', onAuthExpired)
-  window.addEventListener('keydown', onShortcutKey)
-  loadVersion()
-  const key = adminKey.value.trim()
-  if (!key) {
-    authChecking.value = false
-    return
-  }
-  try {
-    const r = await authApi.verify(key)
-    if (r.valid) {
-      authUser.value = r.username || 'admin'
-      authVia.value = r.via || 'session'
-      authExpiresAt.value = r.expiresAt || 0
-      setAuditActor(r.username || '')
-      authed.value = true
-      loadUnread()
-      loadDash()
-    } else {
-      adminKey.value = ''
-      clearAdminKey()
-      loginNotice.value = r.reason === 'expired' ? '登录已过期，请重新登录' : '凭据无效，请重新登录'
-    }
-  } catch {
-    loginNotice.value = '无法校验凭据，请重新登录'
-  } finally {
-    authChecking.value = false
-  }
+  actions.attachShortcuts()
+  auth.loadVersion()
+  await auth.verifyExisting()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onShortcutKey)
+  actions.detachShortcuts()
   window.removeEventListener('nav-auth-expired', onAuthExpired)
 })
+
+// 地址栏改动（含浏览器前进/后退）也要跟着切
+watch(
+  () => route.query.tab,
+  () => {
+    const id = tabFromRoute()
+    if (id !== activeTab.value) activeTab.value = id
+  },
+)
 
 watch(webhookUrl, (v) => {
   if (v) safeSetItem('nav_admin_webhook', v)
   else safeRemoveItem('nav_admin_webhook')
 })
-
-/** 回滚成功：先丢弃未发布的本地分类新建（与站点覆盖层同口径），再把响应回填为云端基底后清覆盖层 —— 顺序反了，自动建的分类会被重新叠进旧表 */
-function onRolled(data) {
-  categoriesStore.clearLocalAdds()
-  sitesStore.applyCloudData(data)
-  sitesStore.clearLocalOverlay()
-  recordAudit('rollback.apply', { target: data.restoredFrom || '', detail: `回滚到 v${data.version} · ${data.sites?.length || 0} 站点` })
-}
-
-/** 发布成功后落一条历史 + 一条通知（运维面失败不影响发布结果） */
-function recordPublish(data) {
-  const key = adminKey.value.trim()
-  const count = data.sites?.length || sitesStore.sites.length
-  opsApi.appendHistory(key, {
-    runner: 'cloud',
-    trigger: 'admin',
-    ok: true,
-    duration: null,
-    steps: [{ key: 'hotupdate', label: 'Blob 热更新', status: 'success', detail: `v${data.version} · ${count} 站点` }],
-    cloud: { version: data.version, count, previousVersion: data.previousVersion || 0 },
-    snapshot: data.snapshot?.pathname ? { pathname: data.snapshot.pathname, ok: data.snapshot.ok !== false } : null,
-    counts: { sites: count },
-    note: '线上后台热更新',
-  }).catch(() => {})
-  opsApi.pushNotification(key, {
-    kind: 'publish.done',
-    title: `发布完成 · v${data.version}`,
-    body: `${count} 站点已热更新到云端`,
-    meta: { version: data.version, count },
-  }).catch(() => {})
-}
-
-async function publishToCloud() {
-  if (!adminKey.value.trim()) {
-    publishState.value = 'error'
-    publishMsg.value = '凭据已失效，请重新登录'
-    return
-  }
-  if (!preflightOk.value) {
-    publishState.value = 'error'
-    publishMsg.value = '预检未通过：' + preflightBlockers.value
-    return
-  }
-  publishState.value = 'loading'
-  publishMsg.value = ''
-  try {
-    // 分类表只在本地草稿偏离云端时才推送：否则每次发布都会把云端表覆盖成本地副本，
-    // 一旦本地没成功拉到云端表（离线/首屏兜底），就会静默把云端分类退回默认表
-    const cats = categoriesStore.dirty ? categoriesStore.toCloudGroups() : undefined
-    const data = await opsApi.publish(adminKey.value.trim(), sitesStore.sites, cats)
-    publishState.value = 'success'
-    publishMsg.value = `发布成功！云端版本 v${data.version}，其他设备将在 30 秒内自动更新。`
-    // 发布的就是「云端基底 + 本地覆盖层」拼出的当前列表，覆盖层内容已进云端：
-    // 先用响应回填基底（避免清层后短暂回退到旧数据），再清掉覆盖层，
-    // 否则本地改动会长期遮蔽后续云端变更。
-    sitesStore.applyCloudData(data)
-    sitesStore.clearLocalOverlay()
-    // 分类同理：发布成功的响应带着云端新表（applyCloudData 已回填基线），
-    // 已进云端的本地新增记录在这里撤掉；被云端表挡下的记录保留，等域回来再生效
-    categoriesStore.clearLocalAdds()
-    recordAudit('publish.done', { target: `v${data.version}`, detail: `${data.sites?.length || sitesStore.sites.length} 站点热更新到云端${cats ? '（含分类表）' : ''}` })
-    recordPublish(data)
-    if (webhookUrl.value.trim()) {
-      notifyWebhook(data.version, data.sites?.length || sitesStore.sites.length)
-    }
-    loadUnread()
-  } catch (e) {
-    publishState.value = 'error'
-    publishMsg.value = '发布失败：' + e.message
-    recordAudit('publish.fail', { target: '', result: 'fail', detail: e.message })
-  }
-}
-
-async function notifyWebhook(version, count) {
-  try {
-    await fetch(webhookUrl.value.trim(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event: 'publish', version, count, time: new Date().toISOString() })
-    })
-  } catch {
-    // webhook 通知失败不影响发布结果，静默忽略
-  }
-}
 </script>
 
 <style scoped>

@@ -60,8 +60,12 @@
                      @open-notes="openNotes"
                      @open-palette="commandPaletteRef?.open()" />
         <!-- 此刻推荐：只在首页「没在搜索」时出现 —— 搜索时结果已经由相关性决定，
-             再插一排推荐等于和用户输入的词抢注意力 -->
-        <SmartBar v-if="scope === 'discover' && !sitesStore.searchQuery && preferencesStore.smartBar" />
+             再插一排推荐等于和用户输入的词抢注意力。
+             用 prop 控制可见性、组件常驻：让「搜索时隐藏推荐」不改变父级模板的
+             兄弟节点数量。理由与守卫见 SmartBar.vue 的 `enabled` 注释。 -->
+        <SmartBar
+          :enabled="scope === 'discover' && !sitesStore.searchQuery && preferencesStore.smartBar"
+        />
 
         <!-- 方向 + 子分类筛选条：回收站里分类无意义，故不显示；归档同理（筛选条的计数
              基于在册站点，在归档范围内会虚高） -->
@@ -178,7 +182,9 @@ import { useNotesStore } from '@/stores/notes'
 import { useSiteNotesStore } from '@/stores/siteNotes'
 import { useThemeStore } from '@/stores/theme'
 import { useUndoActions } from '@/composables/useUndoActions'
-import { startLiveSync } from '@/services/liveSync'
+import { useRouteSync } from '@/composables/useRouteSync'
+import { useAppLifecycle } from '@/composables/useAppLifecycle'
+import { useCloudNotice } from '@/composables/useCloudNotice'
 
 /**
  * 「点开才用」的重组件一律走异步：它们都由用户点击打开、`v-if` 控制，没有任何理由把代码压在首屏。
@@ -301,9 +307,6 @@ watch(drawerOpen, (open) => {
 
 onMounted(() => { if (typeof window !== 'undefined') window.addEventListener('popstate', onDrawerPopState) })
 onBeforeUnmount(() => { if (typeof window !== 'undefined') window.removeEventListener('popstate', onDrawerPopState) })
-
-// 备注 / 便利贴的自动上行句柄（onMounted 里启动，卸载时停掉）
-let stopLiveSync = null
 
 function openAddSite(payload) {
   const url = payload?.url || ''
@@ -583,222 +586,28 @@ function confirmDeleteSite() {
 /* ---- 路由 ⇄ 状态：路由是唯一事实来源 ---- */
 
 // 范围（Axis 1）：由路由名派生，不再作为独立可写状态
-const SCOPE_BY_ROUTE = {
-  Home: 'discover',
-  Favorites: 'favorites',
-  Recent: 'recent',
-  Feed: 'feed',
-  Trash: 'trash',
-  Archived: 'archived',
-  Insights: 'insights',
-  Graph: 'graph',
-  About: 'about',
-  Admin: 'admin'
-}
-const SCOPE_LABEL = {
-  favorites: '收藏',
-  recent: '最近',
-  archived: '归档',
-  feed: '内容聚合',
-  trash: '回收站',
-  insights: '洞察',
-  graph: '关联图谱'
-}
-
-const scope = computed(() => SCOPE_BY_ROUTE[route.name] || 'discover')
-
-/**
- * 不走导航壳的独立页面（自带整页布局）。
- * 2026-10-16：**Admin 从这一组移走** —— 管理后台改成套壳渲染，保持三栏
- * （左导航 / 中内容 / 右信息栏），不再是整页切换。只剩 404 是真·独立页。
+/*
+ * 路由同步 / 生命周期 / 云端状态文案已抽到 composables：
+ *   - useRouteSync      路由 ↔ store（范围 / 分类 / 用途 / 搜索四个轴）
+ *   - useAppLifecycle   云端轮询、可见性与联网事件、快捷键、备注上行、chunk 预热
+ *   - useCloudNotice    云端错误码 → 人话（含 402 的处理指引）
  */
-const STANDALONE_ROUTES = new Set(['NotFound'])
-const isStandalone = computed(() => STANDALONE_ROUTES.has(route.name))
+const { scope, isStandalone } = useRouteSync()
 
-// 分类（Axis 3）：与范围正交，放 query 才能和 /favorites、/recent 组合
-function categoryFromRoute() {
-  const id = route.query.c
-  return id && id !== 'all' ? id : 'all'
-}
-// 用途（Axis 4）：同样放 query，才能和分类、范围任意组合
-function purposeFromRoute() {
-  const id = route.query.p
-  return id && id !== 'all' ? id : 'all'
-}
-function queryFromRoute() {
-  return route.query.q || ''
-}
-
-function applyRouteToStore() {
-  if (sidebarStore.activeNav !== scope.value) sidebarStore.setActiveNav(scope.value)
-
-  // 「归档」是范围轴：只有在这个范围内才把 archived 站点放出来，其余范围一律不显示
-  sitesStore.setArchivedScope(scope.value === 'archived')
-
-  const cat = categoryFromRoute()
-  if (sitesStore.currentCategory !== cat) sitesStore.setCategory(cat)
-
-  const purpose = purposeFromRoute()
-  if (sitesStore.currentPurpose !== purpose) sitesStore.setPurpose(purpose)
-
-  const q = queryFromRoute()
-  if (sitesStore.searchQuery !== q) sitesStore.setSearchQuery(q)
-
-  updatePageTitle()
-}
-
-// 路由变化 → 状态（含首次进入，保证直接粘贴 /favorites 也能还原状态）
-watch(() => route.fullPath, applyRouteToStore, { immediate: true })
-
-// 搜索 → query（仅当路由尚未反映该关键词时；用 replace 避免每个按键都进历史）
-watch(() => sitesStore.searchQuery, (q) => {
-  if ((q || '') === queryFromRoute()) return
-  const next = { ...route.query }
-  if (q) next.q = q
-  else delete next.q
-  router.replace({ path: route.path, query: next })
+useAppLifecycle({
+  sitesStore,
+  clicksStore,
+  sidebarStore,
+  preferencesStore,
+  notesStore,
+  siteNotesStore,
+  commandPaletteRef,
+  undoLast,
+  createNote,
+  showStickyBoard,
+  loadAutoAdd,
 })
 
-function updatePageTitle() {
-  const cat = categoryFromRoute()
-  let title = 'Navigator'
-  if (SCOPE_LABEL[scope.value]) {
-    title = `Navigator | ${SCOPE_LABEL[scope.value]}`
-  } else if (cat !== 'all') {
-    title = `Navigator | ${categoriesStore.getCategoryLabel(cat) || cat}`
-  }
-  if (sitesStore.searchQuery) {
-    title = `Navigator | 搜索: ${sitesStore.searchQuery}`
-  }
-  document.title = title
-}
-
-onMounted(() => {
-  // 右侧面板的折叠策略：必须在**持久化回填之后**才读（persistedstate 是在 store
-  // setup 返回后才写回 ref 的，setup 里同步读只会拿到默认值）。放在这里与主题
-  // 启动动作同源 —— 都是「读持久化值得等回填」这一类。
-  sidebarStore.applyCollapsePolicy()
-
-  // 云端站点热更新：启动拉取 + 轮询（失败会指数退避）
-  sitesStore.initCloudSites()
-  sitesStore.startPolling(30000)
-
-  // 全局点击量（卡片角标 / 排行的权威口径）：启动拉一次，之后按 TTL 自刷新
-  clicksStore.load()
-
-  // 标签页重新可见时立即重拉，避免热更新后等待整轮 30s。
-  // 顺带复位退避：用户切回来就是要看最新数据，不该让他等一个断网期间攒出来的窗口。
-  document.addEventListener('visibilitychange', onVisibility)
-
-  // 联网恢复/断开：恢复时立刻重拉（不必等退避），断开时把状态写进 cloudError 让界面说出来。
-  // 这两个事件在移动端尤其重要 —— 切 4G/WiFi 时 navigator.onLine 变化是最早的信号。
-  window.addEventListener('online', onOnline)
-  window.addEventListener('offline', onOffline)
-
-  document.addEventListener('keydown', onKeydown)
-
-  // 备注 / 便利贴的自动上行：改完 5s 后推一次云端（没填会话密钥则完全不推）
-  stopLiveSync = startLiveSync({ siteNotes: siteNotesStore, notes: notesStore })
-
-  /**
-   * 预热「秒加」那条链路的异步 chunk。
-   *
-   * 它现在是按需 `import()` 的（静态引会把整条链路压回入口、越过 600 KiB 预算），
-   * 代价是**用户按下回车的那一刻才开始下载**。首屏刚过、300 张卡的图标请求还在占着
-   * HTTP/1.1 的连接池时，那一跳可能要等好几秒才拿到 —— 而按回车恰恰是最不该等的时候。
-   *
-   * 所以空闲时先取一次（只是把 chunk 放进模块图，不做任何事）。
-   * 注：它**不改变**分包结果 —— 动态 import 的产物依然不在首屏清单里。
-   */
-  const warm = () => { loadAutoAdd().catch(() => {}) }
-  if (typeof requestIdleCallback === 'function') requestIdleCallback(warm, { timeout: 3000 })
-  else setTimeout(warm, 1200)
-})
-
-onBeforeUnmount(() => {
-  stopLiveSync?.()
-  // 这个组件挂在应用根上，正常不会卸载；但把监听与定时器收干净是基本功，
-  // 否则将来一旦有 HMR / 多实例挂载，就会同时跑好几条轮询。
-  document.removeEventListener('visibilitychange', onVisibility)
-  window.removeEventListener('online', onOnline)
-  window.removeEventListener('offline', onOffline)
-  document.removeEventListener('keydown', onKeydown)
-  sitesStore.stopPolling()
-})
-
-/**
- * 云端状态条文案：把 store 里的机器可读短码翻译成人话。
- * 放在 UI 层而不是 store 里，是为了 store 不带文案、也便于将来换措辞。
- */
-const cloudNotice = computed(() => {
-  const e = sitesStore.cloudError
-  if (!e) return null
-  if (e === 'offline') return { tone: 'warn', retry: true, text: '已离线，当前展示的是本机数据，联网后会自动更新' }
-  if (e === 'timeout') return { tone: 'warn', retry: true, text: '读取云端数据超时，当前展示的是本机数据' }
-  /**
-   * 「这个部署没有后端接口」的两种表现，文案一致。
-   *   404：纯静态托管下 `/api/sites` 根本不存在；
-   *   非 JSON：SPA 兜底页 / 登录页 / 代理拦截页。
-   * 它们跟「离线」是两件事 —— 用户网络好得很，是这个部署环境没接后端。
-   * 说成「已离线」会让人去重启路由器，找错方向。
-   */
-  if (e === 'http-404' || e === 'invalid-payload') {
-    return { tone: 'warn', retry: true, text: '本站未接入云端同步，展示的是本机数据（本地增删改照常可用）' }
-  }
-  /**
-   * 402 单独说清楚：它不是「网络抖了一下」，而是部署被平台停了
-   * （Vercel Hobby 额度打满后会暂停整个部署，全站返回 402 DEPLOYMENT_DISABLED）。
-   * 这种状态重试不会好，所以要直接告诉用户去哪儿处理，否则只会一直点「重试」。
-   */
-  if (e === 'http-402') {
-    return { tone: 'bad', retry: true, text: '云端部署已被平台暂停（402 · 多为用量超限），展示的是本机数据；请到部署平台面板查看用量' }
-  }
-  if (String(e).startsWith('http-')) return { tone: 'bad', retry: true, text: `云端数据读取失败（${e.slice(5)}），当前展示的是本机数据` }
-  return { tone: 'warn', retry: true, text: '云端数据暂时不可用，当前展示的是本机数据' }
-})
-
-function onVisibility() {
-  if (document.visibilityState === 'visible') sitesStore.retryCloudNow()
-}
-function onOnline() { sitesStore.retryCloudNow() }
-function onOffline() { sitesStore.pollCloudSites() }
-
-function onKeydown(e) {
-  // Ctrl+K 打开全能框（命令面板形态）
-  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-    e.preventDefault()
-    commandPaletteRef.value?.open()
-    return
-  }
-  // Ctrl+Z 撤销最近一次批量改动 / 删除（5 秒窗口内，见 stores/undo.js）
-  // 焦点在输入框里时不接管：那是浏览器/编辑器自己的文本撤销，抢过来是破坏
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
-    const tag = e.target?.tagName
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
-    e.preventDefault()
-    undoLast()
-    return
-  }
-  // Ctrl+D 切换主题：快捷键面板里写了这条但一直没实现，这里补上
-  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
-    e.preventDefault()
-    preferencesStore.toggleTheme()
-    return
-  }
-  // Ctrl+Alt+N 新建便利贴；Ctrl+Shift+N 打开便签墙
-  if (e.altKey && (e.ctrlKey || e.metaKey) && (e.key === 'n' || e.key === 'N')) {
-    e.preventDefault()
-    createNote()
-    return
-  }
-  if (e.shiftKey && (e.ctrlKey || e.metaKey) && (e.key === 'N')) {
-    e.preventDefault()
-    showStickyBoard.value = true
-    return
-  }
-  if (e.key === 'Escape') {
-    sidebarStore.close()
-  }
-}
+const { cloudNotice } = useCloudNotice()
 </script>
 

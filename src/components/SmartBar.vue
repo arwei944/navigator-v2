@@ -1,5 +1,5 @@
 <template>
-  <section v-if="items.length" class="smart-bar" :class="{ cold }">
+  <section v-if="items.length && enabled" class="smart-bar" :class="{ cold }">
     <div class="smart-head">
       <svg class="smart-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><line x1="19" y1="17" x2="19" y2="21"/><line x1="17" y1="19" x2="21" y2="19"/></svg>
       <span class="smart-title">{{ cold ? '大家在用的' : '此刻推荐' }}</span>
@@ -35,6 +35,18 @@ import { useCategoriesStore } from '@/stores/categories'
 import { usePreferencesStore } from '@/stores/preferences'
 import { openInNewTab } from '@/utils/open'
 import { buildSignals, hasSignal, rankSites, SLOT_LABELS, slotOf } from '@/utils/smartRank'
+
+/**
+ * `enabled` 由父组件传入，而不是让父组件用 `v-if` 把整个组件卸掉。
+ *
+ * 理由：搜索时隐藏推荐条是**本组件自己的事**，让它常驻、由 prop 决定是否渲染，
+ * 父级模板就不必为了它改变兄弟节点数量。这不是某个具体事故的修复（2026-10 的
+ * 「输入首字符失焦」真因是 `useOmniBox` 漏传评分上下文，见 `commandScore` 的注释），
+ * 而是避免「输入态驱动父级 v-if」这类结构隐患的预防性约束 ——
+ * 静态守卫见 `tools/console/test-inline-stability.mjs`，
+ * 真机逐字符验证见 `tools/console/test-input-focus-real.mjs`。
+ */
+defineProps({ enabled: { type: Boolean, default: true } })
 
 const SHOWN = 8
 

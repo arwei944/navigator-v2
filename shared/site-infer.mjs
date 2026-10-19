@@ -13,86 +13,11 @@
  */
 import { inferPurposes } from './purposes.mjs'
 
-/* ---------------- 文本与标签工具 ---------------- */
-
-export function decodeEntities(str) {
-  return String(str)
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-}
-
-/**
- * 取标签属性值，按定界引号配对。
- * 不能用 `[^"']+`：内联 SVG 的 href 是双引号包裹、内部含单引号
- * （`href="data:image/svg+xml,%3Csvg xmlns='…'"`），会从第一个单引号处被截断。
- */
-export function attrValue(tag, name) {
-  const src = String(tag)
-  const quoted = src.match(new RegExp(name + "\\s*=\\s*([\"'])([\\s\\S]*?)\\1", 'i'))
-  if (quoted) return quoted[2]
-  const bare = src.match(new RegExp(name + '\\s*=\\s*([^\\s>]+)', 'i'))
-  return bare ? bare[1] : ''
-}
-
-/** 按 property/name/itemprop 取 <meta> 内容；属性书写顺序颠倒的页面也能命中 */
-export function metaContent(html, keys) {
-  const want = keys.map(k => String(k).toLowerCase())
-  for (const tag of String(html).matchAll(/<meta\b[^>]*>/gi)) {
-    const t = tag[0]
-    const key = (attrValue(t, 'property') || attrValue(t, 'name') || attrValue(t, 'itemprop') || '').toLowerCase()
-    if (!want.includes(key)) continue
-    const content = attrValue(t, 'content')
-    if (content) return decodeEntities(content).trim()
-  }
-  return ''
-}
-
-function stripTags(html) {
-  return String(html)
-    .replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, ' ')
-    .replace(/<!--[\s\S]*?-->/g, ' ')
-    .replace(/<[^>]+>/g, ' ')
-}
-
-function clip(str, max = 120) {
-  const s = String(str).replace(/\s+/g, ' ').trim()
-  return s.length > max ? s.slice(0, max).replace(/[\s，,、。.；;:：-]+$/, '') : s
-}
-
-/* ---------------- 字节解码 ---------------- */
-
-/**
- * 把 HTML 字节解成字符串，多编码回退：声明编码 → utf-8 → gb18030 → big5 → latin1。
- * 只在 utf-8 出现较多替换字符（≥3 个，说明确实不是 UTF-8）时才换编码，
- * 避免一个坏字节就把整页判成 gb18030；latin1 永远能解出干净结果，故只作最后兜底。
- */
-export function decodeHtmlBytes(bytes) {
-  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)
-  const dec = enc => new TextDecoder(enc).decode(u8)
-  const badCount = s => (s.match(/\uFFFD/g) || []).length
-
-  let best = dec('utf-8')
-  let bestBad = badCount(best)
-  if (bestBad < 3) return best
-
-  const declared = (best.match(/charset\s*=\s*["']?([\w-]+)/i) || [])[1]?.toLowerCase()
-  const order = [...(declared && declared !== 'utf-8' ? [declared] : []), 'gb18030', 'gbk', 'big5', 'latin1']
-  for (const enc of order) {
-    try {
-      const alt = dec(enc)
-      const bad = badCount(alt)
-      if (bad < bestBad) {
-        best = alt
-        bestBad = bad
-        if (bad === 0) break
-      }
-    } catch { /* 该编码不可用则尝试下一个 */ }
-  }
-  return best
-}
-
+/* 文本与标签工具已抽到 shared/html-text.mjs（零业务语义的基础层）。
+ * 这里 re-export，保持既有 import 路径不变 —— api/metadata.js、console/lib/sites.mjs
+ * 等 8 处消费方一行都不用改。 */
+import { decodeEntities, attrValue, metaContent, stripTags, clip, decodeHtmlBytes } from './html-text.mjs'
+export { decodeEntities, attrValue, metaContent, decodeHtmlBytes } from './html-text.mjs'
 /* ---------------- 地址 ---------------- */
 
 // 唯一实现在 shared/host.mjs（本文件原来是四份之一）。
@@ -761,92 +686,7 @@ export function inferSite({ html, rootHtml = '', manifestTheme = '', url, existi
  * ───────────────────────────────────────────────────────────── */
 
 /** desc 垃圾形态：正则 → 给面板看的人读原因 */
-export const DESC_JUNK_RULES = [
-  [/<\/?[a-z][^>]{0,80}>/i, 'HTML 标签残留'],
-  [/&[a-z]{2,8};|&#\d{1,5};/i, 'HTML 实体未解码'],
-  [/�/, '替换字符（乱码）'],
-  [/^\s*(undefined|null|nan)\s*$/i, '字面 undefined / null'],
-  [/(.)\1{9,}/, '连续重复字符'],
-]
-
-/** 命中的垃圾形态原因；无则 ''（空描述不算垃圾，交给内核的 descIssue 报「缺失」） */
-export function descJunkReason(desc) {
-  const d = String(desc ?? '')
-  if (!d.trim()) return ''
-  for (const [re, label] of DESC_JUNK_RULES) if (re.test(d)) return label
-  return ''
-}
-
-/**
- * 从站点表里挑出 desc 命中垃圾形态的条目（后台面板与 tools 脚本共用）。
- * @param {object[]} sites
- * @returns {{ id: string, name: string, url: string, desc: string, reason: string }[]}
- */
-export function auditDescJunk(sites) {
-  const list = Array.isArray(sites) ? sites.filter(s => s && typeof s === 'object') : []
-  const out = []
-  for (const s of list) {
-    const reason = descJunkReason(s.desc)
-    if (reason) out.push({ id: s.id, name: s.name, url: s.url, desc: s.desc, reason })
-  }
-  return out
-}
-
-/* ─────────────────────────────────────────────────────────────
- * 自动归类一致性体检（F5①）
- *
- * 「准确率」的可解释口径：把每条**已有分类**的站点重新喂给 `inferCategory`
- * （与「新增站点」时同一套推断），比对推荐分类与现值。一致的算命中；不一致的列出来，
- * 就是「现存归类里可能与规则不符」的清单 —— 高频出现的偏差模式才是调规则 / 提示词的依据。
- *
- * 两条刻意的边界：
- *   · **无信号不算进分母**：规则对该站（如纯品牌名、无关键词）判断不了时（score<=0），
- *     把它算成「不命中」会凭空拉低准确率。这里直接跳过 —— 准确率衡量的是「规则出手时的正确率」。
- *   · **排除自己再比**：inferCategory 有「同域 / 同族站点」信号，若把自己也算进参照，
- *     每个站都会命中自己而恒等，准确率永远 100%，等于没测。
- * ───────────────────────────────────────────────────────────── */
-export function auditCategoryConsistency(sites, { categoryMeta = {} } = {}) {
-  const list = Array.isArray(sites) ? sites.filter(s => s && typeof s === 'object') : []
-  const meta = categoryMeta && typeof categoryMeta === 'object' ? categoryMeta : {}
-
-  let scored = 0          // 规则能出手的站点数（分母）
-  let consistent = 0      // 其中与现值一致的（分子）
-  const mismatches = []
-
-  for (const s of list) {
-    const current = String(s.categoryId || '').trim()
-    if (!current) continue
-    const others = list.filter(x => x.id !== s.id)
-    const u = String(s.url || '')
-    let host = ''
-    let path = ''
-    try {
-      const parsed = new URL(u.includes('://') ? u : 'https://' + u)
-      host = parsed.hostname
-      path = parsed.pathname
-    } catch { /* 地址解析不了 → 用空域名，只靠名称/描述信号 */ }
-    const rec = inferCategory({ name: s.name, desc: s.desc, domain: host, path }, others, meta, { fallback: '' })
-    if (!(rec.score > 0)) continue   // 规则无信号，不计入分母
-    scored++
-    if (rec.categoryId === current) consistent++
-    else mismatches.push({
-      id: s.id, name: s.name, url: s.url,
-      current, recommended: rec.categoryId,
-      confidence: rec.confidence, reasons: rec.reasons,
-    })
-  }
-
-  const rate = scored ? consistent / scored : 1
-  // 高频偏差：按「现值 → 推荐值」聚合，供「先看哪类系统性判错」排序
-  const pattern = new Map()
-  for (const m of mismatches) {
-    const k = `${m.current} → ${m.recommended}`
-    pattern.set(k, (pattern.get(k) || 0) + 1)
-  }
-  const topPatterns = [...pattern.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([pair, count]) => ({ pair, count }))
-
-  return { scored, consistent, rate, mismatches, topPatterns }
-}
+/* 站点表体检（desc 垃圾形态 / 自动归类一致性）已抽到 shared/site-audit.mjs。
+ * 两者都只依赖本文件的 descJunkReason / inferCategory 与站点数组，
+ * 与「推断一条站点」是两件事 —— 放这里会让引擎同时负责「推导」与「体检」。 */
+export { DESC_JUNK_RULES, descJunkReason, auditDescJunk, auditCategoryConsistency } from './site-audit.mjs'
