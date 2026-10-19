@@ -106,6 +106,33 @@ if (productEntry) {
   }
 }
 
+/*
+ * 5) 每道门禁都要有「单跑入口」（`console:test:xxx`）。
+ *
+ * 执行器失败时会提示「单独复现：node tools/console/test-xxx.mjs」，但人对 npm
+ * 脚本的肌肉记忆是 `npm run console:test:xxx`。缺入口时排障要多想一步：先去
+ * package.json 找文件名 —— 这一步在真出故障时最不划算。
+ *
+ * 这条是补完 7 个缺失入口后加的守卫：缺入口不会让任何东西变红，所以只能靠门禁。
+ */
+{
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf-8'))
+  const targets = new Set(
+    Object.values(pkg.scripts || {})
+      .map((cmd) => (String(cmd).match(/(tools\/(?:console|mcp)\/test-[^\s'"]+\.mjs)/) || [])[1])
+      .filter(Boolean),
+  )
+  const gateFiles = [
+    ...readdirSync(join(ROOT, 'tools/console')).filter((n) => /^test-.*\.mjs$/.test(n)).map((n) => `tools/console/${n}`),
+    ...readdirSync(join(ROOT, 'tools/mcp')).filter((n) => /^test-.*\.mjs$/.test(n)).map((n) => `tools/mcp/${n}`),
+  ]
+  const noEntry = gateFiles.filter((f) => !targets.has(f))
+  ok(
+    noEntry.length === 0,
+    `${noEntry.length} 道门禁没有 console:test:* 单跑入口：${noEntry.slice(0, 5).join(', ')}`,
+  )
+}
+
 console.log(`\n📜 脚本台账门禁：${pass} 通过 / ${failures.length} 失败`)
 console.log(`   scripts/ 下 ${files.length} 个脚本｜README 登记 ${listed.size}｜package.json 引用 ${referenced.size}`)
 if (failures.length) {
