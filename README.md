@@ -27,7 +27,7 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 - **会话同步**: 收藏/待办/偏好按会话密钥云端同步（多设备一致）
 - **部署**: 自有服务器 BotKeep（通道由 `shared/publisher.mjs` 注册表决定，本地 `scripts/publish.mjs` 为唯一发布入口）
 - **本地运维控制台**: Node 原生 HTTP + SSE 实时日志的单页控制台（`tools/console`，仅监听 `127.0.0.1`）
-- **CI/CD**: GitHub Actions 门禁（数据校验 + 构建 + 全量 102 道）+ release-please 自动版本与 CHANGELOG
+- **CI/CD**: GitHub Actions 门禁（数据校验 + 构建 + 全量门禁）+ release-please 自动版本与 CHANGELOG
 
 ## 架构概览
 
@@ -261,14 +261,14 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 
 | 工作流 | 触发 | 作用 |
 |--------|------|------|
-| `ci.yml` | push / PR | 数据 schema 门禁（`validate`）+ 构建（`build`）+ **全量门禁 102 道**（`console:test:all --ci`），只做门禁、不重复部署 |
+| `ci.yml` | push / PR | 数据 schema 门禁（`validate`）+ 构建（`build`）+ **全量门禁**（`console:test:all --ci`），只做门禁、不重复部署 |
 | `release-please.yml` | push 到 `master` | 依 Conventional Commits 推断语义化版本、生成 `CHANGELOG.md`、开 release PR |
 
 > 发布仍以本地 `scripts/publish.mjs` 为唯一入口（Git 集成未开启），CI 不参与部署，避免「代码自动部署」与「数据热更新」两条链路互相覆盖。
 
 ### CI 里的门禁怎么跑
 
-CI 跑的是**与本地相同的 102 道门禁**，不是缩水版。两处差异都由脚本头注释自声明，
+CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异都由脚本头注释自声明，
 而不是在 workflow 里硬编码名单：
 
 | 声明 | 含义 | 当前使用者 |
