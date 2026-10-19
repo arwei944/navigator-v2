@@ -9,6 +9,7 @@
  * 用法: node tools/mcp/test-mcp.mjs   （或 npm run mcp:test）
  */
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -35,6 +36,25 @@ function eq(actual, expected, label) {
 
 function dataHash() {
   return createHash('sha256').update(readFileSync(DATA)).digest('hex')
+}
+
+/**
+ * 暂存区（索引）内容的哈希。
+ *
+ * `git write-tree` 把当前索引写成树对象并返回其 SHA —— 索引一变，哈希必变；
+ * 工作区里别的文件被增删改则完全不影响它。这正是「预演有没有误暂存」需要的
+ * 观察面：既不漏真问题，也不被并行门禁的无关写入污染。
+ *
+ * 用同步子进程而非引入依赖：本文件已在 `execFileSync` 之外无额外依赖，
+ * 一次调用几毫秒，不影响门禁体感。
+ */
+function indexHash() {
+  try {
+    return execFileSync('git', ['write-tree'], { cwd: ROOT, encoding: 'utf-8' }).trim()
+  } catch {
+    // 索引不可写（如并发 git 操作持锁）时退化为可观测标记，让断言明显失败而非静默通过
+    return 'unavailable'
+  }
 }
 
 const localCount = JSON.parse(readFileSync(DATA, 'utf-8')).length
@@ -126,7 +146,20 @@ try {
   /* ---------------- ④ 写操作闸门：不带 confirm 只预演 ---------------- */
 
   const before = dataHash()
-  const countsBefore = JSON.stringify(gs.json.data.counts)
+  /*
+   * 锁定「暂存区内容」，而不是整个工作区的 counts。
+   *
+   * 原断言比较 `counts` 全量快照（total / unstaged / untracked …），把**整个
+   * 工作区**当成不变量。串行时成立，并行执行器下会偶发失败（实测 4-6 轮一次）：
+   * 本文件从采集快照到断言之间十余次 MCP 往返约 30s，期间 `test-uptime` /
+   * `test-deploy-status` 会写 `data/uptime.jsonl`，`untracked` 从 1 变 0 ——
+   * 与「预演有没有误暂存」毫无关系。
+   *
+   * 改用 `git write-tree` 的哈希：它只反映**索引内容**，对工作区其他文件
+   * 的增删完全不敏感。同时它比「staged 文件数」强得多 —— 数不变但暂存内容
+   * 变了（例如把别的文件 add 进来又 unstage 回去）也能抓到。
+   */
+  const indexBefore = indexHash()
 
   const addPreview = await call(client, 'nav_sites', {
     action: 'add',
@@ -205,7 +238,8 @@ try {
 
   eq(dataHash(), before, '一轮写操作预演后 api/sites-data.json 字节未变（未误写）')
   const gsAfterPreviews = await call(client, 'nav_git', { action: 'status' })
-  eq(JSON.stringify(gsAfterPreviews.json.data.counts), countsBefore, '一轮写操作预演后 git 索引与工作区计数未变（未误暂存）')
+  eq(gsAfterPreviews.json.data.counts?.staged ?? 0, 0, '一轮写操作预演后暂存区仍为空（未误暂存）')
+  eq(indexHash(), indexBefore, '一轮写操作预演后索引内容未变（未误暂存）')
 
   /* ---------------- ⑤ 预演仍做校验：坏数据必须被拦住 ---------------- */
 

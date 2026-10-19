@@ -53,6 +53,38 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
 const LEDGER = join(ROOT, 'tools/gate-registry/gate-index.json')
 
+/**
+ * 台账自校验：跑任何门禁之前，先确认「台账本身是可信的」。
+ *
+ * 这一条是 2026-10 实测踩出来的第二个假绿：把 98 段 `&&` 长链换成执行器时，
+ * 长链末尾的 `node tools/gate-registry/cli.mjs check` 一起消失了 ——
+ * 执行器只扫描 `test-*.mjs` 文件，台账校验不在扫描范围内，于是：
+ *
+ *   - 新增 4 道门禁没归类      → 台账 check 报错，但**没人跑 check**；
+ *   - 台账 JSON/MD 与现状不一致 → 同上；
+ *   - 执行器照常打印「102 道全绿」。
+ *
+ * 也就是说：**用来发现假绿的东西本身没在跑**，是比漏跑一道门禁更隐蔽的问题。
+ * 现在把它作为前置闸门，失败即中止（清单不完整时跑出来的绿没有意义）。
+ *
+ * 只在跑全量时执行；`--only` / `--domain` / `--list` 是排障与查询场景，
+ * 不该被台账状态挡住（但也因此不会被当作「全绿」的证据）。
+ */
+function verifyLedger() {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [join(ROOT, 'tools/gate-registry/cli.mjs'), 'check'], {
+      cwd: ROOT,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let out = ''
+    const cap = (b) => { out += String(b) }
+    child.stdout.on('data', cap)
+    child.stderr.on('data', cap)
+    child.on('error', (e) => resolve({ ok: false, out: String(e.message) }))
+    child.on('close', (code) => resolve({ ok: code === 0, out }))
+  })
+}
+
 /* ---------------- 参数 ---------------- */
 
 function parseArgs(argv) {
@@ -274,6 +306,21 @@ if (unindexed.length) {
   for (const f of unindexed) console.error(`   - ${f}`)
   console.error('   → 跑 node tools/gate-registry/cli.mjs index 后重试')
   process.exit(2)
+}
+
+/*
+ * 跑全量前先校验台账本身。筛选场景（--list / --only / --domain）跳过：
+ * 它们是排障入口，不该被台账状态挡住；但只要走了全量路径，台账就必须是可信的。
+ */
+const isFullRun = !args.list && !args.only && !args.domain
+if (isFullRun) {
+  const ledger = await verifyLedger()
+  if (!ledger.ok) {
+    console.error('❌ 门禁台账自校验失败 —— 清单本身不可信，拒绝执行：\n')
+    console.error(ledger.out.trim().replace(/^/gm, '   '))
+    console.error('\n   → 跑 node tools/gate-registry/cli.mjs index 修复台账后重试')
+    process.exit(2)
+  }
 }
 
 if (args.domain) {

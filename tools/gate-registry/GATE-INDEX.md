@@ -11,13 +11,12 @@
 |---|---|---|---|
 | 文档治理 | 2 | `test-doc-facts` | 0.4s |
 | 安全与鉴权 | 3 | `test-netguard` | 0.3s |
-| 未分类 | 4 | `test-file-size` | — |
-| 搜索与交互 | 5 | `test-search` | 0.4s |
-| 工作区治理 | 7 | `test-hunks` | 4.5s |
+| 搜索与交互 | 6 | `test-search` | 0.4s |
+| 工作区治理 | 8 | `test-hunks` | 4.5s |
 | 部署与发布 | 9 | `test-endpoints-run` | 2.8s |
 | 服务端与运行时 | 21 | `test-mcp` | 34.6s |
 | 数据与内容 | 23 | `test-trust` | 0.8s |
-| 前端与体验 | 28 | `test-frontend` | 3.9s |
+| 前端与体验 | 30 | `test-frontend` | 3.9s |
 
 ## 清单
 
@@ -56,7 +55,7 @@
 | 31 | `test-endpoints` | 部署与发布 | 部署端点注册表用例（N2）：零依赖、不联网、不触发真实发布会。 | 115 | 0.2s |
 | 32 | `test-engine` | 数据与内容 | 抓取引擎（热拔插）自测：不联网、不依赖 siteprobe 在线。 | 100 | 0.3s |
 | 33 | `test-env` | 工作区治理 | 环境变量台账门禁（防「三套账」漂移回潮）。 | 104 | 0.5s |
-| 34 | `test-file-size` | 未分类 | 单文件体量守卫（防「拆完又长回去」）。 | 125 | — |
+| 34 | `test-file-size` | 工作区治理 | 单文件体量守卫（防「拆完又长回去」）。 | 125 | — |
 | 35 | `test-filter-chips` | 前端与体验 | 筛选条第二行取数：pickInlineChips。 | 87 | 0.2s |
 | 36 | `test-format` | 前端与体验 | 格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs` | 115 | 0.3s |
 | 37 | `test-frontend` | 前端与体验 | 第三批 · 序 18 / 20 / 23 的前端守卫。 | 236 | 3.9s |
@@ -71,8 +70,8 @@
 | 46 | `test-hygiene` | 工作区治理 | 工作区 5S 门禁（防废料失控回涨）。 | 98 | 0.4s |
 | 47 | `test-image-engine` | 服务端与运行时 | 图片提供者注册表（热拔插）自测：不联网。 | 261 | 0.2s |
 | 48 | `test-infer` | 前端与体验 | shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。 | 368 | 0.2s |
-| 49 | `test-inline-stability` | 未分类 | 「输入框所在切片不许被条件卸载」守卫。 | 114 | — |
-| 50 | `test-input-focus-real` | 未分类 | 真机按键守卫：搜索框逐字符输入不得失焦。 | 143 | — |
+| 49 | `test-inline-stability` | 前端与体验 | 「输入态不许驱动父级 v-if」的结构守卫。 | 106 | — |
+| 50 | `test-input-focus-real` | 搜索与交互 | 真机按键守卫：搜索框逐字符输入不得失焦。 | 143 | — |
 | 51 | `test-intent` | 搜索与交互 | 智能化的两个内核用例：意图解析与场景排序。零依赖、不联网。 | 232 | 0.2s |
 | 52 | `test-livesync` | 服务端与运行时 | 实时通道用例：零依赖、不联网。 | 90 | 0.4s |
 | 53 | `test-llm-engine` | 服务端与运行时 | LLM 后端注册表（热拔插）自测：不联网（端到端跑本地假 OpenAI 服务）。 | 187 | 0.4s |
@@ -109,7 +108,7 @@
 | 84 | `test-site-store` | 数据与内容 | 站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。 | 278 | 0.3s |
 | 85 | `test-sites-cas` | 数据与内容 | 第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。 | 289 | 0.2s |
 | 86 | `test-sites-split` | 数据与内容 | sites store 拆分后的纯函数守卫：覆盖层净化 / 回收站三道闸 / 云端错误分类。 | 245 | — |
-| 87 | `test-split-wiring` | 未分类 | 大文件拆分后的「接线」守卫。 | 244 | — |
+| 87 | `test-split-wiring` | 前端与体验 | 大文件拆分后的「接线」守卫。 | 244 | — |
 | 88 | `test-storage-guard` | 前端与体验 | 存储安全门禁（localStorage 写入必须走 safeStorage） | 72 | 0.2s |
 | 89 | `test-store` | 服务端与运行时 | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 | 0.3s |
 | 90 | `test-sw-refresh` | 前端与体验 | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 | 0.2s |
@@ -124,4 +123,4 @@
 | 99 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
 | 100 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 310 | 0.4s |
 | 101 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 102 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 270 | 34.6s |
+| 102 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 304 | 34.6s |

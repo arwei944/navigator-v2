@@ -77,15 +77,15 @@ export function linesOf(file) {
  * 分类让「某域只有 1 道门禁」这类结构性缺口一眼可见。
  */
 const CATEGORY_RULES = [
-  ['搜索与交互', /search|intent|command|omni|preview/i],
+  ['搜索与交互', /search|intent|command|omni|preview|input-focus/i],
   [
     '前端与体验',
-    /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture|format|safeStorage|share/i,
+    /frontend|a11y|mobile|contrast|bundle|ui|bgm|theme|chart|graph-layout|gridnav|panel|side-width|filter-chips|notes|undo|sw-refresh|visual|touch|gesture|format|safeStorage|share|inline-stability|split-wiring/i,
   ],
   ['部署与发布', /deploy|publish|release|botkeep|endpoint|manifest|schedule/i],
   ['安全与鉴权', /auth|security|netguard|session|secret|rate|token/i],
   ['文档治理', /doc|readme/i],
-  ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust/i],
+  ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size/i],
   [
     '数据与内容',
     /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url/i,
