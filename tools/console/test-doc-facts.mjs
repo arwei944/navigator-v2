@@ -196,6 +196,39 @@ ok(
   `README.md 没有提到当前默认发布通道「${publisher.id}」（${publisher.label}）—— 见 shared/publisher.mjs`,
 )
 
+/*
+ * 代码注释里的「默认通道」也必须与实际一致。
+ *
+ * 实测踩到过：`publisher.mjs` 的模块头与 `resolvePublisher` 文档注释都还写着
+ * 「默认 `vercel`」，而 order 重排后运行时默认早已是 `botkeep`。
+ * 注释漂移的代价比文档更高 —— 读代码的人比读 README 的人更信注释。
+ *
+ * 判定方式：在 publisher.mjs 里找所有出现「默认」的注释行，不允许它们把
+ * 非当前默认通道说成默认。只做保守匹配（`默认 \`xxx\`` / `默认（xxx）`），
+ * 避免把「不再是默认」这类正确表述误判。
+ */
+{
+  const publisherSrc = read('shared/publisher.mjs')
+  const others = [...publisherSrc.matchAll(/id:\s*'([^']+)'/g)].map((m) => m[1])
+    .filter((id) => id !== publisher.id)
+  const wrongDefaults = others.filter((id) => {
+    const quoted = new RegExp(`默认\\s*[（(\`]?${id}\\b[）)\`]?`, 'g')
+    // 排除「不再是默认」「已不是默认」等正确表述所在的行
+    for (const m of publisherSrc.matchAll(quoted)) {
+      const lineStart = publisherSrc.lastIndexOf('\n', m.index) + 1
+      const line = publisherSrc.slice(lineStart, publisherSrc.indexOf('\n', m.index))
+      if (/不再?是默认|已不是默认/.test(line)) continue
+      return true
+    }
+    return false
+  })
+  ok(
+    wrongDefaults.length === 0,
+    `shared/publisher.mjs 的注释仍把 ${wrongDefaults.join('/')} 说成默认通道` +
+      `（实际默认 ${publisher.id}）`,
+  )
+}
+
 /* ---------------- HANDOVER 当前状态区段 ---------------- */
 
 const handover = read('HANDOVER.md')

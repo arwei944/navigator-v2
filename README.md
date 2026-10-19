@@ -348,8 +348,24 @@ nav-v2/
 ├── index.html
 ├── vite.config.js         # Vite + PWA 配置
 ├── server/                # 自建 Node 服务：静态资源 + 全部 /api/* + SQLite 存储
-└── vercel.json            # 历史 Vercel 通道配置（通道已停用，注册表保留以便回退）
+└── vercel.json            # Vercel 通道配置（非默认，勿删：见下方说明）
 ```
+
+### 关于 `vercel.json`（不要删）
+
+Vercel **通道本身仍可用**：`NAV_PUBLISHER=vercel` 可显式切回，部署命令与迁移前逐字一致
+（见 `shared/publisher.mjs` 的注册处）。2026-10-11 被平台停用的是旧站点域名
+`navigator-v2-two.vercel.app`（fair-use 停用，全站 402），不是这条通道能力。
+
+这个文件定义了该通道的路由契约，**删掉会让回退通道失效**，其中最容易忽略的是：
+
+- `{"handle": "filesystem"}` 必须存在 —— 自定义 `routes` 时 Vercel 不做文件系统兜底，
+  缺了它 `/sw.js`、`/manifest.webmanifest` 会被重写到 `index.html`，MIME 变成 `text/html`，
+  **Service Worker 注册必然失败、PWA 离线能力整体失效**（这是 2026-10-10 真实踩过的 P0）。
+- `sw.js` / `manifest.webmanifest` 的 `Cache-Control: max-age=0, must-revalidate`
+  防止旧 SW 被长期缓存。
+
+日常发布走的是 BotKeep，不经过这个文件；它只在显式回退时生效。
 
 ## 分类体系
 

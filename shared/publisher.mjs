@@ -16,8 +16,9 @@
  *
  * ## 热拔插
  *
- * `NAV_PUBLISHER=vercel|rsync-static`（默认 `vercel`，**行为与改动前逐字一致**）。
- * 站点地址可单独用 `NAV_SITE_URL` 覆盖（预览部署、自定义域名都要它）。
+ * `NAV_PUBLISHER=botkeep|workbuddy|vercel|rsync-static`（默认取 order 最小的 `botkeep`；
+ * 另三条保留以便回退，见各自注册处的说明）。站点地址可单独用 `NAV_SITE_URL` 覆盖
+ * （预览部署、自定义域名都要它）。
  */
 
 const registry = new Map()
@@ -74,7 +75,8 @@ export function listPublishers({ check = true } = {}) {
 
 /**
  * 解析出当前生效的发布通道。
- * 优先级：显式 id → `NAV_PUBLISHER` → 第一个 available 的通道（默认 vercel 永远可用）。
+ * 优先级：显式 id → `NAV_PUBLISHER` → 按 `order` 升序的第一个 available 通道
+ * （`botkeep` order 30 最小，因此它是默认；后三条按 50 / 100 / 200 依次回退）。
  */
 export function resolvePublisher(explicit) {
   const all = [...registry.values()].sort((a, b) => a.order - b.order)

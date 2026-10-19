@@ -374,7 +374,7 @@
       "name": "test-doc-facts",
       "purpose": "文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。",
       "category": "文档治理",
-      "lines": 222,
+      "lines": 255,
       "included": true,
       "nodeFlags": [],
       "durationMs": 357

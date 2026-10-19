@@ -48,7 +48,7 @@
 | 24 | `test-deploy-status` | 部署与发布 | 部署状态接口用例：零依赖、不联网（读的是本机 store 与构建产物）。 | 103 | 0.3s |
 | 25 | `test-deps` | 工作区治理 | 依赖 / 供应链门禁（来料检验）。 | 195 | 0.4s |
 | 26 | `test-desc-junk` | 数据与内容 | desc「机器垃圾」形态检测用例：零依赖、不联网。 | 77 | 0.2s |
-| 27 | `test-doc-facts` | 文档治理 | 文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。 | 222 | 0.4s |
+| 27 | `test-doc-facts` | 文档治理 | 文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。 | 255 | 0.4s |
 | 28 | `test-doc-manager` | 文档治理 | doc-manager 自测（门禁） | 133 | 0.3s |
 | 29 | `test-dual-stack` | 服务端与运行时 | 双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主） | 76 | 0.2s |
 | 30 | `test-endpoints-run` | 部署与发布 | 部署多端点发布链路用例（N2 补齐）：零依赖、不联网、**绝不触发真实上传**。 | 226 | 2.8s |
