@@ -59,12 +59,29 @@ export function runChecks(scanResult) {
     if (!d.title && !d.parseError) push('warn', 'missing-title', d.path, '文档没有一级标题')
   }
 
-  /* 4) 过期引用：active 文档引用了非 active（已归档/被取代）的文档 */
+  /*
+   * 4) 过期引用：active 文档引用了非 active（已归档/被取代）的文档。
+   *
+   * 但「历史溯源」是合法引用：交接文档里写「V5 方案见 …」是在交代**当时为什么这么做**，
+   * 删掉它反而丢失决策依据。这类引用必须**逐条**显式声明，不能整篇放行 ——
+   * 整篇放行会让以后新增的「把过期文档当现状」也一起漏检。
+   *
+   * 在**引用方**文档的 frontmatter 写：
+   *   historical-links:
+   *     - docs/NAV-v5-upgrade-plan.md
+   * 声明落在引用方而非目标，因为「这条引用算不算现状」取决于上下文。
+   */
+  const historicalAllowed = (doc) => {
+    const raw = doc.frontmatter?.['historical-links']
+    const list = Array.isArray(raw) ? raw : raw ? [raw] : []
+    return new Set(list.map(s => String(s).trim()).filter(Boolean))
+  }
   for (const d of docs) {
     if (d.status !== 'active') continue
+    const allowed = historicalAllowed(d)
     for (const l of d.links) {
       const target = docByPath.get(l)
-      if (target && target.status !== 'active') {
+      if (target && target.status !== 'active' && !allowed.has(l)) {
         push('warn', 'stale-reference', d.path, `引用了非 active 文档（${target.status}）：${l}`)
       }
     }

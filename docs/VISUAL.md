@@ -1,3 +1,9 @@
+---
+# 历史溯源引用：卡片体系的令牌由这份计划引入，文档本身已归档，不再作为现行依据。
+historical-links:
+  - docs/NAV-v7-card-system-upgrade-plan.md
+---
+
 # 视觉契约（VISUAL）
 
 > 这份文档是「项目所有和视觉有关的实现与设置」的统一入口。

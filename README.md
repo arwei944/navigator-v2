@@ -1,12 +1,20 @@
+---
+# 以下两个链接是「历史溯源」：交代当初为什么这么做，不是把过期文档当成现状。
+# 逐条声明（而非整篇放行），见 tools/doc-manager/lib/checker.mjs 的 stale-reference 规则。
+historical-links:
+  - docs/nav-console-next-plan.md
+  - docs/NAV-v5-upgrade-plan.md
+---
+
 # Navigator — 网站导航中心
 
-现代化网站导航中心，聚合 290+ 优质站点，覆盖 AI 工具、加密货币、开发者工具、基础服务等领域。
+现代化网站导航中心，聚合 300 个优质站点，覆盖 AI 工具、加密货币、开发者工具、基础服务等领域。
 
-线上地址：https://nav-dashboard-19166.app.workbuddy.host/（WorkBuddy 云端 Node 服务，部署目录 `dist/`）
+线上地址：https://navigator-v2.bot-keep.xyz/（自有服务器 BotKeep，完整 Node 服务，部署目录 `dist/`）
 GitHub 仓库：https://github.com/arwei944/navigator-v2
 
-> 旧地址 `navigator-v2-two.vercel.app` 已于 2026-10-11 被 Vercel 停用（全站 402 DEPLOYMENT_DISABLED），不要再访问。
-> 发布通道由 `shared/publisher.mjs` 注册表决定（默认 `workbuddy`，可用 `NAV_PUBLISHER` / `NAV_SITE_URL` 覆盖）。
+> 发布通道由 `shared/publisher.mjs` 注册表决定（默认 `botkeep`；可用 `NAV_PUBLISHER` / `NAV_SITE_URL` 覆盖）。
+> 历史地址：`navigator-v2-two.vercel.app`（2026-10-11 被 Vercel 停用，全站 402）、`nav-dashboard-19166.app.workbuddy.host`（WorkBuddy 云端，现为回退通道）。
 
 ## 技术栈
 
@@ -14,33 +22,32 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 - **搜索**: Fuse.js 模糊搜索 + pinyin-pro 拼音索引（全拼 + 首字母）
 - **样式**: CSS 变量主题系统（明暗模式 + 4 套预设主题）
 - **PWA**: Service Worker 离线支持，可安装为桌面/移动应用
-- **数据真相源**: Vercel Blob（站点数据云端热更新，无需改代码即同步线上）
+- **数据真相源**: 服务端 SQLite（`server/store.mjs` 提供与 Blob 同名同签名的适配层；站点数据热更新，无需改代码即同步线上）
 - **智能能力**: 站点实时在线状态角标 + 基于历史/分类共现的智能推荐
 - **会话同步**: 收藏/待办/偏好按会话密钥云端同步（多设备一致）
-- **部署**: Vercel（本地 `scripts/publish.mjs` 为唯一发布入口）
+- **部署**: 自有服务器 BotKeep（通道由 `shared/publisher.mjs` 注册表决定，本地 `scripts/publish.mjs` 为唯一发布入口）
 - **本地运维控制台**: Node 原生 HTTP + SSE 实时日志的单页控制台（`tools/console`，仅监听 `127.0.0.1`）
 - **CI/CD**: GitHub Actions 门禁（数据校验 + 构建）+ release-please 自动版本与 CHANGELOG
 
 ## 架构概览
 
-```
-浏览器(PWA 离线)                          Vercel Serverless
-┌─────────────────┐    30s 轮询/api/sites    ┌───────────────┐
-│ Vue3 SPA        │ ───────────────────────▶ │ api/sites.js  │ → Blob (sites.json)
-│ · 卡片虚拟化     │   POST 鉴权走请求头       │ api/session.js│ → Blob (session/<key>)
-│ · 在线状态角标   │   GET 元信息代理          │ api/metadata.js│ → 抓取标题/图标
-│ · 智能推荐Feed   │ ◀───────────────────── ─ │               │
-│ · 云端会话同步   │                           └───────┬───────┘
-└────────┬────────┘                                   │ scripts/: publish/check/icons/validate
-  ▲      │ 本地 stores（版本化持久化，可平滑迁移）
-  └──────┘
+```mermaid
+flowchart LR
+  SPA["Vue3 SPA（PWA 离线）<br/>卡片虚拟化 · 在线角标 · 智能推荐 · 会话同步"]
+  API["Node 服务 API 层<br/>sites / session / metadata / health / clicks / ops"]
+  DB[("SQLite<br/>server/store.mjs 适配层")]
+  SCRIPTS["scripts/<br/>publish · check · icons · validate"]
+  SPA -- "30s 轮询 /api/sites" --> API
+  API --> DB
+  SCRIPTS -- "发布 / 校验 / 抓取" --> DB
+  SCRIPTS -- "构建产物 dist/" --> SPA
 ```
 
-- **运行时数据唯一来源**：Vercel Blob 上的 `sites.json`
-- **本地种子**：`api/sites-data.json` 仅作 Blob 为空时的兜底，由 `scripts/publish.mjs` 保持同步
+- **运行时数据唯一来源**：服务端 SQLite 中的 `sites.json`（`server/store.mjs` 提供 Blob 同名同签名适配层；首启自动从 `api/sites-data.json` 导入）
+- **本地种子**：`api/sites-data.json` 仅作存储为空时的兜底，由 `scripts/publish.mjs` 保持同步
 - **热更新**：前端每 30s 轮询 `/api/sites`（`Cache-Control: no-store`）+ 标签页回到前台立即重拉，发布后秒级可见
 - **本地覆盖层**：`src/stores/sites.js` 把「云端基底 + 本地覆盖层（`nav-sites-overlay`：新增/修改/删除墓碑/排序/访问计数）」拼成渲染列表，轮询只换基底不清覆盖层，访客的本地改动不会被云端数据冲掉；管理端发布成功后清层（内容已进云端）
-- **读取一致性**：`api/sites.js` 的 `readStored()` 使用 `get(PATHNAME, { access: 'private', useCache: false })` 绕过 Blob CDN 缓存，发布后**首次**读取即拿到最新版本（此前需轮询 1~4 次才收敛）
+- **读取一致性**：`api/sites.js` 经 `shared/site-store.mjs` 的 CAS 写入 + etag 条件读，发布后**首次**读取即拿到最新版本；并发写冲突返回 409，不会静默丢更新
 - **在线状态**：`src/stores/health.js` 仅探测当前可见卡片，60s 缓存 + 6 路并发，卡片角标显示在线/限流/失效
 - **会话同步**：`api/session.js` 以会话密钥为隔离凭证（`session/<key>.json`），字段级合并，与站点热更新互不冲突
 - **本地数据版本化**：localStorage 持久化的 stores 统一附加 schema 版本号，未来结构变更可平滑迁移
@@ -49,7 +56,7 @@ GitHub 仓库：https://github.com/arwei944/navigator-v2
 
 - [x] 多搜索引擎切换（Google / Bing / 百度 / DuckDuckGo / Perplexity）
 - [x] 站点搜索（名称 / 描述 / URL / 拼音全拼 / 拼音首字母）
-- [x] 多分类体系（AI / 币圈 / 工具 / 基础服务，29 个子分类）
+- [x] 多分类体系（AI / 币圈 / 工具 / 基础服务，30 个子分类）
 - [x] 网格视图 / 列表视图切换
 - [x] 站点管理：添加 / 编辑 / 删除（右键菜单 + 回收站恢复）
 - [x] 批量操作：批量选择 + 批量删除
@@ -77,7 +84,7 @@ pnpm run build       # 构建
 pnpm run console     # 本地运维控制台 → http://localhost:5175（仅监听 127.0.0.1）
 pnpm run console:autostart  # 控制台登录自启 + 保活任务 + 桌面/任务栏快捷方式
 pnpm run nav         # 智能体 CLI：站点/发布/Git/数据 四域 35 条命令（pnpm run nav help）
-pnpm run mcp         # MCP 服务：把同一套能力收敛成 5 个域级工具，供智能体原生调用（stdio）
+pnpm run mcp         # MCP 服务：把同一套能力收敛成 6 个域级工具，供智能体原生调用（stdio）
 pnpm run mcp:test    # MCP 端到端用例：真实 stdio 握手 + 工具契约与写操作闸门断言
 pnpm run publish     # 一键发布：备份 → 数据校验 → 构建 → 部署 → 云端热更新 → 轮询验证
 pnpm run watch:deploy # 保存即部署：常驻监听本地变更，自动构建并发布到生产（见下）
@@ -108,7 +115,7 @@ pnpm run publish -- -w <webhook>   # 发布成功后向该 URL POST 一条通知
 
 | 变更 | 执行 |
 | --- | --- |
-| 只有代码 | `npm run build` → `vercel deploy --prod`（完全不碰云端 Blob 数据） |
+| 只有代码 | `npm run build` → `node scripts/deploy-botkeep.mjs --skip-build`（完全不碰线上站点数据） |
 | 数据变了（`api/sites-data.json`） | `publish --skip-build`：复用其备份 / schema 校验 / 快照 / 热更新 / 收敛验证 |
 | 两者都变 | 构建一次，再走 `publish --skip-build` |
 
@@ -150,7 +157,7 @@ pnpm run watch:deploy -- --debounce=3000 # 自定义防抖（最小 1000ms）
 | 改动 | 文件列表（含增删行数）、单文件 diff 行级高亮、暂存 / 取消暂存、**按 hunk 分块暂存**（等价 `git add -p`，只搬选中的块） |
 | 提交 | 规则式变更摘要 + 建议提交消息（Conventional Commits）、提交 / 提交并推送 / 预演推送 |
 | 同步 | 发布门禁（预检 → 放行，凭证绑定工作区指纹）、一键发布全链路时间线、**云端数据快照与一键回滚**、云端版本对比 |
-| 历史 | 提交记录 + 「已推送 / 仅本地」标注 + 按 commit SHA 关联 Vercel 部署状态 |
+| 历史 | 提交记录 + 「已推送 / 仅本地」标注 + 按 commit SHA 关联本机发布记录（`.deploy-history.json`） |
 | 数据 | 工作区 vs HEAD 站点数据 diff、分类分布、完整性体检（图标/配色/描述缺失、sortOrder 重复与空洞、域名重复） |
 | 可用性 | 站点可用性看板：状态徽标 + 响应时间趋势 + 探活轮次，口径与 `nav sites check` 同源，结果按天落盘 |
 | 审计 | 操作审计留痕：提交 / 推送 / 发布 / 放行 / 拒绝 / 回滚 / 站点增删改，支持按动作与结果筛选 |
@@ -214,7 +221,7 @@ pnpm run console:service              # 改走 NSSM 真服务（需账户有密�
 
 ## 智能体 CLI（nav）
 
-控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖四个命令域共 **35 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/*`）。
+控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 7 个命令域共 **49 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/*`）。
 
 ```bash
 pnpm run nav                       # 全部命令总览
@@ -228,9 +235,12 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 
 | 命令域 | 命令 |
 |--------|------|
-| `sites` | list / get / add / update / remove / categories / meta / icon / check |
+| `release` | plan / run / status |
+| `sites` | list / get / add / update / remove / categories / meta / icon / check / dedupe |
 | `publish` | status / run / verify / sync-data / deployments / preflight / snapshots / rollback |
+| `ops` | history / notify / audit / alert-rules / alerts / plugins / health |
 | `git` | status / diff / hunks / log / suggest / stage / unstage / stage-hunks / unstage-hunks / commit / push / remote |
+| `uptime` | status / history / probe |
 | `data` | stats / integrity / diff / validate / doctor / audit |
 
 **输出契约**：stdout 只有一份结果文档（默认单行 JSON `{ok,command,data,meta}`，`--pretty` 转人类可读文本），进度与长任务日志一律走 stderr，因此 stdout 可直接 `JSON.parse`。
@@ -241,7 +251,7 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 
 ### MCP 服务（智能体原生接入）
 
-`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 5 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_git` / `nav_data`），而不是把 35 条命令平铺成 35 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
+`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 6 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），而不是把 49 条命令平铺成 49 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
 
 **写操作闸门**：MCP 侧的写操作默认**只预演**，返回 `gate.preview = true` 与将要发生的变化；必须显式传 `confirm: true` 才真正执行。命令清单的唯一真相源是 `tools/cli/lib/registry.mjs`，CLI 与 MCP 都从它取，因此两边不会出现清单漂移。
 
@@ -254,22 +264,25 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 | `ci.yml` | push / PR | 数据 schema 门禁（`validate`）+ 构建门禁（`build`），**只做门禁、不重复部署** |
 | `release-please.yml` | push 到 `master` | 依 Conventional Commits 推断语义化版本、生成 `CHANGELOG.md`、开 release PR |
 
-> 发布仍以本地 `scripts/publish.mjs` 为唯一入口（Vercel Git 集成未开启），CI 不参与部署，避免「代码自动部署」与「数据热更新」两条链路互相覆盖。
+> 发布仍以本地 `scripts/publish.mjs` 为唯一入口（Git 集成未开启），CI 不参与部署，避免「代码自动部署」与「数据热更新」两条链路互相覆盖。
 
 ## 环境变量
 
-复制 `.env.example` 为 `.env.local` 并在 Vercel 项目 Production 中配置同名变量：
+复制 `.env.example` 为 `.env.local`；服务端部署时由运行环境注入同名变量（发布沙箱无注入时，构建脚本回填到 `data/` 下的小文件，启动时读回）。变量注册表见 `shared/env-registry.mjs`，`pnpm run env:doctor` 可自检。
 
 | 变量 | 必填 | 用途 |
 |------|------|------|
 | `SITES_ADMIN_KEY` | ✅ | 站点数据发布密钥；显示在管理后台发布按钮旁，**不在请求体明文发送**（走 `Authorization: Bearer <key>` 请求头） |
-| `BLOB_READ_WRITE_TOKEN` | ✅ | Vercel Blob 读写令牌（站点数据 + 会话数据） |
-| `BLOB_WEBHOOK_PUBLIC_KEY` | — | Blob webhook 公钥（如需 webhook 通知才配置） |
-| `BLOB_STORE_ID` | — | Blob 存储 ID（多存储并存时） |
+| `BOTKEEP_API_KEY` | ✅ | BotKeep 部署 API 凭据（`release run` / `deploy-botkeep`） |
+| `BOTKEEP_WORKLOAD_ID` | ✅ | BotKeep workload 标识；与 `.deploy-manifest.json` 比对可判断是否换端点 |
+| `ADMIN_PASSWORD_HASH` | — | 后台登录口令的 scrypt 哈希；未配则 `/admin` 口令登录返回 500（密钥直连照常可用） |
+| `AUTH_SECRET` | — | 会话 token 的 HMAC 签名密钥；缺省回退到 `SITES_ADMIN_KEY` |
+| `DEPLOY_SITE_URL` / `NAV_SITE_URL` | — | 发布后验证用的站点地址；发布通道可提供时优先用通道的 |
+| `NAV_PUBLISHER` | — | 发布通道选择：`botkeep`（默认）/ `workbuddy` / `vercel` / `rsync-static` |
 
 ### 会话同步说明
 
-- 会话数据（收藏/待办/历史/偏好）存于 Blob 的 `session/<key>.json`，**以会话密钥为隔离凭证**，无需管理密钥
+- 会话数据（收藏/待办/历史/偏好）存于服务端存储的 `session/<key>.json`，**以会话密钥为隔离凭证**，无需管理密钥
 - 在「设置 → 数据管理 → 云端会话同步」生成密钥，同一密钥可在不同浏览器/设备间同步
 - 管理密钥不硬编码进脚本；`publish.mjs` 从 `.env.local` / 环境变量 / `--key=` 读取，缺失即中止
 - 本地持久化数据带 schema 版本号，结构升级时通过 `src/utils/storeVersioning.js` 的迁移表平滑兼容
@@ -279,8 +292,8 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 ```
 nav-v2/
 ├── api/
-│   ├── sites.js           # Serverless：站点数据 GET/POST（Blob 真相源，POST 走 header 鉴权）+ 云端快照清单 / 回滚
-│   ├── session.js         # Serverless：用户会话数据读写（Blob session/<key>，密钥隔离）
+│   ├── sites.js           # 接口：站点数据 GET/POST（存储适配层，POST 走 header 鉴权）+ 云端快照清单 / 回滚
+│   ├── session.js         # 接口：用户会话数据读写（session/<key>，密钥隔离）
 │   └── metadata.js        # Serverless：URL 元信息抓取代理（调 shared/site-infer.mjs，回名称/描述/分类/配色/图标）
 ├── shared/
 │   ├── site-infer.mjs     # 站点元信息推断引擎（线上 Serverless / 控制台 / CLI 同源复用）
@@ -297,12 +310,12 @@ nav-v2/
 │   ├── check-sites.mjs    # 全站点健康检查
 │   └── fetch-favicons.mjs # favicon 批量抓取（支持 --only <id>）
 ├── tools/
-│   ├── cli/               # 智能体 CLI（35 条命令，复用 console/lib，JSON 输出契约）
+│   ├── cli/               # 智能体 CLI（49 条命令 / 7 个域，复用 console/lib，JSON 输出契约）
 │   │   ├── nav.mjs        # 入口：分发 / help / schema（命令清单取自 lib/registry.mjs）
 │   │   ├── lib/core.mjs   # 内核：输出信封、退出码、参数解析、长任务等待、预演
 │   │   ├── lib/registry.mjs # 命令注册表：CLI 与 MCP 共用的唯一真相源
 │   │   └── commands/      # sites / publish / snapshots / git / data 五组命令
-│   ├── mcp/               # MCP 服务（stdio，官方 SDK）：35 条命令收敛成 5 个域级工具
+│   ├── mcp/               # MCP 服务（stdio，官方 SDK）：49 条命令收敛成 6 个域级工具
 │   │   ├── server.mjs     # 工具定义与写操作 confirm 闸门
 │   │   ├── lib/bridge.mjs # 复用 CLI 命令层，把命令映射成工具动作
 │   │   └── test-mcp.mjs   # 端到端用例：真实 stdio 握手 + 工具契约断言
@@ -311,7 +324,7 @@ nav-v2/
 │       ├── test-trust.mjs # 来源校验用例（Host/Origin/自定义头，零依赖）
 │       ├── test-hunks.mjs # hunk 分块用例（临时仓库实测暂存 / 取消暂存）
 │       ├── launcher/      # 登录自启 + 保活 + Chrome app 快捷方式（PowerShell，UTF-8 BOM）
-│       ├── lib/           # git / jobs / changes / sync / vercel / history / data / sites / snapshots / gate / audit / health
+│       ├── lib/           # git / jobs / changes / sync / deploy / history / data / sites / snapshots / gate / audit / health
 │       └── ui/            # 单页 UI（9 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
 ├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
@@ -334,7 +347,8 @@ nav-v2/
 ├── .env.example           # 环境变量示例
 ├── index.html
 ├── vite.config.js         # Vite + PWA 配置
-└── vercel.json            # Vercel 部署配置
+├── server/                # 自建 Node 服务：静态资源 + 全部 /api/* + SQLite 存储
+└── vercel.json            # 历史 Vercel 通道配置（通道已停用，注册表保留以便回退）
 ```
 
 ## 分类体系
