@@ -61,6 +61,8 @@
     "console:test:visits-real": "node tools/console/test-visit-tracking-real.mjs",
     "console:test:clicks-reset": "node tools/console/test-clicks-reset.mjs",
     "console:test:clicks-reset-ui": "node tools/console/test-clicks-reset-ui.mjs",
+    "console:test:domain-flow": "node tools/console/test-domain-flow.mjs",
+    "domain:infer": "node scripts/infer-domains.mjs",
     "console:test:color-tokens": "node tools/console/test-color-tokens-real.mjs",
     "console:test:data-quality": "node tools/console/test-data-quality.mjs",
     "console:test:a11y": "node tools/console/test-a11y.mjs",

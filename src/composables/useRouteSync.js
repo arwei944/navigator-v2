@@ -35,6 +35,7 @@ export const SCOPE_BY_ROUTE = {
   Archived: 'archived',
   Insights: 'insights',
   Graph: 'graph',
+  DomainFlow: 'domain',
   About: 'about',
   Admin: 'admin',
 }

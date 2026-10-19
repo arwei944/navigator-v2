@@ -17,6 +17,8 @@ const routes = [
   { path: '/insights', name: 'Insights', component: () => import('@/views/InsightsView.vue') },
   // 关联图谱：懒加载 —— 布局与建图只在真的打开这一页时才跑
   { path: '/graph', name: 'Graph', component: () => import('@/views/GraphView.vue') },
+  // 领域流水线：把站点按「价值链位置」组织，看上下游与空缺
+  { path: '/domain', name: 'DomainFlow', component: () => import('@/views/DomainFlowView.vue') },
   // 关于：同样套壳（带侧边栏），懒加载
   { path: '/about', name: 'About', component: () => import('@/views/AboutView.vue') },
   // PWA 分享目标（share_target）：系统分享面板把网址发到这里，直接走秒加链路收录。

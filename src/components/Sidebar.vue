@@ -53,6 +53,12 @@
         <span v-show="!iconOnly">关联图谱</span>
       </div>
 
+      <div class="sidebar-nav-item" :class="{ active: sidebarStore.activeNav === 'domain' }"
+           @click="navigate('DomainFlow')" @keydown.enter="navigate('DomainFlow')" :title="iconOnly ? '领域流水线' : ''" tabindex="0" role="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="9" width="5" height="6" rx="1"/><rect x="9.5" y="9" width="5" height="6" rx="1"/><rect x="17" y="9" width="5" height="6" rx="1"/><line x1="7" y1="12" x2="9.5" y2="12"/><line x1="14.5" y1="12" x2="17" y2="12"/></svg>
+        <span v-show="!iconOnly">领域流水线</span>
+      </div>
+
       <!-- 管理类入口与上面的「浏览范围」不是同一个轴，用一条细线隔开：
            上面是「看站点」，这里是「管站点」。 -->
       <div class="sidebar-nav-divider" aria-hidden="true"></div>

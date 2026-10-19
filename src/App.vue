@@ -41,6 +41,11 @@
         <GraphView />
       </template>
 
+      <!-- 领域流水线：按价值链位置组织站点，同样整页呈现 -->
+      <template v-else-if="scope === 'domain'">
+        <DomainFlowView />
+      </template>
+
       <!-- 关于：整页信息，同样不走搜索工具栏与卡片网格 -->
       <template v-else-if="scope === 'about'">
         <AboutView />
@@ -210,6 +215,7 @@ const EditSiteModal = defineAsyncComponent(() => import('@/components/EditSiteMo
 const InsightsView = defineAsyncComponent(() => import('@/views/InsightsView.vue'))
 // 关联图谱：同理必须异步 —— 它带着 affinity 引擎与力导向布局，进首屏必超预算
 const GraphView = defineAsyncComponent(() => import('@/views/GraphView.vue'))
+const DomainFlowView = defineAsyncComponent(() => import('@/views/DomainFlowView.vue'))
 const AboutView = defineAsyncComponent(() => import('@/views/AboutView.vue'))
 const AdminView = defineAsyncComponent(() => import('@/views/AdminView.vue'))
 // 背景音乐播放器：懒加载，且只在设置里打开后才挂载 —— 首屏为它只付一行声明

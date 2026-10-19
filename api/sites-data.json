@@ -22,7 +22,14 @@
       "learning",
       "community",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s2",
@@ -44,7 +51,14 @@
       "ai-chat",
       "learning",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s3",
@@ -66,7 +80,14 @@
     "purposes": [
       "ai-chat",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s4",
@@ -89,7 +110,14 @@
       "ai-chat",
       "learning",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s5",
@@ -110,7 +138,14 @@
     "purposes": [
       "ai-chat",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "p1",
@@ -132,7 +167,14 @@
     ],
     "aliases": [
       "learnprompting"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "prompting",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "p2",
@@ -153,7 +195,14 @@
     ],
     "aliases": [
       "prompt engineering"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "prompting",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "p3",
@@ -176,7 +225,14 @@
       "learning",
       "community",
       "design"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "prompting",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "w1",
@@ -196,7 +252,14 @@
       "productivity",
       "data",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "knowledge",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "w2",
@@ -218,7 +281,14 @@
     ],
     "aliases": [
       "gamma app"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "w3",
@@ -241,7 +311,14 @@
     ],
     "aliases": [
       "pplx"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "w4",
@@ -264,7 +341,14 @@
     ],
     "aliases": [
       "napkin ai"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd1",
@@ -285,7 +369,14 @@
     "aliases": [
       "cursor ide",
       "cursor ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd2",
@@ -307,7 +398,14 @@
       "coding",
       "ai-chat",
       "productivity"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd3",
@@ -325,7 +423,14 @@
     "purposes": [
       "coding",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd4",
@@ -345,7 +450,14 @@
     ],
     "purposes": [
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd5",
@@ -367,7 +479,14 @@
     ],
     "aliases": [
       "bolt new"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd6",
@@ -387,7 +506,14 @@
     ],
     "aliases": [
       "lovable ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd7",
@@ -405,7 +531,14 @@
     "purposes": [
       "coding",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "g1",
@@ -425,7 +558,14 @@
     ],
     "purposes": [
       "design"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g2",
@@ -446,7 +586,14 @@
     "purposes": [
       "design",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g3",
@@ -467,7 +614,14 @@
     ],
     "aliases": [
       "RunwayML"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g4",
@@ -487,7 +641,14 @@
     ],
     "aliases": [
       "suno ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "g5",
@@ -507,7 +668,14 @@
     ],
     "purposes": [
       "design"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g6",
@@ -527,7 +695,14 @@
     ],
     "purposes": [
       "design"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「design」兜底"
+    }
   },
   {
     "id": "f1",
@@ -547,7 +722,14 @@
     ],
     "aliases": [
       "zapier"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f2",
@@ -567,7 +749,14 @@
     ],
     "purposes": [
       "productivity"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f3",
@@ -588,7 +777,14 @@
     ],
     "aliases": [
       "dify ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f4",
@@ -611,7 +807,14 @@
       "productivity",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f5",
@@ -634,7 +837,14 @@
       "coding",
       "ai-chat",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "f6",
@@ -658,7 +868,14 @@
       "community",
       "coding",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "f7",
@@ -680,7 +897,14 @@
     ],
     "aliases": [
       "ollama local"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "security",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "l1",
@@ -701,7 +925,14 @@
       "learning",
       "news",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l2",
@@ -720,7 +951,14 @@
       "learning",
       "news",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "l3",
@@ -742,7 +980,14 @@
       "learning",
       "news",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「learning」兜底"
+    }
   },
   {
     "id": "l4",
@@ -764,7 +1009,14 @@
     ],
     "aliases": [
       "jiqizhixin"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l5",
@@ -785,7 +1037,14 @@
     ],
     "aliases": [
       "qbitai"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l6",
@@ -803,7 +1062,14 @@
     "purposes": [
       "learning",
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l7",
@@ -824,7 +1090,14 @@
     ],
     "aliases": [
       "arxiv org"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「learning」兜底"
+    }
   },
   {
     "id": "l8",
@@ -847,7 +1120,14 @@
       "news",
       "community",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「learning」兜底"
+    }
   },
   {
     "id": "l9",
@@ -870,7 +1150,14 @@
       "news",
       "coding",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ex1",
@@ -890,7 +1177,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex2",
@@ -911,7 +1205,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex3",
@@ -931,7 +1232,14 @@
     ],
     "aliases": [
       "coinbase exchange"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex4",
@@ -948,7 +1256,14 @@
     "icon": "icons/ex4.ico",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex5",
@@ -968,7 +1283,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ex6",
@@ -989,7 +1311,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex7",
@@ -1009,7 +1338,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex8",
@@ -1029,7 +1365,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ex9",
@@ -1050,7 +1393,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dx1",
@@ -1070,7 +1420,14 @@
     ],
     "aliases": [
       "UNI"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx2",
@@ -1090,7 +1447,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx3",
@@ -1110,7 +1474,14 @@
     ],
     "aliases": [
       "jupiter exchange"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx4",
@@ -1130,7 +1501,14 @@
     ],
     "aliases": [
       "curve finance"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx5",
@@ -1152,7 +1530,14 @@
       "one inch",
       "1inch exchange",
       "oneinch"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx6",
@@ -1173,7 +1558,14 @@
     "purposes": [
       "trading",
       "community"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx7",
@@ -1193,7 +1585,14 @@
     ],
     "aliases": [
       "balancer dex"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx8",
@@ -1213,7 +1612,14 @@
     ],
     "aliases": [
       "raydium dex"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df1",
@@ -1234,7 +1640,14 @@
     ],
     "aliases": [
       "aave protocol"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df2",
@@ -1254,7 +1667,14 @@
     ],
     "aliases": [
       "lido finance"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df3",
@@ -1274,7 +1694,14 @@
     ],
     "aliases": [
       "eigen layer"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df4",
@@ -1294,7 +1721,14 @@
     ],
     "aliases": [
       "pendle finance"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "df5",
@@ -1315,7 +1749,14 @@
     ],
     "aliases": [
       "morpho labs"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df6",
@@ -1335,7 +1776,14 @@
     ],
     "aliases": [
       "COMP"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt1",
@@ -1358,7 +1806,14 @@
       "reference",
       "learning",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt2",
@@ -1381,7 +1836,14 @@
       "data",
       "reference",
       "community"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt3",
@@ -1404,7 +1866,14 @@
     ],
     "aliases": [
       "Trading View"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt4",
@@ -1426,7 +1895,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt5",
@@ -1447,7 +1923,14 @@
     ],
     "aliases": [
       "tokenterminal"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt6",
@@ -1468,7 +1951,14 @@
     ],
     "aliases": [
       "nansen ai"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt7",
@@ -1492,7 +1982,14 @@
     "aliases": [
       "dune",
       "duneanalytics"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt8",
@@ -1513,7 +2010,14 @@
     ],
     "aliases": [
       "messari crypto"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt9",
@@ -1532,7 +2036,14 @@
       "data",
       "reference",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "marketplace",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl1",
@@ -1552,7 +2063,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl2",
@@ -1573,7 +2091,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl3",
@@ -1593,7 +2118,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl4",
@@ -1613,7 +2145,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl5",
@@ -1635,7 +2174,14 @@
     "purposes": [
       "tool",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl6",
@@ -1652,7 +2198,14 @@
     "icon": "icons/wl6.png",
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch1",
@@ -1675,7 +2228,14 @@
       "data",
       "coding",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch2",
@@ -1697,7 +2257,14 @@
       "tool",
       "data",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch3",
@@ -1720,7 +2287,14 @@
       "tool",
       "data",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch4",
@@ -1742,7 +2316,14 @@
       "tool",
       "data",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch5",
@@ -1760,7 +2341,14 @@
     "purposes": [
       "tool",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch6",
@@ -1777,7 +2365,14 @@
     "purposes": [
       "tool",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「data」兜底"
+    }
   },
   {
     "id": "ch7",
@@ -1796,7 +2391,14 @@
       "tool",
       "data",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in1",
@@ -1817,7 +2419,14 @@
     "purposes": [
       "tool",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in2",
@@ -1837,7 +2446,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in3",
@@ -1857,7 +2473,14 @@
     ],
     "aliases": [
       "ARB"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in4",
@@ -1878,7 +2501,14 @@
     ],
     "aliases": [
       "OP"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in5",
@@ -1899,7 +2529,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in6",
@@ -1921,7 +2558,14 @@
     ],
     "aliases": [
       "LINK"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "in7",
@@ -1941,7 +2585,14 @@
     ],
     "aliases": [
       "layer zero"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in8",
@@ -1962,7 +2613,14 @@
     ],
     "aliases": [
       "TIA"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf1",
@@ -1983,7 +2641,14 @@
     ],
     "aliases": [
       "OS"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "issuance",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf2",
@@ -2005,7 +2670,14 @@
     ],
     "aliases": [
       "blur nft"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "marketplace",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf3",
@@ -2026,7 +2698,14 @@
     ],
     "aliases": [
       "magic eden nft"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "marketplace",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf4",
@@ -2045,7 +2724,14 @@
       "trading",
       "design",
       "community"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc1",
@@ -2063,7 +2749,14 @@
     "purposes": [
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc2",
@@ -2084,7 +2777,14 @@
     "purposes": [
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc3",
@@ -2107,7 +2807,14 @@
       "tool",
       "community",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc4",
@@ -2125,7 +2832,14 @@
     "purposes": [
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "security",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md1",
@@ -2143,7 +2857,14 @@
     "purposes": [
       "news",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md2",
@@ -2164,7 +2885,14 @@
     ],
     "aliases": [
       "CT"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md3",
@@ -2181,7 +2909,14 @@
     "icon": "icons/md3.png",
     "purposes": [
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md4",
@@ -2202,7 +2937,14 @@
     ],
     "aliases": [
       "theblock"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md5",
@@ -2224,7 +2966,14 @@
     "purposes": [
       "news",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md6",
@@ -2244,7 +2993,14 @@
     ],
     "purposes": [
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "st1",
@@ -2264,7 +3020,14 @@
     ],
     "aliases": [
       "stakingrewards"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "st2",
@@ -2284,7 +3047,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "st3",
@@ -2301,7 +3071,14 @@
     "icon": "icons/st3.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "st4",
@@ -2318,7 +3095,14 @@
     "icon": "icons/st4.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sb1",
@@ -2339,7 +3123,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sb2",
@@ -2356,7 +3147,14 @@
     "icon": "icons/sb2.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "issuance",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sb3",
@@ -2373,7 +3171,14 @@
     "icon": "icons/sb3.ico",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sb4",
@@ -2390,7 +3195,14 @@
     "icon": "icons/sb4.svg",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "issuance",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac1",
@@ -2411,7 +3223,14 @@
     ],
     "aliases": [
       "RNDR"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "compute",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac2",
@@ -2433,7 +3252,14 @@
     ],
     "aliases": [
       "TAO"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac3",
@@ -2454,7 +3280,14 @@
     ],
     "aliases": [
       "akash"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac4",
@@ -2476,7 +3309,14 @@
     "aliases": [
       "ionet",
       "io net"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac5",
@@ -2499,7 +3339,14 @@
       "trading",
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac6",
@@ -2522,7 +3369,14 @@
     ],
     "aliases": [
       "GRT"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac7",
@@ -2543,7 +3397,14 @@
     ],
     "aliases": [
       "HNT"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "s6",
@@ -2564,7 +3425,14 @@
     "purposes": [
       "ai-chat",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s7",
@@ -2589,7 +3457,14 @@
       "learning",
       "coding",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s8",
@@ -2610,7 +3485,14 @@
     "purposes": [
       "ai-chat",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "knowledge",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s9",
@@ -2635,7 +3517,14 @@
       "learning",
       "community",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s10",
@@ -2658,7 +3547,14 @@
       "ai-chat",
       "learning",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s11",
@@ -2682,7 +3578,14 @@
       "ai-chat",
       "learning",
       "productivity"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "p4",
@@ -2701,7 +3604,14 @@
       "ai-chat",
       "learning",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "prompting",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd8",
@@ -2722,7 +3632,14 @@
     ],
     "aliases": [
       "Codeium"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd9",
@@ -2745,7 +3662,14 @@
     "aliases": [
       "claudecode",
       "claude-code"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g7",
@@ -2765,7 +3689,14 @@
     ],
     "aliases": [
       "leonardo"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g8",
@@ -2786,7 +3717,14 @@
     "purposes": [
       "design",
       "video"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g9",
@@ -2808,7 +3746,14 @@
     ],
     "aliases": [
       "Pika Labs"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g10",
@@ -2829,7 +3774,14 @@
     ],
     "aliases": [
       "heygen ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g11",
@@ -2851,7 +3803,14 @@
     ],
     "aliases": [
       "viggle ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "g12",
@@ -2873,7 +3832,14 @@
       "design",
       "tool",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "g13",
@@ -2891,7 +3857,14 @@
     "purposes": [
       "design",
       "video"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f8",
@@ -2912,7 +3885,14 @@
     ],
     "aliases": [
       "n8n io"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f9",
@@ -2934,7 +3914,14 @@
     ],
     "aliases": [
       "flowise ai"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f10",
@@ -2955,7 +3942,14 @@
     "purposes": [
       "productivity",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "orchestration",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「productivity」兜底"
+    }
   },
   {
     "id": "l10",
@@ -2977,7 +3971,14 @@
     "purposes": [
       "learning",
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l11",
@@ -3001,7 +4002,14 @@
     "aliases": [
       "pwc",
       "paperswithcode"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "l12",
@@ -3025,7 +4033,14 @@
       "news",
       "community",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "adl1",
@@ -3042,7 +4057,14 @@
     "icon": "icons/adl1.svg",
     "purposes": [
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "adl2",
@@ -3065,7 +4087,14 @@
       "reference",
       "coding",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "adl3",
@@ -3087,7 +4116,14 @@
       "reference",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "adl4",
@@ -3108,7 +4144,14 @@
     "purposes": [
       "reference",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex10",
@@ -3128,7 +4171,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx9",
@@ -3145,7 +4195,14 @@
     "icon": "icons/dx9.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx10",
@@ -3162,7 +4219,14 @@
     "icon": "icons/dx10.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx11",
@@ -3179,7 +4243,14 @@
     "icon": "icons/dx11.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df7",
@@ -3200,7 +4271,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "lending",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df8",
@@ -3219,7 +4297,14 @@
     ],
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "df9",
@@ -3239,7 +4324,14 @@
     ],
     "aliases": [
       "mob exchange"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt10",
@@ -3258,7 +4350,14 @@
       "data",
       "reference",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt11",
@@ -3276,7 +4375,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt12",
@@ -3297,7 +4403,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt13",
@@ -3314,7 +4427,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「data」兜底"
+    }
   },
   {
     "id": "dt14",
@@ -3334,7 +4454,14 @@
       "reference",
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt15",
@@ -3354,7 +4481,14 @@
       "reference",
       "trading",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl7",
@@ -3375,7 +4509,14 @@
     "purposes": [
       "tool",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl8",
@@ -3395,7 +4536,14 @@
     ],
     "aliases": [
       "wallet connect"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "wl9",
@@ -3417,7 +4565,14 @@
     ],
     "aliases": [
       "backpack wallet"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch8",
@@ -3439,7 +4594,14 @@
     ],
     "aliases": [
       "alchemy web3"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch9",
@@ -3458,7 +4620,14 @@
       "tool",
       "data",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ch10",
@@ -3478,7 +4647,14 @@
       "data",
       "coding",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in9",
@@ -3500,7 +4676,14 @@
     ],
     "aliases": [
       "sui network"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in10",
@@ -3517,7 +4700,14 @@
     "icon": "icons/in10.png",
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in11",
@@ -3537,7 +4727,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in12",
@@ -3558,7 +4755,14 @@
     "purposes": [
       "tool",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "in13",
@@ -3579,7 +4783,14 @@
     ],
     "aliases": [
       "near protocol"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "chain-base",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf5",
@@ -3601,7 +4812,14 @@
     ],
     "aliases": [
       "tensor trade"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc5",
@@ -3620,7 +4838,14 @@
       "reference",
       "tool",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc6",
@@ -3641,7 +4866,14 @@
     "purposes": [
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md7",
@@ -3662,7 +4894,14 @@
     "purposes": [
       "news",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md8",
@@ -3684,7 +4923,14 @@
     "purposes": [
       "news",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "md9",
@@ -3701,7 +4947,14 @@
     "icon": "icons/md9.png",
     "purposes": [
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "st5",
@@ -3719,7 +4972,14 @@
     "purposes": [
       "trading",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "staking",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac8",
@@ -3738,7 +4998,14 @@
       "ai-chat",
       "trading",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ac9",
@@ -3757,7 +5024,14 @@
       "ai-chat",
       "trading",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac10",
@@ -3779,7 +5053,14 @@
     ],
     "aliases": [
       "grass network"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac11",
@@ -3801,7 +5082,14 @@
     ],
     "aliases": [
       "allora network"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd1",
@@ -3823,7 +5111,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd2",
@@ -3845,7 +5140,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd3",
@@ -3867,7 +5169,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd4",
@@ -3888,7 +5197,14 @@
     "purposes": [
       "news",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "issuance",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd5",
@@ -3910,7 +5226,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd6",
@@ -3931,7 +5254,14 @@
     "purposes": [
       "news",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "issuance",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd7",
@@ -3950,7 +5280,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "fd8",
@@ -3972,7 +5309,14 @@
     "purposes": [
       "news",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ad2",
@@ -3991,7 +5335,14 @@
       "news",
       "trading",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ad3",
@@ -4012,7 +5363,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ad4",
@@ -4030,7 +5388,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "ad5",
@@ -4051,7 +5416,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "ad6",
@@ -4072,7 +5444,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ad7",
@@ -4094,7 +5473,14 @@
       "news",
       "trading",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ad8",
@@ -4115,7 +5501,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "ad9",
@@ -4136,7 +5529,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ad10",
@@ -4154,7 +5554,14 @@
     "purposes": [
       "news",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "ad11",
@@ -4173,7 +5580,14 @@
       "news",
       "trading",
       "community"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "ad12",
@@ -4195,7 +5609,14 @@
       "news",
       "trading",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "sm1",
@@ -4216,7 +5637,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm2",
@@ -4236,7 +5664,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm4",
@@ -4256,7 +5691,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm5",
@@ -4275,7 +5717,14 @@
       "tool",
       "coding"
     ],
-    "aliases": []
+    "aliases": [],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi1",
@@ -4294,7 +5743,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi2",
@@ -4315,7 +5771,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi3",
@@ -4336,7 +5799,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm6",
@@ -4357,7 +5827,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm7",
@@ -4378,7 +5855,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "sm8",
@@ -4399,7 +5883,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs1",
@@ -4419,7 +5910,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "compute",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs2",
@@ -4436,7 +5934,14 @@
     "icon": "icons/bs2.svg",
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs3",
@@ -4456,7 +5961,14 @@
     "purposes": [
       "tool",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "fd9",
@@ -4475,7 +5987,14 @@
       "news",
       "reference",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「news」兜底"
+    }
   },
   {
     "id": "dt16",
@@ -4494,7 +6013,14 @@
       "data",
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx12",
@@ -4511,7 +6037,14 @@
     "icon": "icons/dx12.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "swap",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi4",
@@ -4531,7 +6064,14 @@
       "coding",
       "data",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm9",
@@ -4553,7 +6093,14 @@
       "tool",
       "coding",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm10",
@@ -4573,7 +6120,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm11",
@@ -4595,7 +6149,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm12",
@@ -4615,7 +6176,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm13",
@@ -4632,7 +6200,14 @@
     "icon": "icons/sm13.ico",
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi5",
@@ -4651,7 +6226,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi6",
@@ -4674,7 +6256,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「coding」兜底"
+    }
   },
   {
     "id": "aiapi7",
@@ -4697,7 +6286,14 @@
       "coding",
       "video",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "acc1",
@@ -4719,7 +6315,14 @@
     "purposes": [
       "tool",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "acc2",
@@ -4739,7 +6342,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi8",
@@ -4761,7 +6371,14 @@
       "tool",
       "coding",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dx13",
@@ -4779,7 +6396,14 @@
     "purposes": [
       "trading",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "ac12",
@@ -4799,7 +6423,14 @@
       "trading",
       "coding",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs4",
@@ -4818,7 +6449,14 @@
       "tool",
       "coding",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi9",
@@ -4841,7 +6479,14 @@
     ],
     "aliases": [
       "venice"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi10",
@@ -4863,7 +6508,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm14",
@@ -4883,7 +6535,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi11",
@@ -4905,7 +6564,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd10",
@@ -4923,7 +6589,14 @@
     "purposes": [
       "coding",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac13",
@@ -4942,7 +6615,14 @@
       "ai-chat",
       "trading",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "marketplace",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt17",
@@ -4962,7 +6642,14 @@
       "reference",
       "trading",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi12",
@@ -4983,7 +6670,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc7",
@@ -5002,7 +6696,14 @@
       "reference",
       "tool",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt18",
@@ -5021,7 +6722,14 @@
       "data",
       "reference",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "g14",
@@ -5040,7 +6748,14 @@
       "design",
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi13",
@@ -5062,7 +6777,14 @@
       "tool",
       "coding",
       "video"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi14",
@@ -5080,7 +6802,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd11",
@@ -5099,7 +6828,14 @@
       "coding",
       "design",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi15",
@@ -5118,7 +6854,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs5",
@@ -5140,7 +6883,14 @@
       "tool",
       "community",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs6",
@@ -5160,7 +6910,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs7",
@@ -5178,7 +6935,14 @@
     "purposes": [
       "tool",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd12",
@@ -5196,7 +6960,14 @@
     "purposes": [
       "coding",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt19",
@@ -5216,7 +6987,14 @@
       "reference",
       "video",
       "news"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt20",
@@ -5235,7 +7013,14 @@
       "data",
       "reference",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "custody",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi16",
@@ -5255,7 +7040,14 @@
       "coding",
       "data",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd13",
@@ -5277,7 +7069,14 @@
     "aliases": [
       "semi ui",
       "semi design system"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "sm15",
@@ -5294,7 +7093,14 @@
     "icon": "icons/sm15.png",
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt21",
@@ -5317,7 +7123,14 @@
       "reference",
       "community",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd14",
@@ -5340,7 +7153,14 @@
       "community",
       "learning",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "coding",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt22",
@@ -5364,7 +7184,14 @@
       "reference",
       "trading",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt23",
@@ -5383,7 +7210,14 @@
       "data",
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「data」兜底"
+    }
   },
   {
     "id": "acc3",
@@ -5403,7 +7237,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs8",
@@ -5425,7 +7266,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "compute",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "l13",
@@ -5446,7 +7294,14 @@
     ],
     "aliases": [
       "shuge"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "generation",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt24",
@@ -5465,7 +7320,14 @@
       "data",
       "reference",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "acc4",
@@ -5485,7 +7347,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "cd15",
@@ -5504,7 +7373,14 @@
       "coding",
       "ai-chat",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "l14",
@@ -5523,7 +7399,14 @@
       "learning",
       "news",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "prompting",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sm17",
@@ -5544,7 +7427,14 @@
     ],
     "purposes": [
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi17",
@@ -5565,7 +7455,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "identity",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "acc5",
@@ -5584,7 +7481,14 @@
       "tool",
       "news",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi18",
@@ -5602,7 +7506,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt25",
@@ -5623,7 +7534,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt26",
@@ -5644,7 +7562,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "monitoring",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt27",
@@ -5665,7 +7590,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "sc8",
@@ -5687,7 +7619,14 @@
       "reference",
       "tool",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "due-diligence",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "aiapi19",
@@ -5709,7 +7648,14 @@
       "tool",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "security",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt28",
@@ -5727,7 +7673,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "aiapi20",
@@ -5750,7 +7703,14 @@
       "coding",
       "video",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "access",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "f11",
@@ -5768,7 +7728,14 @@
     "purposes": [
       "productivity",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "knowledge",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "cd16",
@@ -5791,7 +7758,14 @@
       "community",
       "design",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "nf6",
@@ -5811,7 +7785,14 @@
       "design",
       "data",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "knowledge",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt29",
@@ -5831,7 +7812,14 @@
       "reference",
       "community",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt30",
@@ -5851,7 +7839,14 @@
       "reference",
       "community",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "pj1",
@@ -5872,7 +7867,14 @@
     "purposes": [
       "reference",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac14",
@@ -5891,7 +7893,14 @@
       "trading",
       "tool"
     ],
-    "icon": "icons/ac14.png"
+    "icon": "icons/ac14.png",
+    "position": {
+      "domain": "research",
+      "stage": "practice",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "s12",
@@ -5909,7 +7918,14 @@
     "purposes": [
       "ai-chat",
       "learning"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "chat",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt31",
@@ -5931,7 +7947,14 @@
       "data",
       "reference",
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dx14",
@@ -5949,7 +7972,14 @@
     "purposes": [
       "trading",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ac15",
@@ -5969,7 +7999,14 @@
       "trading",
       "learning",
       "data"
-    ]
+    ],
+    "position": {
+      "domain": "ai-work",
+      "stage": "learning",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "pj2",
@@ -5991,7 +8028,14 @@
       "reference",
       "coding",
       "ai-chat"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「reference」兜底"
+    }
   },
   {
     "id": "ac16",
@@ -6011,7 +8055,14 @@
       "trading",
       "community",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "pj3",
@@ -6029,7 +8080,14 @@
     "purposes": [
       "reference",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "intel",
+      "source": "auto",
+      "confidence": 0.5,
+      "reason": "用途「reference」兜底"
+    }
   },
   {
     "id": "dt32",
@@ -6047,7 +8105,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "ex11",
@@ -6064,7 +8129,14 @@
     "icon": "icons/ex11.png",
     "purposes": [
       "trading"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "fiat-onramp",
+      "source": "auto",
+      "confidence": 0.6,
+      "reason": "描述命中弱关键词"
+    }
   },
   {
     "id": "dt33",
@@ -6083,7 +8155,14 @@
       "data",
       "reference",
       "tool"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "raw-data",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "bs9",
@@ -6101,7 +8180,14 @@
     "purposes": [
       "tool",
       "coding"
-    ]
+    ],
+    "position": {
+      "domain": "infra",
+      "stage": "network",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt34",
@@ -6122,7 +8208,14 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "onchain",
+      "stage": "transfer",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   },
   {
     "id": "dt35",
@@ -6144,6 +8237,13 @@
     "purposes": [
       "data",
       "reference"
-    ]
+    ],
+    "position": {
+      "domain": "research",
+      "stage": "analytics",
+      "source": "auto",
+      "confidence": 0.9,
+      "reason": "描述命中强关键词"
+    }
   }
 ]

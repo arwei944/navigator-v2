@@ -1,6 +1,6 @@
 {
-  "total": 110,
-  "registered": 110,
+  "total": 111,
+  "registered": 111,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -35,6 +35,7 @@
     "tools/console/test-desc-junk.mjs",
     "tools/console/test-doc-facts.mjs",
     "tools/console/test-doc-manager.mjs",
+    "tools/console/test-domain-flow.mjs",
     "tools/console/test-dryrun-purity.mjs",
     "tools/console/test-dual-stack.mjs",
     "tools/console/test-endpoints-run.mjs",
@@ -504,6 +505,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 264
+    },
+    {
+      "file": "tools/console/test-domain-flow.mjs",
+      "name": "test-domain-flow",
+      "purpose": "领域流水线：纯函数契约 + 真实页面渲染。",
+      "category": "数据与内容",
+      "lines": 267,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-dryrun-purity.mjs",
