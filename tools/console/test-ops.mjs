@@ -703,6 +703,36 @@ test('checkAuthHeader 先认会话 token，再回落共享密钥', () => {
   assert.equal(checkAuthHeader({ headers: {} }, env).code, 401)
 })
 
+/*
+ * 双密钥（轮换过渡期）：当前密钥与上一把密钥**同时有效**。
+ *
+ * 存在的理由不是「方便」，而是平台把线上密钥存为只写不读的 secret：
+ * 想统成本地值时无法得知旧值，只能让两边并存直到确认切换完成。
+ * 若哪天有人「简化」成只认一个值，轮换期间就会有客户端被锁在外面。
+ */
+test('双密钥：SITES_ADMIN_KEY 与 _PREVIOUS 同时有效', () => {
+  const env = { AUTH_SECRET: 'sig', SITES_ADMIN_KEY: 'new-key', SITES_ADMIN_KEY_PREVIOUS: 'old-key' }
+
+  const viaNew = checkAuthHeader({ headers: { 'x-nav-key': 'new-key' } }, env)
+  assert.equal(viaNew.ok, true, '当前密钥应通过')
+  assert.equal(viaNew.via, 'key')
+
+  const viaOld = checkAuthHeader({ headers: { 'x-nav-key': 'old-key' } }, env)
+  assert.equal(viaOld.ok, true, '过渡期旧密钥也应通过（否则轮换会锁死旧客户端）')
+
+  assert.equal(checkAuthHeader({ headers: { 'x-nav-key': 'neither' } }, env).code, 401)
+
+  // 单密钥场景不受影响
+  const single = { AUTH_SECRET: 'sig', SITES_ADMIN_KEY: 'only' }
+  assert.equal(checkAuthHeader({ headers: { 'x-nav-key': 'only' } }, single).ok, true)
+  assert.equal(checkAuthHeader({ headers: { 'x-nav-key': 'old-key' } }, single).code, 401)
+
+  // 失败信息要能区分配置缺失 / 不匹配（排查方向完全不同）
+  const noKey = { AUTH_SECRET: 'sig' }
+  assert.match(checkAuthHeader({ headers: { 'x-nav-key': 'x' } }, noKey).error, /no-key/)
+  assert.match(checkAuthHeader({ headers: { 'x-nav-key': 'bad' } }, env).error, /mismatch/)
+})
+
 test('checkAuthHeader 未配置签名密钥时返回 500 而非放行', () => {
   const r = checkAuthHeader({ headers: { authorization: 'Bearer anything' } }, {})
   assert.equal(r.ok, false)

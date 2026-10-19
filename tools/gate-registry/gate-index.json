@@ -906,7 +906,7 @@
       "name": "test-ops",
       "purpose": "发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。",
       "category": "服务端与运行时",
-      "lines": 996,
+      "lines": 1026,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

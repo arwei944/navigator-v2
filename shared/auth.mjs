@@ -126,15 +126,44 @@ export function verifySession(token, secret, now = Date.now()) {
  * `keyReady` 表示能否走共享密钥直连（CLI / 脚本路径）。
  * 签名密钥缺省回退到 SITES_ADMIN_KEY —— 让既有部署零配置即可用上会话能力。
  */
+/**
+ * 共享密钥的**候补列表**：允许多个值同时有效。
+ *
+ * ## 为什么需要这个
+ *
+ * 线上部署的平台把 `SITES_ADMIN_KEY` 存为 secret，**只写不读**（`secretsReadable: false`），
+ * 而环境变量的变更要平台层面重建容器才生效 —— 实测容器 restart 后进程读到的仍是旧值。
+ * 于是「本地想用同一个密钥调线上接口」这件事，在不知道旧值的前提下无法完成。
+ *
+ * 双密钥把它变成可操作的一步：新值写进 `SITES_ADMIN_KEY`（平台/本地都认），
+ * 旧值同时写进 `SITES_ADMIN_KEY_PREVIOUS`，**两边都能通过鉴权**，
+ * 等确认切换完成再摘掉旧值。期间没有任何一方被锁在外面。
+ *
+ * 顺序有意义：`SITES_ADMIN_KEY` 在前，它是「当前」密钥。
+ */
+export function adminKeys(env = process.env) {
+  const out = []
+  // 逐个直接引用而非循环取 env[name]：环境变量门禁按 `env.XXX` 字面量统计引用，
+  // 动态取值会让它认为「登记了但代码没用到」而报错
+  for (const v of [env.SITES_ADMIN_KEY, env.SITES_ADMIN_KEY_PREVIOUS]) {
+    const s = String(v || '').trim()
+    if (s && !out.includes(s)) out.push(s)
+  }
+  return out
+}
+
 export function authConfig(env = process.env) {
-  const secret = String(env.AUTH_SECRET || env.SITES_ADMIN_KEY || '')
+  const keys = adminKeys(env)
+  const secret = String(env.AUTH_SECRET || keys[0] || '')
   const passwordHash = String(env.ADMIN_PASSWORD_HASH || '')
   return {
     username: String(env.ADMIN_USERNAME || 'admin'),
     passwordHash,
     secret,
+    /** 全部可接受的共享密钥（当前 + 过渡期旧值） */
+    keys,
     loginReady: Boolean(passwordHash && secret),
-    keyReady: Boolean(env.SITES_ADMIN_KEY),
+    keyReady: keys.length > 0,
   }
 }
 
@@ -165,8 +194,18 @@ export function checkAuthHeader(req, env = process.env, now = Date.now()) {
   if (!token) return { ok: false, code: 401, error: 'Unauthorized' }
   const session = verifySession(token, cfg.secret, now)
   if (session.ok) return { ok: true, via: 'session', username: session.username }
-  if (cfg.keyReady && safeEqual(token, env.SITES_ADMIN_KEY)) return { ok: true, via: 'key', username: 'key' }
-  return { ok: false, code: 401, error: 'Unauthorized' }
+
+  /*
+   * 共享密钥：候选列表里任意一个匹配即通过（见 adminKeys 的说明）。
+   *
+   * 失败信息分三档而不是笼统 Unauthorized —— 排查时这三种情况要查的地方完全不同：
+   *   no-key     没配任何密钥（去看环境变量）
+   *   no-token   请求没带凭据（去看调用方有没有发 X-Nav-Key）
+   *   mismatch   带了但不匹配（去看两边密钥是否一致）
+   */
+  if (!cfg.keyReady) return { ok: false, code: 401, error: 'no-key: 未配置 SITES_ADMIN_KEY' }
+  if (cfg.keys.some(k => safeEqual(token, k))) return { ok: true, via: 'key', username: 'key' }
+  return { ok: false, code: 401, error: 'mismatch: 凭据与已配置的共享密钥不匹配' }
 }
 
 /* ---------------- 登录限流 ---------------- */

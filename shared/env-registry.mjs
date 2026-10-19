@@ -39,6 +39,13 @@ export const ENV_VARS = [
     desc: '站点数据发布管理密钥；api/sites 的 POST 鉴权，也是 CLI / 脚本的共享凭据',
   },
   {
+    name: 'SITES_ADMIN_KEY_PREVIOUS',
+    scope: 'admin',
+    required: false,
+    example: '""',
+    desc: '过渡期保留的上一把共享密钥，与 SITES_ADMIN_KEY 同时有效。用于轮换时不让旧客户端被锁在外面；确认切换完成后应删除',
+  },
+  {
     name: 'ADMIN_PASSWORD_HASH',
     scope: 'admin',
     example: '""',

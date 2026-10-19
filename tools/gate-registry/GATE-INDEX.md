@@ -87,7 +87,7 @@
 | 63 | `test-netguard` | 安全与鉴权 | 第三批 · 序 17 的守卫：SSRF 防线的**连接层**部分。 | 282 | 0.3s |
 | 64 | `test-notes` | 前端与体验 | 便利贴 / 站点备注的同步内核用例：零依赖、不联网、不起浏览器。 | 189 | 0.2s |
 | 65 | `test-offline-queue` | 服务端与运行时 | 离线编辑队列用例（F8）：零依赖、不联网、不碰 DOM（localStorage 用内存桩）。 | 130 | 0.2s |
-| 66 | `test-ops` | 服务端与运行时 | 发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。 | 996 | 0.8s |
+| 66 | `test-ops` | 服务端与运行时 | 发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。 | 1026 | 0.8s |
 | 67 | `test-pipeline-trace` | 前端与体验 | 管线日志总线（`src/utils/pipelineTrace.js`）用例：零依赖、不联网、不碰 UI。 | 164 | 0.3s |
 | 68 | `test-plugin-registry` | 工作区治理 | 插件目录（统一注册表视图）自测：不联网。 | 208 | 0.3s |
 | 69 | `test-preview-translate` | 搜索与交互 | N1：搜索框网址预览卡片显示**译文**（`src/services/translateFields.js` + `useOmniBox` 的并卡逻辑）。 | 170 | 0.2s |

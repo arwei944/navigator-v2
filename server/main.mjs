@@ -75,6 +75,19 @@ const HOST = process.env.HOST || '0.0.0.0'
 if (!process.env.SITES_ADMIN_KEY) {
   try { process.env.SITES_ADMIN_KEY = readFileSync(join(ROOT, 'data', 'admin-key.txt'), 'utf8').trim() } catch { /* 没有就没有：写接口按未配置拒绝 */ }
 }
+/**
+ * 过渡期旧密钥（`SITES_ADMIN_KEY_PREVIOUS`）：与当前密钥**同时有效**。
+ *
+ * 存在的原因：平台把线上密钥存为只写不读的 secret，无法得知旧值来「统一成一个」；
+ * 而环境变量变更要平台层面重建容器才生效（restart 不够，实测进程仍读到旧值）。
+ * 双密钥让两端并存，轮换不再需要「先停机再换」。
+ *
+ * 启动时打一行日志说明它是否生效 —— 这个变量**长期存在是有风险的**
+ * （等于多一把有效钥匙），运维应该能一眼看到它还在。
+ */
+if (process.env.SITES_ADMIN_KEY_PREVIOUS) {
+  console.log('[auth] 过渡期旧密钥已启用（SITES_ADMIN_KEY_PREVIOUS）—— 轮换完成后请删除该变量')
+}
 if (!process.env.ADMIN_PASSWORD_HASH) {
   try { process.env.ADMIN_PASSWORD_HASH = readFileSync(join(ROOT, 'data', 'admin-password-hash.txt'), 'utf8').trim() } catch { /* 未配口令：登录不可用，密钥直连不受影响 */ }
 }
