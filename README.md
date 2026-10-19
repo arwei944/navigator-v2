@@ -221,7 +221,7 @@ pnpm run console:service              # 改走 NSSM 真服务（需账户有密�
 
 ## 智能体 CLI（nav）
 
-控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 7 个命令域共 **49 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/*`）。
+控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 7 个命令域共 **49 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/` 下按职责分层的模块）。
 
 ```bash
 pnpm run nav                       # 全部命令总览
@@ -308,10 +308,16 @@ CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异�
 
 ```
 nav-v2/
-├── api/
-│   ├── sites.js           # 接口：站点数据 GET/POST（存储适配层，POST 走 header 鉴权）+ 云端快照清单 / 回滚
-│   ├── session.js         # 接口：用户会话数据读写（session/<key>，密钥隔离）
-│   └── metadata.js        # Serverless：URL 元信息抓取代理（调 shared/site-infer.mjs，回名称/描述/分类/配色/图标）
+├── api/                   # 16 个接口，全部导出 (req, res) handler —— 见下方说明
+│   ├── sites.js           # 站点数据 GET/POST（存储适配层，POST 走 header 鉴权）+ 快照清单 / 回滚
+│   ├── session.js         # 用户会话数据读写（session/<key>，密钥隔离）
+│   ├── metadata.js        # URL 元信息抓取代理（shared/site-infer.mjs，返回名称/描述/分类/配色/图标）
+│   ├── auth.js            # 登录、口令校验（scrypt）、会话签发
+│   ├── ai.js / translate.js / cover.js              # AI 描述改写、翻译、封面生成
+│   ├── clicks.js / health.js / health-history.js    # 点击统计、站点探活、历史曲线
+│   ├── ops.js / backup.js / alert-rules.js          # 运维任务、备份、告警规则
+│   ├── deploy-status.js / plugins.js                # 部署状态回读、插件注册表
+│   └── _local-key.js      # 控制台本地凭据端点（`_` 前缀也是端点名的一部分）
 ├── shared/
 │   ├── site-infer.mjs     # 站点元信息推断引擎（线上 Serverless / 控制台 / CLI 同源复用）
 │   ├── categories.mjs     # 分类白名单与元数据（分类推断的唯一真相源）
@@ -341,7 +347,13 @@ nav-v2/
 │       ├── test-trust.mjs # 来源校验用例（Host/Origin/自定义头，零依赖）
 │       ├── test-hunks.mjs # hunk 分块用例（临时仓库实测暂存 / 取消暂存）
 │       ├── launcher/      # 登录自启 + 保活 + Chrome app 快捷方式（PowerShell，UTF-8 BOM）
-│       ├── lib/           # git / jobs / changes / sync / deploy / history / data / sites / snapshots / gate / audit / health
+│       ├── lib/           # 业务逻辑，按职责分 6 组（见下方说明）
+│       │   ├── core/      # env / jobs / audit / cloud / gate —— 无业务语义的基础设施
+│       │   ├── vcs/       # git / changes —— 版本控制读写
+│       │   ├── content/   # sites / data —— 站点数据读写
+│       │   ├── observe/   # health / notify / schedule / uptime / history —— 可观测与通知
+│       │   ├── publish/   # deploy / release / sync / snapshots / publishlog / plugins / endpoints / vercel
+│       │   └── routes/    # api.mjs 分发起 + 5 个域路由（system/git/sites/health/ops）+ 路由期望清单
 │       └── ui/            # 单页 UI（9 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
 ├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
@@ -367,6 +379,25 @@ nav-v2/
 ├── server/                # 自建 Node 服务：静态资源 + 全部 /api/* + SQLite 存储
 └── vercel.json            # Vercel 通道配置（非默认，勿删：见下方说明）
 ```
+
+### 关于 `api/`（不要当成迁移残留删掉）
+
+`api/` 下 16 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，但它们**没有一个
+依赖 Vercel 平台** —— 只用 Node 内置模块与 `shared/` 下的纯函数，没有任何 `@vercel/*`。
+
+所以 `api/` 不是「迁到 BotKeep 后待清理的旧代码」，而是**默认发布通道实际在用的实现源**：
+
+| 谁 | 怎么用 `api/` |
+|---|---|
+| BotKeep（默认） | `server/main.mjs` 启动时按目录派生路由并全量加载 |
+| Vercel（回退通道） | 平台原生识别该目录，无需任何适配 |
+
+签名的意义只是「可移植」。`server/main.mjs` 给原生 `ServerResponse` 补了
+`status()` / `json()` 两个方法，因此**接口源码零改动**即可两边通用 —— 改源码会让
+`test-guard.mjs` / `test-netguard.mjs` 两套 SSRF 用例的保护范围失效。
+
+**删 `api/` 会同时打断两条通道**，且新增端点只需增加文件（路由表与构建复制清单都按目录派生，
+由 `test-server-routes` 保证仓库文件集与部署产物逐一相等）。
 
 ### 关于 `vercel.json`（不要删）
 

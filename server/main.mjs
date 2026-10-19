@@ -1,28 +1,32 @@
 /**
- * 静态资源 + `/api/metadata` 的**零依赖**单文件服务。
+ * 生产服务：静态资源 + **全部 16 个 `/api/*` 接口** + SQLite 存储与巡检。
  *
- * ## 为什么会有这个文件
+ * ## `api/` 是什么（最容易误读的一点）
  *
- * 站点从 Vercel 迁到纯静态托管后，`/api/metadata`（自动补全的抓取接口）跟着消失了 ——
- * 自动补全退化成「按域名猜」。但排查依赖链后发现：**这个接口根本不依赖 Vercel**
- * （`api/metadata.js` 只用 Node 内置模块 + `shared/` 下的纯函数，连 npm 包都没有），
- * 真正绑死 Vercel 的只有云同步那几个 Blob 接口。
+ * `api/` 下 16 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，
+ * 但它们**没有一个依赖 Vercel 平台**：只用 Node 内置模块 + `shared/` 下的纯函数，
+ * 没有任何 `@vercel/*` 包。也就是说，`api/` 不是「迁移后待删的残留」，
+ * **它是默认发布通道（BotKeep）实际在用的实现源** —— 由本文件在启动时全量加载。
  *
- * 所以把部署形态从「纯静态」升级成「Node 服务」：静态文件照发，
- * 同时带上这一个接口，自动补全恢复到与 Vercel 时代**同一份引擎、同一套 SSRF 防护**的真实抓取。
- * 构建后置脚本会把 `api/metadata.js`、`api/sites-data.json`、`shared/*.mjs` 一并复制进部署目录。
+ * 签名的意义只在于「可移植」：同一份源码既能被 Vercel 通道直接吃，
+ * 也能被这里的薄适配层托起来。删掉 `api/` 会同时打断两条通道。
  *
- * ## 适配层为什么这么薄
+ * ## 为什么保留 Vercel 签名而不是改写成原生 (req, res)
  *
- * `api/metadata.js` 用的是 Vercel 函数签名 `(req, res)`，但实际只碰到
- * `req.headers / req.query / req.socket` 与 `res.setHeader / res.status(...).json(...)`。
- * 在原生 ServerResponse 上补上 `status()` 和 `json()` 两个方法即可，**不改接口源码** ——
- * 改源码会让 `tools/console/test-guard.mjs` / `test-netguard.mjs` 这两套 SSRF 用例的
+ * 接口只碰到 `req.headers / req.query / req.socket` 与
+ * `res.setHeader / res.status(...).json(...)`。在原生 ServerResponse 上补上
+ * `status()` 和 `json()` 两个方法即可，**接口源码零改动** —— 改源码会让
+ * `tools/console/test-guard.mjs` / `test-netguard.mjs` 这两套 SSRF 用例的
  * 保护范围失效，那才是真正的安全风险。
+ *
+ * ## 路由表从目录派生
+ *
+ * 见下方 `loadApiRoutes()`：`api/<name>.js` ↔ `/api/<name>`，新增端点只需加文件。
+ * 构建后置脚本把 `api/`、`shared/`、`server/` 整体复制进部署目录。
  *
  * ## 路由约定（前端 `stores/sites.js` 依赖这些语义）
  *
- * - `/api/metadata` → 真实抓取
+ * - `/api/<name>` 命中 → 交给对应 handler
  * - 其余 `/api/*` → **404 JSON**（绝不能回 index.html：前端靠「404」判定
  *   「该部署没有这个接口」并停止轮询，回了 HTML 会被当成响应体异常）
  * - 其余路径 → 静态文件；无扩展名且文件不存在时回 index.html（SPA 兜底，

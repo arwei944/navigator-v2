@@ -197,6 +197,30 @@ ok(
 )
 
 /*
+ * `api/` 的定位必须写清楚：它是**默认通道在用的实现源**，不是迁移残留。
+ *
+ * 实测踩到过：README 的项目结构里 `api/` 只列了 3 个文件，而实际有 16 个，
+ * 读起来像「只剩几个历史接口」，很容易被后来者当成可删的迁移残留 ——
+ * 删掉会同时打断 BotKeep 与 Vercel 两条通道（server/main.mjs 按目录派生路由）。
+ */
+{
+  const apiFileCount = readdirSync(join(ROOT, 'api')).filter((f) => f.endsWith('.js')).length
+
+  ok(
+    readme.includes('不要当成迁移残留'),
+    'README.md 缺少「api/ 不要当成迁移残留」的说明段 —— 该目录是默认通道在用的实现源，不是待清理的旧代码',
+  )
+
+  const declared = readme.match(/(\d+)\s*个(?:文件|接口)[，,]?\s*\**\s*全部\**\s*导出/)
+  const declaredCount = declared ? Number(declared[1]) : null
+  ok(
+    declaredCount === apiFileCount,
+    `README.md 对 api/ 接口数量的描述与实际不符：文档写 ${declaredCount ?? '未声明'}，实际 ${apiFileCount} 个`
+      + '（新增/删除接口时请同步更新 README 的 api/ 段落）',
+  )
+}
+
+/*
  * 代码注释里的「默认通道」也必须与实际一致。
  *
  * 实测踩到过：`publisher.mjs` 的模块头与 `resolvePublisher` 文档注释都还写着
