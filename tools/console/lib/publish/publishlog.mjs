@@ -11,11 +11,11 @@
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
+import { ROOT } from '../core/env.mjs'
 import {
   HISTORY_KEEP, TRIGGERS, normalizeRecord, filterRecords,
   summarizeRecords, sortRecords, prunableRecords,
-} from '../../../shared/ops/publish-history.mjs'
+} from '../../../../shared/ops/publish-history.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
 const FILE = join(DATA_DIR, 'publish-history.jsonl')

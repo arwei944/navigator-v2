@@ -10,9 +10,9 @@ import { readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { ROOT, getAdminKey } from './env.mjs'
-import { SITE_URL, fetchCloudData } from './cloud.mjs'
-import { diffSites } from './changes.mjs'
+import { ROOT, getAdminKey } from '../core/env.mjs'
+import { SITE_URL, fetchCloudData } from '../core/cloud.mjs'
+import { diffSites } from '../vcs/changes.mjs'
 
 const pExecFile = promisify(execFile)
 

@@ -13,9 +13,9 @@
  *
  * 没有发布记录时给出说明而不是空白：空白会让人以为是坏了，而实际只是还没发布过。
  */
-import { getLog, remoteShas, getStatus } from './git.mjs'
-import { history as deployHistory } from './deploy.mjs'
-import { resolvePublisher } from '../../../shared/publisher.mjs'
+import { getLog, remoteShas, getStatus } from '../vcs/git.mjs'
+import { history as deployHistory } from '../publish/deploy.mjs'
+import { resolvePublisher } from '../../../../shared/publisher.mjs'
 
 /** 本机发布记录 → 前端认的部署形状 */
 function asDeployment(p, siteUrl) {

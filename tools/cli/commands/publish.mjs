@@ -2,13 +2,13 @@
  * 发布与云端命令：复用 lib/sync.mjs（发布流水线 / 云端一致性）、lib/sites.mjs（数据同步）、lib/vercel.mjs。
  * 长任务（发布、数据同步）走 jobs 管道，实时把子进程输出打到 stderr，stdout 只留最终 JSON。
  */
-import * as sync from '../../console/lib/sync.mjs'
-import * as sites from '../../console/lib/sites.mjs'
-import * as vercel from '../../console/lib/vercel.mjs'
-import * as jobs from '../../console/lib/jobs.mjs'
-import * as git from '../../console/lib/git.mjs'
-import * as changes from '../../console/lib/changes.mjs'
-import { getAdminKey } from '../../console/lib/env.mjs'
+import * as sync from '../../console/lib/publish/sync.mjs'
+import * as sites from '../../console/lib/content/sites.mjs'
+import * as vercel from '../../console/lib/publish/vercel.mjs'
+import * as jobs from '../../console/lib/core/jobs.mjs'
+import * as git from '../../console/lib/vcs/git.mjs'
+import * as changes from '../../console/lib/vcs/changes.mjs'
+import { getAdminKey } from '../../console/lib/core/env.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, parseCommandArgs, runJob, table } from '../lib/core.mjs'
 
 function requireAdminKey(action) {

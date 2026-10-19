@@ -5,10 +5,10 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { ENV_VARS } from '../../../shared/env-registry.mjs'
+import { ENV_VARS } from '../../../../shared/env-registry.mjs'
 
 // tools/console/lib/ -> 项目根
-export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
 
 const ENV_FILE = join(ROOT, '.env.local')
 

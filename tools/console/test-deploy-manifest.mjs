@@ -11,7 +11,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { walkDistHashes, STARTUP_REQUIRED } from './lib/deploy.mjs'
+import { walkDistHashes, STARTUP_REQUIRED } from './lib/publish/deploy.mjs'
 
 let pass = 0, fail = 0
 const eq = (a, b, msg) => { if (a === b) pass++; else { fail++; console.error(`✗ ${msg}：期望「${b}」，实得「${a}」`) } }

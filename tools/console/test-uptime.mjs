@@ -106,7 +106,7 @@ eq(fmtDuration(null), '0s', '空值容错')
 
 /* ---- 落盘：坏行不吞、窗口过滤、超限裁剪（走临时文件，不碰真实日志）---- */
 process.env.NAV_UPTIME_LOG = join(tmpdir(), `nav-uptime-test-${process.pid}.jsonl`)
-const lib = await import('../../tools/console/lib/uptime.mjs')
+const lib = await import('./lib/observe/uptime.mjs')
 const TMP = lib.logPath()
 
 rmSync(TMP, { force: true })

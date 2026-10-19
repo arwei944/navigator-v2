@@ -15,7 +15,7 @@
  *   node scripts/deploy-botkeep.mjs --skip-build    # 复用现有 dist
  *   node scripts/deploy-botkeep.mjs --quiet         # 只要最终那行结果
  */
-import { publish } from '../tools/console/lib/deploy.mjs'
+import { publish } from '../tools/console/lib/publish/deploy.mjs'
 
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')

@@ -1,6 +1,6 @@
 {
-  "total": 105,
-  "registered": 105,
+  "total": 106,
+  "registered": 106,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -10,6 +10,7 @@
     "tools/console/test-alert-rules.mjs",
     "tools/console/test-api-layer.mjs",
     "tools/console/test-api-ops.mjs",
+    "tools/console/test-api-routes-live.mjs",
     "tools/console/test-auto-add.mjs",
     "tools/console/test-auto-category.mjs",
     "tools/console/test-bgm.mjs",
@@ -195,6 +196,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 182
+    },
+    {
+      "file": "tools/console/test-api-routes-live.mjs",
+      "name": "test-api-routes-live",
+      "purpose": "控制台路由覆盖用例：真实启动控制台，逐条打全部路由，确认每条都**被路由识别**。",
+      "category": "服务端与运行时",
+      "lines": 180,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-auto-add.mjs",
@@ -445,7 +458,7 @@
       "name": "test-doc-facts",
       "purpose": "文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。",
       "category": "文档治理",
-      "lines": 321,
+      "lines": 345,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
@@ -493,7 +506,7 @@
       "name": "test-endpoints-run",
       "purpose": "部署多端点发布链路用例（N2 补齐）：零依赖、不联网、**绝不触发真实上传**。",
       "category": "部署与发布",
-      "lines": 226,
+      "lines": 236,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

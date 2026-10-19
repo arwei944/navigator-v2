@@ -33,7 +33,7 @@ const ok = (cond, label, extra = '') => {
 
 console.log('\n── ① downloadIcon 的预演分支早于任何抓取 ──')
 
-const sitesSrc = readFileSync(join(ROOT, 'tools', 'console', 'lib', 'sites.mjs'), 'utf8')
+const sitesSrc = readFileSync(join(ROOT, 'tools', 'console', 'lib', 'content', 'sites.mjs'), 'utf8')
 const fnStart = sitesSrc.indexOf('export async function downloadIcon')
 ok(fnStart > 0, '找到 downloadIcon 实现')
 
@@ -60,7 +60,7 @@ globalThis.fetch = (...args) => { fetchCount++; return realFetch(...args) }
 let result = null
 let callErr = null
 try {
-  const sites = await import(new URL('../../tools/console/lib/sites.mjs', import.meta.url).href)
+  const sites = await import(new URL('./lib/content/sites.mjs', import.meta.url).href)
   // 用一个真实存在的站点 id；dryRun 路径不应触碰网络，所以选哪个都一样
   const all = sites.loadSites()
   if (!all.length) throw new Error('sites-data.json 为空，无法验证')

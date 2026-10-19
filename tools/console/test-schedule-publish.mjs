@@ -8,7 +8,7 @@
  *
  * 运行：node tools/console/test-schedule-publish.mjs
  */
-import { normalizeHm, isPublishDue } from './lib/schedule.mjs'
+import { normalizeHm, isPublishDue } from './lib/observe/schedule.mjs'
 
 let pass = 0
 const failures = []

@@ -24,9 +24,9 @@
  * 把日志映射成步骤状态（与 `sync.mjs` 解析 `=== N/5 ===` 是同一手法）——
  * 好处是部署那段的实现一行不用改。
  */
-import { ROOT } from './env.mjs'
-import * as jobs from './jobs.mjs'
-import * as git from './git.mjs'
+import { ROOT } from '../core/env.mjs'
+import * as jobs from '../core/jobs.mjs'
+import * as git from '../vcs/git.mjs'
 import * as deploy from './deploy.mjs'
 import * as endpointsLib from './endpoints.mjs'
 

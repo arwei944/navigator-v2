@@ -35,7 +35,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join, relative, sep } from 'node:path'
 import { parseArgs } from 'node:util'
 import { applyProxyEnv } from '../shared/proxy.mjs'
-import { record } from '../tools/console/lib/audit.mjs'
+import { record } from '../tools/console/lib/core/audit.mjs'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const DATA = join(root, 'api', 'sites-data.json')

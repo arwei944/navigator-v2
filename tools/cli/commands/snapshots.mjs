@@ -2,8 +2,8 @@
  * 发布门禁与云端快照命令：预检放行、快照清单、一键回滚。
  * 业务逻辑在 lib/gate.mjs（凭证）与 lib/snapshots.mjs（云端快照读写），与发布流水线同源。
  */
-import * as gate from '../../console/lib/gate.mjs'
-import * as snapshots from '../../console/lib/snapshots.mjs'
+import * as gate from '../../console/lib/core/gate.mjs'
+import * as snapshots from '../../console/lib/publish/snapshots.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, parseCommandArgs, table } from '../lib/core.mjs'
 import { fmtBytes } from '../../../shared/format.mjs'
 

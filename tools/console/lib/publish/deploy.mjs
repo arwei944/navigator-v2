@@ -27,8 +27,8 @@ import { createHash } from 'node:crypto'
 import { join, dirname } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { ROOT, loadEnv } from './env.mjs'
-import * as jobs from './jobs.mjs'
+import { ROOT, loadEnv } from '../core/env.mjs'
+import * as jobs from '../core/jobs.mjs'
 
 const DIST = join(ROOT, 'dist')
 const ENV_FILE = join(ROOT, '.env.local')

@@ -17,9 +17,9 @@ import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   pluginGroups, sanitizeOverrides, applyOverrides, currentOverrides, WRITABLE_ENVS,
-} from '../../../shared/plugin-registry.mjs'
+} from '../../../../shared/plugin-registry.mjs'
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..')
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..')
 const FILE = join(ROOT, 'plugins.local.json')
 const SCHEMA = 1
 

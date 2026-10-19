@@ -6,21 +6,21 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT, getAdminKey } from './env.mjs'
-import { SITE_URL, fetchCloud } from './cloud.mjs'
-import { resolvePublisher } from '../../../shared/publisher.mjs'
-import { fmtDateTime } from '../../../shared/format.mjs'
-import * as jobs from './jobs.mjs'
-import * as git from './git.mjs'
+import { ROOT, getAdminKey } from '../core/env.mjs'
+import { SITE_URL, fetchCloud } from '../core/cloud.mjs'
+import { resolvePublisher } from '../../../../shared/publisher.mjs'
+import { fmtDateTime } from '../../../../shared/format.mjs'
+import * as jobs from '../core/jobs.mjs'
+import * as git from '../vcs/git.mjs'
 import * as vercel from './vercel.mjs'
-import { consumeGate } from './gate.mjs'
-import { record } from './audit.mjs'
+import { consumeGate } from '../core/gate.mjs'
+import { record } from '../core/audit.mjs'
 import { append as appendHistory } from './publishlog.mjs'
-import { push as notifyPush } from './notify.mjs'
+import { push as notifyPush } from '../observe/notify.mjs'
 import {
   FULL_PIPELINE, createSteps, markStep as markStepCore, settlePending, settleRunning,
   stepFromMarker, advanceTo as advanceToCore, pipelineVerdict,
-} from '../../../shared/ops/pipeline.mjs'
+} from '../../../../shared/ops/pipeline.mjs'
 
 export { SITE_URL, fetchCloud }
 

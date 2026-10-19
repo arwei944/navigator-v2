@@ -8,7 +8,7 @@
  *
  * 运行：node tools/console/test-endpoints.mjs
  */
-import { listEndpoints, publicEndpoints, resolveEndpoints } from '../console/lib/endpoints.mjs'
+import { listEndpoints, publicEndpoints, resolveEndpoints } from './lib/publish/endpoints.mjs'
 
 let pass = 0
 const failures = []

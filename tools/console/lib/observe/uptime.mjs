@@ -1,7 +1,7 @@
 /**
  * 本站可用性的「探」与「存」。
  *
- * 注意与 `tools/console/lib/health.mjs` 的区别：
+ * 注意与 `tools/console/lib/observe/health.mjs` 的区别：
  *   - health.mjs  → 探**我们收录的 300 个站点**（内容层面的可用性）
  *   - 本模块      → 探**我们自己部署的站点**（navigator-v2 是否可访问）
  * 两者都叫「可用性」，混起来看结论会完全错。
@@ -11,9 +11,9 @@
  */
 import { appendFileSync, mkdirSync, existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { ROOT } from './env.mjs'
-import { resolvePublisher } from '../../../shared/publisher.mjs'
-import { classifyProbe, KIND } from '../../../shared/uptime.mjs'
+import { ROOT } from '../core/env.mjs'
+import { resolvePublisher } from '../../../../shared/publisher.mjs'
+import { classifyProbe, KIND } from '../../../../shared/uptime.mjs'
 
 // 允许换路径：测试要往临时文件写，部署上也有人想把它放到数据盘
 const LOG = process.env.NAV_UPTIME_LOG || join(ROOT, 'data', 'uptime.jsonl')

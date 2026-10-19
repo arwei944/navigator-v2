@@ -8,7 +8,7 @@
  *
  * 运行：node tools/console/test-deploy-resume.mjs
  */
-import { sliceFingerprint, shouldResumeUpload } from './lib/deploy.mjs'
+import { sliceFingerprint, shouldResumeUpload } from './lib/publish/deploy.mjs'
 
 let pass = 0
 const failures = []

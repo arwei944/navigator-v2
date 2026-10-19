@@ -11,7 +11,7 @@
  *   ⑤ preflight 的形状与阻塞项
  */
 import assert from 'node:assert/strict'
-import { planSteps, isSkipped, markerKeyOf, shouldAdvance, STEP_DEFS, preflight } from './lib/release.mjs'
+import { planSteps, isSkipped, markerKeyOf, shouldAdvance, STEP_DEFS, preflight } from './lib/publish/release.mjs'
 
 let pass = 0
 let fail = 0

@@ -5,11 +5,11 @@
  * （tools/console/lib/{publishlog,notify,schedule}.mjs + shared/ops/*），
  * 因此 CLI 查到的记录与 UI 看到的是同一批，不会出现「命令行说成功、面板没记录」。
  */
-import * as publishlog from '../../console/lib/publishlog.mjs'
-import * as notify from '../../console/lib/notify.mjs'
-import * as schedule from '../../console/lib/schedule.mjs'
-import { readSites } from '../../console/lib/data.mjs'
-import { record } from '../../console/lib/audit.mjs'
+import * as publishlog from '../../console/lib/publish/publishlog.mjs'
+import * as notify from '../../console/lib/observe/notify.mjs'
+import * as schedule from '../../console/lib/observe/schedule.mjs'
+import { readSites } from '../../console/lib/content/data.mjs'
+import { record } from '../../console/lib/core/audit.mjs'
 import { fmtDateTimeShort } from '../../../shared/format.mjs'
 import { CliError, EXIT, buildOptions, note, parseCommandArgs, table } from '../lib/core.mjs'
 

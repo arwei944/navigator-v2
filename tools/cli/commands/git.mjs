@@ -2,10 +2,10 @@
  * Git 工作流命令：复用 tools/console/lib/git.mjs 与 changes.mjs。
  * 路径参数统一经 assertSafePath 校验（拒绝绝对路径与目录穿越）。
  */
-import { ROOT } from '../../console/lib/env.mjs'
-import * as git from '../../console/lib/git.mjs'
-import * as changes from '../../console/lib/changes.mjs'
-import * as jobs from '../../console/lib/jobs.mjs'
+import { ROOT } from '../../console/lib/core/env.mjs'
+import * as git from '../../console/lib/vcs/git.mjs'
+import * as changes from '../../console/lib/vcs/changes.mjs'
+import * as jobs from '../../console/lib/core/jobs.mjs'
 import { assertIndexesInRange, hunkPreview, parseHunkIndexes } from '../../../shared/hunk-patch.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, parseCommandArgs, requirePositional, runJob, table } from '../lib/core.mjs'
 

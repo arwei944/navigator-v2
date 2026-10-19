@@ -7,7 +7,7 @@
  * - 退出码稳定可判定：0 成功 / 1 内部错误 / 2 用法错误 / 3 环境缺失 / 4 远端失败 / 5 业务拒绝
  */
 import { parseArgs } from 'node:util'
-import * as jobs from '../../console/lib/jobs.mjs'
+import * as jobs from '../../console/lib/core/jobs.mjs'
 
 export const EXIT = {
   OK: 0,

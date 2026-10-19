@@ -4,10 +4,10 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
-import { CATEGORY_GROUPS, sanitizeGroups } from '../../../shared/categories.mjs'
-import { categoryMetaFromGroups } from '../../../shared/category-source.mjs'
-import { hostOf } from '../../../shared/ops/site-ops.mjs'
+import { ROOT } from '../core/env.mjs'
+import { CATEGORY_GROUPS, sanitizeGroups } from '../../../../shared/categories.mjs'
+import { categoryMetaFromGroups } from '../../../../shared/category-source.mjs'
+import { hostOf } from '../../../../shared/ops/site-ops.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
 

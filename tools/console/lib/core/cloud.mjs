@@ -7,8 +7,8 @@ import { promisify } from 'node:util'
 import { writeFileSync, rmSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT, getAdminKey } from './env.mjs'
-import { resolveProxyUrl } from '../../../shared/proxy.mjs'
-import { resolvePublisher } from '../../../shared/publisher.mjs'
+import { resolveProxyUrl } from '../../../../shared/proxy.mjs'
+import { resolvePublisher } from '../../../../shared/publisher.mjs'
 
 const pExecFile = promisify(execFile)
 

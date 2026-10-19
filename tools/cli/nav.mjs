@@ -12,7 +12,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT, loadEnv } from '../console/lib/env.mjs'
+import { ROOT, loadEnv } from '../console/lib/core/env.mjs'
 import { applyProxyEnv } from '../../shared/proxy.mjs'
 import { CliError, EXIT, EXIT_CODES, GLOBAL_FLAGS, emitResult, note, splitGlobals, table, toCliError } from './lib/core.mjs'
 import { GROUPS, findCommand } from './lib/registry.mjs'

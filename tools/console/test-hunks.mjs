@@ -17,7 +17,7 @@ import { join } from 'node:path'
 import {
   assertIndexesInRange, buildSubsetPatch, hunkPreview, hunkStats, parseHunkIndexes, splitHunks,
 } from '../../shared/hunk-patch.mjs'
-import { applyHunks } from './lib/git.mjs'
+import { applyHunks } from './lib/vcs/git.mjs'
 
 let pass = 0
 const failures = []

@@ -18,13 +18,21 @@ import { dirname, join } from 'node:path'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8')
 
+/**
+ * 控制台路由域文件集（`api.mjs` 是分发起，路由体在 `api-<域>.mjs`）。
+ * 静态断言针对「路由层」而不是某一个文件名 —— 否则路由换个文件归置，
+ * 断言就会在悄悄失效的同时继续报绿。
+ */
+const ROUTE_FILES = ['api.mjs', 'api-http.mjs', 'api-system.mjs', 'api-git.mjs', 'api-sites.mjs', 'api-health.mjs', 'api-ops.mjs']
+  .map((f) => `tools/console/lib/routes/${f}`)
+
 let pass = 0
 const failures = []
 const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`${label}${extra ? ` — ${extra}` : ''}`) }
 
 /* ============ 1. isTrusted：鉴权 / CSRF 拒绝 ============ */
 {
-  const { isTrusted } = await import('./lib/api.mjs')
+  const { isTrusted } = await import('./lib/routes/api.mjs')
   const req = (headers, method = 'GET') => ({ headers, method })
   const H = (o) => ({ host: '127.0.0.1:5175', ...o })
 
@@ -58,7 +66,7 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
   ])
   process.env.DEPLOY_SITE_URL = 'https://main.example.com'
 
-  const { resolveEndpoints } = await import('./lib/endpoints.mjs')
+  const { resolveEndpoints } = await import('./lib/publish/endpoints.mjs')
 
   const empty = resolveEndpoints([])
   ok(empty.ok && empty.endpoints.length === 1 && empty.endpoints[0].id === 'default',
@@ -91,7 +99,7 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
     process.env[k] = ''
   }
   try {
-    const { publishAll } = await import('./lib/deploy.mjs')
+    const { publishAll } = await import('./lib/publish/deploy.mjs')
     const eps = [
       { id: 'mirror', label: '镜像站', url: 'https://mirror.example.com', workloadId: '', key: '' },
       { id: 'backup', label: '备用站', url: 'https://backup.example.com', workloadId: '', key: '' },
@@ -119,17 +127,19 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
 
 /* ============ 4. 静态不变量：防「显式端点被悄悄降级成单端点」回退 ============ */
 {
-  const deploySrc = read('tools/console/lib/deploy.mjs')
+  const deploySrc = read('tools/console/lib/publish/deploy.mjs')
   ok(/eps\.length\s*\?[\s\S]{0,120}publishAll/.test(deploySrc),
     'startPublish 对「显式给了端点」走 publishAll（含只给一个 —— 否则单选镜像站会发到默认端点）')
   ok(/endpoints:\s*eps/.test(deploySrc), 'startPublish 把解析后的端点数组传给 publishAll')
   ok(/function applyEndpointEnv/.test(deploySrc) && /function restoreEnv/.test(deploySrc),
     '端点环境变量切换与恢复函数仍在（不得被覆盖）')
 
-  const apiSrc = read('tools/console/lib/api.mjs')
-  ok(/endpointsCfg\.resolveEndpoints\(\s*body\.endpoints\s*\)/.test(apiSrc),
+  // 路由已按域拆分，publish 路由在 api-ops.mjs；读整个路由域文件集，
+  // 避免「拆到别的文件后这条断言失效却仍然报绿」
+  const routeSrc = ROUTE_FILES.map(read).join('\n')
+  ok(/endpointsCfg\.resolveEndpoints\(\s*body\.endpoints\s*\)/.test(routeSrc),
     'publish 路由用 resolveEndpoints 解析请求里的端点')
-  ok(/if\s*\(picked && !picked\.ok\)[\s\S]{0,160}sendJson\(res,\s*400/.test(apiSrc),
+  ok(/if\s*\(picked && !picked\.ok\)[\s\S]{0,160}sendJson\(res,\s*400/.test(routeSrc),
     '未知端点 → 400（明确报错，不静默发布）')
 }
 
@@ -147,8 +157,8 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
   try { original = readFileSync(idemFile, 'utf8') } catch { hadFile = false }
 
   try {
-    const { startPublish } = await import('./lib/deploy.mjs')
-    const jobsMod = await import('./lib/jobs.mjs')
+    const { startPublish } = await import('./lib/publish/deploy.mjs')
+    const jobsMod = await import('./lib/core/jobs.mjs')
     const waitDone = async (id) => {
       for (let i = 0; i < 120; i++) {
         const j = jobsMod.getJob(id)
@@ -208,10 +218,10 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
 
 /* ============ 6. 静态不变量：防幂等能力被回退掉 ============ */
 {
-  const apiSrc = read('tools/console/lib/api.mjs')
-  ok(/idempotency-key/.test(apiSrc), '发布路由读 Idempotency-Key 请求头')
-  ok(/idempotencyKey:\s*idem/.test(apiSrc), '路由把幂等键传给 startPublish')
-  const deploySrc = read('tools/console/lib/deploy.mjs')
+  const routeSrc = ROUTE_FILES.map(read).join('\n')
+  ok(/idempotency-key/.test(routeSrc), '发布路由读 Idempotency-Key 请求头')
+  ok(/idempotencyKey:\s*idem/.test(routeSrc), '路由把幂等键传给 startPublish')
+  const deploySrc = read('tools/console/lib/publish/deploy.mjs')
   ok(/IDEM_FILE/.test(deploySrc) && /writeIdemLedger/.test(deploySrc), '幂等台账落盘实现仍在')
   ok(/避免重复部署，本次请求被拒绝/.test(deploySrc), '重启后重复请求的拒绝分支仍在（防回退成「重复部署」）')
 }

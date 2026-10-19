@@ -12,21 +12,21 @@ import { readFileSync, writeFileSync, renameSync, mkdirSync, copyFileSync, rmSyn
 import { join, basename } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { ROOT, getAdminKey } from './env.mjs'
+import { ROOT, getAdminKey } from '../core/env.mjs'
 import { readSites, readCategoryMeta, categoryGroups, hostOf } from './data.mjs'
-import { fmtDateTime } from '../../../shared/format.mjs'
-import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../shared/site-infer.mjs'
-import { translateSiteFields } from '../../../shared/translate.mjs'
-import { normalizePurposes } from '../../../shared/purposes.mjs'
-import { diffSites } from './changes.mjs'
+import { fmtDateTime } from '../../../../shared/format.mjs'
+import { inferSite, decodeHtmlBytes, pickThemeColor, manifestHref, manifestThemeColor, BLOCKED_WARNING } from '../../../../shared/site-infer.mjs'
+import { translateSiteFields } from '../../../../shared/translate.mjs'
+import { normalizePurposes } from '../../../../shared/purposes.mjs'
+import { diffSites } from '../vcs/changes.mjs'
 import {
   EDITABLE_FIELDS, BATCH_OPS, BATCH_OP_LIST, applyBatch, batchSummary,
   normalizeUrl, toTarget, normalizeAliases, nextId, nextSortOrder,
   buildSitesCommitMessage, describeDiff, matchSite,
-} from '../../../shared/ops/site-ops.mjs'
-import * as jobs from './jobs.mjs'
-import * as git from './git.mjs'
-import { SITE_URL, fetchCloud } from './sync.mjs'
+} from '../../../../shared/ops/site-ops.mjs'
+import * as jobs from '../core/jobs.mjs'
+import * as git from '../vcs/git.mjs'
+import { SITE_URL, fetchCloud } from '../publish/sync.mjs'
 
 const pExecFile = promisify(execFile)
 

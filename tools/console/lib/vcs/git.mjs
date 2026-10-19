@@ -6,9 +6,9 @@ import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
-import { fmtBytes } from '../../../shared/format.mjs'
-import { assertIndexesInRange, buildSubsetPatch, hunkStats, splitHunks } from '../../../shared/hunk-patch.mjs'
+import { ROOT } from '../core/env.mjs'
+import { fmtBytes } from '../../../../shared/format.mjs'
+import { assertIndexesInRange, buildSubsetPatch, hunkStats, splitHunks } from '../../../../shared/hunk-patch.mjs'
 
 const pExecFile = promisify(execFile)
 const MAX_DIFF_BYTES = 256 * 1024

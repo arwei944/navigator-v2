@@ -14,7 +14,7 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
-import { AUDIT_ACTIONS, normalizeEntry, filterEntries, summarizeEntries, actionLabel } from '../../../shared/ops/audit-core.mjs'
+import { AUDIT_ACTIONS, normalizeEntry, filterEntries, summarizeEntries, actionLabel } from '../../../../shared/ops/audit-core.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
 const ACTIVE = join(DATA_DIR, 'audit.jsonl')

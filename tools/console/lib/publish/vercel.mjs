@@ -7,7 +7,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { ROOT, loadEnv } from './env.mjs'
+import { ROOT, loadEnv } from '../core/env.mjs'
 
 const pExecFile = promisify(execFile)
 const API = 'https://api.vercel.com'

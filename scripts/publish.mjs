@@ -17,7 +17,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, rmSyn
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { record } from '../tools/console/lib/audit.mjs'
+import { record } from '../tools/console/lib/core/audit.mjs'
 import { applyProxyEnv } from '../shared/proxy.mjs'
 import { resolvePublisher } from '../shared/publisher.mjs'
 

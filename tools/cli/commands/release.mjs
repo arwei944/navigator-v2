@@ -2,10 +2,10 @@
  * 开发流水线命令：把「测试门禁 → 提交 → 推送 → 构建 → 产物门禁 → 打包 → 上传 → 重启 → 线上验证」
  * 收成一条闭环。
  *
- * 业务逻辑全在 `tools/console/lib/release.mjs` —— 与控制台的「流水线」面板共用同一套编排，
+ * 业务逻辑全在 `tools/console/lib/publish/release.mjs` —— 与控制台的「流水线」面板共用同一套编排，
  * 这里只做参数解析与输出。长任务走 jobs 管道，实时把子进程输出打到 stderr，stdout 只留最终 JSON。
  */
-import * as release from '../../console/lib/release.mjs'
+import * as release from '../../console/lib/publish/release.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, parseCommandArgs, runJob } from '../lib/core.mjs'
 
 /** 命令行开关 → 编排选项（连字符键保持原样，与既有命令一致） */

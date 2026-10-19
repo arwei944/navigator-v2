@@ -19,7 +19,7 @@ import { join } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { ROOT } from '../console/lib/env.mjs'
+import { ROOT } from '../console/lib/core/env.mjs'
 import { invoke, invokeGated, toToolText, isToolError } from './lib/bridge.mjs'
 
 function projectVersion() {

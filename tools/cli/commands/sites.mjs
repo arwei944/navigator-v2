@@ -2,12 +2,12 @@
  * 站点管理命令：复用 tools/console/lib/sites.mjs 与 data.mjs，
  * 与控制台「站点」面板、scripts/*.mjs 共用同一套业务逻辑，避免三处实现漂移。
  */
-import * as sites from '../../console/lib/sites.mjs'
-import * as data from '../../console/lib/data.mjs'
+import * as sites from '../../console/lib/content/sites.mjs'
+import * as data from '../../console/lib/content/data.mjs'
 import { probeMany } from '../../../shared/health-probe.mjs'
-import { publishHealth } from '../../console/lib/cloud.mjs'
+import { publishHealth } from '../../console/lib/core/cloud.mjs'
 import { resolveProxyUrl } from '../../../shared/proxy.mjs'
-import { getAdminKey } from '../../console/lib/env.mjs'
+import { getAdminKey } from '../../console/lib/core/env.mjs'
 import { CliError, EXIT, buildOptions, dryRunResult, note, parseCommandArgs, requirePositional, table } from '../lib/core.mjs'
 
 /* ---------------- 命令定义 ---------------- */

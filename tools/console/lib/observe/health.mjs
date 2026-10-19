@@ -10,13 +10,13 @@
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { ROOT } from './env.mjs'
-import { probeMany, tally, STATUS_LABEL } from '../../../shared/health-probe.mjs'
-import { readSites } from './data.mjs'
-import * as jobs from './jobs.mjs'
-import { record } from './audit.mjs'
-import { publishHealth } from './cloud.mjs'
-import { resolveProxyUrl } from '../../../shared/proxy.mjs'
+import { ROOT } from '../core/env.mjs'
+import { probeMany, tally, STATUS_LABEL } from '../../../../shared/health-probe.mjs'
+import { readSites } from '../content/data.mjs'
+import * as jobs from '../core/jobs.mjs'
+import { record } from '../core/audit.mjs'
+import { publishHealth } from '../core/cloud.mjs'
+import { resolveProxyUrl } from '../../../../shared/proxy.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data', 'health')
 const KEEP_DAYS = 30

@@ -4,9 +4,9 @@
  */
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
+import { ROOT } from '../core/env.mjs'
 import { getStatus, showFileAtHead } from './git.mjs'
-import { diffSites, checkIntegrity } from '../../../shared/ops/site-ops.mjs'
+import { diffSites, checkIntegrity } from '../../../../shared/ops/site-ops.mjs'
 
 const SITES_FILE = 'api/sites-data.json'
 

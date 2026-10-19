@@ -12,13 +12,13 @@
  */
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
-import { readSites } from './data.mjs'
-import { probeMany, tally } from '../../../shared/health-probe.mjs'
+import { ROOT } from '../core/env.mjs'
+import { readSites } from '../content/data.mjs'
+import { probeMany, tally } from '../../../../shared/health-probe.mjs'
 import * as health from './health.mjs'
 import * as notify from './notify.mjs'
-import * as jobs from './jobs.mjs'
-import { record } from './audit.mjs'
+import * as jobs from '../core/jobs.mjs'
+import { record } from '../core/audit.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
 const CONFIG_FILE = join(DATA_DIR, 'schedule.json')
@@ -126,7 +126,7 @@ async function checkScheduledPublish(cur) {
   if (!isPublishDue(cur)) return
   persist({ ...cur, lastPublishDate: todayStr() })
   if (cur.publishAuto) {
-    const { startRelease, RELEASE_JOB_TITLE } = await import('./release.mjs')
+    const { startRelease, RELEASE_JOB_TITLE } = await import('../publish/release.mjs')
     if (jobs.listJobs().some(j => j.title === RELEASE_JOB_TITLE && j.status === 'running')) return
     startRelease({ trigger: 'schedule', actor: 'schedule' })
     notify.push({ kind: 'publish.scheduled', title: '定时发布已启动', body: `按配置自动执行流水线（${cur.publishAt}）` })

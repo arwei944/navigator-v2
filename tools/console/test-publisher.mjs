@@ -21,7 +21,7 @@ import { registerPublisher, listPublishers, resolvePublisher } from '../../share
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const PUBLISH_SCRIPT = path.join(HERE, '..', '..', 'scripts', 'publish.mjs')
 const GATE_SCRIPT = path.join(HERE, '..', '..', 'scripts', 'deploy-cloud.mjs')
-const CLOUD_LIB = path.join(HERE, 'lib', 'cloud.mjs')
+const CLOUD_LIB = path.join(HERE, 'lib', 'core', 'cloud.mjs')
 
 let pass = 0
 let fail = 0

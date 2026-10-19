@@ -6,8 +6,8 @@
  * 并且能一眼分出「平台挂了」还是「我们的应用挂了」。
  */
 import { CliError, EXIT, buildOptions, note, parseCommandArgs, table } from '../lib/core.mjs'
-import * as uptime from '../../console/lib/uptime.mjs'
-import * as notify from '../../console/lib/notify.mjs'
+import * as uptime from '../../console/lib/observe/uptime.mjs'
+import * as notify from '../../console/lib/observe/notify.mjs'
 import { KIND, KIND_LABEL, summarize, fmtDuration } from '../../../shared/uptime.mjs'
 import { fmtClockTime } from '../../../shared/format.mjs'
 

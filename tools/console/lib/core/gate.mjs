@@ -14,8 +14,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { ROOT } from './env.mjs'
 import { fetchCloud } from './cloud.mjs'
-import * as git from './git.mjs'
-import * as changes from './changes.mjs'
+import * as git from '../vcs/git.mjs'
+import * as changes from '../vcs/changes.mjs'
 import { record } from './audit.mjs'
 
 const GATE_TTL_MS = 10 * 60 * 1000

@@ -12,12 +12,12 @@
 import { execFile } from 'node:child_process'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { ROOT } from './env.mjs'
+import { ROOT } from '../core/env.mjs'
 import {
   NOTIFY_KINDS, SEVERITY_ORDER, buildNotification, collapseNotifications,
   sortNotifications, filterNotifications, summarizeNotifications,
   webhookPayload, notificationText,
-} from '../../../shared/ops/notify-core.mjs'
+} from '../../../../shared/ops/notify-core.mjs'
 
 const DATA_DIR = join(ROOT, 'tools', 'console', '.data')
 const FILE = join(DATA_DIR, 'notify.jsonl')
