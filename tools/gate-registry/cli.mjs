@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
-import { nodeFlagsOf, purposeOf, linesOf, categoryOf } from './lib/extract.mjs'
+import { nodeFlagsOf, ciSkipOf, ciFlagsOf, purposeOf, linesOf, categoryOf } from './lib/extract.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..', '..')
@@ -55,6 +55,11 @@ function collect() {
       // 启动参数（如 --experimental-test-module-mocks）由脚本头注释 `@node-flags` 声明；
       // 执行器原样传递，否则 mock 不生效、门禁会在真实环境里跑另一套语义。
       nodeFlags: nodeFlagsOf(join(ROOT, file)),
+      // CI 跳过声明（`@ci-skip <原因>`）。null = CI 里照跑。
+      // 用 null 而不是省略字段，是为了让「没声明」与「声明为空」在台账里可区分。
+      ciSkip: ciSkipOf(join(ROOT, file)),
+      // CI 模式下的附加参数（如 --strict：缺产物即失败，不降级为跳过）。
+      ciFlags: ciFlagsOf(join(ROOT, file)),
     }
   })
   return { gates, included: files }

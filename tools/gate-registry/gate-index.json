@@ -115,6 +115,8 @@
       "lines": 100,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 266
     },
     {
@@ -125,6 +127,8 @@
       "lines": 91,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 205
     },
     {
@@ -135,6 +139,8 @@
       "lines": 218,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 483
     },
     {
@@ -145,6 +151,8 @@
       "lines": 78,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 181
     },
     {
@@ -155,6 +163,8 @@
       "lines": 88,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 173
     },
     {
@@ -165,6 +175,8 @@
       "lines": 71,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 191
     },
     {
@@ -177,6 +189,8 @@
       "nodeFlags": [
         "--experimental-test-module-mocks"
       ],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 182
     },
     {
@@ -187,6 +201,8 @@
       "lines": 138,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 180
     },
     {
@@ -197,6 +213,8 @@
       "lines": 111,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 324
     },
     {
@@ -207,6 +225,8 @@
       "lines": 109,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 177
     },
     {
@@ -217,6 +237,8 @@
       "lines": 267,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 555
     },
     {
@@ -224,9 +246,13 @@
       "name": "test-bundle-size",
       "purpose": "产物体积门禁（NAV-v8 · 任务 4pnj9g）",
       "category": "前端与体验",
-      "lines": 116,
+      "lines": 118,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [
+        "--strict"
+      ],
       "durationMs": 313
     },
     {
@@ -234,9 +260,13 @@
       "name": "test-bundle",
       "purpose": "第三批 · 序 23 的守卫：首屏分包**产物**断言（不是源码断言）。",
       "category": "前端与体验",
-      "lines": 259,
+      "lines": 262,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [
+        "--strict"
+      ],
       "durationMs": 742
     },
     {
@@ -247,6 +277,8 @@
       "lines": 76,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 374
     },
     {
@@ -257,6 +289,8 @@
       "lines": 155,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 245
     },
     {
@@ -267,6 +301,8 @@
       "lines": 119,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 236
     },
     {
@@ -277,6 +313,8 @@
       "lines": 333,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 2860
     },
     {
@@ -287,6 +325,8 @@
       "lines": 209,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 203
     },
     {
@@ -297,6 +337,8 @@
       "lines": 239,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 199
     },
     {
@@ -307,6 +349,8 @@
       "lines": 88,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 1176
     },
     {
@@ -317,6 +361,8 @@
       "lines": 123,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 190
     },
     {
@@ -327,6 +373,8 @@
       "lines": 77,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 232
     },
     {
@@ -337,6 +385,8 @@
       "lines": 53,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 192
     },
     {
@@ -347,6 +397,8 @@
       "lines": 103,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 287
     },
     {
@@ -357,6 +409,8 @@
       "lines": 195,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 392
     },
     {
@@ -367,6 +421,8 @@
       "lines": 77,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 178
     },
     {
@@ -374,9 +430,11 @@
       "name": "test-doc-facts",
       "purpose": "文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。",
       "category": "文档治理",
-      "lines": 255,
+      "lines": 321,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 357
     },
     {
@@ -387,6 +445,8 @@
       "lines": 133,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 264
     },
     {
@@ -397,6 +457,8 @@
       "lines": 76,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 184
     },
     {
@@ -407,6 +469,8 @@
       "lines": 226,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 2808
     },
     {
@@ -417,6 +481,8 @@
       "lines": 115,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 188
     },
     {
@@ -427,6 +493,8 @@
       "lines": 100,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 255
     },
     {
@@ -437,6 +505,8 @@
       "lines": 104,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 456
     },
     {
@@ -447,6 +517,8 @@
       "lines": 125,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": null
     },
     {
@@ -457,6 +529,8 @@
       "lines": 87,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 173
     },
     {
@@ -467,6 +541,8 @@
       "lines": 115,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 323
     },
     {
@@ -477,6 +553,8 @@
       "lines": 236,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 3862
     },
     {
@@ -487,6 +565,8 @@
       "lines": 188,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 474
     },
     {
@@ -497,6 +577,8 @@
       "lines": 204,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 665
     },
     {
@@ -507,6 +589,8 @@
       "lines": 111,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 183
     },
     {
@@ -517,6 +601,8 @@
       "lines": 52,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 291
     },
     {
@@ -527,6 +613,8 @@
       "lines": 82,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 172
     },
     {
@@ -537,6 +625,8 @@
       "lines": 112,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 164
     },
     {
@@ -547,6 +637,8 @@
       "lines": 302,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 1108
     },
     {
@@ -557,6 +649,8 @@
       "lines": 281,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 4541
     },
     {
@@ -567,6 +661,8 @@
       "lines": 98,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 404
     },
     {
@@ -577,6 +673,8 @@
       "lines": 261,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 189
     },
     {
@@ -587,6 +685,8 @@
       "lines": 368,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 210
     },
     {
@@ -597,6 +697,8 @@
       "lines": 106,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": null
     },
     {
@@ -604,9 +706,11 @@
       "name": "test-input-focus-real",
       "purpose": "真机按键守卫：搜索框逐字符输入不得失焦。",
       "category": "搜索与交互",
-      "lines": 143,
+      "lines": 145,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": "需要本机 Chrome：cdp-driver 只探测 Windows 路径，CI 容器里没有浏览器；且依赖 dist/ 产物",
+      "ciFlags": [],
       "durationMs": null
     },
     {
@@ -617,6 +721,8 @@
       "lines": 232,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 215
     },
     {
@@ -627,6 +733,8 @@
       "lines": 90,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 394
     },
     {
@@ -637,6 +745,8 @@
       "lines": 187,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 395
     },
     {
@@ -647,6 +757,8 @@
       "lines": 82,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 172
     },
     {
@@ -657,6 +769,8 @@
       "lines": 153,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 229
     },
     {
@@ -669,6 +783,8 @@
       "nodeFlags": [
         "--experimental-test-module-mocks"
       ],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 178
     },
     {
@@ -679,6 +795,8 @@
       "lines": 230,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 222
     },
     {
@@ -689,6 +807,8 @@
       "lines": 246,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 187
     },
     {
@@ -699,6 +819,8 @@
       "lines": 85,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 194
     },
     {
@@ -709,6 +831,8 @@
       "lines": 282,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 321
     },
     {
@@ -719,6 +843,8 @@
       "lines": 189,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 187
     },
     {
@@ -729,6 +855,8 @@
       "lines": 130,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 238
     },
     {
@@ -739,6 +867,8 @@
       "lines": 996,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 794
     },
     {
@@ -749,6 +879,8 @@
       "lines": 164,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 333
     },
     {
@@ -759,6 +891,8 @@
       "lines": 208,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 295
     },
     {
@@ -769,6 +903,8 @@
       "lines": 170,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 186
     },
     {
@@ -779,6 +915,8 @@
       "lines": 150,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 431
     },
     {
@@ -789,6 +927,8 @@
       "lines": 184,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 216
     },
     {
@@ -799,6 +939,8 @@
       "lines": 363,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 279
     },
     {
@@ -809,6 +951,8 @@
       "lines": 96,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 441
     },
     {
@@ -819,6 +963,8 @@
       "lines": 175,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 1751
     },
     {
@@ -829,6 +975,8 @@
       "lines": 277,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 200
     },
     {
@@ -839,6 +987,8 @@
       "lines": 146,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 188
     },
     {
@@ -849,6 +999,8 @@
       "lines": 54,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 287
     },
     {
@@ -856,9 +1008,11 @@
       "name": "test-scripts",
       "purpose": "仓库脚本台账门禁（`scripts/` 的生命周期管理）。",
       "category": "工作区治理",
-      "lines": 116,
+      "lines": 143,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 323
     },
     {
@@ -869,6 +1023,8 @@
       "lines": 103,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 411
     },
     {
@@ -879,6 +1035,8 @@
       "lines": 134,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 178
     },
     {
@@ -891,6 +1049,8 @@
       "nodeFlags": [
         "--experimental-test-module-mocks"
       ],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 196
     },
     {
@@ -901,6 +1061,8 @@
       "lines": 59,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 203
     },
     {
@@ -911,6 +1073,8 @@
       "lines": 60,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 167
     },
     {
@@ -921,6 +1085,8 @@
       "lines": 134,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 387
     },
     {
@@ -931,6 +1097,8 @@
       "lines": 159,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 218
     },
     {
@@ -941,6 +1109,8 @@
       "lines": 166,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 320
     },
     {
@@ -951,6 +1121,8 @@
       "lines": 278,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 322
     },
     {
@@ -963,6 +1135,8 @@
       "nodeFlags": [
         "--experimental-test-module-mocks"
       ],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 194
     },
     {
@@ -973,6 +1147,8 @@
       "lines": 245,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": null
     },
     {
@@ -983,6 +1159,8 @@
       "lines": 244,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": null
     },
     {
@@ -993,6 +1171,8 @@
       "lines": 72,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 211
     },
     {
@@ -1003,6 +1183,8 @@
       "lines": 147,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 289
     },
     {
@@ -1013,6 +1195,8 @@
       "lines": 112,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 186
     },
     {
@@ -1023,6 +1207,8 @@
       "lines": 282,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 3222
     },
     {
@@ -1033,6 +1219,8 @@
       "lines": 192,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 215
     },
     {
@@ -1043,6 +1231,8 @@
       "lines": 212,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 213
     },
     {
@@ -1053,6 +1243,8 @@
       "lines": 112,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 771
     },
     {
@@ -1063,6 +1255,8 @@
       "lines": 192,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 218
     },
     {
@@ -1073,6 +1267,8 @@
       "lines": 152,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 387
     },
     {
@@ -1083,6 +1279,8 @@
       "lines": 141,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 183
     },
     {
@@ -1093,6 +1291,8 @@
       "lines": 127,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 184
     },
     {
@@ -1103,6 +1303,8 @@
       "lines": 193,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 297
     },
     {
@@ -1113,6 +1315,8 @@
       "lines": 310,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 423
     },
     {
@@ -1123,6 +1327,8 @@
       "lines": 257,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 192
     },
     {
@@ -1130,9 +1336,11 @@
       "name": "test-mcp",
       "purpose": "nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。",
       "category": "服务端与运行时",
-      "lines": 304,
+      "lines": 327,
       "included": true,
       "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
       "durationMs": 34626
     }
   ]

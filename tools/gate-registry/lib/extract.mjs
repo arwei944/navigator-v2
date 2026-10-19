@@ -40,6 +40,64 @@ export function nodeFlagsOf(file) {
 }
 
 /**
+ * CI 跳过声明。
+ *
+ * 有些门禁依赖**本机专属资源**，在 GitHub Actions 的干净容器里跑不了（或跑起来
+ * 验证的不是同一件事）。这类门禁必须**显式声明 + 说明原因**，而不是让 CI 静默
+ * 不跑 —— 静默跳过与「忘了接」在结果上完全一样，都是假绿。
+ *
+ * 头注释写法：
+ *
+ *     * @ci-skip 需要本机 Chrome：用 CDP 驱动真实键盘，CI 无浏览器
+ *
+ * 解析出空串视为「写了标签但没写原因」，由校验器判为不合规（见 cli.mjs）。
+ */
+/*
+ * 注意 `[ \t]*` 而非 `\s*`：`\s` 包含换行，会让 `@ci-skip` 独占一行时
+ * 把**下一行注释**吞成「原因」（实测写成 `* @ci-skip` 后，下一行的 ` *`
+ * 被解析成原因 `*`，空原因校验因此失效）。这里只允许行内空白。
+ */
+const CI_SKIP_RE = /^[ \t]*\*[ \t]*@ci-skip[ \t]*(.*)$/m
+
+/**
+ * CI 附加参数声明。
+ *
+ * 有些门禁在缺少前置产物时会**降级为跳过**而不是失败（例如 dist/ 没构建时，
+ * 产物体积断言直接 `process.exit(0)`）。本地这样做是合理的——不想强迫每次跑门禁
+ * 都先构建；但 CI 里会变成假绿：构建没产物 → 门禁跳過 → 报「全部通过」。
+ *
+ * 这类门禁自带 `--strict`（缺产物即失败），在这里声明后，执行器只会在 CI 模式下
+ * 追加该参数：
+ *
+ *     * @ci-flags --strict
+ */
+const CI_FLAGS_RE = /^[ \t]*\*[ \t]*@ci-flags[ \t]*(.*)$/m
+
+/** 从脚本头注释解析 `@ci-flags`；没有则空数组 */
+export function ciFlagsOf(file) {
+  let text
+  try {
+    text = readFileSync(file, 'utf-8')
+  } catch {
+    return []
+  }
+  const m = CI_FLAGS_RE.exec(text)
+  return m ? m[1].trim().split(/\s+/).filter(Boolean) : []
+}
+
+/** 从脚本头注释解析 `@ci-skip <原因>`；没有声明返回 null */
+export function ciSkipOf(file) {
+  let text
+  try {
+    text = readFileSync(file, 'utf-8')
+  } catch {
+    return null
+  }
+  const m = CI_SKIP_RE.exec(text)
+  return m ? m[1].trim() : null
+}
+
+/**
  * 取脚本的一句话用途：头注释里第一个非空行；若形如 `名字 —— 说明`，取破折号后的说明。
  * 没有头注释时返回 null（由调用方标注）。
  */

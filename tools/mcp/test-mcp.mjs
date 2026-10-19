@@ -59,9 +59,21 @@ function indexHash() {
 
 const localCount = JSON.parse(readFileSync(DATA, 'utf-8')).length
 
+/**
+ * 单次工具调用的超时余量。
+ *
+ * SDK 默认 60s。本文件在**冷环境**（CI / 首次安装依赖 / 低配机器）下实测出现过
+ * `MCP error -32001: Request timed out`：整轮 73s、单次调用跨过 60s 线。
+ * 同一台机器预热后连跑两次都是 102/102 通过，说明不是逻辑错误而是冷启动抖动。
+ *
+ * 放宽到 150s 而不是关掉超时：真正的挂死仍会被兜住，只是不会因为一次 GC/冷读
+ * 就误判成失败。上界仍由执行器的 180s 单道门禁超时把关。
+ */
+const CALL_TIMEOUT_MS = 150_000
+
 /** 调用工具并解析回传的 JSON 文本；同时保留 isError 供断言 */
 async function call(client, name, args = {}) {
-  const r = await client.callTool({ name, arguments: args })
+  const r = await client.callTool({ name, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS })
   const text = r.content?.[0]?.text || ''
   let json = null
   try { json = JSON.parse(text) } catch { /* 非 JSON 时保留原文供失败信息 */ }
@@ -124,7 +136,18 @@ try {
   ok(cats.json.data.total > 10, `分类数合理（${cats.json.data.total} 个）`)
 
   const gs = await call(client, 'nav_git', { action: 'status' })
-  eq(gs.json.data.branch, 'master', 'nav_git status 返回分支')
+  /*
+   * 只断言「拿到了分支信息」，不锁定具体分支名。
+   *
+   * 原写法硬断言 `branch === 'master'`，在 CI 里会翻车：GitHub Actions 的
+   * `pull_request` 事件 checkout 的是 detached HEAD，`git rev-parse --abbrev-ref HEAD`
+   * 返回 `HEAD`。这条门禁要守的是「status 能正确解析并回传分支」，不是「你在 master 上」——
+   * 后者由发布流程自己把关，不该由一道 MCP 契约用例承担。
+   */
+  ok(
+    typeof gs.json.data.branch === 'string' && gs.json.data.branch.length > 0,
+    'nav_git status 返回分支信息',
+  )
 
   const remote = await call(client, 'nav_git', { action: 'remote' })
   ok(typeof remote.json.data.url === 'string', 'nav_git remote 返回 origin 地址')

@@ -15,6 +15,9 @@
  * （`<script type="module">` + `<link rel="modulepreload">`），再断言那批文件里没有拼音引擎。
  *
  * 依赖 `dist/`，所以先 `npm run build`。运行：node tools/console/test-bundle.mjs
+ * 加 `--strict`：没有 dist 视为失败（发布/验收/CI 用，那时必定构建过）。
+ *
+ * @ci-flags --strict
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'

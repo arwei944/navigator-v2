@@ -32,5 +32,18 @@ jobs:
         run: pnpm run validate
 
       # 构建门禁：确保可产出可部署产物
+      # 放在门禁之前，因为 test-input-focus-real 等依赖 dist/；虽然它在 CI 被 @ci-skip
+      # 跳过，但先构建能让其余门禁在真实产物上跑，也顺带保证构建可用。
       - name: 构建门禁
         run: pnpm run build
+
+      # 全量门禁（102 道）。
+      #
+      # 此前 CI 只跑 validate + build，102 道门禁全靠本地手动执行 —— 推送到远端时
+      # 一道都不跑。这与 NAV-v4 计划里「CI 只做门禁，不重复部署」的原意不符：
+      # 门禁本身没进 CI。
+      #
+      # `--ci` 会跳过声明了 `@ci-skip <原因>` 的门禁（当前只有 test-input-focus-real，
+      # 它需要本机 Chrome），并在日志里逐条打印跳过了什么、为什么。没有声明的绝不跳过。
+      - name: 全量门禁
+        run: pnpm run console:test:all -- --ci

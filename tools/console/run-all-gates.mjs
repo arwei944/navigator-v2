@@ -88,7 +88,7 @@ function verifyLedger() {
 /* ---------------- 参数 ---------------- */
 
 function parseArgs(argv) {
-  const out = { jobs: 4, serial: false, list: false, domain: null, only: null, verbose: false }
+  const out = { jobs: 4, serial: false, list: false, domain: null, only: null, verbose: false, ci: false }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]
     if (a === '--serial') out.serial = true
@@ -100,6 +100,7 @@ function parseArgs(argv) {
     else if (a.startsWith('--domain=')) out.domain = splitList(a.slice(9))
     else if (a === '--only') out.only = splitList(argv[++i])
     else if (a.startsWith('--only=')) out.only = splitList(a.slice(7))
+    else if (a === '--ci') out.ci = true
     else if (a === '--help' || a === '-h') out.help = true
     else {
       console.error(`未知参数：${a}`)
@@ -177,11 +178,21 @@ function runGate(gate) {
      * 例：test-api-ops 需要 `--experimental-test-module-mocks` 才能在隔离环境里 mock 依赖；
      * 漏传会让它去碰真实模块 —— 门禁看似通过，实际测的是另一件事。
      */
-    const child = spawn(process.execPath, [...(gate.nodeFlags || []), join(ROOT, gate.file)], {
-      cwd: ROOT,
-      windowsHide: true,
-      env: { ...process.env, NAV_GATE_RUNNER: 'test-all' },
-    })
+    /*
+     * CI 模式下追加 `@ci-flags` 声明的参数（如 `--strict`）。
+     * 语义：本地允许「缺前置产物 → 跳过」，CI 不允许 —— 否则构建没产物时
+     * 产物体积门禁会静默跳过并报绿。
+     */
+    const ciFlags = gate.ciMode ? (gate.ciFlags || []) : []
+    const child = spawn(
+      process.execPath,
+      [...(gate.nodeFlags || []), join(ROOT, gate.file), ...ciFlags],
+      {
+        cwd: ROOT,
+        windowsHide: true,
+        env: { ...process.env, NAV_GATE_RUNNER: 'test-all' },
+      },
+    )
     let out = ''
     const cap = (chunk) => {
       out += String(chunk)
@@ -290,6 +301,7 @@ if (args.help) {
   --serial         串行执行全部域
   --list           只打印清单，不执行
   --verbose        成功项也逐条打印
+  --ci             CI 模式：跳过声明了 @ci-skip <原因> 的门禁（逐条打印跳过项）
 `)
   process.exit(0)
 }
@@ -323,6 +335,33 @@ if (isFullRun) {
   }
 }
 
+/*
+ * CI 模式：跳过显式声明 `@ci-skip <原因>` 的门禁。
+ *
+ * 为什么不是「CI 里悄悄少跑几道」：
+ *   1. 跳过必须**逐道声明原因**，没有声明的绝不跳过 —— 否则「忘了接」与
+ *      「有意跳过」在结果里长得一模一样，都是假绿。
+ *   2. 跳过的门禁会**逐条打印**，日志里能看见「哪几道没跑、为什么」。
+ *   3. 声明了标签但没写原因，视为不合规 → 直接失败（写了 `@ci-skip` 空行
+ *      等于给自己开一张空白通行证）。
+ */
+const ciSkipped = []
+if (args.ci) {
+  const badDecl = gates.filter((g) => g.ciSkip === '')
+  if (badDecl.length) {
+    console.error(`❌ ${badDecl.length} 道门禁声明了 @ci-skip 但没写原因：`)
+    for (const g of badDecl) console.error(`   - ${g.file}`)
+    console.error('   → 写成 `@ci-skip <为什么 CI 跑不了>`，或删掉该行')
+    process.exit(2)
+  }
+  const keep = []
+  for (const g of gates) {
+    if (g.ciSkip) ciSkipped.push(g)
+    else keep.push({ ...g, ciMode: true })
+  }
+  gates = keep
+}
+
 if (args.domain) {
   const want = new Set(args.domain)
   gates = gates.filter((g) => want.has(g.category))
@@ -341,11 +380,33 @@ if (args.only) {
   const missing = [...want].filter((n) => !got.has(n))
   if (missing.length) {
     console.error(`❌ 没有匹配到脚本：${missing.join(', ')}`)
+    /*
+     * 常见误区：`--ci --only <被跳过的脚本>`。用户以为脚本不存在，
+     * 实际是它被 @ci-skip 挡在门外。直接把原因说出来，省一次排查。
+     */
+    const skippedNames = new Set(ciSkipped.map((g) => g.name))
+    const blocked = missing.filter((n) => skippedNames.has(n))
+    if (blocked.length) {
+      console.error(`   ⏭  其中 ${blocked.join(', ')} 在 CI 模式下被 @ci-skip 跳过：`)
+      for (const g of ciSkipped) {
+        if (blocked.includes(g.name)) console.error(`      - ${g.name}：${g.ciSkip}`)
+      }
+      console.error('   → 去掉 --ci 即可在本机运行，或修改该脚本的 @ci-skip 声明')
+    }
     process.exit(2)
   }
 }
 
 if (!gates.length) {
+  /*
+   * CI 模式下「全被跳过」是合法但危险的信号：说明 @ci-skip 声明已经覆盖了
+   * 整个清单，CI 实际什么都没验却在报绿。这时应按失败处理并提示。
+   */
+  if (args.ci && ciSkipped.length) {
+    console.error(`❌ CI 模式下全部门禁都被 @ci-skip 跳过（${ciSkipped.length} 道）—— CI 实际未验证任何东西`)
+    console.error('   → 检查 @ci-skip 声明是否写得太宽')
+    process.exit(2)
+  }
   console.error('❌ 筛选后没有要执行的门禁')
   process.exit(2)
 }
@@ -367,7 +428,17 @@ console.log(
     args.serial ? '串行' : `按耗时装箱、${Math.min(args.jobs, gates.length)} 路并发`
   }）`,
 )
-console.log(`   域：${[...domains.keys()].join(' · ')}\n`)
+console.log(`   域：${[...domains.keys()].join(' · ')}`)
+
+/*
+ * 跳过的门禁必须逐条可见。CI 日志里最怕的就是「总数变小了但没人注意」——
+ * 那等于悄悄降低了保护级别。
+ */
+if (ciSkipped.length) {
+  console.log(`\n   ⏭  按 @ci-skip 跳过 ${ciSkipped.length} 道（CI 环境限制，非失败）：`)
+  for (const g of ciSkipped) console.log(`      - ${g.name}：${g.ciSkip}`)
+}
+console.log('')
 
 let results
 if (args.serial) {

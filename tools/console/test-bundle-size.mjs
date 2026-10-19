@@ -15,6 +15,8 @@
  * 基线存于同目录 `bundle-size-baseline.json`（带备注与 M2 目标），超基线即失败。
  * 依赖 `dist/`，所以先 `npm run build`。运行：node tools/console/test-bundle-size.mjs
  * 加 `--strict`：没有 dist 视为失败（发布/验收流程用，那时必定构建过）。
+ *
+ * @ci-flags --strict
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs'
 import { join } from 'node:path'

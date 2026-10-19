@@ -33,8 +33,8 @@
 | 9 | `test-auto-category` | 数据与内容 | 自动分类决策：6 条优先级分支 + label 归一 + id 派生与冲突自增。 | 111 | 0.3s |
 | 10 | `test-bgm` | 前端与体验 | 背景音乐的音符生成：noteFreq / chordAt / notesForBar / barSeconds / clampVolume / fmtClock。 | 109 | 0.2s |
 | 11 | `test-browser-translate` | 数据与内容 | 浏览器本地翻译（L2，`src/services/browserTranslate.js`）用例：零依赖、不联网。 | 267 | 0.6s |
-| 12 | `test-bundle-size` | 前端与体验 | 产物体积门禁（NAV-v8 · 任务 4pnj9g） | 116 | 0.3s |
-| 13 | `test-bundle` | 前端与体验 | 第三批 · 序 23 的守卫：首屏分包**产物**断言（不是源码断言）。 | 259 | 0.7s |
+| 12 | `test-bundle-size` | 前端与体验 | 产物体积门禁（NAV-v8 · 任务 4pnj9g） | 118 | 0.3s |
+| 13 | `test-bundle` | 前端与体验 | 第三批 · 序 23 的守卫：首屏分包**产物**断言（不是源码断言）。 | 262 | 0.7s |
 | 14 | `test-category-consistency` | 数据与内容 | 归类一致性体检用例（F5①）：零依赖、不联网。 | 76 | 0.4s |
 | 15 | `test-category-source` | 数据与内容 | 分类表来源注册表（热拔插）自测：不联网。 | 155 | 0.2s |
 | 16 | `test-chartkit` | 前端与体验 | src/utils/chartkit.js 用例：零依赖、不联网、纯字符串断言。 | 119 | 0.2s |
@@ -48,7 +48,7 @@
 | 24 | `test-deploy-status` | 部署与发布 | 部署状态接口用例：零依赖、不联网（读的是本机 store 与构建产物）。 | 103 | 0.3s |
 | 25 | `test-deps` | 工作区治理 | 依赖 / 供应链门禁（来料检验）。 | 195 | 0.4s |
 | 26 | `test-desc-junk` | 数据与内容 | desc「机器垃圾」形态检测用例：零依赖、不联网。 | 77 | 0.2s |
-| 27 | `test-doc-facts` | 文档治理 | 文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。 | 255 | 0.4s |
+| 27 | `test-doc-facts` | 文档治理 | 文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。 | 321 | 0.4s |
 | 28 | `test-doc-manager` | 文档治理 | doc-manager 自测（门禁） | 133 | 0.3s |
 | 29 | `test-dual-stack` | 服务端与运行时 | 双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主） | 76 | 0.2s |
 | 30 | `test-endpoints-run` | 部署与发布 | 部署多端点发布链路用例（N2 补齐）：零依赖、不联网、**绝不触发真实上传**。 | 226 | 2.8s |
@@ -71,7 +71,7 @@
 | 47 | `test-image-engine` | 服务端与运行时 | 图片提供者注册表（热拔插）自测：不联网。 | 261 | 0.2s |
 | 48 | `test-infer` | 前端与体验 | shared/site-infer.mjs 用例：全部用内联 fixture，不联网、零依赖。 | 368 | 0.2s |
 | 49 | `test-inline-stability` | 前端与体验 | 「输入态不许驱动父级 v-if」的结构守卫。 | 106 | — |
-| 50 | `test-input-focus-real` | 搜索与交互 | 真机按键守卫：搜索框逐字符输入不得失焦。 | 143 | — |
+| 50 | `test-input-focus-real` | 搜索与交互 | 真机按键守卫：搜索框逐字符输入不得失焦。 | 145 | — |
 | 51 | `test-intent` | 搜索与交互 | 智能化的两个内核用例：意图解析与场景排序。零依赖、不联网。 | 232 | 0.2s |
 | 52 | `test-livesync` | 服务端与运行时 | 实时通道用例：零依赖、不联网。 | 90 | 0.4s |
 | 53 | `test-llm-engine` | 服务端与运行时 | LLM 后端注册表（热拔插）自测：不联网（端到端跑本地假 OpenAI 服务）。 | 187 | 0.4s |
@@ -96,7 +96,7 @@
 | 72 | `test-right-panel` | 前端与体验 | 右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+ | 277 | 0.2s |
 | 73 | `test-robust` | 工作区治理 | 第三批 · 序 20 / 29 / 30 的守卫：跨端共享的**纯函数**不变量。 | 146 | 0.2s |
 | 74 | `test-schedule-publish` | 部署与发布 | 定时发布判据守卫：纯函数，不起定时器、不落盘。 | 54 | 0.3s |
-| 75 | `test-scripts` | 工作区治理 | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 116 | 0.3s |
+| 75 | `test-scripts` | 工作区治理 | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 143 | 0.3s |
 | 76 | `test-search` | 搜索与交互 | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 | 0.4s |
 | 77 | `test-session-merge` | 安全与鉴权 | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 | 0.2s |
 | 78 | `test-session` | 安全与鉴权 | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 176 | 0.2s |
@@ -123,4 +123,4 @@
 | 99 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
 | 100 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 310 | 0.4s |
 | 101 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 102 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 304 | 34.6s |
+| 102 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 327 | 34.6s |
