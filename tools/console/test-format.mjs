@@ -64,6 +64,12 @@ if (!existsSync(implPath)) {
   const WHITELIST = new Set([
     'src/utils/bgmScore.js',            // fmtClock：mm:ss 音乐播放进度，test-bgm 的契约
     'tools/console/ui/deploypanel.js',  // ago()：部署距今，round 取整且无 30 天上限，与 fmtRelative 不同
+    // fmtAge：备份新鲜度必须**永远**显示"多少天前"。fmtRelative 超过 30 天会降级成绝对日期，
+    // 而这里「几个月没备份」正是最该刺眼的状态，显示成日期反而看不出紧迫性。
+    'tools/console/ui/backuppanel.js',
+    // 「最近备份已是 N 小时前（阈值 M 小时）」是带阈值的诊断文案，不是纯时间格式化：
+    // 换成 fmtRelative 会丢掉阈值上下文，而这正是用户判断"该不该调阈值"的依据。
+    'tools/console/lib/ops/backup.mjs',
   ])
   const FINGERPRINTS = [
     [/new Date\([^)]*\)\.toLocaleString/g, '内联 Date.toLocaleString → 走 fmtDateTime 系列'],

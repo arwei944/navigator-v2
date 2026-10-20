@@ -62,6 +62,7 @@
     <button class="tab" data-panel="deploy">发布</button>
     <button class="tab" data-panel="plugins">插件</button>
     <button class="tab" data-panel="secrets">密钥</button>
+    <button class="tab" data-panel="backup">备份</button>
     <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
@@ -524,6 +525,53 @@
           BotKeep 的「密钥有效」与「能看到这台机器」是两件事：密钥可能属于另一个账号，
           此时列表为空、按 ID 查会 404。遇到这种情况先点「验证」——
           它会明确告诉你「该账号下没有任何工作负载」，而不是让你在鉴权失败里绕。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-backup">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="backup-summary"></div>
+          <div class="row-actions">
+            <button class="btn" id="btn-backup-run">立即备份</button>
+            <button class="btn ghost" id="btn-backup-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>线上数据库备份</h3>
+        <p class="hint">
+          线上数据只有<strong>一份</strong> <code>/data/store.db</code>，平台没有持久卷。
+          容器一旦被平台重建，数据可能直接归零 —— 而 <code>data/</code> 刻意不进部署包，
+          所以部署也救不回来。
+        </p>
+        <p class="hint">
+          这里把线上 SQLite <strong>整份下载到本机</strong>并做完整性校验，
+          包含站点、点击、健康、审计全部对象。校验不通过的备份不会落盘 ——
+          存一份回滚不了的备份比没有备份更危险。
+        </p>
+        <div class="notice" id="backup-notice" hidden></div>
+        <div id="backup-freshness"></div>
+      </div>
+
+      <div class="card">
+        <h3>备份记录</h3>
+        <p class="hint" id="backup-dir"></p>
+        <div id="backup-list"></div>
+      </div>
+
+      <div class="card">
+        <h3>这份备份救得了什么、救不了什么</h3>
+        <p class="hint">
+          <strong>能救：</strong>容器被平台重建、误删数据、误部署覆盖、数据被写坏 ——
+          把备份里的 <code>store.db</code> 传回 <code>/data/</code> 再重启即可恢复。
+        </p>
+        <p class="hint">
+          <strong>救不了：</strong>本机磁盘故障（备份和项目在同一台机器）、
+          两次备份之间的增量。要真正防住本机故障，需要把 <code>backups/db/</code>
+          同步到云盘或另一台机器。
         </p>
       </div>
     </section>

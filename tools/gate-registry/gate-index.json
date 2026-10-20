@@ -1,6 +1,6 @@
 {
-  "total": 112,
-  "registered": 112,
+  "total": 113,
+  "registered": 113,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -13,6 +13,7 @@
     "tools/console/test-api-routes-live.mjs",
     "tools/console/test-auto-add.mjs",
     "tools/console/test-auto-category.mjs",
+    "tools/console/test-backup.mjs",
     "tools/console/test-bgm.mjs",
     "tools/console/test-browser-translate.mjs",
     "tools/console/test-bundle-size.mjs",
@@ -238,6 +239,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 324
+    },
+    {
+      "file": "tools/console/test-backup.mjs",
+      "name": "test-backup",
+      "purpose": "线上数据库备份：校验强度 + 保留策略 + 部署闸门 + 真实面板渲染。",
+      "category": "数据与内容",
+      "lines": 379,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-bgm.mjs",
@@ -620,7 +633,7 @@
       "name": "test-format",
       "purpose": "格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs`",
       "category": "前端与体验",
-      "lines": 115,
+      "lines": 121,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

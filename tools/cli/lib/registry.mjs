@@ -17,6 +17,7 @@ import { commands as dataCommands } from '../commands/data.mjs'
 import { commands as opsCommands } from '../commands/ops.mjs'
 import { commands as uptimeCommands } from '../commands/uptime.mjs'
 import { commands as changelogCommands } from '../commands/changelog.mjs'
+import { commands as backupCommands } from '../commands/backup.mjs'
 
 export const GROUPS = [
   { id: 'release', label: '开发流水线', desc: '一条命令跑完：测试门禁 → 提交 → 推送 → 构建 → 产物门禁 → 打包 → 上传 → 重启 → 线上验证', commands: [...releaseCommands, ...changelogCommands] },
@@ -26,6 +27,7 @@ export const GROUPS = [
   { id: 'git', label: 'Git 工作流', desc: '状态、差异、历史、提交消息建议、暂存、提交、推送', commands: gitCommands },
   { id: 'uptime', label: '本站可用性', desc: '探我们自己部署的站点是否可访问（区别于 ops inspect：那探的是收录的 300 个站点）', commands: uptimeCommands },
   { id: 'data', label: '数据体检与环境', desc: '统计、完整性体检、改动对比、schema 门禁、环境自检', commands: dataCommands },
+  { id: 'db', label: '数据库备份', desc: '把线上 SQLite 整份拉到本机（平台无持久卷，这是唯一能兜住容器重建的退路）', commands: backupCommands },
 ]
 
 export const REGISTRY = new Map()

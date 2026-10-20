@@ -146,7 +146,8 @@ const CATEGORY_RULES = [
   ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size/i],
   [
     '数据与内容',
-    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url|visit|click|domain|flow|infer/i,
+    // backup：备份守的是数据资产本身（站点/点击/健康全在同一个库里），归这里而不是「部署与发布」
+    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url|visit|click|domain|flow|infer|backup/i,
   ],
   [
     '服务端与运行时',

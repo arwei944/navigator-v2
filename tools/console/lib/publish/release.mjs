@@ -112,6 +112,8 @@ export function planSteps(opts = {}) {
 export async function preflight(opts = {}) {
   const steps = planSteps(opts)
   const blockers = []
+  // 非阻断的提醒：用户该知道，但不该因此无法发布
+  const warnings = []
 
   let st = null
   try { st = await git.getStatus() } catch { blockers.push('无法读取 git 状态（当前不是 git 仓库？）') }
@@ -129,15 +131,45 @@ export async function preflight(opts = {}) {
   if (!c.key) blockers.push('缺少 BOTKEEP_API_KEY（在本机 .env.local 配置）')
   if (!c.workloadId) blockers.push('缺少 BOTKEEP_WORKLOAD_ID（在本机 .env.local 配置）')
 
+  // 部署前必须有新鲜备份。
+  //
+  // 为什么卡在这一步：部署会重启甚至重建容器，那是唯一能真正丢数据的动作。
+  // 而 `data/` 刻意不进部署包（保护线上库），所以部署本身救不回数据 ——
+  // 没有离线备份就部署，等于把不可逆动作押在平台「重启保留文件系统」这个未承诺行为上。
+  // 2026-10-20 的容器失联故障就是活样本。
+  //
+  // 默认不阻断（`requireBackup: false`），只在面板上给出告警；
+  // 需要硬约束时传 `requireBackup: true`。这是因为早期使用、或用户已接外部备份时，
+  // 强行阻断会让正常发布无法进行。
+  let backupFresh = null
+  try {
+    const bk = await import('../ops/backup.mjs')
+    backupFresh = bk.checkFreshness({ maxAgeHours: Number(opts.backupMaxAgeHours) || 24 })
+    if (!backupFresh.ok) {
+      const msg = `线上数据库备份不新鲜：${backupFresh.reason}`
+      if (opts.requireBackup) blockers.push(msg)
+      else warnings.push(`${msg}（建议先备份再发布）`)
+    }
+  } catch (e) {
+    // 备份模块异常不应阻断发布，但要让人看见
+    warnings.push(`无法检查备份新鲜度：${String(e?.message || e)}`)
+  }
+
   const plan = []
   plan.push(`检查工作区（${st ? `${st.branch} · ${dirty} 处改动 · 领先 ${ahead}` : '读不到状态'}）`)
+  plan.push(backupFresh
+    ? `检查数据备份（${backupFresh.ok ? '✓ ' : '⚠ '}${backupFresh.reason}）`
+    : '检查数据备份（不可用）')
   plan.push(isSkipped('test', opts) ? '测试门禁（已跳过）' : '测试门禁：console:test:all')
   plan.push(dirty > 0 ? `提交 ${dirty} 处改动` : '提交（工作区干净，跳过）')
   plan.push(isSkipped('push', opts) ? '推送（已跳过）' : `推送 ${ahead} 个领先提交`)
   plan.push(isSkipped('build', opts) ? '构建（已跳过，复用现有 dist）' : '构建前端产物')
   plan.push('产物门禁 → 打包 → 上传 → 重启容器 → 线上验证')
 
-  return { steps, blockers, plan, facts: { branch: st?.branch || '', dirty, staged, ahead } }
+  return {
+    steps, blockers, warnings, plan,
+    facts: { branch: st?.branch || '', dirty, staged, ahead, backupFresh },
+  }
 }
 
 /* ---------------- 运行期 ---------------- */

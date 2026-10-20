@@ -172,4 +172,16 @@ server.listen(port, '127.0.0.1', () => {
   console.log(`  端口策略: ${STRICT_PORT ? '严格固定（不漂移）' : '占用则顺延 +1'}`)
   console.log(`  代理环境: ${ACTIVE_PROXY || '未探测到（直连）'}`)
   console.log('  仅监听 127.0.0.1，Ctrl+C 退出\n')
+
+  // 定时备份：必须在本机跑 —— 容器内的备份会随容器一起消失
+  void (async () => {
+    try {
+      const { start } = await import('./lib/ops/backup-schedule.mjs')
+      const st = start()
+      if (st.enabled) console.log(`  [backup] 定时备份已启用，间隔 ${st.intervalHours} 小时\n`)
+      else console.log(`  [backup] ${st.lastPhase}\n`)
+    } catch (e) {
+      console.warn('  [backup] 调度器启动失败（不影响控制台）:', String(e?.message || e))
+    }
+  })()
 })

@@ -155,7 +155,8 @@
     "console:test:pipeline-trace": "node tools/console/test-pipeline-trace.mjs",
     "console:test:sites-split": "node tools/console/test-sites-split.mjs",
     "console:test:split-wiring": "node tools/console/test-split-wiring.mjs",
-    "console:test:secrets": "node tools/console/test-secrets.mjs"
+    "console:test:secrets": "node tools/console/test-secrets.mjs",
+    "console:test:backup": "node tools/console/test-backup.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

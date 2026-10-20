@@ -972,3 +972,41 @@ select.msg-input { cursor: pointer; }
 .notice.ok { border-color: var(--tint-ok); background: var(--tint-ok-soft); color: var(--ok); }
 .notice.warn { border-color: var(--tint-warn); background: var(--tint-warn-soft); color: var(--warn); }
 .notice.bad { border-color: var(--tint-err); background: var(--tint-err-soft); color: var(--err); }
+
+/* ══════════ 备份面板 ══════════ */
+/* 新鲜度是整个面板的核心结论：用色块+一句话给出「现在能不能部署」，而不是让用户自己算小时数 */
+.backup-fresh {
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.backup-fresh-ok   { border-left-color: var(--ok);   background: var(--tint-ok-soft); }
+.backup-fresh-warn { border-left-color: var(--warn); background: var(--tint-warn-soft); }
+.backup-fresh-bad  { border-left-color: var(--err);  background: var(--tint-err-soft); }
+.backup-fresh-title { font-size: 13px; font-weight: 600; }
+.backup-fresh-ok   .backup-fresh-title { color: var(--ok); }
+.backup-fresh-warn .backup-fresh-title { color: var(--warn); }
+.backup-fresh-bad  .backup-fresh-title { color: var(--err); }
+.backup-fresh-reason { font-size: 12px; color: var(--text); margin-top: 4px; }
+.backup-fresh-meta { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.backup-verdict { font-size: 12px; margin-top: 8px; color: var(--text-dim); }
+
+/* 表格用 grid 而非 <table>：列宽固定、不随内容跳动，长文件名不会把列挤变形 */
+.backup-table { margin-top: 10px; font-size: 12px; }
+.backup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px 60px 60px 56px;
+  gap: 10px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.backup-row:last-child { border-bottom: none; }
+.backup-row > span { color: var(--text-dim); }
+.backup-row .backup-name { color: var(--text); font-family: var(--mono); font-size: 11px; }
+.backup-head > span { font-size: 11px; font-weight: 600; color: var(--text-dim); }
+.backup-head { border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+/* 自动备份未启用时给个视觉提示：手动备份容易忘，这件事必须显眼 */
+.backup-sched-off { color: var(--warn); }

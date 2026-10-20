@@ -221,7 +221,7 @@ pnpm run console:service              # 改走 NSSM 真服务（需账户有密�
 
 ## 智能体 CLI（nav）
 
-控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 7 个命令域共 **49 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/` 下按职责分层的模块）。
+控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 8 个命令域共 **51 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/` 下按职责分层的模块）。
 
 ```bash
 pnpm run nav                       # 全部命令总览
@@ -251,7 +251,7 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 
 ### MCP 服务（智能体原生接入）
 
-`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 6 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），而不是把 49 条命令平铺成 49 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
+`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 6 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），而不是把 51 条命令平铺成 51 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
 
 **写操作闸门**：MCP 侧的写操作默认**只预演**，返回 `gate.preview = true` 与将要发生的变化；必须显式传 `confirm: true` 才真正执行。命令清单的唯一真相源是 `tools/cli/lib/registry.mjs`，CLI 与 MCP 都从它取，因此两边不会出现清单漂移。
 
@@ -290,6 +290,20 @@ CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异�
 **各平台密钥统一在控制台的「密钥」面板管理**（`pnpm run console` → 密钥）。该面板由 `shared/secrets-registry.mjs` 驱动：写明每把密钥的取值入口、影响范围、是否必需，并支持「验证」——主动向平台发一次只读请求确认还有效。页面上只显示后 4 位，完整值不回浏览器；输入框为密码型且不回填已有值。
 
 > 两类台账的分工：`env-registry.mjs` 是**代码契约**（代码认哪些变量），`secrets-registry.mjs` 是**运维清单**（人需要配哪些平台的密钥）。刻意不合并——合并后任一方新增都会污染另一方语义。
+
+### 数据备份：唯一能兜住平台故障的退路
+
+线上数据只有**一份** `/data/store.db`（SQLite），而平台**没有持久卷**。这意味着容器一旦被平台重建，数据可能直接归零。更关键的是 `data/` 刻意不进部署包（保护线上库），所以**部署这条路径救不回数据**。
+
+控制台的「备份」面板（`pnpm run console` → 备份）把整份 SQLite 拉到本机 `backups/db/`：
+
+- **校验后才落盘**：`PRAGMA integrity_check` + 对象数 + `sites.json` 必须在。下载中断时 HTTP 仍可能 200，不校验就会存下一份回滚不了的"备份"——那比没有备份更危险。
+- **自动调度**：控制台启动后每 6 小时检查一次（`NAV_BACKUP_INTERVAL_HOURS`，0 表示禁用），保留最近 24 份。调度器跑在**本机**而非容器内——容器里的备份会随容器一起消失。
+- **发布前检查**：`release preflight` 会报告备份新鲜度；传 `requireBackup: true` 可硬阻断。
+
+命令行等价入口：`nav db backup` / `nav db status`。
+
+> 备份**救不了**本机磁盘故障（备份与项目在同一台机器）。要防住这一层，需把 `backups/db/` 同步到云盘或另一台机器。
 
 | 变量 | 必填 | 用途 |
 |------|------|------|
