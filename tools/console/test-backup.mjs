@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { launch } from './lib/cdp-driver.mjs'
+import { makeClickUntil, makeWaitFor } from './lib/wait-for.mjs'
 import * as backup from './lib/ops/backup.mjs'
 import { ROOT } from './lib/core/env.mjs'
 
@@ -341,21 +342,22 @@ try {
   ok(up, '控制台在测试端口启动')
 
   if (up) {
-    browser = await launch({ headless: true, port: PORT + 1000, url: `http://127.0.0.1:${PORT}/` })
+    browser = await launch({ headless: true, port: 0, url: `http://127.0.0.1:${PORT}/` })
     const c = browser.client
     await c.eval(`new Promise(r => { if (document.readyState === 'complete') r(1); else addEventListener('load', () => r(1), { once: true }) })`)
     await sleep(600)
 
-    // 切到备份面板
-    const opened = await c.eval(`(() => {
-      const tab = document.querySelector('[data-panel="backup"]')
-      if (!tab) return false
-      tab.click()
-      return document.querySelector('#panel-backup')?.classList.contains('active') ?? false
-    })()`)
+    // 切到备份面板：重试到真正生效（元素存在 ≠ 事件已绑定，详见 wait-for.mjs）
+    const opened = await makeClickUntil(c)(
+      `document.querySelector('[data-panel="backup"]')?.click()`,
+      `document.querySelector('#panel-backup')?.classList.contains('active') === true`,
+    )
     ok(opened, '备份面板可打开（标签与 section id 对得上）')
 
-    await sleep(500)
+    // 面板切过去 ≠ 数据已加载：数据是异步 fetch 的，并发时慢一点就是「空壳」。
+    // 等结论区真的有内容再断言，而不是固定 sleep(500)。
+    const waitFor = makeWaitFor(c, { timeout: 15000 })
+    await waitFor(`(document.querySelector('#backup-freshness')?.textContent || '').trim().length > 10`)
 
     // 面板必须真的渲染出结论，而不是空壳
     const rendered = await c.eval(`(() => {

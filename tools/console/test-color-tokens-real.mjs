@@ -65,7 +65,7 @@ const normRgb = s => String(s).replace(/\s+/g, '').toLowerCase()
 
 let browser
 try {
-  browser = await launch({ headless: true, port: 9900 + Math.floor(Math.random() * 100), url: 'about:blank' })
+  browser = await launch({ headless: true, port: 0, url: 'about:blank' })
   const c = browser.client
   await c.goto(base, { settle: 2500 })
 

@@ -12,10 +12,11 @@
  * 运行：node tools/console/test-domain-flow.mjs
  */
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { launch } from './lib/cdp-driver.mjs'
+import { makeWaitFor, makeClickUntil } from './lib/wait-for.mjs'
 import {
   DOMAINS, STAGE_INDEX, STAGE_IDS, describePosition, bandOf,
   normalizePosition, domainCoverage,
@@ -155,9 +156,14 @@ ok(STAGE_INDEX.size === DOMAINS.reduce((a, d) => a + d.stages.length, 0),
 if (!existsSync(join(DIST, 'server.js'))) {
   failures.push('真机渲染 — 缺少 dist/server.js')
 } else {
+  // SQLite 必须进程独立：门禁并发执行，多个服务共写 dist/data/store.db
+  // 会让彼此的数据互相污染（实测并发时流水线渲染出 0 条链、断言全「实得 0」）。
+  const STORE_DIR = join(process.cwd(), `.tmp-gate-domain-store-${process.pid}`)
+  rmSync(STORE_DIR, { recursive: true, force: true })
+  mkdirSync(STORE_DIR, { recursive: true })
   const server = spawn(process.execPath, ['server.js'], {
     cwd: DIST,
-    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1' },
+    env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_CRON: '0', NAV_STORE_DIR: STORE_DIR },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const ready = await new Promise((resolve) => {
@@ -173,13 +179,22 @@ if (!existsSync(join(DIST, 'server.js'))) {
     ok(ready, '服务已启动')
 
     if (ready) {
-      browser = await launch({ headless: true, port: 9850 + Math.floor(Math.random() * 60), url: `http://127.0.0.1:${PORT}/` })
+      browser = await launch({ headless: true, port: 0, url: `http://127.0.0.1:${PORT}/` })
       const c = browser.client
       await c.sleep(1800)
 
       /* 路由直达 */
-      await c.eval(`window.history.pushState({}, '', '/domain'); window.dispatchEvent(new PopStateEvent('popstate'))`)
-      await c.sleep(1500)
+      // 用 goto 而不是 pushState：首屏还没渲染完时（并发下常见）
+      // pushState 改了 URL 但 Vue 路由不会重新解析 —— 实测 app 内容长度为 0，
+      // 页面停在空白，断言全「实得 0」。goto 是真正的导航，必然触发路由。
+      await c.goto(`http://127.0.0.1:${PORT}/domain`, { settle: 600 })
+
+      // 固定 sleep 在并发下不可靠：多个 Chrome 同时启动时首屏要好几秒，
+      // 实测 1500ms 不够 —— 断言全「实得 0」，看起来像渲染 bug，其实是没等够。
+      // 轮询等到领域视图真正出现再断言。
+      const waitFor = makeWaitFor(c)
+      ok(await waitFor(`document.querySelectorAll('.df-pipeline').length > 0`),
+        '领域视图已渲染（并发下需要等，不能固定 sleep）')
 
       const title = await c.eval(`document.querySelector('.df-title')?.textContent || ''`)
       ok(/领域流水线/.test(title), '页面标题渲染', String(title))
@@ -206,11 +221,12 @@ if (!existsSync(join(DIST, 'server.js'))) {
       ok(Number(chips) > 0, '站点 chip 渲染出来', `实得 ${chips}`)
 
       /* ② 切到矩阵 */
-      await c.eval(`(() => {
-        const b = [...document.querySelectorAll('.df-vbtn')].find(x => x.textContent.trim() === '热力矩阵')
-        if (b) b.click(); return Boolean(b)
-      })()`)
-      await c.sleep(700)
+      // 点击重试到生效：元素存在 ≠ 事件已绑定（详见 wait-for.mjs）
+      const clickUntil = makeClickUntil(c)
+      await clickUntil(
+        `[...document.querySelectorAll('.df-vbtn')].find(x => x.textContent.trim() === '热力矩阵')?.click()`,
+        `document.querySelectorAll('.df-mx-tile').length > 0`,
+      )
       /*
        * 格子总数 = 各领域环节数之和（8+8+6+6=28）。
        *
@@ -227,11 +243,10 @@ if (!existsSync(join(DIST, 'server.js'))) {
         `每个领域独立一张矩阵表（${DOMAINS.length} 张）`, `实得 ${blocks}`)
 
       /* ③ 切到清单 */
-      await c.eval(`(() => {
-        const b = [...document.querySelectorAll('.df-vbtn')].find(x => x.textContent.trim() === '清单')
-        if (b) b.click(); return Boolean(b)
-      })()`)
-      await c.sleep(700)
+      await clickUntil(
+        `[...document.querySelectorAll('.df-vbtn')].find(x => x.textContent.trim() === '清单')?.click()`,
+        `document.querySelectorAll('.df-list-row').length > 0`,
+      )
       const rows = await c.eval(`document.querySelectorAll('.df-list-row').length`)
       ok(Number(rows) > 200, '清单视图列出全部站点', `实得 ${rows}`)
 

@@ -18,7 +18,9 @@
  */
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
+import { rmSync, mkdirSync } from 'node:fs'
 import { launch } from './lib/cdp-driver.mjs'
+import { makeWaitFor } from './lib/wait-for.mjs'
 
 const PORT = 5311
 
@@ -34,9 +36,15 @@ const ok = (cond, label, extra = '') => { if (cond) pass++; else failures.push(`
  * 顺便也验证了「发布产物本身可用」—— 比只测源码更能说明问题。
  */
 const DIST = join(process.cwd(), 'dist')
+// SQLite 必须进程独立：门禁是 4 路并发的，多个服务共写 dist/data/store.db
+// 会让彼此的数据互相污染（实测并发时页面渲染为空、断言全「实得 0」）。
+// 与 test-clicks-reset / test-mirror 同一口径。
+const STORE_DIR = join(process.cwd(), `.tmp-gate-visit-store-${process.pid}`)
+rmSync(STORE_DIR, { recursive: true, force: true })
+mkdirSync(STORE_DIR, { recursive: true })
 const server = spawn(process.execPath, ['server.js'], {
   cwd: DIST,
-  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1' },
+  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_CRON: '0', NAV_STORE_DIR: STORE_DIR },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 
@@ -58,11 +66,14 @@ try {
   if (ready) {
     browser = await launch({
       headless: true,
-      port: 9810 + Math.floor(Math.random() * 80),
+      port: 0,
       url: `http://127.0.0.1:${PORT}/`,
     })
     const c = browser.client
-    await c.sleep(1500)
+    const waitFor = makeWaitFor(c)
+    // 等**应用真正挂载**，而不是 readyState（about:blank 阶段它已是 complete，
+    // 此时 eval 会撞上上下文销毁）
+    await waitFor(`!!document.querySelector('[data-site-id]')`)
 
     /* 等首屏卡片出现，取第一个站点 id */
     const siteId = await c.eval(`(async () => {
@@ -96,7 +107,26 @@ try {
         if (link) link.click()
         return true
       })()`)
-      await c.sleep(1500)
+      // 点击会真的跳转到外站（`<a href>`），执行上下文随之销毁 ——
+      // 所以必须**先导航回本站**再读 localStorage，不能原地轮询。
+      // 原来用 sleep(1500) 恰好躲过了这段，但那是靠运气：并发下跳转的时机
+      // 会漂移，太快就撞上「Execution context was destroyed」。
+      //
+      // 顺序很关键：先给跳转一点时间完成（此时不能 eval），再显式回本站。
+      await new Promise(r => setTimeout(r, 800))
+      await c.goto(`http://127.0.0.1:${PORT}/`, { settle: 600 })
+      await waitFor(`!!document.querySelector('[data-site-id]')`)
+
+      // 等计数真的写进去（点击 → 记录是异步的）
+      await waitFor(`(() => {
+        try {
+          const raw = localStorage.getItem('history')
+          if (!raw) return false
+          const d = JSON.parse(raw)
+          const p = d && d.data ? d.data : d
+          return Object.keys(p || {}).length > 0
+        } catch { return false }
+      })()`, { timeout: 8000 })
 
       const after = await c.eval(readVisits)
       const shape = after?.[siteId]

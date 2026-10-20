@@ -16,6 +16,7 @@ import { spawn } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { launch } from './lib/cdp-driver.mjs'
+import { makeWaitFor, makeClickUntil } from './lib/wait-for.mjs'
 import { SECRETS, groupedSecrets, findSecret, inspectShape, maskSecret, PLATFORM_LABELS } from '../../shared/secrets-registry.mjs'
 import * as secrets from './lib/core/secrets.mjs'
 
@@ -132,7 +133,7 @@ try {
     const realKey = keyMatch ? keyMatch[1].trim() : ''
     ok(!realKey || !apiBody.includes(realKey), 'HTTP 响应体不含完整密钥')
 
-    browser = await launch({ headless: true, port: PORT + 1000, url: `http://127.0.0.1:${PORT}/` })
+    browser = await launch({ headless: true, port: 0, url: `http://127.0.0.1:${PORT}/` })
     const c = {
       eval: async (expr) => {
         const r = await browser.client.send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true })
@@ -141,12 +142,27 @@ try {
       },
       sleep: (ms) => new Promise(r => setTimeout(r, ms)),
     }
-    await c.sleep(1500)
+    // 固定 sleep 在并发下不可靠：门禁是 4 路并发的，多个 Chrome 同时启动时
+    // 首屏可能要好几秒。实测 1500ms 不够，`Runtime.evaluate` 会在页面还没就绪时
+    // 抛 `Uncaught`，而这里没有 try/catch，整个脚本直接崩掉。
+    // 改成轮询等条件成立 —— 快的时候立刻过，慢的时候也不会误判。
+    const waitFor = makeWaitFor(c, { timeout: 15000 })
 
-    await c.eval(`document.querySelector('.tab[data-panel="secrets"]').click(); true`)
-    await c.sleep(1200)
+    ok(await waitFor(`!!document.querySelector('.tab[data-panel="secrets"]')`),
+      '控制台首屏已就绪（并发下需要等，不能固定 sleep）')
+
+    // 点击必须**重试到生效为止**（元素存在 ≠ 事件已绑定，详见 wait-for.mjs）
+    const clickUntil = makeClickUntil(c)
+    ok(await clickUntil(
+      `document.querySelector('.tab[data-panel="secrets"]')?.click()`,
+      `document.querySelector('#panel-secrets')?.classList.contains('active') === true`,
+    ), '密钥面板点击生效（元素存在 ≠ 事件已绑定，必须重试到真正切过去）')
 
     ok(await c.eval(`document.querySelector('#panel-secrets').classList.contains('active')`), '密钥面板可打开')
+
+    // 面板切过去 ≠ 数据已加载：面板的数据是异步 fetch 的，
+    // 并发时接口慢一点就会出现「面板 active 但 0 行」。等行数到位再断言。
+    await waitFor(`document.querySelectorAll('.secret-row').length > 0`, { timeout: 15000 })
 
     const rowCount = await c.eval(`document.querySelectorAll('.secret-row').length`)
     ok(rowCount === SECRETS.length, '面板渲染出全部登记项', `${rowCount}/${SECRETS.length}`)

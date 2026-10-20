@@ -44,6 +44,41 @@ node tools/gate-registry/cli.mjs check
 
 - [GATE-INDEX.md](./GATE-INDEX.md) —— 自动生成的清单（分类汇总 + 逐条明细）
 
+## 写「真机门禁」的约定（并发下才稳）
+
+门禁是 **4 路并发**执行的，同时可能有 6~7 个 Chrome 在启动。真机门禁里
+**任何固定 `sleep` 都是在赌加载速度**，并发下必然偶发失败，而且失败形态
+极易被误判成「功能坏了」：
+
+| 症状 | 真实原因 |
+|---|---|
+| 断言全「实得 0」 | 页面还没渲染完，sleep 不够 |
+| `Runtime.evaluate` 抛 `Uncaught` | 页面未就绪，表达式里的元素不存在 |
+| 元素存在但点击无效 | 事件尚未绑定（静态 HTML 早就渲染了） |
+| 面板已 active 但 0 行 | 数据是异步 fetch 的，还没回来 |
+| `Execution context was destroyed` | ① `readyState==='complete'` 在 about:blank 就成立；② 点击外链后页面真的跳走了 |
+| 路由跳了但内容还是 0 | 用 `pushState` 只改了 URL，Vue Router 没重新解析 |
+
+统一用 `tools/console/lib/wait-for.mjs`：
+
+- `makeWaitFor(client)` —— 轮询到条件成立（内部吞掉未就绪异常）
+- `makeClickUntil(client)` —— **反复点击直到产生效果**，而不是「点一次 + 等」
+
+另外几条硬约定：
+
+1. **CDP 端口传 `0`**（系统分配）。不要写 `9800 + Math.random()*100` ——
+   各门禁的随机区间互相重叠，撞端口时浏览器起不来，表现为「偶发失败」。
+2. **SQLite 用 `NAV_STORE_DIR` 指向进程独立目录**（带 `process.pid`）。
+   共用 `dist/data/store.db` 会让并发门禁互相污染数据。
+   启动 `dist/server.js` 的门禁还应带 `NAV_CRON: '0'`，否则每个实例都跑 300 站探活。
+3. **路由跳转用 `c.goto(url)`，不要 `pushState` + `PopStateEvent`**。
+   后者只改 URL，Vue Router 不会重新解析；首屏未渲染完时页面停在空白。
+4. **就绪判据要落在应用 DOM 上**，不要用 `document.readyState === 'complete'`
+   —— 它在 `about:blank` 阶段就成立，紧接着的 eval 会撞上下文销毁。
+5. **点击外链后必须先 `goto` 回本站**再读 `localStorage`：跳转会让执行上下文销毁。
+
+以上五条都由 `test-gate-concurrency.mjs` 静态检查（14 条断言）。
+
 ## 相关文档
 
 - [工作区文档管理工具](../doc-manager/README.md) —— 管文档资产

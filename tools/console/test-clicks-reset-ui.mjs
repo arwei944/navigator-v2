@@ -21,6 +21,7 @@ import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { launch } from './lib/cdp-driver.mjs'
+import { makeWaitFor } from './lib/wait-for.mjs'
 
 const PORT = 5323
 const ROOT = process.cwd()
@@ -52,7 +53,7 @@ if (!hadRealHash) await writeFile(HASH_PATH, hashPassword(TEST_PASSWORD), 'utf8'
 
 const server = spawn(process.execPath, ['server.js'], {
   cwd: DIST,
-  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_STORE_DIR: storeDir },
+  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_CRON: '0', NAV_STORE_DIR: storeDir },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 
@@ -78,9 +79,14 @@ try {
     }).then(r => r.json()).catch(() => null)
     ok(seeded?.total === 10, '准备了 10 次点击数据', `total=${seeded?.total}`)
 
-    browser = await launch({ headless: true, port: 9830 + Math.floor(Math.random() * 60), url: `${base}/` })
+    browser = await launch({ headless: true, port: 0, url: `${base}/` })
     const c = browser.client
-    await c.sleep(1500)
+    // 等**应用真正挂载**，而不是 readyState。
+    // `document.readyState === 'complete'` 太弱：about:blank 阶段它就已经是
+    // complete，此时 `fetch('/api/auth')` 会因上下文切换而抛
+    // 「Execution context was destroyed」。判据要落在应用自己的 DOM 上。
+    const waitFor = makeWaitFor(c)
+    await waitFor(`location.pathname === '/' && !!document.querySelector('#app, .app-layout, [data-site-id]')`)
 
     /* 真实登录：走 POST /api/auth 换 token，写进 localStorage 的会话槽位 */
     const login = await c.eval(`(async () => {
@@ -98,8 +104,11 @@ try {
     ok(login?.ok, '后台登录成功（口令换会话 token）', JSON.stringify(login))
 
     /* 打开后台洞察页 */
-    await c.eval(`window.history.pushState({}, '', '/admin'); window.dispatchEvent(new PopStateEvent('popstate'))`)
-    await c.sleep(2000)
+    // 用 goto 而不是 pushState：首屏未渲染完时 pushState 只改 URL，
+    // Vue 路由不会重新解析（详见 test-domain-flow 里同一条注释）。
+    await c.goto(`${base}/admin`, { settle: 600 })
+    // 等按钮真的出现（后台页是懒加载的，2 秒在并发下不够）
+    await waitFor(`[...document.querySelectorAll('button')].some(x => /清空统计|清空中/.test(x.textContent || ''))`)
 
     const btn = await c.eval(`(() => {
       const b = [...document.querySelectorAll('button')].find(x => /清空统计|清空中/.test(x.textContent || ''))

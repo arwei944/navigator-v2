@@ -39,7 +39,7 @@ if (!existsSync(join(DIST, 'server.js'))) {
 const storeDir = await mkdtemp(join(tmpdir(), 'nav-clicks-'))
 const server = spawn(process.execPath, ['server.js'], {
   cwd: DIST,
-  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_STORE_DIR: storeDir },
+  env: { ...process.env, PORT: String(PORT), HOST: '127.0.0.1', NAV_CRON: '0', NAV_STORE_DIR: storeDir },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 

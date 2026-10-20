@@ -69,7 +69,7 @@ const base = `http://127.0.0.1:${port}/`
 
 let browser
 try {
-  browser = await launch({ headless: true, port: 9800 + Math.floor(Math.random() * 100), url: 'about:blank' })
+  browser = await launch({ headless: true, port: 0, url: 'about:blank' })
   const c = browser.client
   await c.goto(base, { settle: 2500 })
 
