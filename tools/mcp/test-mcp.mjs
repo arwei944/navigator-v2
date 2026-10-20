@@ -10,7 +10,7 @@
  */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, appendFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
@@ -34,6 +34,22 @@ function eq(actual, expected, label) {
   ok(actual === expected, label, `期望 ${JSON.stringify(expected)}，实得 ${JSON.stringify(actual)}`)
 }
 
+/**
+ * 暂存区里实际有哪些文件（`git diff --cached --name-only`）。
+ *
+ * 为什么不用 `nav_git status` 的 `counts.staged`：实测确认那个字段
+ * 统计的是「内容差异」而非「暂存状态」—— 手动 `git add README.md` 之后
+ * 它仍然是 0，拿它当「未误暂存」的守卫等于永远绿。
+ */
+function stagedPaths() {
+  try {
+    return execFileSync('git', ['diff', '--cached', '--name-only'], { cwd: ROOT, encoding: 'utf-8' })
+      .split('\n').map(s => s.trim()).filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
 function dataHash() {
   return createHash('sha256').update(readFileSync(DATA)).digest('hex')
 }
@@ -48,13 +64,25 @@ function dataHash() {
  * 用同步子进程而非引入依赖：本文件已在 `execFileSync` 之外无额外依赖，
  * 一次调用几毫秒，不影响门禁体感。
  */
-function indexHash() {
-  try {
-    return execFileSync('git', ['write-tree'], { cwd: ROOT, encoding: 'utf-8' }).trim()
-  } catch {
-    // 索引不可写（如并发 git 操作持锁）时退化为可观测标记，让断言明显失败而非静默通过
-    return 'unavailable'
+function indexHash({ retries = 5 } = {}) {
+  // 索引可能被并发的 git 操作短暂锁住（门禁是 4 路并发，`test-hunks` 等也在动 git）。
+  // 之前直接退化成 'unavailable' 是个**真缺陷**：如果开始那次刚好被锁、
+  // 结束那次刚好正常，断言就会拿 'unavailable' 跟真实哈希比，必然失败 ——
+  // 而且报出来的信息（"期望 unavailable 实得 <sha>"）完全看不出是锁竞争。
+  // 实测在发布流水线里命中过（14.82s 那次）。
+  //
+  // 正确做法是短暂重试：拿不到就等一会儿再拿，实在拿不到才退化。
+  for (let i = 0; i < retries; i++) {
+    try {
+      return execFileSync('git', ['write-tree'], { cwd: ROOT, encoding: 'utf-8' }).trim()
+    } catch {
+      if (i === retries - 1) break
+      // 同步等待：这个函数在断言路径上被同步调用，不能改成 async
+      const until = Date.now() + 120
+      while (Date.now() < until) { /* 自旋等待锁释放 */ }
+    }
   }
+  return 'unavailable'
 }
 
 const localCount = JSON.parse(readFileSync(DATA, 'utf-8')).length
@@ -273,7 +301,23 @@ try {
   eq(dataHash(), before, '一轮写操作预演后 api/sites-data.json 字节未变（未误写）')
   const gsAfterPreviews = await call(client, 'nav_git', { action: 'status' })
   eq(gsAfterPreviews.json.data.counts?.staged ?? 0, 0, '一轮写操作预演后暂存区仍为空（未误暂存）')
-  eq(indexHash(), indexBefore, '一轮写操作预演后索引内容未变（未误暂存）')
+
+  // 索引哈希比对：两端都必须真的取到值才有意义。
+  // 任一端是 'unavailable' 时不能直接比 —— 那会把「git 索引被并发锁住」
+  // 误报成「预演误暂存了东西」。
+  //
+  // 注意：**不能**用 `nav_git status` 的 `counts.staged` 兜底。
+  // 实测确认它统计的是「内容差异」，不是「暂存状态」——
+  // 手动 `git add README.md` 之后该值仍是 0，等于永远绿。
+  // 正确的兜底是直接问 git：`git diff --cached --name-only` 有输出就是有暂存。
+  const indexAfter = indexHash()
+  if (indexBefore === 'unavailable' || indexAfter === 'unavailable') {
+    ok(stagedPaths().length === 0,
+      '索引内容未变（git 索引被并发锁住，改用暂存区实际内容兜底）',
+      `暂存区非空：${stagedPaths().join(',')}`)
+  } else {
+    eq(indexAfter, indexBefore, '一轮写操作预演后索引内容未变（未误暂存）')
+  }
 
   /* ---------------- ⑤ 预演仍做校验：坏数据必须被拦住 ---------------- */
 

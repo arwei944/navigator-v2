@@ -1492,7 +1492,7 @@
       "name": "test-mcp",
       "purpose": "nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。",
       "category": "服务端与运行时",
-      "lines": 338,
+      "lines": 382,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
