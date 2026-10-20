@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **113** 道门禁，其中已接入 `console:test:all` 的 **113** 道。
+> 共 **114** 道门禁，其中已接入 `console:test:all` 的 **114** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -15,7 +15,7 @@
 | 工作区治理 | 8 | `test-hunks` | 4.5s |
 | 部署与发布 | 9 | `test-endpoints-run` | 2.8s |
 | 服务端与运行时 | 23 | `test-mcp` | 34.6s |
-| 数据与内容 | 28 | `test-trust` | 0.8s |
+| 数据与内容 | 29 | `test-trust` | 0.8s |
 | 前端与体验 | 31 | `test-frontend` | 3.9s |
 
 ## 清单
@@ -87,51 +87,52 @@
 | 63 | `test-meta-fast` | 数据与内容 | `/api/metadata` 的**快路径**用例：抓取早断、预算收紧、默认不翻译、同域缓存。 | 406 | 0.2s |
 | 64 | `test-meta-fetch` | 数据与内容 | 站点元信息抓取的**响应容错**用例：零依赖、不联网（打桩 globalThis.fetch）。 | 230 | 0.2s |
 | 65 | `test-meta-upgrade` | 数据与内容 | 「秒加之后的真实补全」（`src/services/metaUpgrade.js`）用例：零依赖、不联网。 | 246 | 0.2s |
-| 66 | `test-mobile` | 前端与体验 | 移动端触摸目标守卫（F4）：零依赖、静态检查。 | 85 | 0.2s |
-| 67 | `test-netguard` | 安全与鉴权 | 第三批 · 序 17 的守卫：SSRF 防线的**连接层**部分。 | 282 | 0.3s |
-| 68 | `test-notes` | 前端与体验 | 便利贴 / 站点备注的同步内核用例：零依赖、不联网、不起浏览器。 | 189 | 0.2s |
-| 69 | `test-offline-queue` | 服务端与运行时 | 离线编辑队列用例（F8）：零依赖、不联网、不碰 DOM（localStorage 用内存桩）。 | 130 | 0.2s |
-| 70 | `test-ops` | 服务端与运行时 | 发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。 | 1026 | 0.8s |
-| 71 | `test-pipeline-trace` | 前端与体验 | 管线日志总线（`src/utils/pipelineTrace.js`）用例：零依赖、不联网、不碰 UI。 | 164 | 0.3s |
-| 72 | `test-plugin-registry` | 工作区治理 | 插件目录（统一注册表视图）自测：不联网。 | 208 | 0.3s |
-| 73 | `test-preview-translate` | 搜索与交互 | N1：搜索框网址预览卡片显示**译文**（`src/services/translateFields.js` + `useOmniBox` 的并卡逻辑）。 | 170 | 0.2s |
-| 74 | `test-probe-engine` | 服务端与运行时 | 探针注册表（热拔插）自测：不联网（除最后两条端到端跑本地回环）。 | 150 | 0.4s |
-| 75 | `test-publisher` | 部署与发布 | 发布通道注册表（热拔插）自测：不联网、不部署。 | 184 | 0.2s |
-| 76 | `test-purposes` | 前端与体验 | shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。 | 363 | 0.3s |
-| 77 | `test-release-please` | 部署与发布 | 版本号与发布配置门禁（生产记录的可验证部分）。 | 96 | 0.4s |
-| 78 | `test-release` | 部署与发布 | 开发流水线自测：纯函数为主，不联网、不起子进程。 | 175 | 1.8s |
-| 79 | `test-right-panel` | 前端与体验 | 右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+ | 277 | 0.2s |
-| 80 | `test-robust` | 工作区治理 | 第三批 · 序 20 / 29 / 30 的守卫：跨端共享的**纯函数**不变量。 | 146 | 0.2s |
-| 81 | `test-schedule-publish` | 部署与发布 | 定时发布判据守卫：纯函数，不起定时器、不落盘。 | 54 | 0.3s |
-| 82 | `test-scripts` | 工作区治理 | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 143 | 0.3s |
-| 83 | `test-search` | 搜索与交互 | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 | 0.4s |
-| 84 | `test-secrets` | 安全与鉴权 | 密钥管理：登记表契约 + 形态体检 + **不泄露** + 真实面板渲染。 | 205 | — |
-| 85 | `test-server-routes` | 服务端与运行时 | 服务端路由门禁：`api/` 目录 ↔ 构建产物 ↔ 路由表 三者同源 | 98 | — |
-| 86 | `test-session-merge` | 安全与鉴权 | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 | 0.2s |
-| 87 | `test-session` | 安全与鉴权 | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 176 | 0.2s |
-| 88 | `test-share-target` | 前端与体验 | 分享目标门禁（G4 / L0-2）。 | 59 | 0.2s |
-| 89 | `test-side-width` | 前端与体验 | 侧栏宽度取值范围：clampSideWidth。 | 60 | 0.2s |
-| 90 | `test-site-aliases` | 数据与内容 | 站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。 | 134 | 0.4s |
-| 91 | `test-site-dedupe` | 数据与内容 | 站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。 | 159 | 0.2s |
-| 92 | `test-site-refresh` | 数据与内容 | 「重新获取信息」用例：零依赖、不联网（抓取 / 翻译 / 写回都是注入的）。 | 166 | 0.3s |
-| 93 | `test-site-store` | 数据与内容 | 站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。 | 278 | 0.3s |
-| 94 | `test-sites-cas` | 数据与内容 | 第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。 | 289 | 0.2s |
-| 95 | `test-sites-split` | 数据与内容 | sites store 拆分后的纯函数守卫：覆盖层净化 / 回收站三道闸 / 云端错误分类。 | 245 | — |
-| 96 | `test-split-wiring` | 前端与体验 | 大文件拆分后的「接线」守卫。 | 244 | — |
-| 97 | `test-storage-guard` | 前端与体验 | 存储安全门禁（localStorage 写入必须走 safeStorage） | 72 | 0.2s |
-| 98 | `test-store` | 服务端与运行时 | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 | 0.3s |
-| 99 | `test-sw-refresh` | 前端与体验 | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 | 0.2s |
-| 100 | `test-theme-boot` | 前端与体验 | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 | 3.2s |
-| 101 | `test-theme` | 前端与体验 | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 | 0.2s |
-| 102 | `test-translate-engine` | 数据与内容 | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 | 0.2s |
-| 103 | `test-trust` | 数据与内容 | nav-console 来源校验用例（零依赖）。 | 112 | 0.8s |
-| 104 | `test-undo` | 前端与体验 | E4b 守卫：撤销栈内核。 | 192 | 0.2s |
-| 105 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
-| 106 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
-| 107 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
-| 108 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 109 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 163 | — |
-| 110 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
-| 111 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
-| 112 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 113 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 338 | 34.6s |
+| 66 | `test-mirror` | 数据与内容 | 门禁：云端 → 本地实时镜像同步（含「本地离线期间补齐」这条核心能力）。 | 295 | — |
+| 67 | `test-mobile` | 前端与体验 | 移动端触摸目标守卫（F4）：零依赖、静态检查。 | 85 | 0.2s |
+| 68 | `test-netguard` | 安全与鉴权 | 第三批 · 序 17 的守卫：SSRF 防线的**连接层**部分。 | 282 | 0.3s |
+| 69 | `test-notes` | 前端与体验 | 便利贴 / 站点备注的同步内核用例：零依赖、不联网、不起浏览器。 | 189 | 0.2s |
+| 70 | `test-offline-queue` | 服务端与运行时 | 离线编辑队列用例（F8）：零依赖、不联网、不碰 DOM（localStorage 用内存桩）。 | 130 | 0.2s |
+| 71 | `test-ops` | 服务端与运行时 | 发布 / 管理内核用例：站点数据、发布流水线、发布历史、通知、审计。 | 1026 | 0.8s |
+| 72 | `test-pipeline-trace` | 前端与体验 | 管线日志总线（`src/utils/pipelineTrace.js`）用例：零依赖、不联网、不碰 UI。 | 164 | 0.3s |
+| 73 | `test-plugin-registry` | 工作区治理 | 插件目录（统一注册表视图）自测：不联网。 | 208 | 0.3s |
+| 74 | `test-preview-translate` | 搜索与交互 | N1：搜索框网址预览卡片显示**译文**（`src/services/translateFields.js` + `useOmniBox` 的并卡逻辑）。 | 170 | 0.2s |
+| 75 | `test-probe-engine` | 服务端与运行时 | 探针注册表（热拔插）自测：不联网（除最后两条端到端跑本地回环）。 | 150 | 0.4s |
+| 76 | `test-publisher` | 部署与发布 | 发布通道注册表（热拔插）自测：不联网、不部署。 | 184 | 0.2s |
+| 77 | `test-purposes` | 前端与体验 | shared/purposes.mjs 与 shared/translate.mjs 用例：内联 fixture，不联网、零依赖。 | 363 | 0.3s |
+| 78 | `test-release-please` | 部署与发布 | 版本号与发布配置门禁（生产记录的可验证部分）。 | 96 | 0.4s |
+| 79 | `test-release` | 部署与发布 | 开发流水线自测：纯函数为主，不联网、不起子进程。 | 175 | 1.8s |
+| 80 | `test-right-panel` | 前端与体验 | 右边栏设置面板用例：显示模式状态机（shared/right-panel.mjs）+ | 277 | 0.2s |
+| 81 | `test-robust` | 工作区治理 | 第三批 · 序 20 / 29 / 30 的守卫：跨端共享的**纯函数**不变量。 | 146 | 0.2s |
+| 82 | `test-schedule-publish` | 部署与发布 | 定时发布判据守卫：纯函数，不起定时器、不落盘。 | 54 | 0.3s |
+| 83 | `test-scripts` | 工作区治理 | 仓库脚本台账门禁（`scripts/` 的生命周期管理）。 | 143 | 0.3s |
+| 84 | `test-search` | 搜索与交互 | 检索内核用例（F2）：别名扩充（域名主体）/ 命中位置×频次排序 / 搜索历史。 | 103 | 0.4s |
+| 85 | `test-secrets` | 安全与鉴权 | 密钥管理：登记表契约 + 形态体检 + **不泄露** + 真实面板渲染。 | 205 | — |
+| 86 | `test-server-routes` | 服务端与运行时 | 服务端路由门禁：`api/` 目录 ↔ 构建产物 ↔ 路由表 三者同源 | 98 | — |
+| 87 | `test-session-merge` | 安全与鉴权 | 会话冲突口径一致性用例（F8）：零依赖、不联网、不碰 DOM。 | 134 | 0.2s |
+| 88 | `test-session` | 安全与鉴权 | 第三批 · 序 18/19 的守卫：会话凭据的传递方式与体量门禁。 | 176 | 0.2s |
+| 89 | `test-share-target` | 前端与体验 | 分享目标门禁（G4 / L0-2）。 | 59 | 0.2s |
+| 90 | `test-side-width` | 前端与体验 | 侧栏宽度取值范围：clampSideWidth。 | 60 | 0.2s |
+| 91 | `test-site-aliases` | 数据与内容 | 站点别名数据守卫（F2①）：零依赖（只读本地 JSON，不联网）。 | 134 | 0.4s |
+| 92 | `test-site-dedupe` | 数据与内容 | 站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。 | 159 | 0.2s |
+| 93 | `test-site-refresh` | 数据与内容 | 「重新获取信息」用例：零依赖、不联网（抓取 / 翻译 / 写回都是注入的）。 | 166 | 0.3s |
+| 94 | `test-site-store` | 数据与内容 | 站点存储 provider 自测：不联网（kv 用内存替身，fs 用临时目录）。 | 278 | 0.3s |
+| 95 | `test-sites-cas` | 数据与内容 | 第三批 · 序 20 / 22 的守卫：站点数据的**写入安全**。 | 289 | 0.2s |
+| 96 | `test-sites-split` | 数据与内容 | sites store 拆分后的纯函数守卫：覆盖层净化 / 回收站三道闸 / 云端错误分类。 | 245 | — |
+| 97 | `test-split-wiring` | 前端与体验 | 大文件拆分后的「接线」守卫。 | 244 | — |
+| 98 | `test-storage-guard` | 前端与体验 | 存储安全门禁（localStorage 写入必须走 safeStorage） | 72 | 0.2s |
+| 99 | `test-store` | 服务端与运行时 | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 | 0.3s |
+| 100 | `test-sw-refresh` | 前端与体验 | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 | 0.2s |
+| 101 | `test-theme-boot` | 前端与体验 | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 | 3.2s |
+| 102 | `test-theme` | 前端与体验 | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 | 0.2s |
+| 103 | `test-translate-engine` | 数据与内容 | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 | 0.2s |
+| 104 | `test-trust` | 数据与内容 | nav-console 来源校验用例（零依赖）。 | 112 | 0.8s |
+| 105 | `test-undo` | 前端与体验 | E4b 守卫：撤销栈内核。 | 192 | 0.2s |
+| 106 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
+| 107 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
+| 108 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
+| 109 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
+| 110 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 163 | — |
+| 111 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
+| 112 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
+| 113 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
+| 114 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 338 | 34.6s |

@@ -221,7 +221,7 @@ pnpm run console:service              # 改走 NSSM 真服务（需账户有密�
 
 ## 智能体 CLI（nav）
 
-控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 8 个命令域共 **51 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/` 下按职责分层的模块）。
+控制台是给人看的（浏览器 + SSE），`tools/cli` 是给**智能体与脚本**用的命令行入口，覆盖 9 个命令域共 **54 条命令**，业务逻辑与控制台同源（复用 `tools/console/lib/` 下按职责分层的模块）。
 
 ```bash
 pnpm run nav                       # 全部命令总览
@@ -251,7 +251,7 @@ pnpm run nav git hunks api/sites.js # 列出 hunk 边界，再用 git stage-hunk
 
 ### MCP 服务（智能体原生接入）
 
-`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 6 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），而不是把 51 条命令平铺成 51 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
+`tools/mcp/server.mjs` 用官方 `@modelcontextprotocol/sdk` 以 stdio 暴露同一套能力，但**刻意收敛成 6 个域级工具**（`nav_status` / `nav_sites` / `nav_publish` / `nav_ops` / `nav_git` / `nav_data`），而不是把 54 条命令平铺成 54 个工具 —— 工具数膨胀会显著拉低智能体的选择准确率。
 
 **写操作闸门**：MCP 侧的写操作默认**只预演**，返回 `gate.preview = true` 与将要发生的变化；必须显式传 `confirm: true` 才真正执行。命令清单的唯一真相源是 `tools/cli/lib/registry.mjs`，CLI 与 MCP 都从它取，因此两边不会出现清单漂移。
 
@@ -326,7 +326,7 @@ CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异�
 
 ```
 nav-v2/
-├── api/                   # 16 个接口，全部导出 (req, res) handler —— 见下方说明
+├── api/                   # 17 个接口，全部导出 (req, res) handler —— 见下方说明
 │   ├── sites.js           # 站点数据 GET/POST（存储适配层，POST 走 header 鉴权）+ 快照清单 / 回滚
 │   ├── session.js         # 用户会话数据读写（session/<key>，密钥隔离）
 │   ├── metadata.js        # URL 元信息抓取代理（shared/site-infer.mjs，返回名称/描述/分类/配色/图标）
@@ -400,7 +400,7 @@ nav-v2/
 
 ### 关于 `api/`（不要当成迁移残留删掉）
 
-`api/` 下 16 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，但它们**没有一个
+`api/` 下 17 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，但它们**没有一个
 依赖 Vercel 平台** —— 只用 Node 内置模块与 `shared/` 下的纯函数，没有任何 `@vercel/*`。
 
 所以 `api/` 不是「迁到 BotKeep 后待清理的旧代码」，而是**默认发布通道实际在用的实现源**：

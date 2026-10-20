@@ -1,6 +1,6 @@
 {
-  "total": 113,
-  "registered": 113,
+  "total": 114,
+  "registered": 114,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -68,6 +68,7 @@
     "tools/console/test-meta-fast.mjs",
     "tools/console/test-meta-fetch.mjs",
     "tools/console/test-meta-upgrade.mjs",
+    "tools/console/test-mirror.mjs",
     "tools/console/test-mobile.mjs",
     "tools/console/test-netguard.mjs",
     "tools/console/test-notes.mjs",
@@ -905,6 +906,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 187
+    },
+    {
+      "file": "tools/console/test-mirror.mjs",
+      "name": "test-mirror",
+      "purpose": "门禁：云端 → 本地实时镜像同步（含「本地离线期间补齐」这条核心能力）。",
+      "category": "数据与内容",
+      "lines": 295,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-mobile.mjs",

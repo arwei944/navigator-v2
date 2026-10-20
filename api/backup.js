@@ -196,10 +196,70 @@ async function pruneBackups() {
   } catch { /* 清理失败不影响恢复本身 */ }
 }
 
+/**
+ * 对象级读取 —— 本地镜像同步用（`GET /api/backup?object=<pathname>`）。
+ *
+ * ## 为什么复用 backup 而不是新开一个端点
+ *
+ * 鉴权口径完全一致（都是运维面、都要 `checkAuthHeader`），
+ * 而新开端点要在路由派生、期望清单、门禁三处各登记一次。
+ * 这里只加一个 query 分支，语义也说得通：它就是「把云端某个对象完整拿出来」。
+ *
+ * ## 与 `meta=1` 的区别
+ *
+ * `meta=1` 是**备份摘要**（站点数、体积），不含对象清单；
+ * `objects=1` 才是真正的对象清单（pathname / etag / size / uploadedAt），
+ * 本地镜像靠它做全量对齐 —— 两者不能混用，否则镜像会拿到一堆没有 pathname 的字段。
+ */
+async function exportObject(req, res, pathname) {
+  const auth = checkAuthHeader(req)
+  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  try {
+    const blob = await get(pathname, { access: 'private', useCache: false })
+    if (!blob || !blob.stream) {
+      res.status(404).json({ ok: false, error: '对象不存在' })
+      return
+    }
+    const body = await new Response(blob.stream).text()
+    res.status(200).json({
+      ok: true,
+      pathname,
+      etag: (blob.blob && blob.blob.etag) || blob.etag || null,
+      size: blob.size ?? Buffer.byteLength(body),
+      uploadedAt: blob.uploadedAt || null,
+      body,
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) })
+  }
+}
+
+/** 对象清单 —— 全量对齐用（`GET /api/backup?objects=1`） */
+async function exportObjects(req, res) {
+  const auth = checkAuthHeader(req)
+  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  try {
+    const { blobs } = await list({ prefix: '', limit: 1000 })
+    res.status(200).json({
+      ok: true,
+      objects: (blobs || []).map(b => ({
+        pathname: b.pathname,
+        etag: b.etag || null,
+        size: b.size ?? null,
+        uploadedAt: b.uploadedAt || null,
+      })),
+    })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) })
+  }
+}
+
 export default async function handler(req, res) {
   noStore(res)
   if (req.method === 'GET') {
     const query = (req.query && typeof req.query === 'object') ? req.query : {}
+    if (query.object !== undefined) return exportObject(req, res, String(query.object))
+    if (query.objects !== undefined) return exportObjects(req, res)
     if (query.meta === '1') return exportMeta(req, res)
     return exportBackup(req, res)
   }

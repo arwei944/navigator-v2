@@ -184,4 +184,19 @@ server.listen(port, '127.0.0.1', () => {
       console.warn('  [backup] 调度器启动失败（不影响控制台）:', String(e?.message || e))
     }
   })()
+
+  // 镜像同步：把云端变化实时拉到本地。
+  // 本机离线期间的补齐**不依赖这个调度器是否在跑** —— 云端自己记了变更日志，
+  // 控制台重新启动时会从上次的游标继续追，所以这里只是「及时性」的优化。
+  void (async () => {
+    try {
+      const { start } = await import('./lib/ops/mirror-schedule.mjs')
+      const sec = Number(process.env.NAV_MIRROR_INTERVAL_SEC)
+      const st = start({ intervalSec: Number.isFinite(sec) ? sec : undefined })
+      if (st.enabled) console.log(`  [mirror] 镜像同步已启用，间隔 ${st.intervalSec} 秒\n`)
+      else console.log(`  [mirror] ${st.lastPhase}\n`)
+    } catch (e) {
+      console.warn('  [mirror] 调度器启动失败（不影响控制台）:', String(e?.message || e))
+    }
+  })()
 })

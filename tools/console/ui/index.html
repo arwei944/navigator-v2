@@ -63,6 +63,7 @@
     <button class="tab" data-panel="plugins">插件</button>
     <button class="tab" data-panel="secrets">密钥</button>
     <button class="tab" data-panel="backup">备份</button>
+    <button class="tab" data-panel="mirror">镜像同步</button>
     <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
@@ -572,6 +573,58 @@
           <strong>救不了：</strong>本机磁盘故障（备份和项目在同一台机器）、
           两次备份之间的增量。要真正防住本机故障，需要把 <code>backups/db/</code>
           同步到云盘或另一台机器。
+        </p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-mirror">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="mirror-summary"></div>
+          <div class="row-actions">
+            <button class="btn" id="btn-mirror-sync">立即同步</button>
+            <button class="btn ghost" id="btn-mirror-full">全量对齐</button>
+            <button class="btn ghost" id="btn-mirror-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>云端 → 本地 实时镜像</h3>
+        <p class="hint">
+          本机关机、休眠、控制台没启动的时候，云端照样在变。
+          如果只是「定时拉全量比对」，那段窗口里的变化就<strong>永久丢失</strong>了 ——
+          所以这里的做法是<strong>云端自己记账</strong>：每次写入都在同一个事务里记一条变更，
+          本机回来时按游标追赶。<strong>离线多久都不影响，一条都不会少。</strong>
+        </p>
+        <p class="hint">
+          镜像是<strong>只读副本</strong>，绝不回写云端 —— 写入请走发布链路
+          （那边有 CAS 与结构校验）。把镜像当成可回写的副本，它就会变成第二个真相源。
+        </p>
+        <div class="notice" id="mirror-notice" hidden></div>
+        <div id="mirror-status"></div>
+      </div>
+
+      <div class="card">
+        <h3>本地对象</h3>
+        <p class="hint" id="mirror-dir"></p>
+        <div id="mirror-objects"></div>
+      </div>
+
+      <div class="card">
+        <h3>三种失败，处理方式不同</h3>
+        <p class="hint">
+          <strong>网络/平台故障：</strong>本次同步失败，<strong>游标不推进</strong>。
+          下次从同一位置重试，幂等，不会漏数据。
+        </p>
+        <p class="hint">
+          <strong>游标被裁剪：</strong>日志有保留上限，本地落后太多时中间那段永远补不回来。
+          这时会自动降级为<strong>全量对齐</strong>，并在上方明确标注发生过。
+          最坏的失败是回一个空结果让你以为「没有变化」—— 这里不会那样。
+        </p>
+        <p class="hint">
+          <strong>单对象拉取失败：</strong>同样不推进游标。推进了就会永久跳过那个对象，
+          而且是静默的。
         </p>
       </div>
     </section>

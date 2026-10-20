@@ -13,6 +13,7 @@ import { initDeployPanel, refresh as refreshDeploy } from './deploypanel.js'
 import { initPluginPanel, refresh as refreshPlugins } from './pluginpanel.js'
 import { initSecretsPanel, refresh as refreshSecrets } from './secretspanel.js'
 import { refresh as refreshBackup } from './backuppanel.js'
+import { refresh as refreshMirror } from './mirrorpanel.js'
 import { initPipelinePanel, refresh as refreshRelease } from './pipelinepanel.js'
 
 /* ---------- 标签切换 ---------- */
@@ -23,6 +24,7 @@ $('#tabs').addEventListener('click', e => {
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${btn.dataset.panel}`))
   if (btn.dataset.panel === 'sites') refreshSites()
   if (btn.dataset.panel === 'backup') refreshBackup()
+  if (btn.dataset.panel === 'mirror') refreshMirror()
   if (btn.dataset.panel === 'changes' || btn.dataset.panel === 'commit') refresh()
   if (btn.dataset.panel === 'sync') refreshSync()
   if (btn.dataset.panel === 'history') refreshHistory()

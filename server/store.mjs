@@ -60,6 +60,50 @@ db.exec(`
   )
 `)
 
+/* ---------------- 变更日志（离线追赶的基础） ----------------
+ *
+ * ## 为什么必须在云端记账
+ *
+ * 「本地离线时云端的变化也要能同步回来」这件事，靠本机轮询是做不到的：
+ * 本机关机的那段时间没有任何人在观察，错过的变化就永久丢失。
+ * 唯一可行的做法是**云端自己把每次变化记下来**，本机回来时按游标追赶。
+ *
+ * 所以日志必须和对象写入在**同一个事务**里落盘 —— 否则会出现
+ * 「对象写成功但日志没记」，本地永远追不到这次变化，而且是静默的。
+ *
+ * ## 为什么不存 body
+ *
+ * 只存 `pathname / etag / size`，本地按 etag 判断要不要拉内容。
+ * 存整份 body 会让日志体积和主数据同量级（sites.json 118 KB × 每次改动），
+ * 而绝大多数变化本地只是需要知道「这个对象变了」。
+ */
+db.exec(`
+  CREATE TABLE IF NOT EXISTS changes (
+    seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+    pathname   TEXT NOT NULL,
+    op         TEXT NOT NULL,
+    etag       TEXT,
+    size       INTEGER,
+    at         TEXT NOT NULL
+  )
+`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_changes_at ON changes (at)')
+
+/** 日志保留上限。按每对象元数据约 120 字节算，50000 条 ≈ 6 MB，可接受 */
+export const CHANGES_KEEP = 50000
+
+const stmtChangeInsert = db.prepare(
+  'INSERT INTO changes (pathname, op, etag, size, at) VALUES (?, ?, ?, ?, ?)'
+)
+const stmtChangesSince = db.prepare(
+  'SELECT seq, pathname, op, etag, size, at FROM changes WHERE seq > ? ORDER BY seq ASC LIMIT ?'
+)
+const stmtChangeHead = db.prepare('SELECT COALESCE(MAX(seq), 0) AS head FROM changes')
+const stmtChangeOldest = db.prepare('SELECT COALESCE(MIN(seq), 0) AS oldest FROM changes')
+const stmtChangePrune = db.prepare(
+  'DELETE FROM changes WHERE seq <= (SELECT seq FROM changes ORDER BY seq DESC LIMIT 1 OFFSET ?)'
+)
+
 const stmtGet = db.prepare('SELECT etag, content_type, body, size, uploaded_at FROM objects WHERE pathname = ?')
 const stmtInsert = db.prepare(
   'INSERT INTO objects (pathname, etag, content_type, body, size, uploaded_at) VALUES (?, ?, ?, ?, ?, ?)'
@@ -117,6 +161,8 @@ export async function put(pathname, body, opts = {}) {
     const etag = randomUUID()
     if (cur) stmtUpdate.run(etag, contentType, text, size, uploadedAt, key)
     else stmtInsert.run(key, etag, contentType, text, size, uploadedAt)
+    // 与对象写入同事务：漏记会让本地永久追不到这次变化，且是静默的
+    stmtChangeInsert.run(key, cur ? 'put' : 'create', etag, size, uploadedAt)
     db.exec('COMMIT')
     return { pathname: key, etag, size, uploadedAt, contentType }
   } catch (e) {
@@ -136,15 +182,88 @@ export async function list({ prefix = '', limit = 1000 } = {}) {
 
 export async function del(pathnames) {
   const arr = Array.isArray(pathnames) ? pathnames : [pathnames]
+  const at = nowIso()
   db.exec('BEGIN IMMEDIATE')
   try {
-    for (const p of arr) stmtDel.run(String(p))
+    for (const p of arr) {
+      const key = String(p)
+      // 只有真的删掉了才记日志：不存在的对象不该产生一条「删除」事件，
+      // 否则本地会收到一堆无意义的墓碑
+      const cur = stmtGet.get(key)
+      if (!cur) continue
+      stmtDel.run(key)
+      stmtChangeInsert.run(key, 'del', null, null, at)
+    }
     db.exec('COMMIT')
   } catch (e) {
     try { db.exec('ROLLBACK') } catch { /* 同上 */ }
     throw e
   }
   return {}
+}
+
+/* ---------------- 变更日志读取 ---------------- */
+
+/**
+ * 按游标读取变更。`since = 0` 表示「从头开始」（首次同步）。
+ *
+ * 返回 `{ head, oldest, items, hasMore, truncated }`：
+ * - `head`：当前最新序号，调用方存下来当游标
+ * - `oldest`：日志里还留着的最早序号。**`since < oldest - 1` 说明游标已被裁剪**，
+ *   中间那一段永远补不回来了 —— 必须显式告诉调用方，让它改走全量对齐，
+ *   而不是让它以为「没有变化」。
+ * - `truncated`：调用方传的 since 比 oldest 还老，本次返回的是不完整区间。
+ */
+export function readChanges({ since = 0, limit = 500 } = {}) {
+  const head = Number(stmtChangeHead.get()?.head || 0)
+  const oldest = Number(stmtChangeOldest.get()?.oldest || 0)
+  const from = Math.max(0, Number(since) || 0)
+  const rows = stmtChangesSince.all(from, Math.max(1, Math.min(Number(limit) || 500, 2000)))
+  return {
+    head,
+    oldest,
+    items: rows.map(r => ({
+      seq: r.seq,
+      pathname: r.pathname,
+      op: r.op,
+      etag: r.etag,
+      size: r.size,
+      at: r.at,
+    })),
+    hasMore: rows.length > 0 && rows[rows.length - 1].seq < head,
+    // 缺口判据：since 之后的第一条现存记录，seq 必须正好是 since+1；
+    // 也就是「现存最早记录」不能比 since+1 更晚。
+    //
+    // 写成 `oldest > since + 1` 而不是 `since < oldest - 1` 只是可读性选择 ——
+    // 两者在整数域上完全等价（枚举验证过）。真正要防的是把边界写成
+    // `oldest > since`（那样 since 紧邻 oldest 时会误报缺口），
+    // 或写成 `since <= oldest`（那样会漏报一格）。
+    truncated: oldest > 0 && oldest > from + 1,
+  }
+}
+
+/** 裁剪日志到最近 `keep` 条。返回删除条数。 */
+export function pruneChanges(keep = CHANGES_KEEP) {
+  const n = Math.max(1, Number(keep) || CHANGES_KEEP)
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    stmtChangePrune.run(n)
+    db.exec('COMMIT')
+  } catch (e) {
+    try { db.exec('ROLLBACK') } catch { /* 同上 */ }
+    throw e
+  }
+  const oldest = Number(stmtChangeOldest.get()?.oldest || 0)
+  const head = Number(stmtChangeHead.get()?.head || 0)
+  return { kept: head - oldest + (oldest > 0 ? 1 : 0), oldest, head }
+}
+
+/** 供状态展示：日志规模与覆盖区间 */
+export function changesInfo() {
+  const head = Number(stmtChangeHead.get()?.head || 0)
+  const oldest = Number(stmtChangeOldest.get()?.oldest || 0)
+  const row = db.prepare('SELECT COUNT(*) AS n FROM changes').get()
+  return { head, oldest, count: Number(row?.n || 0), keep: CHANGES_KEEP }
 }
 
 /** 供 HTTP 层做条件请求（If-None-Match → 304）：只读 etag，不搬 body */
@@ -170,7 +289,14 @@ function seedIfNeeded() {
     const sites = JSON.parse(readFileSync(seedPath, 'utf-8'))
     if (!Array.isArray(sites) || sites.length === 0) return
     const body = JSON.stringify({ version: 1, sites, updatedAt: nowIso() })
-    stmtInsert.run('sites.json', randomUUID(), 'application/json', body, Buffer.byteLength(body), nowIso())
+    // etag 要记真实值：本地靠它判断「内容有没有变」，记 null 会让它每次都重拉
+    const etag = randomUUID()
+    const at = nowIso()
+    stmtInsert.run('sites.json', etag, 'application/json', body, Buffer.byteLength(body), at)
+    // 迁移也是一次「对象出现」，必须记日志。
+    // 漏了这条，本地镜像会看到「对象在、日志里没有」—— 它永远不知道要拉这份数据，
+    // 而且没有任何报错能提示它。这正是实测中抓到的那次静默漏记。
+    stmtChangeInsert.run('sites.json', 'create', etag, Buffer.byteLength(body), at)
     console.log(`[store] 首启迁移：已从 api/sites-data.json 导入 ${sites.length} 条站点（sites.json @ version 1）`)
   } catch (e) {
     // 迁移失败不阻断启动：api/sites.js 对「没有数据」有自己的种子路径

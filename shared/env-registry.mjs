@@ -89,6 +89,7 @@ export const ENV_VARS = [
   { name: 'NAV_DEPLOY_SRC', scope: 'deploy', desc: '部署源目录（默认 dist）' },
   { name: 'NAV_PUBLISHER', scope: 'deploy', desc: '发布通道选择：botkeep（默认）/ workbuddy / vercel / rsync-static' },
   { name: 'NAV_BACKUP_INTERVAL_HOURS', scope: 'deploy', desc: '本机控制台的自动备份间隔（小时）；0 表示禁用（已接外部备份时用）' },
+  { name: 'NAV_MIRROR_INTERVAL_SEC', scope: 'deploy', desc: '本机控制台的云端→本地镜像同步间隔（秒），默认 60；0 表示禁用（只保留手动同步）' },
   { name: 'NAV_VERIFY_INTERVAL_MS', scope: 'deploy', desc: '线上验证轮询间隔，默认 1500 ms' },
 
   // ── 引擎链 ─────────────────────────────────────────────────────────

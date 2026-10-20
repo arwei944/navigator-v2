@@ -80,6 +80,30 @@ export function fmtRelative(ts, { fallback, now = Date.now() } = {}) {
   return fallback ? fallback(ts) : new Date(ts).toLocaleDateString('zh-CN')
 }
 
+/**
+ * 秒级相对时间 —— 给「分钟粒度看不出差别」的场景用。
+ *
+ * 为什么不能直接用 `fmtRelative`：它最小粒度是分钟，`< 1 分钟` 一律显示「刚刚」。
+ * 对镜像同步这类**按分钟级周期跑**的东西，这个粒度会让「刚同步过 3 秒」
+ * 和「已经 58 秒没同步」看起来完全一样 —— 而后者可能意味着调度器卡住了。
+ *
+ * 30 天以上仍降级为绝对日期：那时候「多少天前」已经没有决策价值。
+ */
+export function fmtRelativeSec(ts, { fallback, now = Date.now() } = {}) {
+  if (!ts) return '从未'
+  const diff = now - new Date(ts).getTime()
+  if (!Number.isFinite(diff)) return '—'
+  const sec = Math.floor(diff / 1000)
+  if (sec < 60) return `${Math.max(0, sec)} 秒前`
+  const minutes = Math.floor(sec / 60)
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `${days} 天前`
+  return fallback ? fallback(ts) : new Date(ts).toLocaleDateString('zh-CN')
+}
+
 /** 字节：`B` / `KB` / `MB`（各保留一位小数）。 */
 export function fmtBytes(n) {
   const b = Number(n) || 0

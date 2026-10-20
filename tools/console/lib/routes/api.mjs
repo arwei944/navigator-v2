@@ -26,11 +26,12 @@ import { handleHealthGet, handleHealthPost } from './api-health.mjs'
 import { handleOpsGet, handleOpsPost } from './api-ops.mjs'
 import { handleSecretsGet, handleSecretsPost } from './api-secrets.mjs'
 import { handleBackupGet, handleBackupPost } from './api-backup.mjs'
+import { handleMirrorGet, handleMirrorPost } from './api-mirror.mjs'
 
 export { sendJson, isTrusted }
 
-const GET_HANDLERS = [handleGitGet, handleSitesGet, handleHealthGet, handleOpsGet, handleSecretsGet, handleBackupGet, handleSystemGet]
-const POST_HANDLERS = [handleGitPost, handleSitesPost, handleHealthPost, handleOpsPost, handleSecretsPost, handleBackupPost, handleSystemPost]
+const GET_HANDLERS = [handleGitGet, handleSitesGet, handleHealthGet, handleOpsGet, handleSecretsGet, handleBackupGet, handleMirrorGet, handleSystemGet]
+const POST_HANDLERS = [handleGitPost, handleSitesPost, handleHealthPost, handleOpsPost, handleSecretsPost, handleBackupPost, handleMirrorPost, handleSystemPost]
 
 export async function handleApi(req, res, path, url) {
   const method = req.method
