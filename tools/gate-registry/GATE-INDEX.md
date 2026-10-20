@@ -35,7 +35,7 @@
 | 11 | `test-backup` | 数据与内容 | 线上数据库备份：校验强度 + 保留策略 + 部署闸门 + 真实面板渲染。 | 446 | — |
 | 12 | `test-bgm` | 前端与体验 | 背景音乐的音符生成：noteFreq / chordAt / notesForBar / barSeconds / clampVolume / fmtClock。 | 109 | 0.2s |
 | 13 | `test-browser-translate` | 数据与内容 | 浏览器本地翻译（L2，`src/services/browserTranslate.js`）用例：零依赖、不联网。 | 267 | 0.6s |
-| 14 | `test-bundle-size` | 前端与体验 | 产物体积门禁（NAV-v8 · 任务 4pnj9g） | 118 | 0.3s |
+| 14 | `test-bundle-size` | 前端与体验 | 产物体积门禁（NAV-v8 · 任务 4pnj9g） | 141 | 0.3s |
 | 15 | `test-bundle` | 前端与体验 | 第三批 · 序 23 的守卫：首屏分包**产物**断言（不是源码断言）。 | 262 | 0.7s |
 | 16 | `test-category-consistency` | 数据与内容 | 归类一致性体检用例（F5①）：零依赖、不联网。 | 76 | 0.4s |
 | 17 | `test-category-source` | 数据与内容 | 分类表来源注册表（热拔插）自测：不联网。 | 155 | 0.2s |

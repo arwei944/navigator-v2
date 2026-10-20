@@ -283,7 +283,7 @@
       "name": "test-bundle-size",
       "purpose": "产物体积门禁（NAV-v8 · 任务 4pnj9g）",
       "category": "前端与体验",
-      "lines": 118,
+      "lines": 141,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

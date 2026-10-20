@@ -76,6 +76,22 @@ export default defineConfig({
         //     秒加链路（autoAdd / meta / site-infer）、首页视图……
         // favicon.svg / pwa-*.png **不写在这里** —— includeAssets 与 manifest.icons
         // 会各注入一次，glob 再匹配一遍就是重复条目（实测曾因此各重复 1 条）。
+        /**
+         * **必须显式设为 null**（2026-10-21 真实故障）。
+         *
+         * 插件默认值是 `navigateFallback: 'index.html'`（见 vite-plugin-pwa/dist/index.js:907），
+         * 它会注入两条互斥的东西：
+         *   ① `additionalManifestEntries` 把 index.html 塞进预缓存清单；
+         *   ② `createHandlerBoundToURL("index.html")` 建一条导航兜底路由。
+         * 而下方 `globIgnores` 里那条排除 html 的规则会把 ① 过滤掉，② 却照旧生成 ——
+         * 于是 SW 启动时抛 `non-precached-url :: [{"url":"index.html"}]`，
+         * **整段注册逻辑中断**，后面那条 nav-html NetworkFirst 根本没注册上。
+         * 症状是 PWA 离线能力静默失效（不白屏，所以很难发现）。
+         *
+         * 本项目的导航请求由下方 nav-html 的 NetworkFirst 全权接管，
+         * 本来就不需要插件的兜底路由，关掉它才是唯一自洽的状态。
+         */
+        navigateFallback: null,
         globPatterns: ['**/*.{js,css}'],
         globIgnores: [
           // sw.js / workbox-*.js 由 workbox 自行管理，绝不进预缓存清单

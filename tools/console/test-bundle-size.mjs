@@ -97,6 +97,29 @@ ok(swMissing.length === 0,
   '预缓存清单里的文件都真实存在（清单挂 404 会让 SW 安装失败）',
   `缺 ${swMissing.join(' ')}`)
 
+/*
+ * ③ SW 自身的路由自洽性（2026-10-21 真实故障）。
+ *
+ * `createHandlerBoundToURL(url)` 要求 url **在预缓存清单里**，否则 SW 启动时抛
+ * `non-precached-url`，整段注册逻辑中断 —— 后面所有 registerRoute 都不会执行。
+ * 症状是 PWA 离线能力静默失效：不白屏、不报错给用户，只有控制台一条 Uncaught。
+ *
+ * 本项目实测踩过：vite-plugin-pwa 默认 `navigateFallback: 'index.html'` 会注入这条路由，
+ * 而 `globIgnores` 里的 html 排除规则又把 index.html 从清单里过滤掉了。
+ * 两条规则各自看都合理，叠在一起就是崩溃。
+ */
+const boundUrls = [...swCode.matchAll(/createHandlerBoundToURL\(\s*["']([^"']+)["']\s*\)/g)].map(m => m[1])
+const boundMissing = boundUrls.filter(u => !swUrls.includes(u) && !swUrls.includes(u.replace(/^\//, '')))
+ok(boundMissing.length === 0,
+  'createHandlerBoundToURL 引用的 URL 都在预缓存清单里（否则 SW 注册中断）',
+  `缺 ${boundMissing.join(' ')} —— 加进 globIgnores 或把 navigateFallback 设为 null`)
+
+// 导航请求必须有承接：要么插件的 navigateFallback 路由，要么自己的 navigate 规则
+const hasNavRoute = swCode.includes('navigate') || swCode.includes('NavigationRoute')
+ok(hasNavRoute,
+  'SW 有导航请求的承接路由（否则离线打不开任何页面）',
+  '既无 navigateFallback 也无 navigate 规则')
+
 /* ---------------- 台账（让人一眼看到离 M2 目标还有多远） ---------------- */
 
 console.log('\n应用外壳体积台账（磁盘字节 / gzip）：')
