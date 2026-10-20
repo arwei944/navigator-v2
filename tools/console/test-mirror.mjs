@@ -21,7 +21,7 @@
  * 云端 HTTP 层不参与：门禁要能在无网络环境下跑。
  * 网络失败的语义用「指向不可达端口」验证，不依赖真实外网。
  */
-import { rmSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
+import { rmSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = process.cwd()
@@ -186,6 +186,8 @@ try {
       }
       if (url.pathname === '/api/backup') {
         const obj = url.searchParams.get('object')
+        // 防御：全量对齐会先问 `?objects=1`，那条请求没有 object 参数
+        if (obj === null) { res.end(JSON.stringify({ ok: true, objects: [] })); return }
         if (obj === 'p3.json') { res.statusCode = 500; res.end(JSON.stringify({ ok: false, error: '模拟失败' })); return }
         res.end(JSON.stringify({ ok: true, pathname: obj, etag: obj.replace('.json', '-e'), size: 2, body: '{}' }))
         return
@@ -197,7 +199,14 @@ try {
     const port = stub.address().port
     process.env.NAV_SITE_URL = `http://127.0.0.1:${port}`
 
+    // 必须先让本地「非空」：本地为空时会走全量对齐（见上面的边界用例），
+    // 那就碰不到「逐条拉取中途失败」这条路径了。
+    // 放一个占位对象，把游标置 0，模拟「已有基线、正在追增量」。
     rmSync(mirror.MIRROR_DIR, { recursive: true, force: true })
+    mkdirSync(join(mirror.MIRROR_DIR, 'objects'), { recursive: true })
+    writeFileSync(join(mirror.MIRROR_DIR, 'objects', 'placeholder.json'), JSON.stringify({ etag: 'P' }))
+    writeFileSync(join(mirror.MIRROR_DIR, '_state.json'), JSON.stringify({ cursor: 0 }))
+
     const curBefore = mirror.status().cursor
     const partial = await mirror.syncOnce()
     const curAfter = mirror.status().cursor
@@ -277,6 +286,55 @@ try {
     ok('降级后确实拉到了对象',
       mirror.status().objects > 0,
       `实际 ${mirror.status().objects}`)
+
+    // 第二种情况：日志**非空**但只有一条（head=1），云端却有多个存量对象。
+    // 这是真实踩到的第二次：只追那一条，sites.json 全缺，照样报 ok:true。
+    // 判据必须是「本地有没有对象」，不是「日志空不空」。
+    stub.close()
+    await new Promise(r => setTimeout(r, 80))
+
+    const stub2 = http.createServer((req, res) => {
+      const url = new URL(req.url, 'http://127.0.0.1')
+      res.setHeader('Content-Type', 'application/json')
+      if (url.pathname === '/api/changes') {
+        const since = Number(url.searchParams.get('since') || 0)
+        // 日志里只有一条新记录（head=1），但云端有 3 个对象
+        const items = since < 1
+          ? [{ seq: 1, pathname: 'only-one.json', op: 'create', etag: 'E1', size: 2, at: '2026-01-01T00:00:00Z' }]
+          : []
+        res.end(JSON.stringify({ ok: true, head: 1, oldest: 1, truncated: false, hasMore: false, items }))
+        return
+      }
+      if (url.pathname === '/api/backup') {
+        if (url.searchParams.get('objects') !== null) {
+          res.end(JSON.stringify({ ok: true, objects: [
+            { pathname: 'only-one.json', etag: 'E1', size: 2, uploadedAt: '2026-01-01T00:00:00Z' },
+            { pathname: 'legacy-a.json', etag: 'LA', size: 2, uploadedAt: '2026-01-01T00:00:00Z' },
+            { pathname: 'legacy-b.json', etag: 'LB', size: 2, uploadedAt: '2026-01-01T00:00:00Z' },
+          ] }))
+          return
+        }
+        const obj = url.searchParams.get('object')
+        if (obj === null) { res.end(JSON.stringify({ ok: true, objects: [] })); return }
+        res.end(JSON.stringify({ ok: true, pathname: obj, etag: 'X', size: 2, body: '{}' }))
+        return
+      }
+      res.statusCode = 404; res.end('{}')
+    })
+    await new Promise(r => stub2.listen(0, '127.0.0.1', r))
+    process.env.NAV_SITE_URL = `http://127.0.0.1:${stub2.address().port}`
+
+    rmSync(mirror.MIRROR_DIR, { recursive: true, force: true })
+    const second = await mirror.syncOnce()
+    ok('日志非空但本地为空时，仍必须全量对齐（否则存量对象永远缺）',
+      second.fullResync === true,
+      JSON.stringify(second).slice(0, 100))
+    ok('存量对象全部拉到（不只是日志里那一条）',
+      mirror.status().objects >= 3,
+      `实际 ${mirror.status().objects}`)
+
+    stub2.close()
+    await new Promise(r => setTimeout(r, 80))
 
     stub.close()
     await new Promise(r => setTimeout(r, 100))

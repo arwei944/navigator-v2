@@ -912,7 +912,7 @@
       "name": "test-mirror",
       "purpose": "门禁：云端 → 本地实时镜像同步（含「本地离线期间补齐」这条核心能力）。",
       "category": "数据与内容",
-      "lines": 350,
+      "lines": 408,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
