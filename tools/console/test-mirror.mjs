@@ -25,7 +25,9 @@ import { rmSync, mkdirSync, existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOT = process.cwd()
-const TMP_DB = join(ROOT, '.tmp-gate-mirror-db')
+// 临时目录必须**进程唯一**：门禁是并行执行的（4 路），共用固定路径时
+// 两个实例会互相 rmSync 对方的库 —— 实测三轮并发里两轮直接 EPERM 崩掉。
+const TMP_DB = join(ROOT, `.tmp-gate-mirror-db-${process.pid}`)
 
 let pass = 0
 let fail = 0
@@ -45,6 +47,8 @@ function section(title) {
 rmSync(TMP_DB, { recursive: true, force: true })
 mkdirSync(TMP_DB, { recursive: true })
 process.env.NAV_STORE_DIR = TMP_DB
+// 镜像目录同样进程唯一：并发时共用 backups/mirror 会互相删除
+process.env.NAV_MIRROR_DIR = join(ROOT, `.tmp-gate-mirror-out-${process.pid}`)
 process.env.NAV_SITE_URL = 'http://127.0.0.1:3000'
 // 密钥给一个值即可：本门禁不打真实云端，只测存储层与本地镜像逻辑
 process.env.SITES_ADMIN_KEY = 'gate-test-key'
@@ -227,6 +231,57 @@ try {
   if (existsSync(statePath)) {
     const raw = readFileSync(statePath, 'utf-8')
     ok('状态文件不含密钥明文', !raw.includes(process.env.SITES_ADMIN_KEY))
+  }
+
+  /* ---------------- 6b. 首次同步不能静默空跑 ---------------- */
+
+  section('首次同步边界')
+
+  // 踩过的真实缺陷：云端在「变更日志上线前」就有数据，head=0 且 items 为空。
+  // 流程会「成功」返回 applied=0，调用方看到 ok:true 以为同步完成，实际本地一个对象都没有。
+  // 线上第一次跑就命中了（云端 8 个对象、head=0、镜像为空却报成功）。
+  {
+    const http = await import('node:http')
+    const stub = http.createServer((req, res) => {
+      const url = new URL(req.url, 'http://127.0.0.1')
+      res.setHeader('Content-Type', 'application/json')
+      if (url.pathname === '/api/changes') {
+        // 空日志：这是关键 —— head=0、items=[]
+        res.end(JSON.stringify({ ok: true, head: 0, oldest: 0, truncated: false, hasMore: false, items: [] }))
+        return
+      }
+      if (url.pathname === '/api/backup') {
+        if (url.searchParams.get('objects') !== null) {
+          // 但云端确实有对象
+          res.end(JSON.stringify({ ok: true, objects: [
+            { pathname: 'legacy.json', etag: 'L1', size: 2, uploadedAt: '2026-01-01T00:00:00Z' },
+          ] }))
+          return
+        }
+        const obj = url.searchParams.get('object')
+        res.end(JSON.stringify({ ok: true, pathname: obj, etag: 'L1', size: 2, body: '{}' }))
+        return
+      }
+      res.statusCode = 404; res.end('{}')
+    })
+    await new Promise(r => stub.listen(0, '127.0.0.1', r))
+    const port = stub.address().port
+    process.env.NAV_SITE_URL = `http://127.0.0.1:${port}`
+
+    rmSync(mirror.MIRROR_DIR, { recursive: true, force: true })
+    const first = await mirror.syncOnce()
+
+    ok('日志为空但云端有数据时，必须降级全量对齐（不能报「成功 0 变化」）',
+      first.fullResync === true,
+      JSON.stringify(first).slice(0, 100))
+    ok('降级后确实拉到了对象',
+      mirror.status().objects > 0,
+      `实际 ${mirror.status().objects}`)
+
+    stub.close()
+    await new Promise(r => setTimeout(r, 100))
+    process.env.NAV_SITE_URL = 'http://127.0.0.1:3000'
+    rmSync(mirror.MIRROR_DIR, { recursive: true, force: true })
   }
 
   /* ---------------- 7. 镜像只读语义 ---------------- */

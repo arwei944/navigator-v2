@@ -31,8 +31,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, readdirSync
 import { join, dirname } from 'node:path'
 import { ROOT, loadEnv, getAdminKey } from '../core/env.mjs'
 
-/** 镜像根目录（gitignore 内，本机磁盘） */
-export const MIRROR_DIR = join(ROOT, 'backups', 'mirror')
+/** 镜像根目录（gitignore 内，本机磁盘）。
+ *  可用 `NAV_MIRROR_DIR` 覆盖 —— 门禁并行执行时需要各自的目录，
+ *  否则两个实例会互相 rmSync 对方的镜像（实测 EPERM 崩掉）；
+ *  生产上也受益：可以把镜像放到别的磁盘。 */
+export const MIRROR_DIR = process.env.NAV_MIRROR_DIR || join(ROOT, 'backups', 'mirror')
 
 /** 游标与状态文件 */
 const STATE_FILE = '_state.json'
@@ -239,6 +242,20 @@ export async function syncOnce({ force = false, maxPages = MAX_PAGES } = {}) {
       }
       const data = r.json
 
+      // 关键边界：日志为空，但本地镜像也是空的 —— 这通常是**首次同步**，
+      // 或者云端是在「变更日志上线之前」就有数据的。
+      //
+      // 这种情况下 `items` 是空的，流程会「成功」返回 applied=0，
+      // 调用方看到 ok:true 会以为同步完成，实际本地一个对象都没有。
+      // 这是最坏的一种静默失败（实测在线上第一次跑就命中了：
+      // 云端 9 个对象、head=0，同步报成功、镜像为空）。
+      //
+      // 所以：日志为空且本地为空时，直接降级为全量对齐。
+      if (pages === 0 && (data.items || []).length === 0 && data.head === 0 && !hasLocalObjects()) {
+        sawTruncated = true
+        break
+      }
+
       // 游标落后于日志保留区间：中间那段补不回来了，必须降级为全量对齐
       if (data.truncated) {
         sawTruncated = true
@@ -342,9 +359,20 @@ export async function fullAlign() {
     }
   }
 
+  // 游标推进到当前 head。日志为空时 head=0 —— 这是**正确**的：
+  // 全量对齐已经把现有对象都拉下来了，之后的增量靠新写入产生的 seq 追。
+  // 但要注意：这时不能把「本地已有对象」误判成「同步完成」，
+  // 所以 `applied` 必须如实反映这次实际拉了多少。
   const info = await callCloud('/api/changes?info=1', { timeoutSec: 30 })
   const head = info.ok && info.json ? Number(info.json.head) || 0 : 0
   return { ok: true, applied, removed, head }
+}
+
+/** 本地镜像里是否已有对象（用于判断「首次同步」） */
+function hasLocalObjects() {
+  const objRoot = join(MIRROR_DIR, 'objects')
+  if (!existsSync(objRoot)) return false
+  try { return walk(objRoot).length > 0 } catch { return false }
 }
 
 /** 递归列出目录下的文件（只用于清理孤儿对象） */
