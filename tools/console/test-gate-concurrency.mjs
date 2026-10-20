@@ -123,6 +123,21 @@ try {
     '没有门禁只用 readyState 判就绪（about:blank 也满足，会撞上下文销毁）',
     readyStateGates.map(g => g.name).join(', '))
 
+  section('③d 临时目录必须在 finally 里清理')
+
+  // 只在开头 rmSync 会让每轮都在工作区留一份：污染 git status、
+  // 累积占磁盘。实测跑几轮后工作区里堆了十几个 .tmp-gate-* 目录。
+  const leaky = distServers.filter(g => {
+    if (!/rmSync\(STORE_DIR/.test(g.src)) return false
+    // 必须出现在 finally 之后的位置（粗略判据：文件里 finally 段也含 rmSync）
+    const finallyIdx = g.src.lastIndexOf('} finally {')
+    if (finallyIdx < 0) return true
+    return !/rmSync\(STORE_DIR/.test(g.src.slice(finallyIdx))
+  })
+  ok(leaky.length === 0,
+    '用 STORE_DIR 的门禁都在 finally 里删掉临时目录',
+    leaky.map(g => g.name).join(', '))
+
   section('④ 共享等待工具存在且可用')
 
   const waitForSrc = readFileSync(join(GATE_DIR, 'lib', 'wait-for.mjs'), 'utf-8')

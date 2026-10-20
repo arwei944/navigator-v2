@@ -55,7 +55,7 @@
 | 31 | `test-desc-junk` | 数据与内容 | desc「机器垃圾」形态检测用例：零依赖、不联网。 | 77 | 0.2s |
 | 32 | `test-doc-facts` | 文档治理 | 文档「事实断言」门禁（防 README / HANDOVER 叙事漂移）。 | 345 | 0.4s |
 | 33 | `test-doc-manager` | 文档治理 | doc-manager 自测（门禁） | 133 | 0.3s |
-| 34 | `test-domain-flow` | 数据与内容 | 领域流水线：纯函数契约 + 真实页面渲染。 | 282 | — |
+| 34 | `test-domain-flow` | 数据与内容 | 领域流水线：纯函数契约 + 真实页面渲染。 | 285 | — |
 | 35 | `test-dryrun-purity` | 安全与鉴权 | 预演纯净性门禁：dryRun 分支不得产生外部副作用 | 104 | — |
 | 36 | `test-dual-stack` | 服务端与运行时 | 双栈一致性门禁（kd7y5b）：`api/*.js`（Vercel 签名源）与 `server/main.mjs`（自托管宿主） | 89 | 0.2s |
 | 37 | `test-endpoints-run` | 部署与发布 | 部署多端点发布链路用例（N2 补齐）：零依赖、不联网、**绝不触发真实上传**。 | 236 | 2.8s |
@@ -66,7 +66,7 @@
 | 42 | `test-filter-chips` | 前端与体验 | 筛选条第二行取数：pickInlineChips。 | 87 | 0.2s |
 | 43 | `test-format` | 前端与体验 | 格式化门禁：时间 / 字节 / 时长 / 耗时的展示实现只许住在 `shared/format.mjs` | 121 | 0.3s |
 | 44 | `test-frontend` | 前端与体验 | 第三批 · 序 18 / 20 / 23 的前端守卫。 | 236 | 3.9s |
-| 45 | `test-gate-concurrency` | 工作区治理 | 门禁：真机门禁的并发安全约定。 | 154 | — |
+| 45 | `test-gate-concurrency` | 工作区治理 | 门禁：真机门禁的并发安全约定。 | 169 | — |
 | 46 | `test-glossary` | 前端与体验 | 离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。 | 188 | 0.5s |
 | 47 | `test-graph-layout` | 前端与体验 | 关系图布局用例：零依赖、不跑浏览器。 | 204 | 0.7s |
 | 48 | `test-gridnav` | 前端与体验 | src/utils/gridnav.js 用例：零依赖、不联网、纯函数穷举。 | 111 | 0.2s |
@@ -132,7 +132,7 @@
 | 108 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
 | 109 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
 | 110 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 111 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 193 | — |
+| 111 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
 | 112 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
 | 113 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
 | 114 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |

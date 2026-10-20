@@ -181,6 +181,11 @@ try {
 } finally {
   if (browser) await browser.close().catch(() => {})
   server.kill()
+  // 临时 SQLite 必须删掉：只在开头 rmSync 会让每轮都在工作区留一份，
+  // 累积后既污染 git status（未忽略时会误提交），也让磁盘越跑越满。
+  // 给 server 一点时间释放句柄，否则 Windows 上会 EBUSY。
+  await new Promise(r => setTimeout(r, 300))
+  try { rmSync(STORE_DIR, { recursive: true, force: true }) } catch { /* 句柄未释放时留给系统临时目录 */ }
 }
 
 console.log(`\n👣 访问追踪真机：${pass} 通过 / ${failures.length} 失败`)

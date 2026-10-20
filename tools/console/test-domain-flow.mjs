@@ -269,6 +269,9 @@ if (!existsSync(join(DIST, 'server.js'))) {
   } finally {
     if (browser) await browser.close().catch(() => {})
     server.kill()
+    // 临时 SQLite 必须删掉（理由同 test-visit-tracking-real）
+    await new Promise(r => setTimeout(r, 300))
+    try { rmSync(STORE_DIR, { recursive: true, force: true }) } catch { /* 句柄未释放 */ }
   }
 }
 
