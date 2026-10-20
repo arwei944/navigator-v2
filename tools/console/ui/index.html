@@ -61,6 +61,7 @@
     <button class="tab" data-panel="audit">审计</button>
     <button class="tab" data-panel="deploy">发布</button>
     <button class="tab" data-panel="plugins">插件</button>
+    <button class="tab" data-panel="secrets">密钥</button>
     <button class="tab" data-panel="notify">通知<span class="tab-badge" id="notify-badge" hidden>0</span></button>
   </nav>
 
@@ -492,6 +493,38 @@
         </div>
         <div class="result" id="plugins-notice"></div>
         <p class="hint" id="plugins-file"></p>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-secrets">
+      <div class="card tight">
+        <div class="row-between">
+          <div class="repo-info" id="secrets-summary"></div>
+          <div class="row-actions">
+            <button class="btn ghost" id="secrets-verify-all">全部验证</button>
+            <button class="btn ghost" id="btn-secrets-refresh">刷新</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>平台凭据</h3>
+        <p class="hint">
+          这里管理各外部平台的密钥，统一写进 <code>.env.local</code>（已 gitignore）。
+          <strong>页面只显示后 4 位</strong>，完整值不会回到浏览器 —— 要改就重新粘一把。
+          「验证」会主动向平台发起一次只读请求，确认这把 key 现在还有效。
+        </p>
+        <div class="notice" id="secrets-notice" hidden></div>
+        <div id="secrets-groups"></div>
+      </div>
+
+      <div class="card">
+        <h3>关于密钥与工作负载不配套</h3>
+        <p class="hint">
+          BotKeep 的「密钥有效」与「能看到这台机器」是两件事：密钥可能属于另一个账号，
+          此时列表为空、按 ID 查会 404。遇到这种情况先点「验证」——
+          它会明确告诉你「该账号下没有任何工作负载」，而不是让你在鉴权失败里绕。
+        </p>
       </div>
     </section>
 

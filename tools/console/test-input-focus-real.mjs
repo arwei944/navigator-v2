@@ -107,10 +107,25 @@ try {
   ok(Array.isArray(errs) && errs.length === 0, '输入过程中无 render 异常', (errs || []).slice(0, 2).join(' | '))
 
   /* 输入必须真的驱动检索：URL 同步 + 结果收敛 */
-  await c.sleep(500)
-  const search = await c.eval('location.search')
-  ok(search.includes('q=github'), '输入同步到 URL（q=github）', search)
-  const cards = await c.eval(`document.querySelectorAll('.site-card').length`)
+  // 轮询等待而不是固定 sleep：搜索词写入 URL 经过 300ms 防抖，
+  // 固定等待在并行跑门禁（CPU 被占满）时会偶尔不够，表现为「只同步了首字符」。
+  // 那是**测试的时序问题**，不是功能问题 —— 用固定 sleep 会把噪声当成缺陷报出来。
+  let search = ''
+  const urlDeadline = Date.now() + 5000
+  while (Date.now() < urlDeadline) {
+    search = await c.eval('location.search')
+    if (String(search).includes('q=github')) break
+    await c.sleep(150)
+  }
+  ok(String(search).includes('q=github'), '输入同步到 URL（q=github）', search)
+  // 同上：卡片列表随防抖后的搜索结果重渲染，轮询等它真的收敛
+  let cards = 300
+  const cardDeadline = Date.now() + 5000
+  while (Date.now() < cardDeadline) {
+    cards = Number(await c.eval(`document.querySelectorAll('.site-card').length`))
+    if (cards >= 0 && cards < 300) break
+    await c.sleep(150)
+  }
   ok(cards >= 0 && cards < 300, '结果从 300 条收敛', `当前 ${cards} 条`)
 
   /* 下拉要能展开：这是「首字符即失焦」事故里最先崩掉的那一块 */

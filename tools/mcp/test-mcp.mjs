@@ -71,6 +71,17 @@ const localCount = JSON.parse(readFileSync(DATA, 'utf-8')).length
  */
 const CALL_TIMEOUT_MS = 150_000
 
+/**
+ * 握手与列工具也要放宽。
+ *
+ * 之前只有 `callTool` 传了 timeout，`connect()` / `listTools()` 走 SDK 默认的 60s。
+ * 而这两步恰恰是**子进程冷启动**最慢的时刻（要加载整个 shared/ 与全部依赖），
+ * 并行跑门禁（CPU 被其他 3 道占满）时实测会越过 60s —— 表现是
+ * `MCP error -32001: Request timed out`，看起来像「用例挂了」，实际只是握手没等到。
+ * 用同一个上界，让冷启动慢和真正挂死都被同一条线兜住。
+ */
+const HANDSHAKE_TIMEOUT_MS = CALL_TIMEOUT_MS
+
 /** 调用工具并解析回传的 JSON 文本；同时保留 isError 供断言 */
 async function call(client, name, args = {}) {
   const r = await client.callTool({ name, arguments: args }, undefined, { timeout: CALL_TIMEOUT_MS })
@@ -86,11 +97,11 @@ const transport = new StdioClientTransport({ command: process.execPath, args: [S
 const client = new Client({ name: 'nav-mcp-test', version: '1.0.0' })
 
 try {
-  await client.connect(transport)
+  await client.connect(transport, { timeout: HANDSHAKE_TIMEOUT_MS })
 
   /* ---------------- ① 工具清单 ---------------- */
 
-  const { tools } = await client.listTools()
+  const { tools } = await client.listTools(undefined, { timeout: HANDSHAKE_TIMEOUT_MS })
   eq(tools.length, EXPECTED_TOOLS.length, `工具数收敛到 ${EXPECTED_TOOLS.length} 个（避免选择准确率退化）`)
   eq(tools.map(t => t.name).sort().join(','), [...EXPECTED_TOOLS].sort().join(','), '工具名与预期一致')
 

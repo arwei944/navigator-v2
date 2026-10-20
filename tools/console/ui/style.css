@@ -913,3 +913,62 @@ select.msg-input { cursor: pointer; }
 .rel-note { color: var(--text-dim); }
 .rel-block-title { font-size: 12px; color: var(--warn); margin: 10px 0 4px; }
 .rel-block { font-size: 12px; color: var(--err); padding: 2px 0; }
+/* ══════════ 密钥面板 ══════════ */
+/* 每项一张卡片式行：名称 + 状态徽标 → 影响范围 → 取值入口 → 操作区 → 验证结果 */
+.secret-group { margin-top: 18px; }
+.secret-group h3 { font-size: 13px; color: var(--text-dim); margin: 0 0 8px; font-weight: 600; }
+.secret-row {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  background: var(--bg-panel);
+}
+.secret-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.secret-name { font-size: 13px; }
+.secret-name code { font-family: var(--mono); color: var(--text); }
+.secret-label { color: var(--text-dim); }
+/* 影响范围是用户最需要的信息，给足行高、不和元信息挤在一起 */
+.secret-scope { font-size: 12px; color: var(--text-dim); margin-top: 6px; line-height: 1.6; }
+.secret-meta { display: flex; flex-wrap: wrap; gap: 14px; font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+.secret-meta .warn { color: var(--warn); }
+.secret-problems { margin: 8px 0 0; padding-left: 18px; font-size: 12px; color: var(--warn); }
+.secret-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+/* 输入框占满剩余宽度：粘密钥时不需要精确点击 */
+.secret-input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-family: var(--mono);
+  background: var(--bg-console);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+}
+.secret-input:focus { outline: none; border-color: var(--accent); }
+.secret-result { font-size: 12px; margin-top: 8px; }
+.secret-result.ok { color: var(--ok); }
+.secret-result.bad { color: var(--err); }
+
+/* 状态徽标：复用 .badge 的形态，语义色按「必需 / 异常 / 正常 / 未配」四档区分 */
+.badge.badge-req, .badge.req { background: var(--tint-warn); color: var(--warn); }
+.badge.ok { background: var(--tint-ok); color: var(--ok); }
+.badge.warn { background: var(--tint-warn); color: var(--warn); }
+.badge.bad { background: var(--tint-err); color: var(--err); }
+.badge.muted { background: var(--bg-raised); color: var(--text-dim); }
+.btn.danger { color: var(--err); border-color: var(--tint-err); }
+
+/* 面板级提示条 */
+.notice {
+  font-size: 12px;
+  padding: 8px 11px;
+  border-radius: 6px;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  background: var(--bg-raised);
+  color: var(--text-dim);
+}
+.notice.ok { border-color: var(--tint-ok); background: var(--tint-ok-soft); color: var(--ok); }
+.notice.warn { border-color: var(--tint-warn); background: var(--tint-warn-soft); color: var(--warn); }
+.notice.bad { border-color: var(--tint-err); background: var(--tint-err-soft); color: var(--err); }

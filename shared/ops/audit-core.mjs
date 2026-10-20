@@ -49,6 +49,8 @@ export const AUDIT_ACTIONS = {
   'notify.read': '通知已读',
   'notify.clear': '通知清空',
   'plugins.save': '插件配置变更',
+  'secrets.save': '密钥变更',
+  'secrets.verify': '密钥验证',
   'release.start': '开发流水线启动',
 }
 

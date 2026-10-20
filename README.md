@@ -287,6 +287,10 @@ CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异�
 
 复制 `.env.example` 为 `.env.local`；服务端部署时由运行环境注入同名变量（发布沙箱无注入时，构建脚本回填到 `data/` 下的小文件，启动时读回）。变量注册表见 `shared/env-registry.mjs`，`pnpm run env:doctor` 可自检。
 
+**各平台密钥统一在控制台的「密钥」面板管理**（`pnpm run console` → 密钥）。该面板由 `shared/secrets-registry.mjs` 驱动：写明每把密钥的取值入口、影响范围、是否必需，并支持「验证」——主动向平台发一次只读请求确认还有效。页面上只显示后 4 位，完整值不回浏览器；输入框为密码型且不回填已有值。
+
+> 两类台账的分工：`env-registry.mjs` 是**代码契约**（代码认哪些变量），`secrets-registry.mjs` 是**运维清单**（人需要配哪些平台的密钥）。刻意不合并——合并后任一方新增都会污染另一方语义。
+
 | 变量 | 必填 | 用途 |
 |------|------|------|
 | `SITES_ADMIN_KEY` | ✅ | 站点数据发布密钥；显示在管理后台发布按钮旁，**不在请求体明文发送**（走 `Authorization: Bearer <key>` 请求头） |
@@ -348,13 +352,13 @@ nav-v2/
 │       ├── test-hunks.mjs # hunk 分块用例（临时仓库实测暂存 / 取消暂存）
 │       ├── launcher/      # 登录自启 + 保活 + Chrome app 快捷方式（PowerShell，UTF-8 BOM）
 │       ├── lib/           # 业务逻辑，按职责分 6 组（见下方说明）
-│       │   ├── core/      # env / jobs / audit / cloud / gate —— 无业务语义的基础设施
+│       │   ├── core/      # env / secrets / jobs / audit / cloud / gate —— 无业务语义的基础设施
 │       │   ├── vcs/       # git / changes —— 版本控制读写
 │       │   ├── content/   # sites / data —— 站点数据读写
 │       │   ├── observe/   # health / notify / schedule / uptime / history —— 可观测与通知
 │       │   ├── publish/   # deploy / release / sync / snapshots / publishlog / plugins / endpoints / vercel
-│       │   └── routes/    # api.mjs 分发起 + 5 个域路由（system/git/sites/health/ops）+ 路由期望清单
-│       └── ui/            # 单页 UI（9 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
+│       │   └── routes/    # api.mjs 分发起 + 6 个域路由（system/git/sites/health/ops/secrets）+ 路由期望清单
+│       └── ui/            # 单页 UI（10 个面板 + theme.js 主题 + 日志过滤，零框架依赖）
 ├── .github/workflows/     # ci.yml（门禁）+ release-please.yml（版本与 CHANGELOG）
 ├── backups/               # 发布前自动备份的站点数据
 ├── docs/

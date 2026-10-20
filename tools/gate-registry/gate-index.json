@@ -1,6 +1,6 @@
 {
-  "total": 111,
-  "registered": 111,
+  "total": 112,
+  "registered": 112,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -85,6 +85,7 @@
     "tools/console/test-schedule-publish.mjs",
     "tools/console/test-scripts.mjs",
     "tools/console/test-search.mjs",
+    "tools/console/test-secrets.mjs",
     "tools/console/test-server-routes.mjs",
     "tools/console/test-session-merge.mjs",
     "tools/console/test-session.mjs",
@@ -787,7 +788,7 @@
       "name": "test-input-focus-real",
       "purpose": "真机按键守卫：搜索框逐字符输入不得失焦。",
       "category": "搜索与交互",
-      "lines": 145,
+      "lines": 160,
       "included": true,
       "nodeFlags": [],
       "ciSkip": "需要本机 Chrome：cdp-driver 只探测 Windows 路径，CI 容器里没有浏览器；且依赖 dist/ 产物",
@@ -1107,6 +1108,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 411
+    },
+    {
+      "file": "tools/console/test-secrets.mjs",
+      "name": "test-secrets",
+      "purpose": "密钥管理：登记表契约 + 形态体检 + **不泄露** + 真实面板渲染。",
+      "category": "安全与鉴权",
+      "lines": 192,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-server-routes.mjs",
@@ -1453,7 +1466,7 @@
       "name": "test-mcp",
       "purpose": "nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。",
       "category": "服务端与运行时",
-      "lines": 327,
+      "lines": 338,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
