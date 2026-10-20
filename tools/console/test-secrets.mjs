@@ -81,6 +81,19 @@ ok(inspectShape('BOTKEEP_API_KEY', '').ok, '空值不算形态问题（是否必
   ok(st.summary.total === SECRETS.length, 'summary 总数与登记表一致')
 }
 
+/* ============ ④b 线上一致性比对 ============ */
+
+{
+  // 只测「离线时不会崩、且会明确报出连不上」，不依赖线上可达：
+  // 门禁跑在本地，把网络抖动变成红灯只会制造噪声。
+  const cmp = await secrets.compareWithCloud('http://127.0.0.1:9/')
+  ok(typeof cmp === 'object' && 'ok' in cmp, '一致性比对返回结构化结果')
+  ok(cmp.ok === false, '连不上时判定为不一致（而不是默认通过）', cmp.detail?.slice(0, 60))
+  ok(/无法连接|超时/.test(cmp.detail || ''), '连不上时给出可读原因', cmp.detail?.slice(0, 60))
+  // 指纹必须是 10 位十六进制：它是本地算的，线上不可达也应有
+  ok(/^[0-9a-f]{10}$/.test(cmp.localFp || ''), '本地指纹格式正确（10 位十六进制）', cmp.localFp)
+}
+
 /* ============ ⑤ 写入拒绝未登记变量 ============ */
 
 {

@@ -150,6 +150,21 @@ const PROBES = {
     }
   },
 
+  /**
+   * 站点管理密钥：本地配了不等于线上认。
+   * 两件事都查——「有效吗」看格式与平台，「线上是不是同一把」看指纹比对。
+   */
+  async SITES_ADMIN_KEY(value) {
+    const cmp = await compareWithCloud()
+    return {
+      ok: cmp.same,
+      detail: cmp.same
+        ? `本地与线上一致（指纹 ${cmp.localFp}）`
+        : cmp.detail,
+      compare: cmp,
+    }
+  },
+
   async BOTKEEP_WORKLOAD_ID(value) {
     const { value: key } = readValue('BOTKEEP_API_KEY')
     if (!key) return { ok: false, detail: '需先配置 BOTKEEP_API_KEY 才能验证' }
@@ -196,6 +211,56 @@ export async function verify(key) {
     return { ...r, shapeOnly: false }
   } catch (e) {
     return { ok: false, detail: `验证请求失败：${e.name === 'TimeoutError' ? '超时' : e.message}` }
+  }
+}
+
+/**
+ * 本地与线上密钥是否一致 —— 比对**指纹**，不传输明文。
+ *
+ * 为什么需要单独一项：`verify()` 只能回答「本地这把 key 在平台上有效吗」，
+ * 回答不了「线上那台机器用的和我本地是不是同一把」。而后者才是 401 mismatch
+ * 的真正原因（2026-10-20 实测：平台密钥改不动、`data/` 又不进部署包，
+ * 线上读到的既不是本地值也不是平台值，纯靠 `/api/_diag` 的指纹才定位到）。
+ *
+ * 线上用 `/api/_diag` 的 `secretFp`（sha256 前 10 位，不可逆），
+ * 本地算同一算法 —— 两个指纹可比对，但任一方都无法从指纹还原密钥。
+ */
+export async function compareWithCloud(siteUrl = process.env.DEPLOY_SITE_URL || 'https://navigator-v2.bot-keep.xyz') {
+  const { createHash } = await import('node:crypto')
+  const { value } = readValue('SITES_ADMIN_KEY')
+  if (!value) return { ok: false, detail: '本地未配置 SITES_ADMIN_KEY，无法比对' }
+  const localFp = createHash('sha256').update(value).digest('hex').slice(0, 10)
+
+  try {
+    const r = await fetch(`${siteUrl.replace(/\/+$/, '')}/api/_diag`, {
+      headers: { 'X-Nav-Key': value },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!r.ok) return { ok: false, detail: `线上诊断接口返回 HTTP ${r.status}`, localFp }
+    const j = await r.json()
+    const cloudFp = String(j.secretFp || '')
+    if (!cloudFp) return { ok: false, detail: '线上未返回密钥指纹（服务端版本过旧？）', localFp }
+
+    const same = cloudFp === localFp
+    return {
+      ok: same,
+      same,
+      localFp,
+      cloudFp,
+      hasEnvKey: Boolean(j.hasEnvKey),
+      hasKeyFile: Boolean(j.hasKeyFile),
+      detail: same
+        ? '本地与线上使用同一把密钥'
+        : `不一致（本地 ${localFp} / 线上 ${cloudFp}）—— 写接口会回 401 mismatch。`
+          + `线上来源：环境变量 ${j.hasEnvKey ? '有' : '无'}、密钥文件 ${j.hasKeyFile ? '有' : '无'}。`
+          + `注意 data/ 不进部署包，改本地文件不会自动同步到线上。`,
+    }
+  } catch (e) {
+    return {
+      ok: false,
+      localFp,
+      detail: `无法连接线上：${e.name === 'TimeoutError' ? '超时' : e.message}`,
+    }
   }
 }
 

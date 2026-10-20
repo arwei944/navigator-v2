@@ -84,6 +84,14 @@ function renderItem(s) {
     verifyBtn.addEventListener('click', () => verifyOne(s.key, verifyBtn))
     actions.append(verifyBtn)
 
+    // 站点管理密钥额外给一个「比对线上」：本地有效 ≠ 线上认这一把。
+    // 401 mismatch 时最想知道的就是这个，而它只能靠指纹比对回答。
+    if (s.key === 'SITES_ADMIN_KEY') {
+      const cmpBtn = el('button', 'btn ghost', '比对线上')
+      cmpBtn.addEventListener('click', () => verifyOne(s.key, cmpBtn))
+      actions.append(cmpBtn)
+    }
+
     const clearBtn = el('button', 'btn danger', '清除')
     clearBtn.addEventListener('click', () => {
       // 破坏性操作必须二次确认，且要说清后果

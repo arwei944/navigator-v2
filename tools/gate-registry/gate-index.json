@@ -1114,7 +1114,7 @@
       "name": "test-secrets",
       "purpose": "密钥管理：登记表契约 + 形态体检 + **不泄露** + 真实面板渲染。",
       "category": "安全与鉴权",
-      "lines": 192,
+      "lines": 205,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
