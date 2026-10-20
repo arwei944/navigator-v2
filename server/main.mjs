@@ -65,35 +65,16 @@ const PORT = Number(process.env.PORT || process.env.SERVER_PORT) || 3000
 const HOST = process.env.HOST || '0.0.0.0'
 
 /**
- * 管理凭据回填：构建脚本把两项配置写进 data/ 下的小文件
+ * 管理凭据回填：发布沙箱没有环境变量注入，构建脚本把两项配置写进 data/ 下的小文件
  * （不入 git；静态服务对 `/data/*` 一律拒绝）。启动时读回 process.env ——
  * shared/auth.mjs 在**调用时**才读环境变量，所以这里补上即可，鉴权源码零改动。
  *   admin-key.txt            → SITES_ADMIN_KEY（共享密钥直连，CLI/脚本用）
  *   admin-password-hash.txt  → ADMIN_PASSWORD_HASH（scrypt 口令哈希，登录用）
- *
- * ## 为什么文件优先于环境变量（2026-10-20 修正）
- *
- * 原实现是 `if (!process.env.SITES_ADMIN_KEY)` 才读文件 —— 即环境变量优先。
- * 前提是「环境变量总能改」，实测在 BotKeep 上不成立：
- *   · 密钥以 secret 存储，**只写不读**（`secretsReadable: false`），读不到旧值；
- *   · 通过 API 写入返回 200，但 `kill → start` 重建容器后进程读到的**仍是旧值**
- *     （实测 secretFp 始终是 d7d13c252f，与写入值不符）。
- * 结果是：线上密钥既改不了、也不知道是什么，而随包发布的文件（内容确定、
- * 受 git 与构建控制）却被这个改不动的变量挡在外面 —— 完全反了。
- *
- * 现在文件优先，并把环境变量里的旧值**降级为备用密钥**（而不是丢弃）：
- * 已经拿旧密钥接入的客户端不会被锁在外面，而文件成为唯一可控的真相源。
+ * 没配口令哈希时登录接口会明确回 500「未配置登录口令」，共享密钥路径照常可用。
  */
-try {
-  const fromFile = readFileSync(join(ROOT, 'data', 'admin-key.txt'), 'utf8').trim()
-  if (fromFile) {
-    // 环境变量里若有一把不同的值，降级为备用而不是覆盖 —— 避免把在用客户端锁死
-    if (process.env.SITES_ADMIN_KEY && process.env.SITES_ADMIN_KEY !== fromFile && !process.env.SITES_ADMIN_KEY_PREVIOUS) {
-      process.env.SITES_ADMIN_KEY_PREVIOUS = process.env.SITES_ADMIN_KEY
-    }
-    process.env.SITES_ADMIN_KEY = fromFile
-  }
-} catch { /* 没有文件就沿用环境变量；两者都没有时写接口按未配置拒绝 */ }
+if (!process.env.SITES_ADMIN_KEY) {
+  try { process.env.SITES_ADMIN_KEY = readFileSync(join(ROOT, 'data', 'admin-key.txt'), 'utf8').trim() } catch { /* 没有就没有：写接口按未配置拒绝 */ }
+}
 /**
  * 过渡期旧密钥（`SITES_ADMIN_KEY_PREVIOUS`）：与当前密钥**同时有效**。
  *
