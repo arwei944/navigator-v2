@@ -245,7 +245,7 @@
       "name": "test-backup",
       "purpose": "线上数据库备份：校验强度 + 保留策略 + 部署闸门 + 真实面板渲染。",
       "category": "数据与内容",
-      "lines": 379,
+      "lines": 444,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

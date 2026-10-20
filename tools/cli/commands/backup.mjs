@@ -5,7 +5,7 @@
  * 「出事时」，而这两个场景用户往往在命令行里。面板适合日常查看，CLI 适合卡点。
  */
 import * as backup from '../../console/lib/ops/backup.mjs'
-import { EXIT } from '../lib/core.mjs'
+import { EXIT, buildOptions, dryRunResult, parseCommandArgs } from '../lib/core.mjs'
 import { fmtDateTimeSec, fmtBytes } from '../../../shared/format.mjs'
 
 const backupCmd = {
@@ -13,9 +13,30 @@ const backupCmd = {
   summary: '备份线上数据库到本机（整份 SQLite，含站点/点击/健康/审计）',
   usage: 'nav db backup [--keep 24]',
   examples: ['nav db backup', 'nav db backup --keep 48'],
+  flags: {
+    keep: { desc: '保留最近多少份，默认 24' },
+  },
   mutating: true,
-  async run({ flags }) {
-    const keep = Number(flags.keep) || undefined
+  async run(argv, ctx = {}) {
+    const { values } = parseCommandArgs(argv, buildOptions(backupCmd.flags), { usage: backupCmd.usage })
+    const keep = Number(values.keep) || undefined
+
+    // `--dry-run` 必须真的不落盘。写命令声明了 `mutating: true` 就等于
+    // 承诺支持预演 —— 实测漏掉这个分支时，预演会**真的备份并清理旧文件**，
+    // 调用方以为只是看看，实际已经改动了磁盘状态。
+    //
+    // 注意 `--dry-run` 是**全局标志**，由 splitGlobals 先剥离，不在 values 里；
+    // 要从第二个参数 ctx 取。
+    if (ctx.dryRun) {
+      const st = backup.status()
+      return dryRunResult({
+        action: 'db backup',
+        willWrite: `${st.dir}\\store-<时间戳>.db（约 460 KB）`,
+        willPrune: `超出 ${keep || 24} 份的旧备份`,
+        current: { count: st.count, lastAt: st.lastAt, freshness: st.freshness },
+      })
+    }
+
     const r = await backup.runBackup(keep ? { keep } : {})
     if (!r.ok) {
       const e = new Error(r.error || '备份失败')

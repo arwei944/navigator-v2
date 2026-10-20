@@ -32,7 +32,7 @@
 | 8 | `test-api-routes-live` | 服务端与运行时 | 控制台路由覆盖用例：真实启动控制台，逐条打全部路由，确认每条都**被路由识别**。 | 180 | — |
 | 9 | `test-auto-add` | 数据与内容 | 站点草稿工具：自动添加管道与「添加站点」弹窗共用的判据。 | 138 | 0.2s |
 | 10 | `test-auto-category` | 数据与内容 | 自动分类决策：6 条优先级分支 + label 归一 + id 派生与冲突自增。 | 111 | 0.3s |
-| 11 | `test-backup` | 数据与内容 | 线上数据库备份：校验强度 + 保留策略 + 部署闸门 + 真实面板渲染。 | 379 | — |
+| 11 | `test-backup` | 数据与内容 | 线上数据库备份：校验强度 + 保留策略 + 部署闸门 + 真实面板渲染。 | 444 | — |
 | 12 | `test-bgm` | 前端与体验 | 背景音乐的音符生成：noteFreq / chordAt / notesForBar / barSeconds / clampVolume / fmtClock。 | 109 | 0.2s |
 | 13 | `test-browser-translate` | 数据与内容 | 浏览器本地翻译（L2，`src/services/browserTranslate.js`）用例：零依赖、不联网。 | 267 | 0.6s |
 | 14 | `test-bundle-size` | 前端与体验 | 产物体积门禁（NAV-v8 · 任务 4pnj9g） | 118 | 0.3s |

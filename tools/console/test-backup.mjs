@@ -107,11 +107,14 @@ if (good) {
   // 所以还原目标要从 .env.local 里兜底读回来。
   const envFile = join(ROOT, '.env.local')
   const savedEnvText = existsSync(envFile) ? readFileSync(envFile, 'utf8') : null
-  let restoreWid = process.env.BOTKEEP_WORKLOAD_ID
-  if (!restoreWid && savedEnvText) {
+  // **始终以 .env.local 为还原依据**，不信任 process.env ——
+  // 那个值可能已被前面某条用例改过，拿它还原等于把污染传下去。
+  let restoreWid = ''
+  if (savedEnvText) {
     const m = /^BOTKEEP_WORKLOAD_ID=(.*)$/m.exec(savedEnvText)
     if (m) restoreWid = m[1].trim().replace(/^"|"$/g, '')
   }
+  if (!restoreWid) restoreWid = process.env.BOTKEEP_WORKLOAD_ID
 
   let threw = false
   let res = null
@@ -236,11 +239,13 @@ if (good) {
   // 还原目标：优先用进程里已有的值；若本来没有（由 loadEnv 惰性填充），
   // 就从 .env.local 里读回来 —— 直接 delete 会让后续子进程拿不到凭据。
   const envFileW = join(ROOT, '.env.local')
-  let restoreWid = savedWid
-  if (!restoreWid && existsSync(envFileW)) {
+  // 同上一处：以 .env.local 为唯一可信来源
+  let restoreWid = ''
+  if (existsSync(envFileW)) {
     const m = /^BOTKEEP_WORKLOAD_ID=(.*)$/m.exec(readFileSync(envFileW, 'utf8'))
     if (m) restoreWid = m[1].trim().replace(/^"|"$/g, '')
   }
+  if (!restoreWid) restoreWid = savedWid
   try {
     process.env.BOTKEEP_WORKLOAD_ID = 'wid-does-not-exist-for-test'
     sch.status.intervalHours = 0.0001  // 让 shouldRun 判真
@@ -255,6 +260,66 @@ if (good) {
     ok(String(process.env.BOTKEEP_WORKLOAD_ID || '') !== 'wid-does-not-exist-for-test',
       '测试后工作负载 ID 已还原（未污染后续用例）')
   }
+}
+
+/* ============ ④c CLI 命令契约 ============ */
+
+{
+  // 门禁里之前只测了模块函数，没测 CLI —— 结果 `nav db backup` 上线后
+  // 一跑就报 `Cannot read properties of undefined (reading 'keep')`：
+  // 这个 CLI 框架的 run 收的是 argv 数组，不是解构出来的 flags 对象。
+  // 纯模块测试永远发现不了接线错误，必须真跑一次命令。
+  const { execFileSync } = await import('node:child_process')
+  const runCli = (args) => {
+    try {
+      const out = execFileSync(process.execPath, [join(ROOT, 'tools', 'cli', 'nav.mjs'), ...args], {
+        encoding: 'utf8', timeout: 120000, windowsHide: true,
+      })
+      return { ok: true, out }
+    } catch (e) {
+      return { ok: false, out: String(e.stdout || '') + String(e.stderr || '') }
+    }
+  }
+
+  // status 是只读的，可以放心跑
+  const st = runCli(['db', 'status'])
+  ok(st.ok, 'nav db status 可执行', st.ok ? '' : st.out.slice(0, 120))
+  if (st.ok) {
+    let parsed = null
+    try { parsed = JSON.parse(st.out.trim().split('\n').pop()) } catch { /* 非 JSON */ }
+    ok(parsed && parsed.ok === true, 'nav db status 输出合法 JSON（智能体依赖此契约）')
+    ok(parsed?.data && typeof parsed.data.count === 'number', 'nav db status 带备份数量')
+    ok(parsed?.data?.freshness && typeof parsed.data.freshness.ok === 'boolean',
+      'nav db status 带新鲜度判定（这是"能否部署"的依据）')
+  }
+
+  // ★ 必须覆盖**带参数的写命令**：`db backup` 的 run 收 argv 并自己解析 flags，
+  // 和 `db status`（无参数）是两条不同的代码路径。只测 status 会漏掉
+  // 「run 解构 { flags } 但框架传的是 argv」这类接线错误 —— 实测就漏过一次。
+  //
+  // 并且要验证 `--dry-run` **真的不落盘**：写命令声明 `mutating: true`
+  // 就等于承诺支持预演。实测漏掉这个分支时，预演会真的备份并清理旧文件，
+  // 调用方以为只是看看，磁盘已经被改了。
+  const beforeDry = new Set(readdirSync(BACKUP_DIR).filter(n => n.endsWith('.db')))
+  const dry = runCli(['db', 'backup', '--dry-run'])
+  ok(dry.ok, 'nav db backup --dry-run 可执行（带参数的写命令接线正确）', dry.ok ? '' : dry.out.slice(0, 160))
+
+  const afterDry = new Set(readdirSync(BACKUP_DIR).filter(n => n.endsWith('.db')))
+  const added = [...afterDry].filter(n => !beforeDry.has(n))
+  const removed = [...beforeDry].filter(n => !afterDry.has(n))
+  ok(added.length === 0, '--dry-run 不产生新备份文件（预演必须真的不落盘）', added.join(','))
+  ok(removed.length === 0, '--dry-run 不清理旧备份（预演不改动磁盘状态）', removed.join(','))
+
+  // 输出里要能看出"未生效"。默认是单行 JSON，所以查 `dryRun`/`applied` 字段；
+  // 人类可读的"预演（未生效）"只在 --pretty 下出现。
+  let dryJson = null
+  try { dryJson = JSON.parse(dry.out.trim().split('\n').pop()) } catch { /* 非 JSON */ }
+  ok(dryJson && dryJson.data && dryJson.data.dryRun === true && dryJson.data.applied === false,
+    '--dry-run 输出标明 dryRun/applied（调用方不会误以为已落盘）')
+
+  // help 要能列出新命令域，否则用户根本不知道有这个能力
+  const help = runCli(['help'])
+  ok(help.ok && /db\s+backup|数据库备份/.test(help.out), 'nav help 里能看到备份命令域')
 }
 
 /* ============ ⑤ 真实面板渲染 ============ */
