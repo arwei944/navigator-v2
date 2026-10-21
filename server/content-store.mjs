@@ -87,6 +87,8 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_fetch_source ON fetch_log(source_id, at 
 db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
 // 已有库补列（CREATE TABLE IF NOT EXISTS 不会修改旧表）
 try { db.exec('ALTER TABLE sources ADD COLUMN max_items INTEGER NOT NULL DEFAULT 60') } catch { /* 已存在 */ }
+try { db.exec('ALTER TABLE sources ADD COLUMN credibility REAL NOT NULL DEFAULT 1') } catch { /* 已存在 */ }
+try { db.exec('ALTER TABLE entries ADD COLUMN insights_at INTEGER') } catch { /* 已存在 */ }
 for (const sql of [
   'ALTER TABLE entries ADD COLUMN content TEXT',
   'ALTER TABLE entries ADD COLUMN title_zh TEXT',
@@ -172,6 +174,7 @@ function sourceRow(row) {
     categoryId: row.category_id,
     weight: Number(row.weight) || 1,
     maxItems: Number(row.max_items) || 60,
+    credibility: Number(row.credibility) || 1,
     enabled: row.enabled === 1,
     etag: row.etag || '',
     lastModified: row.last_modified || '',
@@ -183,7 +186,7 @@ function sourceRow(row) {
   }
 }
 
-function entryRow(row) {
+export function entryRow(row) {
   if (!row) return null
   return {
     id: row.id,

@@ -25,6 +25,7 @@ import {
   clusterDocuments, heatScore, eventTitle, eventSummary, ruleDigest,
   parseJsonLoose, isMostlyChinese,
 } from '../shared/content-text.mjs'
+import { refreshInsights } from './content-insights.mjs'
 import { chatWithChain } from '../shared/llm-engine.mjs'
 import { translateWithChain, translatorChain } from '../shared/translate-engine.mjs'
 import {
@@ -343,6 +344,7 @@ export async function processContent({ extractLimit = 12, summaryLimit = 12 } = 
     extract: null,
     summarize: null,
     cluster: null,
+    insights: null,
     digest: null,
     errors: [],
   }
@@ -352,6 +354,8 @@ export async function processContent({ extractLimit = 12, summaryLimit = 12 } = 
   catch (e) { out.errors.push({ step: 'summarize', error: String(e?.message || e) }) }
   try { out.cluster = rebuildEvents() }
   catch (e) { out.errors.push({ step: 'cluster', error: String(e?.message || e) }) }
+  try { out.insights = await refreshInsights() }
+  catch (e) { out.errors.push({ step: 'insights', error: String(e?.message || e) }) }
   try { out.digest = await ensureDigest() }
   catch (e) { out.errors.push({ step: 'digest', error: String(e?.message || e) }) }
   return out

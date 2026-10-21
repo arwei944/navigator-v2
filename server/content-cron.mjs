@@ -64,6 +64,12 @@ async function runOnce(reason = 'schedule') {
           skippedBudget: processed.summarize.skippedBudget,
         } : null,
         cluster: processed.cluster || null,
+        insights: processed.insights ? {
+          synced: processed.insights.sync,
+          eventLinks: processed.insights.eventLinks,
+          trends: (processed.insights.trends || []).length,
+          alertsAdded: processed.insights.alertsAdded,
+        } : null,
         digest: processed.digest ? { date: processed.digest.date, status: processed.digest.llmStatus } : null,
         llm: processed.llm,
         translation: processed.translation,

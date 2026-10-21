@@ -171,7 +171,8 @@
     "console:test:store-surface": "node tools/console/test-store-surface.mjs",
     "console:test:version-bump": "node tools/console/test-version-bump.mjs",
     "console:test:content": "node tools/console/test-content.mjs",
-    "console:test:content-text": "node tools/console/test-content-text.mjs"
+    "console:test:content-text": "node tools/console/test-content-text.mjs",
+    "console:test:content-insights": "node tools/console/test-content-insights.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

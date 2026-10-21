@@ -84,7 +84,10 @@ copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
  * 否则线上第一次写站点就会在 import 期报 ENOENT（登录/发布整块受影响）。
  */
 mkdirSync(join(DIST, 'server'), { recursive: true })
-for (const file of ['audit-log.mjs', 'content-store.mjs', 'content-fetch.mjs', 'content-process.mjs', 'content-cron.mjs']) {
+for (const file of [
+  'audit-log.mjs', 'content-store.mjs', 'content-fetch.mjs', 'content-process.mjs',
+  'content-insights-store.mjs', 'content-insights.mjs', 'content-cron.mjs',
+]) {
   copyFileSync(join(root, 'server', file), join(DIST, 'server', file))
 }
 // 复制 `api/` 下**全部** .js —— 与 server/main.mjs 的路由表同源（那边也是按目录派生）。

@@ -1,6 +1,6 @@
 {
-  "total": 128,
-  "registered": 128,
+  "total": 129,
+  "registered": 129,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -27,6 +27,7 @@
     "tools/console/test-cloud-publish.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
+    "tools/console/test-content-insights.mjs",
     "tools/console/test-content-text.mjs",
     "tools/console/test-content.mjs",
     "tools/console/test-contrast.mjs",
@@ -426,6 +427,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 203
+    },
+    {
+      "file": "tools/console/test-content-insights.mjs",
+      "name": "test-content-insights",
+      "purpose": "阶段 2 门禁：实体抽取、趋势、告警候选。",
+      "category": "数据与内容",
+      "lines": 103,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-content-text.mjs",

@@ -28,8 +28,12 @@ function contentModules() {
       import('../server/content-store.mjs'),
       import('../server/content-fetch.mjs'),
       import('../server/content-process.mjs'),
+      import('../server/content-insights-store.mjs'),
+      import('../server/content-insights.mjs'),
       import('../server/content-cron.mjs'),
-    ]).then(([store, fetch, process, cron]) => ({ ...store, ...fetch, ...process, ...cron }))
+    ]).then(([store, fetch, process, insightsStore, insights, cron]) => ({
+      ...store, ...fetch, ...process, ...insightsStore, ...insights, ...cron,
+    }))
   }
   return modsPromise
 }
@@ -87,6 +91,31 @@ export default async function handler(req, res) {
         })
         return
       }
+      if (query.insights !== undefined) {
+        res.status(200).json({ ok: true, ...mods.getInsights({ hours: Number(query.hours) || 24 }) })
+        return
+      }
+      if (query.entities !== undefined) {
+        res.status(200).json({
+          ok: true,
+          entities: mods.topEntities({ hours: Number(query.hours) || 24, limit: Number(query.limit) || 20 }),
+          catalog: mods.allEntities().slice(0, 200),
+        })
+        return
+      }
+      if (query.entity) {
+        const items = mods.entityEntries(String(query.entity), { limit: Number(query.limit) || 50 })
+        res.status(200).json({ ok: true, items, count: items.length })
+        return
+      }
+      if (query.alerts !== undefined) {
+        res.status(200).json({
+          ok: true,
+          items: mods.listAlerts({ limit: Number(query.limit) || 20, unreadOnly: String(query.unread || '') === '1' }),
+          keywords: mods.getAlertKeywords(),
+        })
+        return
+      }
       if (query.events !== undefined) {
         const items = mods.listEvents({
           domain: String(query.domain || ''),
@@ -100,7 +129,7 @@ export default async function handler(req, res) {
       if (query.event) {
         const event = mods.getEvent(String(query.event))
         if (!event) { res.status(404).json({ ok: false, error: '事件不存在' }); return }
-        res.status(200).json({ ok: true, event })
+        res.status(200).json({ ok: true, event: { ...event, entities: mods.eventEntities(event.id) } })
         return
       }
       if (query.digest !== undefined) {
@@ -125,22 +154,45 @@ export default async function handler(req, res) {
       }
 
       const limit = Math.max(1, Math.min(Number(query.limit) || 50, 200))
-      const items = mods.listEntries({
-        domain: String(query.domain || ''),
-        categoryId: String(query.categoryId || ''),
-        sourceId: String(query.sourceId || ''),
-        q: String(query.q || '').trim(),
-        unread: String(query.unread || '') === '1',
-        saved: String(query.saved || '') === '1',
-        limit: limit + 1,
-        before: Number(query.before) || 0,
-      })
-      const hasMore = items.length > limit
+      const q = String(query.q || '').trim()
+      const domain = String(query.domain || '')
+      const categoryId = String(query.categoryId || '')
+      let items = null
+      let hasMore = false
+
+      // 有查询词时优先走倒排索引（可解释、支持中文 2-gram）；无词项时回退 LIKE
+      if (q) {
+        const searched = mods.searchEntries({ q, domain, categoryId, limit: limit + 1 })
+        if (searched) {
+          items = searched
+          hasMore = items.length > limit
+        }
+      }
+      if (!items) {
+        items = mods.listEntries({
+          domain,
+          categoryId,
+          sourceId: String(query.sourceId || ''),
+          q,
+          unread: String(query.unread || '') === '1',
+          saved: String(query.saved || '') === '1',
+          limit: limit + 1,
+          before: Number(query.before) || 0,
+        })
+        hasMore = items.length > limit
+      }
+
+      const page = hasMore ? items.slice(0, limit) : items
+      const entityMap = mods.entitiesForEntries(page.map(i => i.id))
+      for (const item of page) item.entities = entityMap.get(item.id) || []
       res.status(200).json({
         ok: true,
-        items: hasMore ? items.slice(0, limit) : items,
+        items: page,
         hasMore,
         stats: mods.stats(),
+        processing: mods.processingStats(),
+        llm: mods.llmAvailable(),
+        translation: mods.translationAvailable(),
         scheduler: mods.getContentStatus(),
       })
       return
@@ -189,6 +241,30 @@ export default async function handler(req, res) {
         return
       }
 
+      if (action === 'alert-read') {
+        const changed = mods.markAlertsRead(body?.ids || [])
+        res.status(200).json({ ok: true, changed })
+        return
+      }
+
+      if (action === 'set-keywords') {
+        const keywords = mods.setAlertKeywords(body?.keywords || [])
+        res.status(200).json({ ok: true, keywords })
+        return
+      }
+
+      if (action === 'credibility') {
+        const value = mods.setCredibility(String(body?.id || ''), body?.value)
+        res.status(200).json({ ok: true, credibility: value })
+        return
+      }
+
+      if (action === 'insights') {
+        const r = await mods.refreshInsights()
+        res.status(200).json({ ok: true, ...r })
+        return
+      }
+
       if (action === 'source') {
         const source = mods.upsertSource({
           id: body?.id,
@@ -201,7 +277,8 @@ export default async function handler(req, res) {
           maxItems: body?.maxItems,
           enabled: body?.enabled,
         })
-        res.status(200).json({ ok: true, source })
+        if (body?.credibility !== undefined) mods.setCredibility(source.id, body.credibility)
+        res.status(200).json({ ok: true, source: mods.getSource(source.id) })
         return
       }
 

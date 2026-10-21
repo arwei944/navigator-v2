@@ -244,6 +244,36 @@ LLM 成本控制：
 
 预计：约 3 周。
 
+#### 阶段 2 实现状态（2026-10-22）
+
+已完成：
+
+| 能力 | 文件 | 说明 |
+|---|---|---|
+| 实体抽取 | `shared/content-entities.mjs` | 精编词典 + 别名 + 英文词边界；公司/模型/协议/技术/人物/监管 |
+| 实体存储 | `server/content-insights-store.mjs` | entities / entity_mentions / event_entities |
+| 倒排检索 | 同上 | 中文 2-gram + 英文词项；支持实体过滤与中文查询 |
+| 趋势/异常 | `shared/content-trends.mjs` | 当前 24h vs 过去 7 天基线，z-score |
+| 告警 | 同上 + `server/content-insights.mjs` | 实体突增、关键词命中、来源连续失败；可选 webhook |
+| 来源可信度 | `server/content-insights-store.mjs` | sources.credibility，后台可编辑 |
+| 前端 | `src/views/ContentView.vue` | 趋势/告警视图、实体标签、实体过滤、告警已读 |
+
+实测：
+
+- 索引：448 条中的 361 + 87 条（增量），14,964 + 1,760 个词项，235 + 73 个实体提及
+- 实体 Top：AI Agent 14 / Bitcoin 12 / OpenAI 10 / DeFi 8 / 稳定币 8
+- 趋势 Top：DeFi z=8、AI Agent z=6.05、稳定币 z=5.93、Bitcoin z=5.56、OpenAI z=5.03
+- 告警：8 条实体突增（阈值 z≥3 且当前≥5）
+- 中文检索：`q=模型` 命中 1 条（URL 编码正确时）
+- 事件实体：13 条关联（仅对成员条目本身有实体的事件显示）
+
+边界：
+
+- 实体识别是**词典规则**，词典外的新公司/新模型不会自动识别；LLM 可用时可扩展。
+- 告警默认阈值较敏感（常青实体 Bitcoin/OpenAI 也会触发）；可在 `alertCandidates` 调高阈值或通过关键词告警收敛。
+- 语义检索尚未启用：当前是倒排关键词；embedding/向量检索留待阶段 3。
+- 可信度是人工值，不自动从历史准确率学习。
+
 ### 阶段 3 · 顶级情报（L5）
 
 范围：

@@ -43,6 +43,9 @@ const hasMore = ref(false)
 
 const expandedEvent = ref('')
 const eventDetail = ref(null)
+const insights = ref(null)
+const entityFilter = ref(null)
+const keywordDraft = ref('')
 
 let statsTimer = null
 let searchTimer = null
@@ -87,6 +90,11 @@ function categoryLabel(id) {
     if (hit) return hit.label
   }
   return id || '未分类'
+}
+
+function heatWidth(item) {
+  const max = Math.max(1, ...(insights.value?.domainHeat || []).map(x => x.count))
+  return `${Math.round((Number(item.count) || 0) / max * 100)}%`
 }
 
 function llmBadge(item) {
@@ -159,11 +167,58 @@ async function loadDigest() {
   }
 }
 
+async function loadInsights() {
+  loading.value = true
+  error.value = ''
+  try {
+    const r = await contentApi.insights(null, { hours: 24 })
+    if (!r.ok) { error.value = r.error || '读取洞察失败'; return }
+    insights.value = r
+    keywordDraft.value = (r.keywords || []).join(', ')
+  } finally {
+    loading.value = false
+  }
+}
+
 async function reloadCurrent() {
   if (view.value === 'timeline') await loadTimeline()
   else if (view.value === 'events') await loadEvents()
+  else if (view.value === 'trends') await loadInsights()
   else await loadDigest()
   await loadStats()
+}
+
+async function filterByEntity(entity) {
+  entityFilter.value = { id: entity.id, name: entity.name }
+  view.value = 'timeline'
+  loading.value = true
+  error.value = ''
+  try {
+    const r = await contentApi.entity(null, entity.id, { limit: 50 })
+    if (!r.ok) { error.value = r.error || '读取实体条目失败'; return }
+    items.value = r.items || []
+    hasMore.value = false
+  } finally {
+    loading.value = false
+  }
+}
+
+async function clearEntityFilter() {
+  entityFilter.value = null
+  await loadTimeline()
+}
+
+async function markAlert(alert) {
+  const r = await contentApi.markAlertsRead(null, [alert.id])
+  if (r.ok) alert.read = true
+}
+
+async function saveKeywords() {
+  const list = keywordDraft.value.split(/[,，]/).map(s => s.trim()).filter(Boolean)
+  const r = await contentApi.setKeywords(null, list)
+  if (!r.ok) { error.value = r.error || '保存关键词失败（需要登录后台）'; return }
+  notice.value = '告警关键词已保存'
+  await loadInsights()
 }
 
 async function loadMore() {
@@ -278,8 +333,10 @@ function openEntry(item) {
 watch(domain, () => {
   category.value = ''
   expandedEvent.value = ''
+  entityFilter.value = null
   if (view.value === 'timeline') loadTimeline()
   else if (view.value === 'events') loadEvents()
+  else if (view.value === 'trends') loadInsights()
 })
 watch(category, () => { if (view.value === 'timeline') loadTimeline() })
 watch(unreadOnly, () => { if (view.value === 'timeline') loadTimeline() })
@@ -288,6 +345,7 @@ watch(view, () => {
   error.value = ''
   if (view.value === 'timeline') loadTimeline()
   else if (view.value === 'events') loadEvents()
+  else if (view.value === 'trends') loadInsights()
   else loadDigest()
 })
 
@@ -356,6 +414,7 @@ onBeforeUnmount(() => {
     <nav class="cv-views">
       <button type="button" :class="{ active: view === 'timeline' }" @click="view = 'timeline'">时间线</button>
       <button type="button" :class="{ active: view === 'events' }" @click="view = 'events'">事件</button>
+      <button type="button" :class="{ active: view === 'trends' }" @click="view = 'trends'">趋势 / 告警</button>
       <button type="button" :class="{ active: view === 'digest' }" @click="view = 'digest'">每日简报</button>
     </nav>
 
@@ -378,6 +437,11 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
+    <div v-if="entityFilter" class="cv-entity-filter">
+      实体：<b>{{ entityFilter.name }}</b>
+      <button class="cv-mini" type="button" @click="clearEntityFilter">清除</button>
+    </div>
+
     <div v-if="loading" class="cv-empty">正在读取…</div>
 
     <!-- 时间线 -->
@@ -391,6 +455,10 @@ onBeforeUnmount(() => {
             <time class="cv-time">{{ fmtRelative(item.publishedAt) }}</time>
             <span class="cv-cat">{{ categoryLabel(item.categoryId) }}</span>
             <span v-if="llmBadge(item)" class="cv-ai">{{ llmBadge(item) }}</span>
+            <button
+              v-for="entity in (item.entities || [])" :key="entity.id"
+              class="cv-entity" type="button" @click="filterByEntity(entity)"
+            >{{ entity.name }}</button>
           </div>
           <h2 class="cv-item-title">
             <a :href="item.url" target="_blank" rel="noopener noreferrer" @click="openEntry(item)">
@@ -433,6 +501,9 @@ onBeforeUnmount(() => {
             <span v-else>{{ event.title }}</span>
           </h2>
           <p v-if="event.summary" class="cv-summary">{{ event.summary }}</p>
+          <div v-if="eventDetail?.id === event.id && eventDetail?.entities?.length" class="cv-event-entities">
+            <span v-for="entity in eventDetail.entities" :key="entity.id" class="cv-entity">{{ entity.name }}</span>
+          </div>
           <div class="cv-item-foot">
             <button class="cv-mini" type="button" @click="toggleEvent(event)">
               {{ expandedEvent === event.id ? '收起报道' : `查看 ${event.entryCount} 条报道` }}
@@ -451,6 +522,62 @@ onBeforeUnmount(() => {
           </div>
         </article>
       </section>
+    </template>
+
+    <!-- 趋势 / 告警 -->
+    <template v-else-if="view === 'trends'">
+      <div v-if="!insights" class="cv-empty">正在读取洞察…</div>
+      <template v-else>
+        <section class="cv-panel">
+          <div class="cv-panel-head">
+            <h3>突增实体（24h）</h3>
+            <span class="cv-hint">当前窗口 vs 过去 7 天基线</span>
+          </div>
+          <div class="cv-trend-grid">
+            <article v-for="t in insights.trends.slice(0, 12)" :key="t.entityId" class="cv-trend-card">
+              <header>
+                <b>{{ t.name }}</b>
+                <span class="cv-trend-z" :class="{ hot: t.z >= 5 }">z {{ t.z }}</span>
+              </header>
+              <p>{{ t.current }} 条 · 基线期望 {{ t.expected }} · {{ t.sources }} 个来源</p>
+              <button class="cv-mini" type="button" @click="filterByEntity({ id: t.entityId, name: t.name })">
+                查看相关条目
+              </button>
+            </article>
+            <p v-if="!insights.trends.length" class="cv-empty">暂无明显突增</p>
+          </div>
+        </section>
+
+        <section class="cv-panel">
+          <div class="cv-panel-head"><h3>领域热度（24h）</h3></div>
+          <div v-for="d in insights.domainHeat" :key="d.domain" class="cv-heat-row">
+            <span class="cv-heat-domain">{{ d.domain }}</span>
+            <div class="cv-heat-bar"><i :style="{ width: heatWidth(d) }"></i></div>
+            <span class="cv-heat-num">{{ d.count }}</span>
+          </div>
+          <p v-if="!insights.domainHeat.length" class="cv-empty">暂无数据</p>
+        </section>
+
+        <section class="cv-panel">
+          <div class="cv-panel-head">
+            <h3>告警</h3>
+            <span class="cv-hint">实体突增 / 关键词 / 来源失败</span>
+          </div>
+          <div class="cv-alert-keywords">
+            <input v-model="keywordDraft" class="cv-input" placeholder="关键词告警，用逗号分隔">
+            <button class="cv-btn" type="button" @click="saveKeywords">保存关键词</button>
+          </div>
+          <article v-for="a in insights.alerts" :key="a.id" class="cv-alert" :class="{ read: a.read }">
+            <span class="cv-alert-sev" :class="a.severity">{{ a.severity }}</span>
+            <div class="cv-alert-main">
+              <b>{{ a.title }}</b>
+              <p>{{ a.detail }}</p>
+            </div>
+            <button v-if="!a.read" class="cv-mini" type="button" @click="markAlert(a)">标记已读</button>
+          </article>
+          <p v-if="!insights.alerts.length" class="cv-empty">暂无告警</p>
+        </section>
+      </template>
     </template>
 
     <!-- 简报 -->
@@ -568,6 +695,48 @@ onBeforeUnmount(() => {
 
 .cv-empty { padding: 40px 0; text-align: center; color: var(--text-secondary); font-size: 13px; }
 .cv-more { display: flex; justify-content: center; margin-top: 18px; }
+
+.cv-entity-filter {
+  display: flex; align-items: center; gap: 8px; margin: 12px 0; padding: 8px 12px;
+  border: 1px solid var(--accent); border-radius: 8px; font-size: 13px;
+}
+.cv-entity {
+  padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px;
+  background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 10.5px;
+}
+.cv-entity:hover { border-color: var(--accent); color: var(--accent); }
+
+.cv-panel { margin-top: 16px; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.cv-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.cv-panel-head h3 { margin: 0; font-size: 15px; }
+.cv-hint { color: var(--text-secondary); font-size: 11.5px; }
+.cv-trend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.cv-trend-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.cv-trend-card header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.cv-trend-card p { margin: 6px 0; color: var(--text-secondary); font-size: 12px; }
+.cv-trend-z {
+  font-size: 11px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-secondary);
+}
+.cv-trend-z.hot { color: var(--danger, #b91c1c); border-color: currentColor; }
+.cv-heat-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; font-size: 12px; }
+.cv-heat-domain { width: 90px; color: var(--text-secondary); }
+.cv-heat-bar { flex: 1; height: 8px; background: var(--border); border-radius: 999px; overflow: hidden; }
+.cv-heat-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.cv-heat-num { width: 36px; text-align: right; }
+.cv-alert-keywords { display: flex; gap: 8px; margin-bottom: 10px; }
+.cv-alert { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.cv-alert:last-child { border-bottom: none; }
+.cv-alert.read { opacity: .55; }
+.cv-alert-main { flex: 1; }
+.cv-alert-main b { font-size: 13px; }
+.cv-alert-main p { margin: 3px 0 0; color: var(--text-secondary); font-size: 12px; }
+.cv-alert-sev {
+  font-size: 10px; padding: 1px 7px; border-radius: 999px;
+  border: 1px solid var(--border); color: var(--text-secondary); white-space: nowrap;
+}
+.cv-alert-sev.high { color: var(--danger, #b91c1c); border-color: currentColor; }
+.cv-alert-sev.medium { color: var(--warning, #b45309); border-color: currentColor; }
 
 @media (max-width: 640px) {
   .cv-head { flex-direction: column; }

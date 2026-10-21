@@ -65,6 +65,30 @@ export const contentApi = {
   processing(key) {
     return call('GET', { query: { processing: '1' } }, key)
   },
+  insights(key, { hours = 24 } = {}) {
+    return call('GET', { query: { insights: '1', hours: String(hours) } }, key)
+  },
+  entities(key, { hours = 24 } = {}) {
+    return call('GET', { query: { entities: '1', hours: String(hours) } }, key)
+  },
+  entity(key, id, { limit = 50 } = {}) {
+    return call('GET', { query: { entity: id, limit: String(limit) } }, key)
+  },
+  alerts(key, { limit = 20, unread = false } = {}) {
+    return call('GET', { query: { alerts: '1', limit: String(limit), unread: unread ? '1' : '' } }, key)
+  },
+  markAlertsRead(key, ids) {
+    return call('POST', { body: { ids }, query: { action: 'alert-read' } }, key)
+  },
+  setKeywords(key, keywords) {
+    return call('POST', { body: { keywords }, query: { action: 'set-keywords' } }, key)
+  },
+  setCredibility(key, id, value) {
+    return call('POST', { body: { id, value }, query: { action: 'credibility' } }, key)
+  },
+  insightsRefresh(key) {
+    return call('POST', { body: {}, query: { action: 'insights' } }, key)
+  },
   process(key, { wait = false, extractLimit, summaryLimit } = {}) {
     return call('POST', {
       body: { wait, extractLimit, summaryLimit },

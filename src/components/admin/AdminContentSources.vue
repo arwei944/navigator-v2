@@ -41,7 +41,7 @@ const allCategories = computed(() => {
 function emptyForm() {
   return {
     id: '', label: '', type: 'rss', url: '', domain: 'ai-work',
-    categoryId: 'learning', weight: 1, maxItems: 60, enabled: true,
+    categoryId: 'learning', weight: 1, credibility: 1, maxItems: 60, enabled: true,
   }
 }
 
@@ -215,6 +215,7 @@ onMounted(load)
           </select>
         </label>
         <label><span>权重</span><input v-model.number="form.weight" type="number" min="0.1" max="3" step="0.05"></label>
+        <label><span>可信度</span><input v-model.number="form.credibility" type="number" min="0.2" max="2" step="0.05"></label>
         <label><span>单次上限</span><input v-model.number="form.maxItems" type="number" min="1" max="200"></label>
         <label class="inline"><input v-model="form.enabled" type="checkbox"> 启用</label>
       </div>
@@ -230,7 +231,7 @@ onMounted(load)
       <table class="cs-table">
         <thead>
           <tr>
-            <th>源</th><th>类型</th><th>领域 / 分类</th><th>状态</th><th>上次抓取</th><th>下次</th><th>操作</th>
+            <th>源</th><th>类型</th><th>领域 / 分类</th><th>可信度</th><th>状态</th><th>上次抓取</th><th>下次</th><th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -241,6 +242,7 @@ onMounted(load)
             </td>
             <td>{{ s.type }}</td>
             <td>{{ s.domain }} / {{ s.categoryId }}</td>
+            <td>{{ Number(s.credibility || 1).toFixed(2) }}</td>
             <td>
               <span v-if="s.failCount" class="cs-pill bad">失败 {{ s.failCount }}</span>
               <span v-else-if="s.enabled" class="cs-pill ok">正常</span>
@@ -256,7 +258,7 @@ onMounted(load)
               <button class="cs-mini danger" type="button" :disabled="busy === s.id" @click="remove(s)">删除</button>
             </td>
           </tr>
-          <tr v-if="!sources.length"><td colspan="7" class="cs-empty">还没有内容源</td></tr>
+          <tr v-if="!sources.length"><td colspan="8" class="cs-empty">还没有内容源</td></tr>
         </tbody>
       </table>
     </div>
