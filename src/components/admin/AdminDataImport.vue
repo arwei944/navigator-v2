@@ -8,6 +8,7 @@
 import { ref, computed } from 'vue'
 import { dataManagerApi } from '@/services/dataManagerApi'
 import { useDataWrite } from '@/composables/useDataWrite'
+import { fmtBytes } from '@/utils/format'
 
 const props = defineProps({
   adminKey: { type: String, default: '' },
@@ -34,13 +35,6 @@ const strategyDesc = computed(() => {
   const hit = props.catalog.find(s => s.key === strategy.value)
   return hit ? hit.desc : ''
 })
-
-function fmtBytes(n) {
-  if (!Number.isFinite(n)) return '—'
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(2)} MB`
-}
 
 function onFile(ev) {
   const file = ev.target.files && ev.target.files[0]

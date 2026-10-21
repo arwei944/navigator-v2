@@ -7,6 +7,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { contentApi } from '@/services/contentApi'
 import { useCategoriesStore } from '@/stores/categories'
+import { fmtDateTimeShort as fmtTime } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const categoriesStore = useCategoriesStore()
@@ -41,16 +42,8 @@ const allCategories = computed(() => {
 function emptyForm() {
   return {
     id: '', label: '', type: 'rss', url: '', domain: 'ai-work',
-    categoryId: 'learning', weight: 1, credibility: 1, maxItems: 60, enabled: true,
+    categoryId: 'learning', weight: 1, credibility: 1, maxItems: 60, intervalMin: 20, enabled: true,
   }
-}
-
-function fmtTime(ts) {
-  if (!ts) return '—'
-  const d = new Date(Number(ts))
-  if (Number.isNaN(d.getTime())) return '—'
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 function say(text, tone = '') {
@@ -102,6 +95,7 @@ async function save() {
       id: form.value.id.trim(),
       weight: Number(form.value.weight) || 1,
       maxItems: Number(form.value.maxItems) || 60,
+      intervalMin: Number(form.value.intervalMin) || 20,
     })
     if (!r.ok) { say(r.error || '保存失败', 'error'); return }
     say('已保存')
@@ -217,6 +211,7 @@ onMounted(load)
         <label><span>权重</span><input v-model.number="form.weight" type="number" min="0.1" max="3" step="0.05"></label>
         <label><span>可信度</span><input v-model.number="form.credibility" type="number" min="0.2" max="2" step="0.05"></label>
         <label><span>单次上限</span><input v-model.number="form.maxItems" type="number" min="1" max="200"></label>
+        <label><span>抓取间隔（分）</span><input v-model.number="form.intervalMin" type="number" min="1" max="1440"></label>
         <label class="inline"><input v-model="form.enabled" type="checkbox"> 启用</label>
       </div>
       <div class="cs-form-actions">
@@ -231,7 +226,7 @@ onMounted(load)
       <table class="cs-table">
         <thead>
           <tr>
-            <th>源</th><th>类型</th><th>领域 / 分类</th><th>可信度</th><th>状态</th><th>上次抓取</th><th>下次</th><th>操作</th>
+            <th>源</th><th>类型</th><th>间隔</th><th>领域 / 分类</th><th>可信度</th><th>状态</th><th>上次抓取</th><th>下次</th><th>操作</th>
           </tr>
         </thead>
         <tbody>
@@ -241,6 +236,7 @@ onMounted(load)
               <code class="cs-id">{{ s.id }}</code>
             </td>
             <td>{{ s.type }}</td>
+            <td>{{ s.intervalMin || 20 }} 分</td>
             <td>{{ s.domain }} / {{ s.categoryId }}</td>
             <td>{{ Number(s.credibility || 1).toFixed(2) }}</td>
             <td>

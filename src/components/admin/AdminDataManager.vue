@@ -23,6 +23,7 @@ import { dataManagerApi } from '@/services/dataManagerApi'
 import AdminDataRepair from './AdminDataRepair.vue'
 import AdminDataMerge from './AdminDataMerge.vue'
 import AdminDataImport from './AdminDataImport.vue'
+import { fmtDateTimeSec as fmtTime, fmtBytes } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['applied'])
@@ -83,20 +84,6 @@ function downloadBlob(blob, filename) {
 function pct(n, d) {
   if (!d) return 0
   return Math.round((n / d) * 1000) / 10
-}
-
-function fmtTime(ts) {
-  if (!ts) return '—'
-  const d = new Date(Number(ts))
-  if (Number.isNaN(d.getTime())) return '—'
-  return d.toLocaleString('zh-CN', { hour12: false })
-}
-
-function fmtBytes(n) {
-  if (!Number.isFinite(n)) return '—'
-  if (n < 1024) return `${n} B`
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`
-  return `${(n / 1024 / 1024).toFixed(2)} MB`
 }
 
 async function load() {

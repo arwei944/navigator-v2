@@ -15,6 +15,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ingestApi } from '@/services/ingestApi'
+import { fmtDateTimeShort as fmtTime } from '@/utils/format'
 
 const props = defineProps({ adminKey: { type: String, default: '' } })
 const emit = defineEmits(['applied'])
@@ -65,14 +66,6 @@ const visibleRows = computed(() => rows.value.slice(0, MAX_RENDER))
 const selectedCount = computed(() => picked.value.size)
 
 function say(text, t = '') { notice.value = text; tone.value = t }
-
-function fmtTime(value) {
-  if (!value) return '—'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return String(value)
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
 
 async function loadList() {
   const r = await ingestApi.list(props.adminKey)

@@ -119,7 +119,9 @@ const SITES = [
   const r = JSON.parse(res.body)
   ok(r.restored.version > cur.version, '恢复后 version 严格递增（客户端才肯应用）', `${cur.version} → ${r.restored.version}`)
   eq(r.restored.sites, 2, '恢复站点数正确')
-  ok(String(r.safetySnapshot).includes('pre-restore'), '恢复前留了安全快照', r.safetySnapshot)
+  // 备份已升级为内容寻址：路径不再带 pre-restore 前缀，语义记在 manifest.backupKind
+  const safety = JSON.parse(await new Response((await store.get(r.safetySnapshot, {})).stream).text())
+  eq(safety.backupKind, 'pre-restore', '恢复前留了安全快照（manifest 标记 pre-restore）', r.safetySnapshot)
   const after = JSON.parse(await new Response((await store.get('sites.json', {})).stream).text())
   eq(after.sites.length, 2, '落库后站点数正确')
 }

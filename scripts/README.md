@@ -30,6 +30,8 @@
 | `watch-deploy.mjs` | 监听源码变更并自动触发部署（含持续推进/失败回退语义） |
 | `verify-icons-online.mjs` | 线上图标可访问性校验（站点地址由发布通道给出） |
 | `audit-data.mjs` | 站点数据质量体检 CLI（F1：真重复 / 同站多入口 / 缺 icon / 描述质量） |
+| `bump-version.mjs` | 发布前递增 patch 版本（package.json + 版本清单），让页脚版本号与部署一致 |
+| `upgrade-guard.mjs` | 升级数据守护：部署前后对比条数 / 版本 / 审计数，异常自动回滚 |
 
 ## 3. 账号与本地工具
 
@@ -38,6 +40,7 @@
 | `hash-password.mjs` | 生成管理后台口令的 scrypt 哈希 |
 | `set-admin-password.mjs` | 交互式设置管理后台口令 |
 | `perf-scroll.mjs` | 滚动性能基线采集 |
+| `clean-content-text.mjs` | 清洗内容库里的 HTML 实体与模板词（一次性修复脚本，可重复执行） |
 
 ## 4. 历史一次性脚本（使命已完成，保留供追溯 / 按需复跑）
 

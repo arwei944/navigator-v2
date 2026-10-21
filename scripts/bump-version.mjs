@@ -7,9 +7,10 @@
  *   node scripts/bump-version.mjs --minor
  *   node scripts/bump-version.mjs --dry-run
  *
- * 只改 version 一个字段，保留原有键顺序与两空格缩进。
+ * 只改 version 一个字段，保留原有键顺序与两空格缩进；
+ * 同时同步 `.release-please-manifest.json`，否则 release-please 会按旧基线算错下一版。
  */
-import { readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { bumpVersion } from '../shared/version-bump.mjs'
@@ -30,6 +31,15 @@ export function bumpPackageVersion({ part = 'patch', dryRun = false } = {}) {
   if (!dryRun) {
     pkg.version = to
     writeFileSync(PKG, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8')
+    // release-please 的基线文件必须与 package.json 同步，否则下一版会算错
+    const manifest = join(ROOT, '.release-please-manifest.json')
+    if (existsSync(manifest)) {
+      try {
+        const data = JSON.parse(readFileSync(manifest, 'utf8'))
+        data['.'] = to
+        writeFileSync(manifest, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
+      } catch { /* 清单损坏时不阻塞发布，交由门禁提示 */ }
+    }
   }
   return { from, to, changed: from !== to }
 }

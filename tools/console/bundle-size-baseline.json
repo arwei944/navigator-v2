@@ -1,13 +1,13 @@
 {
   "_note": "NAV-v8 产物体积基线。由 tools/console/test-bundle-size.mjs 读取，超基线即失败。有意的体积增量请改本文件并在此补一句备注（格式见下方 history）。",
-  "_updated": "2026-10-19",
+  "_updated": "2026-10-22",
   "baseline": {
-    "shellGzBytes": 563200,
-    "_shellGzBytes_note": "550 KiB。2026-10-19 领域流水线插件实测 546.3 KiB gz（触及旧基线边界），上调留余量。新增一个整页视图（三视图 + 领域/环节渲染），属新功能的有意增量。",
-    "swPrecacheItems": 26,
-    "_swPrecacheItems_note": "2026-10-19 领域流水线插件落地后实测 26 条，留 1 条浮动。该视图与既有低频页一样走运行时缓存。",
-    "swPrecacheBytes": 819200,
-    "_swPrecacheBytes_note": "2026-10-19 领域流水线插件落地后实测约 0.75 MB（触及旧基线边界），上调到 800 KiB 留 5% 余量。"
+    "shellGzBytes": 624640,
+    "_shellGzBytes_note": "610 KiB。2026-10-22 内容情报阶段 1–3（ContentView + 图谱/影响/周报组件）实测 584.7 KiB gz，上调留约 4% 余量。属新功能的有意增量。",
+    "swPrecacheItems": 30,
+    "_swPrecacheItems_note": "2026-10-22 内容情报落地后实测 29 条，留 1 条浮动。内容页与后台仍走运行时缓存。",
+    "swPrecacheBytes": 890880,
+    "_swPrecacheBytes_note": "2026-10-22 实测约 0.80 MB，上调到 870 KiB 留余量。"
   },
   "target": {
     "_note": "M2 减重目标（规划 §3.1 / §4 验收表），仅供台账打印，不作为断言。",
@@ -40,6 +40,11 @@
       "date": "2026-10-19",
       "by": "domain-flow",
       "note": "新增领域流水线插件（/domain）：按「领域×环节」组织站点，三视图切换。外壳 544 → 546.3 KiB gz；预缓存 24 → 26 条（偏保守，实际视图走运行时缓存）。"
+    },
+    {
+      "date": "2026-10-22",
+      "by": "content-intel",
+      "note": "内容情报阶段 1–3：内容页新增事件/趋势/图谱/周报视图与三个子组件（图谱 SVG、影响面板、周报面板），ContentView chunk 24.9 KiB raw / 9.2 KiB gz。外壳 550 → 610 KiB gz；预缓存 26 → 30 条。"
     }
   ]
 }

@@ -134,8 +134,11 @@ transition 的时长只有 **3 档**，定义在 `main.css` 的 `:root`：
 |---|---|---|
 | 520 | `xs` | AdminLogin 窄屏表单 |
 | 560 | `sm` | AboutView 窄屏排版 |
+| 640 | `content` | 内容页与实体图谱窄屏 |
+| 760 | `admin-narrow` | AdminDataManager 窄屏表格 |
 | **768** | `md` | **主断点**：移动端切换（全局 20+ 处） |
 | 820 | `md-alt` | AdminView 双栏折叠 |
+| 860 | `admin-ingest` | AdminIngest 窄屏表单 |
 | 900 | `lg` | 后台三栏折叠（AdminInsights / InsightsView 等） |
 | 1024 | `xl` | 右栏折叠 + MainToolbar 换挡 |
 | 1300 / 1360 / 1500 | `tb-1/2/3` | MainToolbar 间距微调 |

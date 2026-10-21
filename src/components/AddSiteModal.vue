@@ -658,16 +658,16 @@ loadSuggestCategory().catch(() => {})
 .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
 .hint { font-weight: 400; font-size: 11.5px; color: var(--text-secondary); }
 .field-tag { margin-left: 6px; font-weight: 500; font-size: 10.5px; padding: 1px 6px; border-radius: 999px; }
-.field-tag.ok { color: #047857; background: #d1fae5; }
-.field-tag.warn { color: #b45309; background: #fef3c7; }
+.field-tag.ok { color: var(--success); background: color-mix(in srgb, var(--success) 14%, var(--bg)); }
+.field-tag.warn { color: var(--warning); background: color-mix(in srgb, var(--warning) 14%, var(--bg)); }
 .field-note { margin-top: 4px; font-size: 11.5px; color: var(--text-secondary); }
-.field-note.translated { color: #0d9488; }
+.field-note.translated { color: var(--success); }
 .url-row { display: flex; gap: 8px; }
 .url-row .form-input { flex: 1; }
 .status-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; }
-.status-line.ok { color: #047857; }
-.status-line.warn { color: #b45309; }
-.status-line.err { color: #dc2626; }
+.status-line.ok { color: var(--success); }
+.status-line.warn { color: var(--warning); }
+.status-line.err { color: var(--danger); }
 .status-line.loading { color: var(--text-secondary); }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .form-input {

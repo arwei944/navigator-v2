@@ -126,6 +126,22 @@ export const ENV_VARS = [
   { name: 'NAV_ALERT_WEBHOOK_URL', scope: 'runtime', example: '""', desc: '告警站外出口（G3）：巡检判出连续不可达时 POST 到此地址；逗号分隔即多渠道；留空则完全不推送' },
   { name: 'NAV_ALERT_WEBHOOK_FORMAT', scope: 'runtime', desc: '告警 webhook 载荷格式：json（默认，通用）/ text（飞书、钉钉文本机器人）' },
 
+  // ── 内容情报（仅本地）─────────────────────────────────────────────
+  { name: 'NAV_CONTENT_ENABLED', scope: 'runtime', desc: '内容动态调度器开关；仅本地设为 1，线上不启用（/api/content 会返回 503）' },
+  { name: 'NAV_CONTENT_DB', scope: 'runtime', desc: '内容库路径（默认 data/content.db，独立于站点库）' },
+  { name: 'NAV_CONTENT_INTERVAL_MIN', scope: 'runtime', desc: '内容抓取调度间隔（分钟），默认 20；单源可在面板单独设置' },
+  { name: 'NAV_CONTENT_CONCURRENCY', scope: 'runtime', desc: '单轮抓取并发数，默认 4' },
+  { name: 'NAV_CONTENT_EXTRACT_LIMIT', scope: 'runtime', desc: '每轮正文抽取条数上限，默认 12' },
+  { name: 'NAV_CONTENT_SUMMARY_LIMIT', scope: 'runtime', desc: '每轮翻译 / 摘要条数上限，默认 12' },
+  { name: 'NAV_CONTENT_LLM_DAILY_MAX', scope: 'runtime', desc: '每日 LLM 摘要调用预算（条），超出后降级为规则摘要' },
+  { name: 'NAV_CONTENT_CLUSTER_THRESHOLD', scope: 'runtime', desc: '事件聚类余弦阈值，默认 0.55' },
+
+  // ── 三端同步 ──────────────────────────────────────────────────────
+  { name: 'NAV_SYNC_ENABLED', scope: 'runtime', desc: '三端自动同步开关' },
+  { name: 'NAV_SYNC_INTERVAL_SEC', scope: 'runtime', desc: '三端自动同步间隔（秒）' },
+  { name: 'NAV_SYNC_TIMEOUT_MS', scope: 'runtime', desc: '三端同步单次请求超时（毫秒）' },
+  { name: 'NAV_SYNC_STATE_DIR', scope: 'runtime', desc: '三端同步状态与移除归档目录（默认 backups/sync）' },
+
   // ── 旧平台遗留 ─────────────────────────────────────────────────────
   { name: 'VERCEL_TOKEN', scope: 'legacy', desc: 'Vercel 部署凭据（该通道 2026-10-11 已被平台停用，保留以备用）' },
   { name: 'VERCEL_API_TOKEN', scope: 'legacy', desc: 'Vercel API 凭据（同上）' },

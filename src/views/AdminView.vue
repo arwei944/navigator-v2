@@ -282,7 +282,7 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fmtDateTime } from '@/utils/format'
+import { fmtDateTime, fmtClockTime } from '@/utils/format'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
@@ -408,11 +408,7 @@ function setPublishMode(next) {
   setPublishModeValue(next)
 }
 
-function fmtAutoTime(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('zh-CN', { hour12: false })
-}
+const fmtAutoTime = (value) => (value ? fmtClockTime(value, '') : '')
 
 /* ---------------- 全局搜索（#21） ---------------- */
 
@@ -712,7 +708,7 @@ watch(webhookUrl, (v) => {
 .admin-stat-value.warn { color: var(--color-danger, #e5484d); }
 .admin-stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
 .admin-stat-sub { font-size: 11.5px; color: var(--text-disabled, var(--text-secondary)); margin-top: 2px; }
-.admin-stat-card.clickable { cursor: pointer; transition: border-color .15s, transform .15s; }
+.admin-stat-card.clickable { cursor: pointer; transition: border-color var(--dur-fast), transform var(--dur-fast); }
 .admin-stat-card.clickable:hover { border-color: var(--accent); }
 .admin-stat-card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .admin-section { padding: 0 32px 32px; }

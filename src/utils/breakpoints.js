@@ -14,8 +14,11 @@
 export const BREAKPOINTS = [
   { value: 520, name: 'xs', used: 'AdminLogin 窄屏表单' },
   { value: 560, name: 'sm', used: 'AboutView 窄屏排版' },
+  { value: 640, name: 'content', used: '内容页与实体图谱窄屏' },
+  { value: 760, name: 'admin-narrow', used: 'AdminDataManager 窄屏表格' },
   { value: 768, name: 'md', used: '主断点：移动端切换（全局 20+ 处）' },
   { value: 820, name: 'md-alt', used: 'AdminView 双栏折叠' },
+  { value: 860, name: 'admin-ingest', used: 'AdminIngest 窄屏表单' },
   { value: 900, name: 'lg', used: '后台三栏折叠（AdminInsights / InsightsView 等）' },
   { value: 1024, name: 'xl', used: '右栏折叠 + MainToolbar 换挡' },
   { value: 1300, name: 'tb-1', used: 'MainToolbar 间距微调' },

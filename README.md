@@ -350,7 +350,7 @@ CI 跑的是**与本地相同的全部门禁**，不是缩水版。两处差异�
 
 ```
 nav-v2/
-├── api/                   # 17 个接口，全部导出 (req, res) handler —— 见下方说明
+├── api/                   # 21 个接口，全部导出 (req, res) handler —— 见下方说明
 │   ├── sites.js           # 站点数据 GET/POST（存储适配层，POST 走 header 鉴权）+ 快照清单 / 回滚
 │   ├── session.js         # 用户会话数据读写（session/<key>，密钥隔离）
 │   ├── metadata.js        # URL 元信息抓取代理（shared/site-infer.mjs，返回名称/描述/分类/配色/图标）
@@ -424,7 +424,7 @@ nav-v2/
 
 ### 关于 `api/`（不要当成迁移残留删掉）
 
-`api/` 下 17 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，但它们**没有一个
+`api/` 下 21 个文件**全部**导出 Vercel 风格的 `(req, res)` handler，但它们**没有一个
 依赖 Vercel 平台** —— 只用 Node 内置模块与 `shared/` 下的纯函数，没有任何 `@vercel/*`。
 
 所以 `api/` 不是「迁到 BotKeep 后待清理的旧代码」，而是**默认发布通道实际在用的实现源**：

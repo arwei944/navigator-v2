@@ -1,6 +1,6 @@
 {
-  "total": 129,
-  "registered": 129,
+  "total": 132,
+  "registered": 132,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -27,6 +27,9 @@
     "tools/console/test-cloud-publish.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
+    "tools/console/test-content-feedback.mjs",
+    "tools/console/test-content-graph.mjs",
+    "tools/console/test-content-impact.mjs",
     "tools/console/test-content-insights.mjs",
     "tools/console/test-content-text.mjs",
     "tools/console/test-content.mjs",
@@ -427,6 +430,42 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 203
+    },
+    {
+      "file": "tools/console/test-content-feedback.mjs",
+      "name": "test-content-feedback",
+      "purpose": "阶段 3 门禁：隐藏/置顶、反馈权重、共现边落库、周报落库。",
+      "category": "数据与内容",
+      "lines": 140,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-content-graph.mjs",
+      "name": "test-content-graph",
+      "purpose": "阶段 3 门禁：实体共现边、图谱裁剪、确定性布局。",
+      "category": "数据与内容",
+      "lines": 112,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-content-impact.mjs",
+      "name": "test-content-impact",
+      "purpose": "阶段 3 门禁：影响评分、跨事件扩散、周报结构。",
+      "category": "数据与内容",
+      "lines": 153,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-content-insights.mjs",
@@ -1615,7 +1654,7 @@
       "name": "test-v10",
       "purpose": "v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。",
       "category": "服务端与运行时",
-      "lines": 193,
+      "lines": 195,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
