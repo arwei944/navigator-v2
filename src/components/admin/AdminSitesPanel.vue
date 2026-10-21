@@ -104,6 +104,10 @@
         全选筛选结果
       </label>
       <span>共 <b>{{ sitesStore.sites.length }}</b> 个站点</span>
+      <span v-if="sitesStore.localChangeCount" class="site-meta-hit">
+        本地草稿 <b>{{ sitesStore.localChangeCount }}</b> 项 ·
+        {{ publishRealtime ? '实时发布' : '待手动发布' }}
+      </span>
       <span v-if="isFiltering" class="site-meta-hit">命中 <b>{{ filtered.length }}</b> 个</span>
       <span class="site-meta-page">第 {{ page }} / {{ totalPages }} 页</span>
     </div>
@@ -195,6 +199,7 @@
 import { computed, defineAsyncComponent, reactive, ref, watch } from 'vue'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import { useCloudPublishMode } from '@/stores/cloudPublishMode'
 import { useHealthStore } from '@/stores/health'
 import { useClicksStore } from '@/stores/clicks'
 import { rankSites } from '@/utils/search'
@@ -212,6 +217,7 @@ defineProps({ adminKey: { type: String, default: '' } })
 
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
+const { isRealtime: publishRealtime } = useCloudPublishMode()
 const healthStore = useHealthStore()
 const clicksStore = useClicksStore()
 

@@ -172,7 +172,24 @@ export const useSitesStore = defineStore('sites', () => {
       order: localOrder.value,
       // visits 已迁到 history store（唯一存储），这里不再写第二份
     })
+    /*
+     * 通知「本机草稿变了」。实时发布模式监听这个事件，防抖后自动推送云端。
+     * 不在这里直接发请求：store 不该知道鉴权与网络，也不该让一次拖拽排序
+     * 触发一次同步请求（防抖由监听方负责）。
+     */
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nav-sites-local-change'))
+    }
   }
+
+  /** 本机草稿条目数（新增 + 编辑 + 删除 + 排序）；0 表示相对云端基底没有待发布内容 */
+  const localChangeCount = computed(() =>
+    localAdds.value.length
+    + Object.keys(localEdits.value || {}).length
+    + localDeletes.value.length
+    + localOrder.value.length,
+  )
+  const hasLocalChanges = computed(() => localChangeCount.value > 0)
 
   /**
    * 回收站落盘：**所有**改动回收站的入口都走这里，所以治理只挂一处即可，不会漏。
@@ -453,6 +470,7 @@ function rebuild() {
 
   return {
     sites, cloudSites, searchQuery, currentCategory, currentPurpose, sortBy, viewMode,
+    localChangeCount, hasLocalChanges,
     highlightSiteId, highlightSite, clearHighlight,
     filteredSites, categorySites, trash, batchMode, dragEnabled, selectedIds,
     cloudVersion, cloudLoaded, cloudError,

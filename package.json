@@ -166,7 +166,8 @@
     "console:test:tri-sync": "node tools/console/test-tri-sync.mjs",
     "console:test:ingest": "node tools/console/test-ingest.mjs",
     "console:test:upgrade-guard": "node tools/console/test-upgrade-guard.mjs",
-    "console:test:site-audit": "node tools/console/test-site-audit.mjs"
+    "console:test:site-audit": "node tools/console/test-site-audit.mjs",
+    "console:test:cloud-publish": "node tools/console/test-cloud-publish.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

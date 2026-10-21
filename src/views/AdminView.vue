@@ -171,6 +171,32 @@
 
             <div class="admin-publish-box">
               <p class="admin-publish-desc">将当前站点数据发布到云端后，所有已打开的页面会在 <b>30 秒内自动热更新</b>，无需刷新、无需重新部署。</p>
+
+              <div class="admin-publish-mode">
+                <span class="admin-publish-mode-label">发布模式</span>
+                <button
+                  type="button"
+                  class="admin-mode-btn"
+                  :class="{ active: publishMode === 'manual' }"
+                  @click="setPublishMode('manual')"
+                >手动发布</button>
+                <button
+                  type="button"
+                  class="admin-mode-btn"
+                  :class="{ active: publishMode === 'realtime' }"
+                  @click="setPublishMode('realtime')"
+                >实时发布</button>
+                <span v-if="publishMode === 'realtime'" class="admin-publish-live">
+                  改动约 1.5 秒后自动写入线上
+                </span>
+              </div>
+              <p
+                v-if="publishMode === 'realtime' && autoPublishMessage"
+                class="admin-publish-msg"
+                :class="{ success: autoPublishState === 'success', error: autoPublishState === 'error' }"
+              >
+                {{ autoPublishMessage }}<template v-if="autoPublishAt"> · {{ fmtAutoTime(autoPublishAt) }}</template>
+              </p>
               <p v-if="categoriesStore.dirty" class="admin-publish-warn">
                 检测到分类体系有本地改动，本次发布会一并推送新的分类表。
               </p>
@@ -269,6 +295,9 @@ import { useAdminAuth } from '@/composables/useAdminAuth'
 import { useAdminActions } from '@/composables/useAdminActions'
 import { useAdminDashboard } from '@/composables/useAdminDashboard'
 import { useAdminPublish } from '@/composables/useAdminPublish'
+import { useAutoPublish } from '@/composables/useAutoPublish'
+import { useCloudPublishMode } from '@/stores/cloudPublishMode'
+import { PUBLISH_MODE } from '../../shared/cloud-publish.mjs'
 
 import AdminLogin from '@/components/admin/AdminLogin.vue'
 import AdminSitesPanel from '@/components/admin/AdminSitesPanel.vue'
@@ -364,6 +393,23 @@ const { dashCards, railMetaOf, loadDash } = dash
 
 const publish = useAdminPublish({ adminKey, webhookUrl, sitesStore, categoriesStore, onPublished: loadUnread })
 const { publishState, publishMsg, preflight, preflightOk, preflightBlockers, onPreflight, publishToCloud, onRolled } = publish
+
+/* 发布模式：手动（默认）/ 实时。切到实时前必须确认 —— 它会立刻改变写入行为。 */
+const { mode: publishMode, setMode: setPublishModeValue } = useCloudPublishMode()
+const { state: autoPublishState, message: autoPublishMessage, lastAt: autoPublishAt } = useAutoPublish()
+
+function setPublishMode(next) {
+  if (next === PUBLISH_MODE.REALTIME && !window.confirm(
+    '开启后，本机每次站点改动会在约 1.5 秒后自动写入线上，不再需要手动点「发布到云端」。\n\n实时发布不跑发布预检，由服务端结构校验兜底。继续？',
+  )) return
+  setPublishModeValue(next)
+}
+
+function fmtAutoTime(value) {
+  if (!value) return ''
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString('zh-CN', { hour12: false })
+}
 
 /* ---------------- 全局搜索（#21） ---------------- */
 
@@ -701,6 +747,20 @@ watch(webhookUrl, (v) => {
 }
 .admin-publish-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.6; }
 .admin-publish-desc b { color: var(--accent); }
+.admin-publish-mode {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 8px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--bg-subtle, transparent);
+}
+.admin-publish-mode-label { font-size: 13px; color: var(--text-secondary); }
+.admin-mode-btn {
+  padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: var(--text); cursor: pointer; font-size: 12px;
+}
+.admin-mode-btn:hover { border-color: var(--accent); }
+.admin-mode-btn.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.admin-publish-live { font-size: 12px; color: var(--ok-fg, #15803d); }
 .admin-publish-warn {
   font-size: 12.5px; color: var(--warn-fg); background: var(--warn-bg); border: 1px solid var(--warn-border);
   border-radius: var(--radius-sm); padding: 8px 12px; margin-bottom: 14px;

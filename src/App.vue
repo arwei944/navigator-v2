@@ -155,6 +155,7 @@ import { useSidebarStore } from '@/stores/sidebar'
 import { usePreferencesStore } from '@/stores/preferences'
 import { useSitesStore } from '@/stores/sites'
 import { useCategoriesStore } from '@/stores/categories'
+import { useAutoPublish } from '@/composables/useAutoPublish'
 import { useClicksStore } from '@/stores/clicks'
 import MobileHeader from '@/components/MobileHeader.vue'
 import MobileTabBar from '@/components/MobileTabBar.vue'
@@ -235,6 +236,11 @@ const sidebarStore = useSidebarStore()
 const preferencesStore = usePreferencesStore()
 const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
+/**
+ * 实时发布调度器：全局安装一次。
+ * 默认手动模式下它什么都不做；只有用户在后台切到「实时发布」且已登录时才生效。
+ */
+useAutoPublish()
 const clicksStore = useClicksStore()
 const toastStore = useToastStore()
 const omniStore = useOmniStore()

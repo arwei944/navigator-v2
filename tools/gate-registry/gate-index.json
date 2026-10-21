@@ -1,6 +1,6 @@
 {
-  "total": 123,
-  "registered": 123,
+  "total": 124,
+  "registered": 124,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -24,6 +24,7 @@
     "tools/console/test-clicks-reset-ui.mjs",
     "tools/console/test-clicks-reset.mjs",
     "tools/console/test-cloud-poll.mjs",
+    "tools/console/test-cloud-publish.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
     "tools/console/test-contrast.mjs",
@@ -385,6 +386,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 2860
+    },
+    {
+      "file": "tools/console/test-cloud-publish.mjs",
+      "name": "test-cloud-publish",
+      "purpose": "发布模式的门禁：默认必须安全，实时模式必须同时满足「已登录 / 有草稿 / 不在发布中」。",
+      "category": "部署与发布",
+      "lines": 65,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-color-tokens-real.mjs",
@@ -1307,7 +1320,7 @@
       "name": "test-site-audit",
       "purpose": "站点变更审计的门禁。",
       "category": "数据与内容",
-      "lines": 104,
+      "lines": 110,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
