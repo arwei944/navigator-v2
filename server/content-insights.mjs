@@ -11,7 +11,7 @@
  * 所有步骤都是旁路：失败只记录，不影响内容入库。
  */
 import {
-  syncInsights, linkEventEntities, trendInputs, topEntities, listAlerts,
+  syncInsights, linkEventEntities, rebuildEntityEdges, trendInputs, topEntities, listAlerts,
   saveAlerts, failingSources, allEntities,
 } from './content-insights-store.mjs'
 import {
@@ -99,7 +99,10 @@ export function getInsights({ hours = 24 } = {}) {
 
 /** 处理管道末尾调用：写索引、关联事件、生成趋势与告警 */
 export async function refreshInsights({ now = Date.now() } = {}) {
-  const out = { sync: null, eventLinks: 0, trends: [], domainHeat: [], alertsAdded: 0, webhook: null, errors: [] }
+  const out = {
+    sync: null, eventLinks: 0, edges: 0, trends: [], domainHeat: [],
+    alertsAdded: 0, webhook: null, errors: [],
+  }
 
   // 索引覆盖完整保留期（30 天），趋势仍只比较最近 7 天
   try { out.sync = syncInsights({ days: 30 }) }
@@ -107,6 +110,10 @@ export async function refreshInsights({ now = Date.now() } = {}) {
 
   try { out.eventLinks = linkEventEntities() }
   catch (e) { out.errors.push({ step: 'event-links', error: String(e?.message || e) }) }
+
+  // 实体共现边：7 天窗口、至少 2 次共现
+  try { out.edges = rebuildEntityEdges({ days: 7 }).edges }
+  catch (e) { out.errors.push({ step: 'edges', error: String(e?.message || e) }) }
 
   let trends = []
   let entries = []

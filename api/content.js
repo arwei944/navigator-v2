@@ -30,9 +30,10 @@ function contentModules() {
       import('../server/content-process.mjs'),
       import('../server/content-insights-store.mjs'),
       import('../server/content-insights.mjs'),
+      import('../server/content-analytics.mjs'),
       import('../server/content-cron.mjs'),
-    ]).then(([store, fetch, process, insightsStore, insights, cron]) => ({
-      ...store, ...fetch, ...process, ...insightsStore, ...insights, ...cron,
+    ]).then(([store, fetch, process, insightsStore, insights, analytics, cron]) => ({
+      ...store, ...fetch, ...process, ...insightsStore, ...insights, ...analytics, ...cron,
     }))
   }
   return modsPromise
@@ -95,6 +96,48 @@ export default async function handler(req, res) {
         res.status(200).json({ ok: true, ...mods.getInsights({ hours: Number(query.hours) || 24 }) })
         return
       }
+      if (query.graph !== undefined) {
+        res.status(200).json({
+          ok: true,
+          ...mods.graphView({ hours: Number(query.hours) || 168, maxNodes: Number(query.nodes) || 40 }),
+        })
+        return
+      }
+      if (query.impact !== undefined) {
+        res.status(200).json({
+          ok: true,
+          ...mods.impactEvents({
+            domain: String(query.domain || ''),
+            hours: Number(query.hours) || 24,
+            limit: Number(query.limit) || 20,
+          }),
+        })
+        return
+      }
+      if (query.reports !== undefined) {
+        res.status(200).json({
+          ok: true,
+          items: mods.listReports({ type: String(query.type || 'weekly'), limit: Number(query.limit) || 12 }),
+        })
+        return
+      }
+      if (query.report !== undefined) {
+        const type = String(query.report || 'weekly')
+        const report = query.id ? mods.getReport(String(query.id)) : mods.latestReport(type)
+        res.status(200).json({ ok: true, report })
+        return
+      }
+      if (query.feedback !== undefined) {
+        res.status(200).json({
+          ok: true,
+          ...mods.feedbackView({
+            targetType: String(query.targetType || ''),
+            targetId: String(query.targetId || ''),
+            limit: Number(query.limit) || 50,
+          }),
+        })
+        return
+      }
       if (query.entities !== undefined) {
         res.status(200).json({
           ok: true,
@@ -104,8 +147,11 @@ export default async function handler(req, res) {
         return
       }
       if (query.entity) {
-        const items = mods.entityEntries(String(query.entity), { limit: Number(query.limit) || 50 })
-        res.status(200).json({ ok: true, items, count: items.length })
+        const id = String(query.entity)
+        const items = mods.entityEntries(id, { limit: Number(query.limit) || 50 })
+        res.status(200).json({
+          ok: true, items, count: items.length, neighbors: mods.entityNeighbors(id),
+        })
         return
       }
       if (query.alerts !== undefined) {
@@ -123,6 +169,20 @@ export default async function handler(req, res) {
           before: Number(query.before) || 0,
           since: Number(query.since) || 0,
         })
+        // 事件卡直接带影响分与实体，避免前端逐条再请求
+        try {
+          const assessed = new Map(
+            mods.impactEvents({ domain: String(query.domain || ''), hours: 24 * 30, limit: 80 })
+              .items.map(x => [x.id, x]),
+          )
+          for (const item of items) {
+            const hit = assessed.get(item.id)
+            if (!hit) continue
+            item.impact = hit.impact
+            item.entities = hit.entities
+            item.actions = hit.actions
+          }
+        } catch { /* 影响分析失败不影响事件列表 */ }
         res.status(200).json({ ok: true, items, count: items.length })
         return
       }
@@ -265,6 +325,23 @@ export default async function handler(req, res) {
         return
       }
 
+      if (action === 'feedback') {
+        const r = mods.applyFeedback({
+          targetType: String(body?.targetType || 'entry'),
+          targetId: String(body?.targetId || body?.id || ''),
+          action: String(body?.feedback || body?.verb || ''),
+          note: String(body?.note || ''),
+        })
+        res.status(200).json({ ok: true, ...r })
+        return
+      }
+
+      if (action === 'report') {
+        const report = await mods.ensureWeeklyReport({ force: Boolean(body?.force) })
+        res.status(200).json({ ok: true, report })
+        return
+      }
+
       if (action === 'source') {
         const source = mods.upsertSource({
           id: body?.id,
@@ -275,6 +352,7 @@ export default async function handler(req, res) {
           categoryId: body?.categoryId,
           weight: body?.weight,
           maxItems: body?.maxItems,
+          intervalMin: body?.intervalMin,
           enabled: body?.enabled,
         })
         if (body?.credibility !== undefined) mods.setCredibility(source.id, body.credibility)

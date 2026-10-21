@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto'
 import { db, entryRow } from './content-store.mjs'
 import { tokenize } from '../shared/content-text.mjs'
 import { extractEntities } from '../shared/content-entities.mjs'
+import { buildEntityEdges, entityGraph } from '../shared/content-graph.mjs'
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS entities (
@@ -60,6 +61,31 @@ db.exec(`
   )
 `)
 db.exec('CREATE INDEX IF NOT EXISTS idx_alerts_at ON alerts(created_at DESC)')
+// 阶段 3：实体共现边（无向图，a < b 规范化）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS entity_edges (
+    a       TEXT NOT NULL,
+    b       TEXT NOT NULL,
+    co      INTEGER NOT NULL DEFAULT 0,
+    sources INTEGER NOT NULL DEFAULT 0,
+    weight  REAL NOT NULL DEFAULT 0,
+    last_at INTEGER NOT NULL,
+    PRIMARY KEY (a, b)
+  )
+`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_edges_weight ON entity_edges(weight DESC)')
+// 阶段 3：人工反馈（隐藏/置顶/不相关/重要）
+db.exec(`
+  CREATE TABLE IF NOT EXISTS feedback (
+    id          TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,
+    target_id   TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    note        TEXT NOT NULL DEFAULT '',
+    created_at  INTEGER NOT NULL
+  )
+`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_feedback_target ON feedback(target_type, target_id)')
 
 const stmtUpsertEntity = db.prepare(`
   INSERT INTO entities (id, name, kind, first_seen, last_seen, count)
@@ -153,7 +179,7 @@ export function searchEntries({ q = '', domain = '', categoryId = '', since = 0,
   const terms = [...new Set(tokenize(q))].slice(0, 12)
   if (!terms.length) return null
   const placeholders = terms.map(() => '?').join(',')
-  const where = [`et.term IN (${placeholders})`]
+  const where = [`et.term IN (${placeholders})`, 'e.hidden = 0']
   const params = [...terms]
   if (domain) { where.push('e.domain = ?'); params.push(domain) }
   if (categoryId) { where.push('e.category_id = ?'); params.push(categoryId) }
@@ -184,7 +210,7 @@ export function topEntities({ hours = 24, limit = 20 } = {}) {
     FROM entity_mentions em
     JOIN entities en ON en.id = em.entity_id
     JOIN entries e ON e.id = em.entry_id
-    WHERE em.at >= ?
+    WHERE em.at >= ? AND e.hidden = 0
     GROUP BY en.id ORDER BY c DESC, latest DESC LIMIT ?
   `).all(since, Math.max(1, Math.min(Number(limit) || 20, 100))).map(r => ({
     id: r.id, name: r.name, kind: r.kind, count: r.c, sources: r.sources, latestAt: r.latest,
@@ -194,7 +220,7 @@ export function topEntities({ hours = 24, limit = 20 } = {}) {
 export function entityEntries(entityId, { limit = 50 } = {}) {
   return db.prepare(`
     SELECT e.* FROM entity_mentions em JOIN entries e ON e.id = em.entry_id
-    WHERE em.entity_id = ? ORDER BY e.published_at DESC LIMIT ?
+    WHERE em.entity_id = ? AND e.hidden = 0 ORDER BY e.published_at DESC LIMIT ?
   `).all(String(entityId), Math.max(1, Math.min(Number(limit) || 50, 200))).map(entryRow)
 }
 
@@ -208,7 +234,7 @@ export function trendInputs({ days = 7 } = {}) {
   const since = Date.now() - Math.max(1, days) * 86400000
   const entries = db.prepare(`
     SELECT id, published_at, source_id, domain, category_id, title, summary
-    FROM entries WHERE published_at >= ? ORDER BY published_at DESC
+    FROM entries WHERE published_at >= ? AND hidden = 0 ORDER BY published_at DESC
   `).all(since).map(r => ({
     id: r.id,
     publishedAt: r.published_at,
@@ -218,9 +244,12 @@ export function trendInputs({ days = 7 } = {}) {
     title: r.title,
     summary: r.summary,
   }))
-  const mentions = db.prepare('SELECT entity_id, entry_id, at FROM entity_mentions WHERE at >= ?')
-    .all(since)
-    .map(r => ({ entityId: r.entity_id, entryId: r.entry_id, at: r.at }))
+  const mentions = db.prepare(`
+    SELECT em.entity_id, em.entry_id, em.at, e.source_id
+    FROM entity_mentions em JOIN entries e ON e.id = em.entry_id
+    WHERE em.at >= ? AND e.hidden = 0
+  `).all(since)
+    .map(r => ({ entityId: r.entity_id, entryId: r.entry_id, at: r.at, sourceId: r.source_id }))
   const names = new Map(db.prepare('SELECT id, name, kind FROM entities').all().map(r => [r.id, { name: r.name, kind: r.kind }]))
   return { entries, mentions, names }
 }
@@ -287,4 +316,133 @@ export function failingSources({ threshold = 3 } = {}) {
   return db.prepare('SELECT id, label, fail_count, last_error FROM sources WHERE enabled = 1 AND fail_count >= ?')
     .all(Number(threshold) || 3)
     .map(r => ({ id: r.id, label: r.label, failCount: r.fail_count, error: r.last_error || '' }))
+}
+
+/* ---------------- 阶段 3：图谱 ---------------- */
+
+/** 建边与图谱共用的输入；隐藏条目不参与 */
+export function graphInputs({ days = 7, limit = 3000 } = {}) {
+  const since = Date.now() - Math.max(1, days) * 86400000
+  const mentions = db.prepare(`
+    SELECT em.entity_id, em.entry_id, em.at, e.source_id
+    FROM entity_mentions em JOIN entries e ON e.id = em.entry_id
+    WHERE em.at >= ? AND e.hidden = 0
+    ORDER BY em.at DESC LIMIT ?
+  `).all(since, Math.max(1, Math.min(Number(limit) || 3000, 8000)))
+    .map(r => ({ entityId: r.entity_id, entryId: r.entry_id, at: r.at, sourceId: r.source_id }))
+  const names = new Map(
+    db.prepare('SELECT id, name, kind FROM entities').all().map(r => [r.id, { name: r.name, kind: r.kind }]),
+  )
+  return { mentions, names }
+}
+
+/** 全量重建共现边（边数量小，重建比增量更不容易漂移） */
+export function rebuildEntityEdges({ days = 7, minCo = 2 } = {}) {
+  const { mentions } = graphInputs({ days, limit: 6000 })
+  const edges = buildEntityEdges({ mentions, minCo, limit: 800 })
+  db.exec('BEGIN')
+  try {
+    db.exec('DELETE FROM entity_edges')
+    const ins = db.prepare(`
+      INSERT OR REPLACE INTO entity_edges (a, b, co, sources, weight, last_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `)
+    for (const edge of edges) {
+      ins.run(edge.a, edge.b, edge.co, edge.sources, edge.weight, edge.lastAt || Date.now())
+    }
+    db.exec('COMMIT')
+  } catch (e) {
+    try { db.exec('ROLLBACK') } catch { /* 忽略 */ }
+    throw e
+  }
+  return { mentions: mentions.length, edges: edges.length }
+}
+
+export function graphData({ hours = 168, maxNodes = 40, minCo = 2 } = {}) {
+  const { mentions, names } = graphInputs({ days: Math.max(1, Number(hours) / 24), limit: 6000 })
+  return entityGraph({ mentions, names, maxNodes, minCo })
+}
+
+export function entityNeighbors(entityId, { limit = 12 } = {}) {
+  const id = String(entityId)
+  return db.prepare(`
+    SELECT CASE WHEN a = ? THEN b ELSE a END AS other, co, sources, weight, last_at
+    FROM entity_edges WHERE a = ? OR b = ?
+    ORDER BY weight DESC LIMIT ?
+  `).all(id, id, id, Math.max(1, Math.min(Number(limit) || 12, 50))).map(row => {
+    const meta = db.prepare('SELECT name, kind FROM entities WHERE id = ?').get(row.other) || {}
+    return {
+      id: row.other,
+      name: meta.name || row.other,
+      kind: meta.kind || 'unknown',
+      co: row.co,
+      sources: row.sources,
+      weight: row.weight,
+      lastAt: row.last_at,
+    }
+  })
+}
+
+/* ---------------- 阶段 3：人工反馈 ---------------- */
+
+export function addFeedback({ targetType = 'entry', targetId, action, note = '' } = {}) {
+  const type = String(targetType || 'entry')
+  const id = String(targetId || '')
+  const act = String(action || '')
+  if (!id || !act) throw new Error('反馈缺少目标或动作')
+  const createdAt = Date.now()
+  const fid = createHash('sha256')
+    .update(`${type}:${id}:${act}:${createdAt}:${Math.random()}`)
+    .digest('hex').slice(0, 20)
+  db.prepare(`
+    INSERT INTO feedback (id, target_type, target_id, action, note, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(fid, type, id, act, String(note || '').slice(0, 200), createdAt)
+  return { id: fid, targetType: type, targetId: id, action: act, note: String(note || ''), createdAt }
+}
+
+export function listFeedback({ targetType = '', targetId = '', limit = 50 } = {}) {
+  const where = []
+  const params = []
+  if (targetType) { where.push('target_type = ?'); params.push(String(targetType)) }
+  if (targetId) { where.push('target_id = ?'); params.push(String(targetId)) }
+  params.push(Math.max(1, Math.min(Number(limit) || 50, 200)))
+  return db.prepare(`
+    SELECT * FROM feedback ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY created_at DESC LIMIT ?
+  `).all(...params).map(r => ({
+    id: r.id,
+    targetType: r.target_type,
+    targetId: r.target_id,
+    action: r.action,
+    note: r.note,
+    createdAt: r.created_at,
+  }))
+}
+
+/**
+ * 反馈 → 来源权重系数。
+ * 「重要」加分、「不相关」减分，夹在 0.5–1.8 之间，避免几次点击就把一个源打死。
+ */
+export function feedbackScoreMap() {
+  const rows = db.prepare(`
+    SELECT CASE WHEN f.target_type = 'source' THEN f.target_id ELSE e.source_id END AS source_id,
+           f.action, COUNT(*) AS n
+    FROM feedback f
+    LEFT JOIN entries e ON f.target_type = 'entry' AND e.id = f.target_id
+    WHERE f.target_type IN ('entry', 'source')
+    GROUP BY source_id, f.action
+  `).all()
+  const map = new Map()
+  for (const row of rows) {
+    if (!row.source_id) continue
+    let score = map.get(row.source_id) ?? 1
+    if (row.action === 'important') score += 0.1 * Math.min(5, Number(row.n) || 0)
+    if (row.action === 'irrelevant') score -= 0.15 * Math.min(5, Number(row.n) || 0)
+    map.set(row.source_id, score)
+  }
+  for (const [id, score] of map) {
+    map.set(id, Math.max(0.5, Math.min(1.8, Math.round(score * 100) / 100)))
+  }
+  return map
 }

@@ -172,7 +172,10 @@
     "console:test:version-bump": "node tools/console/test-version-bump.mjs",
     "console:test:content": "node tools/console/test-content.mjs",
     "console:test:content-text": "node tools/console/test-content-text.mjs",
-    "console:test:content-insights": "node tools/console/test-content-insights.mjs"
+    "console:test:content-insights": "node tools/console/test-content-insights.mjs",
+    "console:test:content-graph": "node tools/console/test-content-graph.mjs",
+    "console:test:content-impact": "node tools/console/test-content-impact.mjs",
+    "console:test:content-feedback": "node tools/console/test-content-feedback.mjs"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

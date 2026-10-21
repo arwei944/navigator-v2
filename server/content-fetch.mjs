@@ -288,7 +288,9 @@ export async function refreshSources({ sourceIds = [], force = false, concurrenc
       }
       recordFetch({
         source, status: r.status, httpStatus: r.httpStatus, bytes: r.bytes,
-        durationMs: r.durationMs, added, error: r.error || '', intervalMinutes,
+        durationMs: r.durationMs, added, error: r.error || '',
+        // 每源独立频率：本地部署没有公网回调，用「高频轮询 + 条件请求」代替 WebSub
+        intervalMinutes: Number(source.intervalMin) || intervalMinutes,
       })
       return {
         sourceId: source.id, label: source.label, status: r.status,

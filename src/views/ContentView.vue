@@ -8,6 +8,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { contentApi } from '@/services/contentApi'
 import { useCategoriesStore } from '@/stores/categories'
+import { fmtDateTimeCompact, fmtRelative } from '@/utils/format'
+import ContentGraphPanel from '@/components/content/ContentGraphPanel.vue'
+import ContentImpactPanel from '@/components/content/ContentImpactPanel.vue'
+import ContentReportPanel from '@/components/content/ContentReportPanel.vue'
 
 const categoriesStore = useCategoriesStore()
 
@@ -47,6 +51,12 @@ const insights = ref(null)
 const entityFilter = ref(null)
 const keywordDraft = ref('')
 
+const graphData = ref(null)
+const impact = ref(null)
+const report = ref(null)
+const reportHistory = ref([])
+const generatingReport = ref(false)
+
 let statsTimer = null
 let searchTimer = null
 
@@ -63,26 +73,9 @@ const categoryOptions = computed(() => {
   return out
 })
 
-function fmtRelative(ts) {
-  if (!ts) return ''
-  const diff = Date.now() - Number(ts)
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`
-  if (diff < 7 * 86_400_000) return `${Math.floor(diff / 86_400_000)} 天前`
-  const d = new Date(Number(ts))
-  const pad = n => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
-function fmtRange(first, last) {
-  if (!first || !last) return ''
-  const a = new Date(Number(first))
-  const b = new Date(Number(last))
-  const pad = n => String(n).padStart(2, '0')
-  const day = d => `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-  return `${day(a)} ~ ${day(b)}`
-}
+const eventRange = (first, last) => (first && last
+  ? `${fmtDateTimeCompact(first)} ~ ${fmtDateTimeCompact(last)}`
+  : '')
 
 function categoryLabel(id) {
   for (const g of categoriesStore.groups || []) {
@@ -101,6 +94,10 @@ function llmBadge(item) {
   if (item.llmStatus === 'ok') return 'LLM 摘要'
   if (item.llmStatus === 'fallback') return '规则摘要'
   return ''
+}
+
+function levelText(level) {
+  return level === 'high' ? '高' : level === 'medium' ? '中' : '低'
 }
 
 async function loadSources() {
@@ -180,10 +177,92 @@ async function loadInsights() {
   }
 }
 
+async function loadGraph() {
+  loading.value = true
+  error.value = ''
+  try {
+    const r = await contentApi.graph(null, { hours: 168, nodes: 40 })
+    if (!r.ok) { error.value = r.error || '读取图谱失败'; return }
+    graphData.value = r
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadImpact() {
+  loading.value = true
+  error.value = ''
+  try {
+    const r = await contentApi.impact(null, { hours: 24, limit: 20 })
+    if (!r.ok) { error.value = r.error || '读取影响分析失败'; return }
+    impact.value = r
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadReport() {
+  loading.value = true
+  error.value = ''
+  try {
+    const [current, list] = await Promise.all([
+      contentApi.report(null, { type: 'weekly' }),
+      contentApi.reports(null, { type: 'weekly', limit: 12 }),
+    ])
+    if (current.ok) report.value = current.report || null
+    if (list.ok) reportHistory.value = list.items || []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function generateReport() {
+  if (generatingReport.value) return
+  generatingReport.value = true
+  error.value = ''
+  try {
+    const r = await contentApi.generateReport(null, { force: true })
+    if (!r.ok) { error.value = r.error || '生成周报失败（需要登录后台）'; return }
+    report.value = r.report
+    notice.value = '周报已更新'
+    const list = await contentApi.reports(null, { type: 'weekly', limit: 12 })
+    if (list.ok) reportHistory.value = list.items || []
+  } catch (e) {
+    error.value = String(e?.message || e)
+  } finally {
+    generatingReport.value = false
+  }
+}
+
+async function openReport(id) {
+  const r = await contentApi.report(null, { type: 'weekly', id })
+  if (r.ok) report.value = r.report
+}
+
+/** 反馈闭环：隐藏/置顶立即在当前列表生效，下一轮聚类会排除隐藏条目 */
+async function feedback(item, verb) {
+  const r = await contentApi.feedback(null, { id: item.id, feedback: verb })
+  if (!r.ok) { error.value = r.error || '操作失败（需要登录后台）'; return }
+  if (verb === 'hide' || verb === 'irrelevant') {
+    items.value = items.value.filter(x => x.id !== item.id)
+    notice.value = verb === 'irrelevant' ? '已隐藏，并降低该来源权重' : '已隐藏（可在下一轮聚类前恢复）'
+  } else if (verb === 'pin' || verb === 'important') {
+    item.pinned = true
+    notice.value = '已置顶'
+  } else if (verb === 'unpin') {
+    item.pinned = false
+  } else if (verb === 'unhide') {
+    item.hidden = false
+  }
+  await loadStats()
+}
+
 async function reloadCurrent() {
   if (view.value === 'timeline') await loadTimeline()
   else if (view.value === 'events') await loadEvents()
-  else if (view.value === 'trends') await loadInsights()
+  else if (view.value === 'trends') await Promise.all([loadInsights(), loadImpact()])
+  else if (view.value === 'graph') await loadGraph()
+  else if (view.value === 'report') await loadReport()
   else await loadDigest()
   await loadStats()
 }
@@ -336,7 +415,7 @@ watch(domain, () => {
   entityFilter.value = null
   if (view.value === 'timeline') loadTimeline()
   else if (view.value === 'events') loadEvents()
-  else if (view.value === 'trends') loadInsights()
+  else if (view.value === 'trends') Promise.all([loadInsights(), loadImpact()])
 })
 watch(category, () => { if (view.value === 'timeline') loadTimeline() })
 watch(unreadOnly, () => { if (view.value === 'timeline') loadTimeline() })
@@ -345,7 +424,9 @@ watch(view, () => {
   error.value = ''
   if (view.value === 'timeline') loadTimeline()
   else if (view.value === 'events') loadEvents()
-  else if (view.value === 'trends') loadInsights()
+  else if (view.value === 'trends') Promise.all([loadInsights(), loadImpact()])
+  else if (view.value === 'graph') loadGraph()
+  else if (view.value === 'report') loadReport()
   else loadDigest()
 })
 
@@ -415,10 +496,12 @@ onBeforeUnmount(() => {
       <button type="button" :class="{ active: view === 'timeline' }" @click="view = 'timeline'">时间线</button>
       <button type="button" :class="{ active: view === 'events' }" @click="view = 'events'">事件</button>
       <button type="button" :class="{ active: view === 'trends' }" @click="view = 'trends'">趋势 / 告警</button>
+      <button type="button" :class="{ active: view === 'graph' }" @click="view = 'graph'">图谱</button>
+      <button type="button" :class="{ active: view === 'report' }" @click="view = 'report'">周报</button>
       <button type="button" :class="{ active: view === 'digest' }" @click="view = 'digest'">每日简报</button>
     </nav>
 
-    <section v-if="view !== 'digest'" class="cv-filters">
+    <section v-if="view === 'timeline' || view === 'events' || view === 'trends'" class="cv-filters">
       <div class="cv-domains">
         <button
           v-for="d in DOMAINS" :key="d.id" type="button"
@@ -471,6 +554,8 @@ onBeforeUnmount(() => {
             <span v-if="item.author" class="cv-author">{{ item.author }}</span>
             <button class="cv-mini" type="button" @click="toggleRead(item)">{{ item.read ? '标为未读' : '标为已读' }}</button>
             <button class="cv-mini" type="button" @click="toggleSaved(item)">{{ item.saved ? '取消收藏' : '收藏' }}</button>
+            <button class="cv-mini" type="button" @click="feedback(item, item.pinned ? 'unpin' : 'pin')">{{ item.pinned ? '取消置顶' : '置顶' }}</button>
+            <button class="cv-mini" type="button" @click="feedback(item, 'hide')">隐藏</button>
           </div>
         </article>
       </section>
@@ -492,22 +577,35 @@ onBeforeUnmount(() => {
             <span class="cv-event-tag">事件</span>
             <span class="cv-source">{{ event.sourceCount }} 个来源</span>
             <span class="cv-dot">·</span>
-            <span class="cv-time">{{ fmtRange(event.firstSeen, event.lastSeen) }}</span>
+            <span class="cv-time">{{ eventRange(event.firstSeen, event.lastSeen) }}</span>
             <span class="cv-cat">{{ categoryLabel(event.categoryId) }}</span>
             <span class="cv-heat">热度 {{ Number(event.heat || 0).toFixed(2) }}</span>
+            <span v-if="event.impact" class="cv-impact" :class="event.impact.level">
+              影响 {{ event.impact.score }} · {{ levelText(event.impact.level) }}
+            </span>
           </div>
           <h2 class="cv-item-title">
             <a v-if="event.primaryUrl" :href="event.primaryUrl" target="_blank" rel="noopener noreferrer">{{ event.title }}</a>
             <span v-else>{{ event.title }}</span>
           </h2>
           <p v-if="event.summary" class="cv-summary">{{ event.summary }}</p>
-          <div v-if="eventDetail?.id === event.id && eventDetail?.entities?.length" class="cv-event-entities">
-            <span v-for="entity in eventDetail.entities" :key="entity.id" class="cv-entity">{{ entity.name }}</span>
+          <div
+            v-if="event.entities?.length || (eventDetail?.id === event.id && eventDetail?.entities?.length)"
+            class="cv-event-entities"
+          >
+            <span
+              v-for="entity in (event.entities?.length ? event.entities : eventDetail.entities)"
+              :key="entity.id" class="cv-entity"
+            >{{ entity.name }}</span>
           </div>
           <div class="cv-item-foot">
             <button class="cv-mini" type="button" @click="toggleEvent(event)">
               {{ expandedEvent === event.id ? '收起报道' : `查看 ${event.entryCount} 条报道` }}
             </button>
+            <button
+              class="cv-mini" type="button" :disabled="!event.primaryEntryId"
+              @click="feedback({ id: event.primaryEntryId }, 'irrelevant')"
+            >不相关</button>
           </div>
           <div v-if="expandedEvent === event.id" class="cv-event-entries">
             <p v-if="!eventDetail" class="cv-empty">读取中…</p>
@@ -528,6 +626,8 @@ onBeforeUnmount(() => {
     <template v-else-if="view === 'trends'">
       <div v-if="!insights" class="cv-empty">正在读取洞察…</div>
       <template v-else>
+        <ContentImpactPanel v-if="impact" :impact="impact" @select="filterByEntity" />
+
         <section class="cv-panel">
           <div class="cv-panel-head">
             <h3>突增实体（24h）</h3>
@@ -578,6 +678,28 @@ onBeforeUnmount(() => {
           <p v-if="!insights.alerts.length" class="cv-empty">暂无告警</p>
         </section>
       </template>
+    </template>
+
+    <!-- 图谱 -->
+    <template v-else-if="view === 'graph'">
+      <div v-if="!graphData" class="cv-empty">正在计算图谱…</div>
+      <section v-else class="cv-panel">
+        <div class="cv-panel-head">
+          <h3>实体共现图谱</h3>
+          <span class="cv-hint">
+            {{ graphData.summary.nodes }} 个实体 · {{ graphData.summary.edges }} 条关联 · 最近 7 天
+          </span>
+        </div>
+        <ContentGraphPanel :graph="graphData" @select="filterByEntity" />
+      </section>
+    </template>
+
+    <!-- 周报 -->
+    <template v-else-if="view === 'report'">
+      <ContentReportPanel
+        :report="report" :history="reportHistory" :generating="generatingReport"
+        @generate="generateReport" @open="openReport"
+      />
     </template>
 
     <!-- 简报 -->
@@ -658,7 +780,7 @@ onBeforeUnmount(() => {
 .cv-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .cv-item, .cv-event {
   border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
-  background: var(--bg-elevated, transparent); transition: border-color .15s;
+  background: var(--bg-elevated, transparent); transition: border-color var(--dur-fast);
 }
 .cv-item:hover, .cv-event:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 .cv-item.read { opacity: .68; }
@@ -737,6 +859,13 @@ onBeforeUnmount(() => {
 }
 .cv-alert-sev.high { color: var(--danger, #b91c1c); border-color: currentColor; }
 .cv-alert-sev.medium { color: var(--warning, #b45309); border-color: currentColor; }
+
+.cv-impact {
+  padding: 1px 7px; border: 1px solid var(--border); border-radius: 999px;
+  font-size: 10.5px; color: var(--text-secondary); white-space: nowrap;
+}
+.cv-impact.high { color: var(--danger, #b91c1c); border-color: currentColor; }
+.cv-impact.medium { color: var(--warning, #b45309); border-color: currentColor; }
 
 @media (max-width: 640px) {
   .cv-head { flex-direction: column; }

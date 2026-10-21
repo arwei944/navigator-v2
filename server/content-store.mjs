@@ -88,7 +88,11 @@ db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
 // 已有库补列（CREATE TABLE IF NOT EXISTS 不会修改旧表）
 try { db.exec('ALTER TABLE sources ADD COLUMN max_items INTEGER NOT NULL DEFAULT 60') } catch { /* 已存在 */ }
 try { db.exec('ALTER TABLE sources ADD COLUMN credibility REAL NOT NULL DEFAULT 1') } catch { /* 已存在 */ }
+try { db.exec('ALTER TABLE sources ADD COLUMN interval_min REAL NOT NULL DEFAULT 20') } catch { /* 已存在 */ }
 try { db.exec('ALTER TABLE entries ADD COLUMN insights_at INTEGER') } catch { /* 已存在 */ }
+// 阶段 3 反馈闭环：隐藏的条目不进时间线/聚类；置顶的排在前面
+try { db.exec('ALTER TABLE entries ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0') } catch { /* 已存在 */ }
+try { db.exec('ALTER TABLE entries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0') } catch { /* 已存在 */ }
 for (const sql of [
   'ALTER TABLE entries ADD COLUMN content TEXT',
   'ALTER TABLE entries ADD COLUMN title_zh TEXT',
@@ -136,19 +140,31 @@ db.exec(`
     created_at INTEGER NOT NULL
   )
 `)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reports (
+    id           TEXT PRIMARY KEY,
+    type         TEXT NOT NULL,
+    period_start INTEGER NOT NULL,
+    period_end   INTEGER NOT NULL,
+    content_md   TEXT NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'rule',
+    created_at   INTEGER NOT NULL
+  )
+`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_reports_type ON reports(type, created_at DESC)')
 
 const nowIso = () => new Date().toISOString()
 
 const stmtInsertSource = db.prepare(`
   INSERT OR IGNORE INTO sources
-    (id, label, type, url, domain, category_id, weight, max_items, enabled, next_fetch_at, created_at, updated_at)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
+    (id, label, type, url, domain, category_id, weight, max_items, interval_min, enabled, next_fetch_at, created_at, updated_at)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?)
 `)
 const stmtGetSource = db.prepare('SELECT * FROM sources WHERE id = ?')
 const stmtAllSources = db.prepare('SELECT * FROM sources ORDER BY enabled DESC, id ASC')
 const stmtDueSources = db.prepare('SELECT * FROM sources WHERE enabled = 1 AND next_fetch_at <= ? ORDER BY next_fetch_at ASC')
 const stmtUpdateSource = db.prepare(`
-  UPDATE sources SET label = ?, url = ?, domain = ?, category_id = ?, weight = ?, enabled = ?, updated_at = ?
+  UPDATE sources SET label = ?, url = ?, domain = ?, category_id = ?, weight = ?, interval_min = ?, enabled = ?, updated_at = ?
   WHERE id = ?
 `)
 const stmtDeleteSource = db.prepare('DELETE FROM sources WHERE id = ?')
@@ -174,6 +190,7 @@ function sourceRow(row) {
     categoryId: row.category_id,
     weight: Number(row.weight) || 1,
     maxItems: Number(row.max_items) || 60,
+    intervalMin: Number(row.interval_min) || 20,
     credibility: Number(row.credibility) || 1,
     enabled: row.enabled === 1,
     etag: row.etag || '',
@@ -203,6 +220,8 @@ export function entryRow(row) {
     score: Number(row.score) || 0,
     read: row.read === 1,
     saved: row.saved === 1,
+    hidden: row.hidden === 1,
+    pinned: row.pinned === 1,
     content: row.content || '',
     titleZh: row.title_zh || '',
     summaryZh: row.summary_zh || '',
@@ -224,7 +243,7 @@ export function seedSources(list = CONTENT_SOURCES) {
     for (const s of list) {
       const r = stmtInsertSource.run(
         s.id, s.label, s.type, s.url, s.domain, s.categoryId,
-        Number(s.weight) || 1, Number(s.maxItems) || 60, now, now,
+        Number(s.weight) || 1, Number(s.maxItems) || 60, Number(s.intervalMin) || 20, now, now,
       )
       added += Number(r.changes) || 0
     }
@@ -257,7 +276,7 @@ export function upsertSource(input) {
     const r = stmtInsertSource.run(
       id, String(input.label || id), String(input.type || 'rss'), String(input.url || ''),
       String(input.domain || 'ai-work'), String(input.categoryId || 'learning'),
-      Number(input.weight) || 1, now, now,
+      Number(input.weight) || 1, Number(input.maxItems) || 60, Number(input.intervalMin) || 20, now, now,
     )
     if (!Number(r.changes)) throw new Error('源已存在')
   }
@@ -268,6 +287,7 @@ export function upsertSource(input) {
       String(input.domain || existing?.domain || 'ai-work'),
       String(input.categoryId || existing?.categoryId || 'learning'),
       Number(input.weight ?? existing?.weight ?? 1),
+      Number(input.intervalMin ?? existing?.intervalMin ?? 20),
       input.enabled === undefined ? (existing?.enabled === false ? 0 : 1) : (input.enabled ? 1 : 0),
       now, id,
     )
@@ -349,10 +369,12 @@ export function saveSourceCursor(id, { etag = null, lastModified = null } = {}) 
 
 export function listEntries({
   domain = '', categoryId = '', sourceId = '', q = '', unread = false,
-  saved = false, limit = 50, before = 0,
+  saved = false, limit = 50, before = 0, includeHidden = false,
 } = {}) {
   const where = []
   const params = []
+  // 隐藏是「人工判定不相关」，默认不进时间线；恢复时显式 includeHidden
+  if (!includeHidden) where.push('hidden = 0')
   if (domain) { where.push('domain = ?'); params.push(domain) }
   if (categoryId) { where.push('category_id = ?'); params.push(categoryId) }
   if (sourceId) { where.push('source_id = ?'); params.push(sourceId) }
@@ -361,7 +383,7 @@ export function listEntries({
   if (q) { where.push('(title LIKE ? OR summary LIKE ?)'); params.push(`%${q}%`, `%${q}%`) }
   if (before) { where.push('published_at < ?'); params.push(Number(before)) }
   const sql = `SELECT * FROM entries ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY published_at DESC, id DESC LIMIT ?`
+    ORDER BY pinned DESC, published_at DESC, id DESC LIMIT ?`
   params.push(Math.max(1, Math.min(Number(limit) || 50, 200)))
   return db.prepare(sql).all(...params).map(entryRow)
 }
@@ -370,7 +392,7 @@ export function getEntry(id) {
   return entryRow(db.prepare('SELECT * FROM entries WHERE id = ?').get(String(id)))
 }
 
-export function setEntryFlags(ids, { read, saved } = {}) {
+export function setEntryFlags(ids, { read, saved, hidden, pinned } = {}) {
   const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean)
   if (!list.length) return 0
   let changed = 0
@@ -382,6 +404,12 @@ export function setEntryFlags(ids, { read, saved } = {}) {
       }
       if (saved !== undefined) {
         changed += Number(db.prepare('UPDATE entries SET saved = ? WHERE id = ?').run(saved ? 1 : 0, id).changes) || 0
+      }
+      if (hidden !== undefined) {
+        changed += Number(db.prepare('UPDATE entries SET hidden = ? WHERE id = ?').run(hidden ? 1 : 0, id).changes) || 0
+      }
+      if (pinned !== undefined) {
+        changed += Number(db.prepare('UPDATE entries SET pinned = ? WHERE id = ?').run(pinned ? 1 : 0, id).changes) || 0
       }
     }
     db.exec('COMMIT')
@@ -396,13 +424,15 @@ export function stats(now = Date.now()) {
   const total = db.prepare('SELECT COUNT(*) AS n FROM entries').get().n
   const unread = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE read = 0').get().n
   const saved = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE saved = 1').get().n
-  const today = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE published_at >= ?').get(now - 86400000).n
+  const hidden = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE hidden = 1').get().n
+  const pinned = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE pinned = 1').get().n
+  const today = db.prepare('SELECT COUNT(*) AS n FROM entries WHERE published_at >= ? AND hidden = 0').get(now - 86400000).n
   const sources = db.prepare('SELECT COUNT(*) AS n FROM sources WHERE enabled = 1').get().n
   const failing = db.prepare('SELECT COUNT(*) AS n FROM sources WHERE enabled = 1 AND fail_count > 0').get().n
   const lastFetch = db.prepare('SELECT MAX(last_fetch_at) AS t FROM sources').get().t
   const byDomain = db.prepare('SELECT domain, COUNT(*) AS n FROM entries GROUP BY domain').all()
   return {
-    total, unread, saved, today, sources, failing,
+    total, unread, saved, hidden, pinned, today, sources, failing,
     lastFetchAt: lastFetch || null,
     byDomain: Object.fromEntries(byDomain.map(r => [r.domain, r.n])),
     dbPath: DB_PATH,
@@ -436,11 +466,20 @@ export function prune(now = Date.now()) {
   const ev = db.prepare('DELETE FROM events WHERE last_seen < ?').run(entryCut)
   db.prepare('DELETE FROM event_entries WHERE event_id NOT IN (SELECT id FROM events)').run()
   const dg = db.prepare('DELETE FROM digests WHERE date < ?').run(new Date(entryCut).toISOString().slice(0, 10))
+  // 周报保留一年（周期性复盘用），比条目寿命长得多
+  const rp = db.prepare('DELETE FROM reports WHERE created_at < ?').run(now - 365 * 86400000)
+  // 实体边由 insights 重建；这里兜底清掉 30 天没再出现的边
+  let edges = 0
+  try {
+    edges = Number(db.prepare('DELETE FROM entity_edges WHERE last_at < ?').run(now - 30 * 86400000).changes) || 0
+  } catch { /* 表可能尚未创建 */ }
   return {
     entries: Number(e.changes) || 0,
     logs: Number(l.changes) || 0,
     events: Number(ev.changes) || 0,
     digests: Number(dg.changes) || 0,
+    reports: Number(rp.changes) || 0,
+    edges,
   }
 }
 
@@ -460,7 +499,7 @@ export function entriesForExtraction({ limit = 20, hours = 48 } = {}) {
   const since = Date.now() - Math.max(1, hours) * 3600000
   return db.prepare(`
     SELECT * FROM entries
-    WHERE published_at >= ?
+    WHERE published_at >= ? AND hidden = 0
       AND (extract_status IS NULL OR (extract_status = 'failed' AND (extract_at IS NULL OR extract_at < ?)))
     ORDER BY published_at DESC LIMIT ?
   `).all(since, Date.now() - 6 * 3600000, Math.max(1, Math.min(Number(limit) || 20, 100))).map(entryRow)
@@ -475,7 +514,7 @@ export function entriesForSummary({ limit = 20, hours = 72 } = {}) {
   const since = Date.now() - Math.max(1, hours) * 3600000
   return db.prepare(`
     SELECT * FROM entries
-    WHERE published_at >= ? AND llm_status IS NULL
+    WHERE published_at >= ? AND hidden = 0 AND llm_status IS NULL
     ORDER BY published_at DESC LIMIT ?
   `).all(since, Math.max(1, Math.min(Number(limit) || 20, 100))).map(entryRow)
 }
@@ -497,7 +536,7 @@ export function saveSummary(id, { summaryZh = '', why = '', status = 'ok' } = {}
 export function recentEntriesForCluster({ hours = 72, limit = 500 } = {}) {
   const since = Date.now() - Math.max(1, hours) * 3600000
   return db.prepare(`
-    SELECT * FROM entries WHERE published_at >= ? ORDER BY published_at DESC LIMIT ?
+    SELECT * FROM entries WHERE published_at >= ? AND hidden = 0 ORDER BY published_at DESC LIMIT ?
   `).all(since, Math.max(1, Math.min(Number(limit) || 500, 1000))).map(entryRow)
 }
 
@@ -606,12 +645,12 @@ export function processingStats() {
   const one = sql => Number(db.prepare(sql).get()?.n || 0)
   return {
     extract: {
-      pending: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status IS NULL"),
+      pending: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status IS NULL AND hidden = 0"),
       ok: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status = 'ok'"),
       failed: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status = 'failed'"),
     },
     summary: {
-      pending: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status IS NULL"),
+      pending: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status IS NULL AND hidden = 0"),
       ok: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'ok'"),
       translated: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'translated'"),
       fallback: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'fallback'"),
@@ -619,6 +658,58 @@ export function processingStats() {
     events: one('SELECT COUNT(*) AS n FROM events'),
     digests: one('SELECT COUNT(*) AS n FROM digests'),
   }
+}
+
+/* ---------------- 阶段 3：周报 ---------------- */
+
+export function saveReport({ id, type = 'weekly', periodStart, periodEnd, contentMd, status = 'rule' }) {
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO reports (id, type, period_start, period_end, content_md, status, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET content_md = excluded.content_md,
+      status = excluded.status, created_at = excluded.created_at
+  `).run(String(id), String(type), Number(periodStart) || now, Number(periodEnd) || now,
+    String(contentMd), String(status), now)
+  return getReport(id)
+}
+
+function reportRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    type: row.type,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    contentMd: row.content_md,
+    status: row.status,
+    createdAt: row.created_at,
+  }
+}
+
+export function getReport(id) {
+  return reportRow(db.prepare('SELECT * FROM reports WHERE id = ?').get(String(id)))
+}
+
+export function latestReport(type = 'weekly') {
+  return reportRow(db.prepare('SELECT * FROM reports WHERE type = ? ORDER BY period_end DESC LIMIT 1').get(String(type)))
+}
+
+export function listReports({ type = '', limit = 12 } = {}) {
+  const sql = type
+    ? 'SELECT * FROM reports WHERE type = ? ORDER BY period_end DESC LIMIT ?'
+    : 'SELECT * FROM reports ORDER BY period_end DESC LIMIT ?'
+  const params = type ? [String(type), Math.max(1, Math.min(Number(limit) || 12, 50))] : [Math.max(1, Math.min(Number(limit) || 12, 50))]
+  return db.prepare(sql).all(...params).map(reportRow)
+}
+
+/** 环比用：区间内的新增条目数（默认不含隐藏） */
+export function countEntriesBetween(from, to, { includeHidden = false } = {}) {
+  const hidden = includeHidden ? '' : ' AND hidden = 0'
+  return Number(db.prepare(`
+    SELECT COUNT(*) AS n FROM entries
+    WHERE published_at >= ? AND published_at < ?${hidden}
+  `).get(Number(from) || 0, Number(to) || 0).n) || 0
 }
 
 seedSources()

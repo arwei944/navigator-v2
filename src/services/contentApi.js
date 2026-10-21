@@ -89,6 +89,27 @@ export const contentApi = {
   insightsRefresh(key) {
     return call('POST', { body: {}, query: { action: 'insights' } }, key)
   },
+  graph(key, { hours = 168, nodes = 40 } = {}) {
+    return call('GET', { query: { graph: '1', hours: String(hours), nodes: String(nodes) } }, key)
+  },
+  impact(key, { domain = '', hours = 24, limit = 20 } = {}) {
+    return call('GET', { query: { impact: '1', domain, hours: String(hours), limit: String(limit) } }, key)
+  },
+  reports(key, { type = 'weekly', limit = 12 } = {}) {
+    return call('GET', { query: { reports: '1', type, limit: String(limit) } }, key)
+  },
+  report(key, { type = 'weekly', id = '' } = {}) {
+    return call('GET', { query: { report: type, id } }, key)
+  },
+  generateReport(key, { force = true } = {}) {
+    return call('POST', { body: { force }, query: { action: 'report' } }, key)
+  },
+  feedback(key, { id, targetType = 'entry', feedback, note = '' }) {
+    return call('POST', {
+      body: { id, targetId: id, targetType, feedback, note },
+      query: { action: 'feedback' },
+    }, key)
+  },
   process(key, { wait = false, extractLimit, summaryLimit } = {}) {
     return call('POST', {
       body: { wait, extractLimit, summaryLimit },

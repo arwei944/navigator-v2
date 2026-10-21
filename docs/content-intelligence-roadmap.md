@@ -292,6 +292,45 @@ LLM 成本控制：
 
 预计：持续迭代。
 
+#### 阶段 3 实现状态（2026-10-22）
+
+已完成：
+
+| 能力 | 文件 | 说明 |
+|---|---|---|
+| 知识图谱 | `shared/content-graph.mjs` | 同条目实体共现 → 无向边；`weight = co × (1 + log2(1+来源数))`；确定性 FNV 力导向布局 |
+| 图谱存储 | `server/content-insights-store.mjs` | `entity_edges` 表，每轮全量重建（边数量小，重建避免增量漂移） |
+| 影响分析 | `shared/content-impact.mjs` | 来源数 / 报道量 / 来源权重 / 实体数 / 突增 z / 48h 半衰期；输出分数、等级、依据、建议 |
+| 跨事件扩散 | 同上 | 同一实体出现在 ≥2 个中/高影响事件 |
+| 周报 | `shared/content-report.mjs` + `server/content-analytics.mjs` | 滚动 7 天：概览、环比、高影响事件、突增实体、领域热度、跨事件扩散、来源健康、下周建议 |
+| 反馈闭环 | `server/content-insights-store.mjs` / `content-analytics.mjs` | hide / unhide / pin / unpin / irrelevant / important；隐藏排除时间线与聚类；反馈调整来源系数（0.5–1.8） |
+| 每源频率 | `server/content-store.mjs` / `content-fetch.mjs` | `sources.interval_min`，1–1440 分钟；后台可编辑 |
+| 前端 | `ContentView.vue` + `components/content/*` | 「图谱」「周报」视图、事件影响徽章、置顶/隐藏按钮 |
+
+实测（本地，2026-10-22）：
+
+- 图谱：37 个实体、21 条边；最强关联 `agent ↔ openai`（共现 7 次 / 2 个来源）
+- 影响：8 个事件，最高 63 分（中影响）；5 个中影响、2 个低影响
+- 周报：`weekly-2026-10-22`，3514 字符，七个段落齐全
+- 处理管道：374 条参与聚类 → 8 个事件，洞察写入 21 条边，无错误
+- 反馈：pin 后条目立即排到首位，unpin 恢复
+
+关于 WebSub：**本地部署没有公网回调地址**，无法接收 WebSub 推送。
+因此用「每源独立间隔 + 条件请求（ETag / Last-Modified）+ 失败指数退避」替代，
+关键源可设为 5–10 分钟。真正的事件级实时推送留给有公网入口的部署形态。
+
+页面变更监控（changedetection 思路）尚未实现，列入阶段 3 后续。
+
+边界：
+
+- 影响分是**排序辅助**，不是事实判断；`reasons` 与 `actions` 都展示给读者。
+- 图谱边只统计词典内实体；词典外主体不会出现。
+- 周报为规则版；配置 LLM 后可润色，但数字仍以规则稿为准。
+- 反馈目前只影响来源系数与条目可见性，尚未学习聚类阈值。
+- 「不相关」作用于事件时会隐藏主稿条目；事件本身要等下一轮聚类才消失。
+
+新增环境变量：无（复用既有 `NAV_CONTENT_*` 与告警 webhook）。
+
 ## 八、技术选型
 
 | 能力 | 选型 | 理由 |

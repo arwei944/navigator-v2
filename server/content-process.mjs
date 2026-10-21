@@ -26,6 +26,8 @@ import {
   parseJsonLoose, isMostlyChinese,
 } from '../shared/content-text.mjs'
 import { refreshInsights } from './content-insights.mjs'
+import { feedbackScoreMap } from './content-insights-store.mjs'
+import { ensureWeeklyReport } from './content-analytics.mjs'
 import { chatWithChain } from '../shared/llm-engine.mjs'
 import { translateWithChain, translatorChain } from '../shared/translate-engine.mjs'
 import {
@@ -236,7 +238,12 @@ function mode(list) {
 
 export function rebuildEvents({ hours = 72, threshold } = {}) {
   const entries = recentEntriesForCluster({ hours, limit: 600 })
-  const weights = new Map(listSources().map(s => [s.id, Number(s.weight) || 1]))
+  // 事件热度用「人工权重 × 可信度 × 反馈系数」，反馈闭环从这里生效
+  const feedback = feedbackScoreMap()
+  const weights = new Map(listSources().map(s => [
+    s.id,
+    (Number(s.weight) || 1) * (Number(s.credibility) || 1) * (feedback.get(s.id) || 1),
+  ]))
   const docs = entries.map(e => ({
     id: e.id,
     title: e.titleZh || e.title,
@@ -346,6 +353,7 @@ export async function processContent({ extractLimit = 12, summaryLimit = 12 } = 
     cluster: null,
     insights: null,
     digest: null,
+    weekly: null,
     errors: [],
   }
   try { out.extract = await extractEntries({ limit: extractLimit }) }
@@ -358,6 +366,9 @@ export async function processContent({ extractLimit = 12, summaryLimit = 12 } = 
   catch (e) { out.errors.push({ step: 'insights', error: String(e?.message || e) }) }
   try { out.digest = await ensureDigest() }
   catch (e) { out.errors.push({ step: 'digest', error: String(e?.message || e) }) }
+  // 周报每天一份（滚动 7 天）；已存在则复用，手动刷新可 force
+  try { out.weekly = await ensureWeeklyReport() }
+  catch (e) { out.errors.push({ step: 'weekly', error: String(e?.message || e) }) }
   return out
   } finally {
     processing = false
