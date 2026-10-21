@@ -191,7 +191,8 @@ export function parseHn(items, { now = Date.now(), baseUrl = 'https://news.ycomb
       guid: `hn-${item.id}`,
       url: item.url || `${baseUrl}${item.id}`,
       title: item.title,
-      summary: item.text || `Hacker News · ${item.score || 0} 分 · ${item.descendants || 0} 条评论`,
+      // 只用真实讨论文本；分数/评论数属于元数据，会污染聚类相似度
+      summary: stripHtml(item.text || ''),
       author: item.by,
       publishedAt: (Number(item.time) || 0) * 1000 || now,
       now,

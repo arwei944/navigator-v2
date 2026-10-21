@@ -1,6 +1,6 @@
 {
-  "total": 127,
-  "registered": 127,
+  "total": 128,
+  "registered": 128,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -27,6 +27,7 @@
     "tools/console/test-cloud-publish.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
+    "tools/console/test-content-text.mjs",
     "tools/console/test-content.mjs",
     "tools/console/test-contrast.mjs",
     "tools/console/test-cron.mjs",
@@ -425,6 +426,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 203
+    },
+    {
+      "file": "tools/console/test-content-text.mjs",
+      "name": "test-content-text",
+      "purpose": "阶段 1 文本处理门禁：语言、分词、聚类、热度、规则简报、宽松 JSON。",
+      "category": "数据与内容",
+      "lines": 91,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-content.mjs",

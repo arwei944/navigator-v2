@@ -192,6 +192,39 @@ LLM 成本控制：
 
 预计：约 2 周 / 25–30 个文件。
 
+#### 阶段 1 实现状态（2026-10-22）
+
+已完成：
+
+| 能力 | 文件 | 说明 |
+|---|---|---|
+| 正文抽取 | `server/content-process.mjs` | Readability + linkedom，最近 48h、每轮 12 条 |
+| 翻译 | 同上 | 复用翻译链；无端点时保留原文 |
+| LLM 摘要 | 同上 | 生成中文摘要 + “为什么重要”；未配置/失败降级规则摘要 |
+| 事件聚类 | `shared/content-text.mjs` | TF-IDF + 余弦 + 并查集；清洗 HN/Product Hunt 模板词 |
+| 每日简报 | 同上 | LLM 可用时生成；否则规则汇总 |
+| 三视图 | `src/views/ContentView.vue` | 时间线 / 事件 / 每日简报 |
+
+当前环境**未配置 LLM 与翻译**（无 `data/ai-config.json`，无 `AI_*`），
+所以实测为规则摘要模式：
+
+- 正文抽取：24 条处理，全部成功（两轮各 12 条）
+- 摘要：24 条 fallback（保留原文摘要）
+- 事件：7 个（修复前曾把 14 条不同 HN 故事误合并成 1 个事件）
+- 简报：1 份规则汇总
+
+启用 LLM：创建 `data/ai-config.json`（`baseURL` / `apiKey` / `model`），
+或设置 `AI_BASE_URL` / `AI_API_KEY` / `AI_MODEL`。下一轮处理自动切换为 LLM 摘要。
+
+新增环境变量：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `NAV_CONTENT_EXTRACT_LIMIT` | 12 | 每轮正文抽取上限 |
+| `NAV_CONTENT_SUMMARY_LIMIT` | 12 | 每轮摘要上限 |
+| `NAV_CONTENT_LLM_DAILY_MAX` | 100 | 每日 LLM 调用预算（条） |
+| `NAV_CONTENT_CLUSTER_THRESHOLD` | 0.55 | 事件聚类余弦阈值 |
+
 ### 阶段 2 · 洞察与检索（L4）
 
 范围：

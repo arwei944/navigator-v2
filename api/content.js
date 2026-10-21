@@ -27,8 +27,9 @@ function contentModules() {
     modsPromise = Promise.all([
       import('../server/content-store.mjs'),
       import('../server/content-fetch.mjs'),
+      import('../server/content-process.mjs'),
       import('../server/content-cron.mjs'),
-    ]).then(([store, fetch, cron]) => ({ ...store, ...fetch, ...cron }))
+    ]).then(([store, fetch, process, cron]) => ({ ...store, ...fetch, ...process, ...cron }))
   }
   return modsPromise
 }
@@ -65,7 +66,46 @@ export default async function handler(req, res) {
     const query = q(req)
     try {
       if (query.stats !== undefined) {
-        res.status(200).json({ ok: true, stats: mods.stats(), scheduler: mods.getContentStatus() })
+        res.status(200).json({
+          ok: true,
+          stats: mods.stats(),
+          scheduler: mods.getContentStatus(),
+          processing: mods.processingStats(),
+          llm: mods.llmAvailable(),
+          translation: mods.translationAvailable(),
+        })
+        return
+      }
+      if (query.processing !== undefined) {
+        res.status(200).json({
+          ok: true,
+          processing: mods.processingStats(),
+          running: mods.isProcessing(),
+          llm: mods.llmAvailable(),
+          translation: mods.translationAvailable(),
+          scheduler: mods.getContentStatus(),
+        })
+        return
+      }
+      if (query.events !== undefined) {
+        const items = mods.listEvents({
+          domain: String(query.domain || ''),
+          limit: Number(query.limit) || 30,
+          before: Number(query.before) || 0,
+          since: Number(query.since) || 0,
+        })
+        res.status(200).json({ ok: true, items, count: items.length })
+        return
+      }
+      if (query.event) {
+        const event = mods.getEvent(String(query.event))
+        if (!event) { res.status(404).json({ ok: false, error: '事件不存在' }); return }
+        res.status(200).json({ ok: true, event })
+        return
+      }
+      if (query.digest !== undefined) {
+        const digest = query.date ? mods.getDigest(String(query.date)) : mods.latestDigest()
+        res.status(200).json({ ok: true, digest })
         return
       }
       if (query.sources !== undefined) {
@@ -130,6 +170,22 @@ export default async function handler(req, res) {
         }
         mods.refreshSources({ sourceIds, force: sourceIds.length === 0 }).catch(() => {})
         res.status(200).json({ ok: true, started: true, running: true })
+        return
+      }
+
+      if (action === 'process') {
+        if (mods.isProcessing()) { res.status(200).json({ ok: true, started: true, running: true }); return }
+        const opts = {
+          extractLimit: Number(body?.extractLimit) || 12,
+          summaryLimit: Number(body?.summaryLimit) || 12,
+        }
+        if (body?.wait) {
+          const r = await mods.processContent(opts)
+          res.status(200).json({ ok: true, ...r })
+          return
+        }
+        mods.processContent(opts).catch(() => {})
+        res.status(200).json({ ok: true, started: true })
         return
       }
 

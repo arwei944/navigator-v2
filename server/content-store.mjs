@@ -87,6 +87,53 @@ db.exec('CREATE INDEX IF NOT EXISTS idx_fetch_source ON fetch_log(source_id, at 
 db.exec('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)')
 // 已有库补列（CREATE TABLE IF NOT EXISTS 不会修改旧表）
 try { db.exec('ALTER TABLE sources ADD COLUMN max_items INTEGER NOT NULL DEFAULT 60') } catch { /* 已存在 */ }
+for (const sql of [
+  'ALTER TABLE entries ADD COLUMN content TEXT',
+  'ALTER TABLE entries ADD COLUMN title_zh TEXT',
+  'ALTER TABLE entries ADD COLUMN summary_zh TEXT',
+  'ALTER TABLE entries ADD COLUMN why TEXT',
+  'ALTER TABLE entries ADD COLUMN extract_status TEXT',
+  'ALTER TABLE entries ADD COLUMN extract_at INTEGER',
+  'ALTER TABLE entries ADD COLUMN extract_error TEXT',
+  'ALTER TABLE entries ADD COLUMN llm_status TEXT',
+  'ALTER TABLE entries ADD COLUMN llm_at INTEGER',
+]) {
+  try { db.exec(sql) } catch { /* 已存在 */ }
+}
+db.exec(`
+  CREATE TABLE IF NOT EXISTS events (
+    id               TEXT PRIMARY KEY,
+    title            TEXT NOT NULL,
+    summary          TEXT NOT NULL DEFAULT '',
+    domain           TEXT NOT NULL,
+    category_id      TEXT NOT NULL,
+    first_seen       INTEGER NOT NULL,
+    last_seen        INTEGER NOT NULL,
+    source_count     INTEGER NOT NULL DEFAULT 0,
+    entry_count      INTEGER NOT NULL DEFAULT 0,
+    heat             REAL NOT NULL DEFAULT 0,
+    primary_entry_id TEXT,
+    created_at       INTEGER NOT NULL,
+    updated_at       INTEGER NOT NULL
+  )
+`)
+db.exec('CREATE INDEX IF NOT EXISTS idx_events_heat ON events(heat DESC)')
+db.exec('CREATE INDEX IF NOT EXISTS idx_events_last ON events(last_seen DESC)')
+db.exec(`
+  CREATE TABLE IF NOT EXISTS event_entries (
+    event_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    PRIMARY KEY (event_id, entry_id)
+  )
+`)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS digests (
+    date       TEXT PRIMARY KEY,
+    content_md TEXT NOT NULL,
+    llm_status TEXT NOT NULL DEFAULT 'rule',
+    created_at INTEGER NOT NULL
+  )
+`)
 
 const nowIso = () => new Date().toISOString()
 
@@ -153,6 +200,15 @@ function entryRow(row) {
     score: Number(row.score) || 0,
     read: row.read === 1,
     saved: row.saved === 1,
+    content: row.content || '',
+    titleZh: row.title_zh || '',
+    summaryZh: row.summary_zh || '',
+    why: row.why || '',
+    extractStatus: row.extract_status || '',
+    extractAt: row.extract_at || null,
+    extractError: row.extract_error || '',
+    llmStatus: row.llm_status || '',
+    llmAt: row.llm_at || null,
   }
 }
 
@@ -374,7 +430,15 @@ export function prune(now = Date.now()) {
   const logCut = now - CONTENT_DEFAULTS.logTtlDays * 86400000
   const e = db.prepare('DELETE FROM entries WHERE published_at < ?').run(entryCut)
   const l = db.prepare('DELETE FROM fetch_log WHERE at < ?').run(logCut)
-  return { entries: Number(e.changes) || 0, logs: Number(l.changes) || 0 }
+  const ev = db.prepare('DELETE FROM events WHERE last_seen < ?').run(entryCut)
+  db.prepare('DELETE FROM event_entries WHERE event_id NOT IN (SELECT id FROM events)').run()
+  const dg = db.prepare('DELETE FROM digests WHERE date < ?').run(new Date(entryCut).toISOString().slice(0, 10))
+  return {
+    entries: Number(e.changes) || 0,
+    logs: Number(l.changes) || 0,
+    events: Number(ev.changes) || 0,
+    digests: Number(dg.changes) || 0,
+  }
 }
 
 export function setMeta(key, value) {
@@ -385,6 +449,173 @@ export function setMeta(key, value) {
 export function getMeta(key) {
   const row = db.prepare('SELECT value FROM meta WHERE key = ?').get(String(key))
   return row ? row.value : null
+}
+
+/* ---------------- 阶段 1：正文、翻译、摘要、事件、简报 ---------------- */
+
+export function entriesForExtraction({ limit = 20, hours = 48 } = {}) {
+  const since = Date.now() - Math.max(1, hours) * 3600000
+  return db.prepare(`
+    SELECT * FROM entries
+    WHERE published_at >= ?
+      AND (extract_status IS NULL OR (extract_status = 'failed' AND (extract_at IS NULL OR extract_at < ?)))
+    ORDER BY published_at DESC LIMIT ?
+  `).all(since, Date.now() - 6 * 3600000, Math.max(1, Math.min(Number(limit) || 20, 100))).map(entryRow)
+}
+
+export function saveExtraction(id, { content = '', status = 'ok', error = '' } = {}) {
+  db.prepare('UPDATE entries SET content = ?, extract_status = ?, extract_at = ?, extract_error = ? WHERE id = ?')
+    .run(String(content || '').slice(0, 4000), String(status), Date.now(), String(error || '').slice(0, 200), String(id))
+}
+
+export function entriesForSummary({ limit = 20, hours = 72 } = {}) {
+  const since = Date.now() - Math.max(1, hours) * 3600000
+  return db.prepare(`
+    SELECT * FROM entries
+    WHERE published_at >= ? AND llm_status IS NULL
+    ORDER BY published_at DESC LIMIT ?
+  `).all(since, Math.max(1, Math.min(Number(limit) || 20, 100))).map(entryRow)
+}
+
+export function saveTranslation(id, { titleZh = '', summaryZh = '' } = {}) {
+  // 翻译不改变 llm_status：翻译后仍要进入 LLM 摘要队列
+  db.prepare(`
+    UPDATE entries SET title_zh = ?, summary_zh = CASE WHEN llm_status = 'ok' THEN summary_zh ELSE ? END
+    WHERE id = ?
+  `).run(String(titleZh || '').slice(0, 220), String(summaryZh || '').slice(0, 800), String(id))
+}
+
+export function saveSummary(id, { summaryZh = '', why = '', status = 'ok' } = {}) {
+  db.prepare(`
+    UPDATE entries SET summary_zh = ?, why = ?, llm_status = ?, llm_at = ? WHERE id = ?
+  `).run(String(summaryZh || '').slice(0, 800), String(why || '').slice(0, 400), String(status), Date.now(), String(id))
+}
+
+export function recentEntriesForCluster({ hours = 72, limit = 500 } = {}) {
+  const since = Date.now() - Math.max(1, hours) * 3600000
+  return db.prepare(`
+    SELECT * FROM entries WHERE published_at >= ? ORDER BY published_at DESC LIMIT ?
+  `).all(since, Math.max(1, Math.min(Number(limit) || 500, 1000))).map(entryRow)
+}
+
+/**
+ * 重建时间窗口内的事件。窗口外的事件保留（它们不会再被重新聚类）。
+ * @param {{id:string,title:string,summary:string,domain:string,categoryId:string,
+ *          firstSeen:number,lastSeen:number,sourceCount:number,entryCount:number,
+ *          heat:number,primaryEntryId:string,members:string[]}[]} events
+ */
+export function replaceEvents(events, windowStart) {
+  const now = Date.now()
+  db.exec('BEGIN')
+  try {
+    db.prepare('DELETE FROM event_entries WHERE event_id IN (SELECT id FROM events WHERE last_seen >= ?)').run(windowStart)
+    db.prepare('DELETE FROM events WHERE last_seen >= ?').run(windowStart)
+    const insEvent = db.prepare(`
+      INSERT INTO events
+        (id, title, summary, domain, category_id, first_seen, last_seen, source_count, entry_count, heat, primary_entry_id, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `)
+    const insLink = db.prepare('INSERT OR IGNORE INTO event_entries (event_id, entry_id) VALUES (?, ?)')
+    for (const e of events) {
+      insEvent.run(
+        e.id, e.title, String(e.summary || '').slice(0, 1000), e.domain, e.categoryId,
+        e.firstSeen, e.lastSeen, e.sourceCount, e.entryCount, e.heat, e.primaryEntryId || null, now, now,
+      )
+      for (const entryId of e.members || []) insLink.run(e.id, entryId)
+    }
+    db.exec('COMMIT')
+  } catch (err) {
+    try { db.exec('ROLLBACK') } catch { /* 忽略 */ }
+    throw err
+  }
+  return events.length
+}
+
+function eventRow(row) {
+  if (!row) return null
+  return {
+    id: row.id,
+    title: row.title,
+    summary: row.summary,
+    domain: row.domain,
+    categoryId: row.category_id,
+    firstSeen: row.first_seen,
+    lastSeen: row.last_seen,
+    sourceCount: row.source_count,
+    entryCount: row.entry_count,
+    heat: Number(row.heat) || 0,
+    primaryEntryId: row.primary_entry_id,
+    primaryUrl: row.primary_url || '',
+  }
+}
+
+export function listEvents({ domain = '', limit = 30, before = 0, since = 0 } = {}) {
+  const where = []
+  const params = []
+  if (domain) { where.push('e.domain = ?'); params.push(domain) }
+  if (before) { where.push('e.last_seen < ?'); params.push(Number(before)) }
+  if (since) { where.push('e.last_seen >= ?'); params.push(Number(since)) }
+  const sql = `
+    SELECT e.*, en.url AS primary_url
+    FROM events e LEFT JOIN entries en ON en.id = e.primary_entry_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY e.heat DESC, e.last_seen DESC LIMIT ?
+  `
+  params.push(Math.max(1, Math.min(Number(limit) || 30, 100)))
+  return db.prepare(sql).all(...params).map(eventRow)
+}
+
+export function getEventEntries(eventId) {
+  return db.prepare(`
+    SELECT en.* FROM event_entries ee JOIN entries en ON en.id = ee.entry_id
+    WHERE ee.event_id = ? ORDER BY en.published_at DESC
+  `).all(String(eventId)).map(entryRow)
+}
+
+export function getEvent(id) {
+  const row = db.prepare(`
+    SELECT e.*, en.url AS primary_url FROM events e LEFT JOIN entries en ON en.id = e.primary_entry_id
+    WHERE e.id = ?
+  `).get(String(id))
+  if (!row) return null
+  return { ...eventRow(row), entries: getEventEntries(id) }
+}
+
+export function saveDigest(date, contentMd, llmStatus = 'rule') {
+  db.prepare(`
+    INSERT INTO digests (date, content_md, llm_status, created_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(date) DO UPDATE SET content_md = excluded.content_md,
+      llm_status = excluded.llm_status, created_at = excluded.created_at
+  `).run(String(date), String(contentMd), String(llmStatus), Date.now())
+}
+
+export function getDigest(date) {
+  const row = db.prepare('SELECT * FROM digests WHERE date = ?').get(String(date))
+  return row ? { date: row.date, contentMd: row.content_md, llmStatus: row.llm_status, createdAt: row.created_at } : null
+}
+
+export function latestDigest() {
+  const row = db.prepare('SELECT * FROM digests ORDER BY date DESC LIMIT 1').get()
+  return row ? { date: row.date, contentMd: row.content_md, llmStatus: row.llm_status, createdAt: row.created_at } : null
+}
+
+export function processingStats() {
+  const one = sql => Number(db.prepare(sql).get()?.n || 0)
+  return {
+    extract: {
+      pending: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status IS NULL"),
+      ok: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status = 'ok'"),
+      failed: one("SELECT COUNT(*) AS n FROM entries WHERE extract_status = 'failed'"),
+    },
+    summary: {
+      pending: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status IS NULL"),
+      ok: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'ok'"),
+      translated: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'translated'"),
+      fallback: one("SELECT COUNT(*) AS n FROM entries WHERE llm_status = 'fallback'"),
+    },
+    events: one('SELECT COUNT(*) AS n FROM events'),
+    digests: one('SELECT COUNT(*) AS n FROM digests'),
+  }
 }
 
 seedSources()

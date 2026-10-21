@@ -49,6 +49,28 @@ export const contentApi = {
   entry(key, id) {
     return call('GET', { query: { entry: id } }, key)
   },
+  events(key, params = {}) {
+    const query = { events: '1' }
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined && v !== null && v !== '') query[k] = String(v)
+    }
+    return call('GET', { query }, key)
+  },
+  event(key, id) {
+    return call('GET', { query: { event: id } }, key)
+  },
+  digest(key, date = '') {
+    return call('GET', { query: date ? { digest: '1', date } : { digest: '1' } }, key)
+  },
+  processing(key) {
+    return call('GET', { query: { processing: '1' } }, key)
+  },
+  process(key, { wait = false, extractLimit, summaryLimit } = {}) {
+    return call('POST', {
+      body: { wait, extractLimit, summaryLimit },
+      query: { action: 'process' },
+    }, key)
+  },
   refresh(key, { wait = false, sourceIds = [] } = {}) {
     return call('POST', { body: { wait, sourceIds }, query: { action: 'refresh' } }, key)
   },

@@ -307,3 +307,10 @@ export async function refreshSources({ sourceIds = [], force = false, concurrenc
 export function isRefreshing() {
   return running
 }
+
+/** 供正文抽取复用：抓公开页面（仍走 SSRF 校验、逐跳重定向与字节上限） */
+export async function fetchPage(url, opts = {}) {
+  return fetchFollow(url, opts)
+}
+
+export { robotsAllows }

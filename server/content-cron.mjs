@@ -8,6 +8,7 @@
  * 失败的源按 5m → 15m → 1h → 6h → 24h 退避，不会每轮重撞。
  */
 import { refreshSources, isRefreshing } from './content-fetch.mjs'
+import { processContent } from './content-process.mjs'
 import { prune, setMeta, getMeta, stats } from './content-store.mjs'
 import { CONTENT_DEFAULTS } from '../shared/content-sources.mjs'
 
@@ -34,6 +35,17 @@ async function runOnce(reason = 'schedule') {
       concurrency: Number(process.env.NAV_CONTENT_CONCURRENCY) || CONTENT_DEFAULTS.concurrency,
       intervalMinutes: status.intervalMinutes,
     })
+    // 抓取之后处理积压：正文 → 翻译/摘要 → 聚类 → 简报
+    let processed = null
+    try {
+      processed = await processContent({
+        extractLimit: Number(process.env.NAV_CONTENT_EXTRACT_LIMIT) || 12,
+        summaryLimit: Number(process.env.NAV_CONTENT_SUMMARY_LIMIT) || 12,
+      })
+    } catch (e) {
+      processed = { error: String(e?.message || e) }
+    }
+
     const cleaned = prune()
     const snapshot = stats()
     const result = {
@@ -43,6 +55,19 @@ async function runOnce(reason = 'schedule') {
       sources: r.totals.sources,
       added: r.totals.added,
       failed: r.totals.failed,
+      processed: processed ? {
+        extract: processed.extract ? { ok: processed.extract.ok, failed: processed.extract.failed } : null,
+        summarize: processed.summarize ? {
+          summarized: processed.summarize.summarized,
+          translated: processed.summarize.translated,
+          fallback: processed.summarize.fallback,
+          skippedBudget: processed.summarize.skippedBudget,
+        } : null,
+        cluster: processed.cluster || null,
+        digest: processed.digest ? { date: processed.digest.date, status: processed.digest.llmStatus } : null,
+        llm: processed.llm,
+        translation: processed.translation,
+      } : null,
       pruned: cleaned,
       total: snapshot.total,
       unread: snapshot.unread,

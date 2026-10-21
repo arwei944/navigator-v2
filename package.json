@@ -170,12 +170,15 @@
     "console:test:cloud-publish": "node tools/console/test-cloud-publish.mjs",
     "console:test:store-surface": "node tools/console/test-store-surface.mjs",
     "console:test:version-bump": "node tools/console/test-version-bump.mjs",
-    "console:test:content": "node tools/console/test-content.mjs"
+    "console:test:content": "node tools/console/test-content.mjs",
+    "console:test:content-text": "node tools/console/test-content-text.mjs"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "@vercel/blob": "^2.8.0",
     "fast-xml-parser": "^5.11.2",
     "fuse.js": "^7.5.0",
+    "linkedom": "^0.18.13",
     "pinia": "^2.1.0",
     "pinia-plugin-persistedstate": "^3.2.0",
     "pinyin-pro": "^3.28.2",
