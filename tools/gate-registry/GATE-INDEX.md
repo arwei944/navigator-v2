@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **124** 道门禁，其中已接入 `console:test:all` 的 **124** 道。
+> 共 **125** 道门禁，其中已接入 `console:test:all` 的 **125** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -16,7 +16,7 @@
 | 工作区治理 | 12 | `test-hunks` | 4.5s |
 | 服务端与运行时 | 24 | `test-mcp` | 34.6s |
 | 前端与体验 | 31 | `test-frontend` | 3.9s |
-| 数据与内容 | 33 | `test-trust` | 0.8s |
+| 数据与内容 | 34 | `test-trust` | 0.8s |
 
 ## 清单
 
@@ -128,21 +128,22 @@
 | 104 | `test-sites-split` | 数据与内容 | sites store 拆分后的纯函数守卫：覆盖层净化 / 回收站三道闸 / 云端错误分类。 | 245 | — |
 | 105 | `test-split-wiring` | 前端与体验 | 大文件拆分后的「接线」守卫。 | 244 | — |
 | 106 | `test-storage-guard` | 前端与体验 | 存储安全门禁（localStorage 写入必须走 safeStorage） | 72 | 0.2s |
-| 107 | `test-store` | 服务端与运行时 | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 | 0.3s |
-| 108 | `test-sw-refresh` | 前端与体验 | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 | 0.2s |
-| 109 | `test-theme-boot` | 前端与体验 | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 | 3.2s |
-| 110 | `test-theme` | 前端与体验 | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 | 0.2s |
-| 111 | `test-translate-engine` | 数据与内容 | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 | 0.2s |
-| 112 | `test-tri-sync` | 服务端与运行时 | 三端同步核心规则的门禁。 | 215 | — |
-| 113 | `test-trust` | 数据与内容 | nav-console 来源校验用例（零依赖）。 | 112 | 0.8s |
-| 114 | `test-undo` | 前端与体验 | E4b 守卫：撤销栈内核。 | 192 | 0.2s |
-| 115 | `test-upgrade-guard` | 工作区治理 | 升级数据保护的门禁。 | 103 | — |
-| 116 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
-| 117 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
-| 118 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
-| 119 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 120 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
-| 121 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
-| 122 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
-| 123 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 124 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |
+| 107 | `test-store-surface` | 数据与内容 | store 导出面门禁：源码里调用的 `sitesStore.xxx()` / `categoriesStore.xxx()` | 99 | — |
+| 108 | `test-store` | 服务端与运行时 | `server/store.mjs`（Blob 同名同签名适配层）用例：**真库真表**，不 mock。 | 147 | 0.3s |
+| 109 | `test-sw-refresh` | 前端与体验 | A1 守卫：PWA 新版本提示不许自动刷新。 | 112 | 0.2s |
+| 110 | `test-theme-boot` | 前端与体验 | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 | 3.2s |
+| 111 | `test-theme` | 前端与体验 | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 | 0.2s |
+| 112 | `test-translate-engine` | 数据与内容 | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 | 0.2s |
+| 113 | `test-tri-sync` | 服务端与运行时 | 三端同步核心规则的门禁。 | 215 | — |
+| 114 | `test-trust` | 数据与内容 | nav-console 来源校验用例（零依赖）。 | 112 | 0.8s |
+| 115 | `test-undo` | 前端与体验 | E4b 守卫：撤销栈内核。 | 192 | 0.2s |
+| 116 | `test-upgrade-guard` | 工作区治理 | 升级数据保护的门禁。 | 103 | — |
+| 117 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
+| 118 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
+| 119 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
+| 120 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
+| 121 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
+| 122 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
+| 123 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
+| 124 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
+| 125 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |

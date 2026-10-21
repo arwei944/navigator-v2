@@ -1,6 +1,6 @@
 {
-  "total": 124,
-  "registered": 124,
+  "total": 125,
+  "registered": 125,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -109,6 +109,7 @@
     "tools/console/test-sites-split.mjs",
     "tools/console/test-split-wiring.mjs",
     "tools/console/test-storage-guard.mjs",
+    "tools/console/test-store-surface.mjs",
     "tools/console/test-store.mjs",
     "tools/console/test-sw-refresh.mjs",
     "tools/console/test-theme-boot.mjs",
@@ -1412,6 +1413,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 211
+    },
+    {
+      "file": "tools/console/test-store-surface.mjs",
+      "name": "test-store-surface",
+      "purpose": "store 导出面门禁：源码里调用的 `sitesStore.xxx()` / `categoriesStore.xxx()`",
+      "category": "数据与内容",
+      "lines": 99,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-store.mjs",

@@ -483,6 +483,8 @@ function rebuild() {
     toggleBatchMode, toggleDragMode, toggleSelect, selectAll, clearSelection, pruneSelection,
     batchDeleteToTrash,
     restoreFromTrash, permanentDelete, emptyTrash, clearLocalOverlay,
+    // 发布成功后回填云端基底：手动发布与实时发布都依赖它
+    applyCloudData,
     initCloudSites, pollCloudSites, startPolling, stopPolling, retryCloudNow
   }
 })
