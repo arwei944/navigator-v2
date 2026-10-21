@@ -12,6 +12,8 @@ import { sanitizeGroups } from '../shared/categories.mjs'
 import { sanitizeSites } from '../shared/sanitize.mjs'
 import { checkAuthHeader } from '../shared/auth.mjs'
 import { contentFingerprint } from '../shared/backup-policy.mjs'
+import { diffSites, buildSiteAuditEntries } from '../shared/site-change-audit.mjs'
+import { appendAudit, writeSiteChangeDetail } from '../server/audit-log.mjs'
 
 // 数据真相源：Vercel Blob 上的 sites.json（运行时权威数据）。
 // 以下 SEED_SITES 仅作为 Blob 为空时的本地兜底，由 scripts/publish.mjs 保持与 Blob 同步，
@@ -61,6 +63,32 @@ function writeMain(data, etag) {
  *
  * 比对失败不影响写入：读不出上一份快照时按原逻辑照常落盘，宁可多存一份。
  */
+/**
+ * 站点变更审计：写入成功后对比前后站点表，落一条可追溯的操作记录。
+ *
+ * - 少量变更逐条记 `sites.add / sites.update / sites.remove`（target = 站点 id）；
+ * - 批量 / 同步 / 回滚合并成一条 `sites.batch` 或 `sites.sync`，完整明细另存
+ *   `ops/site-changes/*.json`，审计里留摘要与路径；
+ * - 审计是**旁路**：任何失败只打日志，绝不影响已经成功的数据写入。
+ */
+const AUDIT_DETAIL_THRESHOLD = 30
+
+async function recordSiteAudit({ before, after, actor, source }) {
+  try {
+    const diff = diffSites(before, after)
+    if (!diff.total) return
+    const needDetail = source === 'sync' || diff.total > AUDIT_DETAIL_THRESHOLD
+    const detailPath = needDetail
+      ? await writeSiteChangeDetail({ diff, actor, source })
+      : null
+    const entries = buildSiteAuditEntries(diff, { actor, source, detailPath })
+    const r = await appendAudit(entries)
+    if (!r.ok) console.error('[sites] audit append failed:', r.error)
+  } catch (e) {
+    console.error('[sites] audit failed:', String(e?.message || e))
+  }
+}
+
 async function snapshotUnlessIdentical(prev) {
   try {
     const items = await store.listSnapshots()
@@ -279,6 +307,12 @@ export default async function handler(req, res) {
         }
         throw e
       }
+      await recordSiteAudit({
+        before: Array.isArray(prev?.sites) ? prev.sites : [],
+        after: snapshot.sites,
+        actor: auth.username || auth.via || 'admin',
+        source: 'rollback',
+      })
       const pruned = await store.pruneSnapshots()
       res.status(200).json({
         ...data,
@@ -333,6 +367,13 @@ export default async function handler(req, res) {
       }
       throw e
     }
+    await recordSiteAudit({
+      before: Array.isArray(prev?.sites) ? prev.sites : [],
+      after: sites,
+      actor: auth.username || auth.via || 'admin',
+      // 同步器带 X-Nav-Sync：合并成一条 sites.sync，不把 300 条逐条写进审计
+      source: String(req.headers?.['x-nav-sync'] || '') === '1' ? 'sync' : 'manual',
+    })
     const pruned = await store.pruneSnapshots()
     res.status(200).json({ ...data, snapshot, pruned })
     return

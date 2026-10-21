@@ -1,6 +1,6 @@
 {
-  "total": 122,
-  "registered": 122,
+  "total": 123,
+  "registered": 123,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -100,6 +100,7 @@
     "tools/console/test-share-target.mjs",
     "tools/console/test-side-width.mjs",
     "tools/console/test-site-aliases.mjs",
+    "tools/console/test-site-audit.mjs",
     "tools/console/test-site-dedupe.mjs",
     "tools/console/test-site-refresh.mjs",
     "tools/console/test-site-store.mjs",
@@ -1302,6 +1303,18 @@
       "durationMs": 387
     },
     {
+      "file": "tools/console/test-site-audit.mjs",
+      "name": "test-site-audit",
+      "purpose": "站点变更审计的门禁。",
+      "category": "数据与内容",
+      "lines": 104,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-site-dedupe.mjs",
       "name": "test-site-dedupe",
       "purpose": "站点去重 / 书签导入 / 批量编辑用例：零依赖、不联网。",
@@ -1452,7 +1465,7 @@
       "name": "test-tri-sync",
       "purpose": "三端同步核心规则的门禁。",
       "category": "服务端与运行时",
-      "lines": 209,
+      "lines": 215,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

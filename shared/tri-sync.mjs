@@ -272,6 +272,8 @@ async function writeTarget(target, data, key) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // 让目标端把这次写入记成一条 sites.sync（摘要 + 明细），而不是逐条站点审计
+        'X-Nav-Sync': '1',
         ...(key ? { 'X-Nav-Key': key, Authorization: `Bearer ${key}` } : {}),
       },
       body: JSON.stringify({ sites: data.sites, categories: data.categories }),

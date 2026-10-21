@@ -78,6 +78,13 @@ mkdirSync(join(DIST, 'shared'), { recursive: true })
 copyFileSync(join(root, 'server', 'main.mjs'), join(DIST, 'server.js'))
 copyFileSync(join(root, 'server', 'store.mjs'), join(DIST, 'store.mjs'))
 copyFileSync(join(root, 'server', 'cron.mjs'), join(DIST, 'cron.mjs'))
+/**
+ * `api/sites.js` 通过 `../server/audit-log.mjs` 引用审计写入。
+ * 源码树里 `api/../server` 天然成立；产物里必须显式建 `dist/server/`，
+ * 否则线上第一次写站点就会在 import 期报 ENOENT（登录/发布整块受影响）。
+ */
+mkdirSync(join(DIST, 'server'), { recursive: true })
+copyFileSync(join(root, 'server', 'audit-log.mjs'), join(DIST, 'server', 'audit-log.mjs'))
 // 复制 `api/` 下**全部** .js —— 与 server/main.mjs 的路由表同源（那边也是按目录派生）。
 //
 // 此处原先是逐个列文件名的白名单，与路由表构成两份必须同步的手工清单：
