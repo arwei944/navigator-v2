@@ -304,7 +304,8 @@ async function llmDigest({ date, events, entries }) {
 export async function ensureDigest({ date } = {}) {
   const day = date || today()
   const existing = getDigest(day)
-  if (existing) return existing
+  // LLM 简报保留；规则简报每轮重算，保证清洗/聚类更新后内容不会停在旧版本
+  if (existing && existing.llmStatus === 'ok') return existing
   const since = Date.now() - 24 * 3600000
   const events = listEvents({ limit: 20, since })
   const entries = recentEntriesForCluster({ hours: 24, limit: 80 })

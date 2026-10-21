@@ -44,6 +44,8 @@ export function stripHtml(input) {
   for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
     text = text.split(entity).join(char)
   }
+  // 十进制与十六进制实体都要解码：HN 的讨论文本里常见 &#x2F;、&#x27;
+  text = text.replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
   text = text.replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
   return text.replace(/\s+/g, ' ').trim()
 }
