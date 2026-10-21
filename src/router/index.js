@@ -13,6 +13,8 @@ const routes = [
   { path: '/recent', name: 'Recent', component: HomeView },
   { path: '/archived', name: 'Archived', component: HomeView },
   { path: '/feed', name: 'Feed', component: HomeView },
+  // 领域动态：公开 RSS/API 的时间线（仅本地内容库）
+  { path: '/content', name: 'Content', component: () => import('@/views/ContentView.vue') },
   { path: '/trash', name: 'Trash', component: HomeView },
   { path: '/insights', name: 'Insights', component: () => import('@/views/InsightsView.vue') },
   // 关联图谱：懒加载 —— 布局与建图只在真的打开这一页时才跑

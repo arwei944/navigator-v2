@@ -456,3 +456,17 @@ try {
 } catch (e) {
   console.error('[nav-server] 三端同步调度器未启动：', e.message)
 }
+
+/**
+ * 内容抓取调度器：默认关闭，只有 `NAV_CONTENT_ENABLED=1` 时启动。
+ * 内容库是本地能力，线上沙箱不应悄悄抓取外网。
+ */
+if (process.env.NAV_CONTENT_ENABLED === '1') {
+  try {
+    const contentMod = await import(pathToFileURL(join(ROOT, 'server', 'content-cron.mjs')).href)
+    const s = contentMod.startContentCron()
+    if (s.started) console.log(`[nav-server] 内容抓取调度器已启动（每 ${s.intervalMinutes} 分钟）`)
+  } catch (e) {
+    console.error('[nav-server] 内容抓取调度器未启动：', e.message)
+  }
+}

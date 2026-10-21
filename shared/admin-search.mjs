@@ -20,6 +20,7 @@ export const ADMIN_TAB_KEYWORDS = {
   'data-manager': '数据 体检 质量 覆盖率 重复 孤儿分类 低置信度 修复 导出 csv json',
   sync: '同步 三端 本地 botkeep workbuddy vercel 一致 冲突 选主 sync',
   'data-ingest': '浏览器 历史 书签 标签页 临时工作区 工作区 导入 批次 分类 ingest staging',
+  'content-sources': '内容 动态 情报 rss atom feed 抓取 源 调度 失败 content',
   publish: '云端发布 热更新 预检 publish',
   snapshots: '快照 回滚 恢复 snapshot rollback',
   history: '发布历史 记录 history',

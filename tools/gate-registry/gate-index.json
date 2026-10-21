@@ -1,6 +1,6 @@
 {
-  "total": 126,
-  "registered": 126,
+  "total": 127,
+  "registered": 127,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -27,6 +27,7 @@
     "tools/console/test-cloud-publish.mjs",
     "tools/console/test-color-tokens-real.mjs",
     "tools/console/test-command-phrases.mjs",
+    "tools/console/test-content.mjs",
     "tools/console/test-contrast.mjs",
     "tools/console/test-cron.mjs",
     "tools/console/test-data-history.mjs",
@@ -424,6 +425,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 203
+    },
+    {
+      "file": "tools/console/test-content.mjs",
+      "name": "test-content",
+      "purpose": "领域动态阶段 0 的门禁：订阅解析、清洗、指纹去重、分类、退避。",
+      "category": "数据与内容",
+      "lines": 129,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-contrast.mjs",
