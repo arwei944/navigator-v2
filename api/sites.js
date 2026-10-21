@@ -11,6 +11,7 @@ import { SNAPSHOT_PREFIX, SNAPSHOT_KEEP, parseSnapshotName, isSnapshotPathname }
 import { sanitizeGroups } from '../shared/categories.mjs'
 import { sanitizeSites } from '../shared/sanitize.mjs'
 import { checkAuthHeader } from '../shared/auth.mjs'
+import { contentFingerprint } from '../shared/backup-policy.mjs'
 
 // 数据真相源：Vercel Blob 上的 sites.json（运行时权威数据）。
 // 以下 SEED_SITES 仅作为 Blob 为空时的本地兜底，由 scripts/publish.mjs 保持与 Blob 同步，
@@ -49,6 +50,32 @@ if (!store.cas) throw new Error('站点存储 provider 必须支持 CAS（条件
  */
 function writeMain(data, etag) {
   return store.write(data, etag ? { ifMatch: etag } : { createOnly: true })
+}
+
+/**
+ * 写前快照，但内容与最近一份相同时跳过。
+ *
+ * 为什么值得多一次读：同步 / 修复 / 导入经常产生「只改了 version」的写入
+ * （尤其是三端同步把同一份内容写到落后端）。这类写入再存一份完整快照，
+ * 只是白占空间，回滚价值为零 —— 它的内容和上一份逐字节等价。
+ *
+ * 比对失败不影响写入：读不出上一份快照时按原逻辑照常落盘，宁可多存一份。
+ */
+async function snapshotUnlessIdentical(prev) {
+  try {
+    const items = await store.listSnapshots()
+    const newest = (items || [])
+      .map(it => ({ ...it, meta: parseSnapshotName(it.pathname) }))
+      .filter(it => it.meta)
+      .sort((a, b) => (a.pathname < b.pathname ? 1 : -1))[0]
+    if (newest) {
+      const last = await store.readAt(newest.pathname)
+      if (last && contentFingerprint(last) === contentFingerprint(prev)) {
+        return { ok: true, pathname: newest.pathname, skipped: '内容与上一份快照相同' }
+      }
+    }
+  } catch { /* 比对失败就正常写快照 */ }
+  return store.writeSnapshot(prev)
 }
 
 function readBody(req) {
@@ -288,7 +315,7 @@ export default async function handler(req, res) {
     }
 
     const version = prevVersion + 1
-    const snapshot = prev ? await store.writeSnapshot(prev) : { ok: true, pathname: null, skipped: '无前值可快照' }
+    const snapshot = prev ? await snapshotUnlessIdentical(prev) : { ok: true, pathname: null, skipped: '无前值可快照' }
     const data = {
       version,
       sites,

@@ -157,6 +157,10 @@
 
           <AdminDataManager v-else-if="activeTab === 'data-manager'" :admin-key="adminKey" />
 
+          <AdminSync v-else-if="activeTab === 'sync'" :admin-key="adminKey" />
+
+          <AdminIngest v-else-if="activeTab === 'data-ingest'" :admin-key="adminKey" />
+
           <div v-else-if="activeTab === 'publish'" class="admin-section">
             <div class="admin-section-header">
               <h2>云端发布（热更新）</h2>
@@ -270,6 +274,8 @@ import AdminLogin from '@/components/admin/AdminLogin.vue'
 import AdminSitesPanel from '@/components/admin/AdminSitesPanel.vue'
 import AdminCategoryManager from '@/components/admin/AdminCategoryManager.vue'
 import AdminDataManager from '@/components/admin/AdminDataManager.vue'
+import AdminSync from '@/components/admin/AdminSync.vue'
+import AdminIngest from '@/components/admin/AdminIngest.vue'
 import AdminInsights from '@/components/admin/AdminInsights.vue'
 import AdminPublishPreflight from '@/components/admin/AdminPublishPreflight.vue'
 import AdminSnapshots from '@/components/admin/AdminSnapshots.vue'

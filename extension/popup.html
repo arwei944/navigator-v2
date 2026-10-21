@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>浏览器同步</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <strong>浏览器同步</strong>
+      <span id="conn" class="pill">未连接</span>
+    </div>
+    <button id="openOptions" class="link" type="button">设置</button>
+  </header>
+
+  <section class="filters">
+    <div class="row">
+      <span class="label">来源</span>
+      <label class="chk"><input type="checkbox" id="src-history" checked> 历史</label>
+      <label class="chk"><input type="checkbox" id="src-bookmarks" checked> 书签</label>
+      <label class="chk"><input type="checkbox" id="src-tabs" checked> 标签页</label>
+    </div>
+    <div class="row">
+      <span class="label">时间</span>
+      <select id="days">
+        <option value="7">近 7 天</option>
+        <option value="30">近 30 天</option>
+        <option value="90" selected>近 90 天</option>
+        <option value="365">近一年</option>
+        <option value="0">全部</option>
+      </select>
+      <span class="label">最少访问</span>
+      <input type="number" id="minVisits" min="1" max="999" value="1">
+    </div>
+    <div class="row">
+      <span class="label">排除词</span>
+      <input id="exclude" type="text" placeholder="用逗号分隔，匹配标题或网址">
+    </div>
+    <div class="row actions">
+      <button id="scan" class="primary" type="button">扫描浏览器</button>
+      <span id="scanHint" class="hint"></span>
+    </div>
+  </section>
+
+  <section id="summary" class="summary" hidden></section>
+
+  <section id="toolbar" class="toolbar" hidden>
+    <label class="chk"><input type="checkbox" id="selectAll"> 全选</label>
+    <select id="bulkCategory"><option value="">批量设置分类…</option></select>
+    <button id="applyBulk" type="button">应用</button>
+    <span id="selectedCount" class="hint"></span>
+  </section>
+
+  <div id="list" class="list" hidden></div>
+
+  <footer>
+    <button id="save" class="primary" type="button" disabled>保存到临时工作区</button>
+    <a id="openAdmin" class="link" target="_blank" rel="noopener" hidden>去后台处理</a>
+    <div id="status" class="status" role="status"></div>
+  </footer>
+
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

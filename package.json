@@ -162,7 +162,9 @@
     "console:test:data-manager": "node tools/console/test-data-manager.mjs",
     "console:test:data-import": "node tools/console/test-data-import.mjs",
     "console:test:data-merge": "node tools/console/test-data-merge.mjs",
-    "console:test:data-history": "node tools/console/test-data-history.mjs"
+    "console:test:data-history": "node tools/console/test-data-history.mjs",
+    "console:test:tri-sync": "node tools/console/test-tri-sync.mjs",
+    "console:test:ingest": "node tools/console/test-ingest.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

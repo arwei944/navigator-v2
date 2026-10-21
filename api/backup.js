@@ -27,6 +27,12 @@
 import { get, put, list, del } from '#store'
 import { checkAuthHeader } from '../shared/auth.mjs'
 import { sanitizeSites, isSitesValid } from '../shared/sanitize.mjs'
+import {
+  BACKUP_DIR, BLOB_PREFIX, MANIFEST_PREFIX, MANIFEST_KEEP,
+  sha256, contentFingerprint, packText, unpackText,
+  blobPathname, manifestPathname, parseManifestName,
+  selectManifestsToPrune, referencedBlobs,
+} from '../shared/backup-policy.mjs'
 
 const SITES_PATH = 'sites.json'
 const CLOUDS_PATH = 'clicks.json'
@@ -34,8 +40,7 @@ const HEALTH_PATH = 'ops/health.json'
 const AUDIT_PATH = 'ops/audit.json'
 const HISTORY_PATH = 'ops/publish-history.json'
 const NOTIFY_PATH = 'ops/notifications.json'
-const BACKUP_DIR = 'ops/backups/'
-const BACKUP_KEEP = 20
+const BACKUP_KEEP = MANIFEST_KEEP
 
 /** 备份里带走的键（顺序即恢复顺序：先数据面，后旁路） */
 const CLOUD_KEYS = [CLOUDS_PATH, HEALTH_PATH, AUDIT_PATH, HISTORY_PATH, NOTIFY_PATH]
@@ -59,6 +64,129 @@ async function writeJson(pathname, data) {
     allowOverwrite: true,
     contentType: 'application/json',
   })
+}
+
+async function readText(pathname) {
+  const blob = await get(pathname, { access: 'private', useCache: false })
+  if (!blob || !blob.stream) return null
+  return new Response(blob.stream).text()
+}
+
+/**
+ * 内容寻址写入：同一个哈希只落一份，已存在就跳过。
+ *
+ * 跳过写入不只是省空间，也省一条 changes 日志 —— 否则「备份」这个纯读操作
+ * 会持续污染镜像游标，让本地镜像为一份没变的内容反复拉取。
+ */
+async function ensureBlob(hash, body) {
+  const p = blobPathname(hash)
+  const cur = await get(p, { access: 'private', useCache: false })
+  if (cur) return { pathname: p, written: false, size: cur.size || 0 }
+  await put(p, body, {
+    access: 'private',
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    contentType: 'application/gzip+base64',
+  })
+  return { pathname: p, written: true, size: Buffer.byteLength(body) }
+}
+
+/**
+ * 写一次备份：sites 与 cloud 各自内容寻址，manifest 只存引用与摘要。
+ *
+ * 为什么 manifest 每次都要写：它记录的是「这个时间点存在过这样一份数据」。
+ * 内容不变时 manifest 仍然很小（几百字节），而 blob 一行都不增加。
+ */
+async function storeBackup({ sites, cloud, backupKind = 'manual', at = new Date() }) {
+  const sitesText = JSON.stringify(sites ?? null)
+  const cloudText = JSON.stringify(cloud ?? {})
+  const sitesHash = sha256(sitesText)
+  const cloudHash = sha256(cloudText)
+  const packedSites = packText(sitesText)
+  const packedCloud = packText(cloudText)
+
+  const sitesBlob = await ensureBlob(sitesHash, packedSites.body)
+  const cloudBlob = await ensureBlob(cloudHash, packedCloud.body)
+
+  const manifest = {
+    kind: 'navigator-backup',
+    schema: 2,
+    backupKind,
+    at: at.toISOString(),
+    fingerprint: contentFingerprint(sites, cloud),
+    counts: countsOf(sites, cloud),
+    sitesRef: sitesHash,
+    cloudRef: cloudHash,
+    // 原始体积与压缩后体积都记下来：面板才能显示「省了多少」
+    bytes: {
+      raw: packedSites.rawBytes + packedCloud.rawBytes,
+      stored: packedSites.storedBytes + packedCloud.storedBytes,
+    },
+  }
+  const pathname = manifestPathname(at, manifest.fingerprint)
+  await writeJson(pathname, manifest)
+
+  return {
+    pathname,
+    manifest,
+    blobs: {
+      sites: { ...sitesBlob, reused: !sitesBlob.written },
+      cloud: { ...cloudBlob, reused: !cloudBlob.written },
+    },
+  }
+}
+
+/** 备份清单（manifest + 旧格式文件），新的在前 */
+async function listBackups() {
+  const { blobs } = await list({ prefix: BACKUP_DIR, limit: 1000 })
+  const items = []
+  for (const b of blobs || []) {
+    if (b.pathname.startsWith(BLOB_PREFIX)) continue
+    if (b.pathname.startsWith(MANIFEST_PREFIX)) {
+      const meta = parseManifestName(b.pathname)
+      if (meta) items.push({ ...meta, size: b.size, uploadedAt: b.uploadedAt, format: 'manifest' })
+      continue
+    }
+    // 旧格式（pre-restore-*.json 等）：时间只能取对象上传时间
+    if (!b.pathname.endsWith('.json')) continue
+    items.push({
+      pathname: b.pathname,
+      ts: b.uploadedAt || new Date(0).toISOString(),
+      size: b.size,
+      uploadedAt: b.uploadedAt,
+      format: 'legacy',
+    })
+  }
+  items.sort((a, b) => (a.ts < b.ts ? 1 : a.ts > b.ts ? -1 : 0))
+  return items
+}
+
+/**
+ * 解析一次恢复请求：既接受新格式的 manifest 引用，也接受旧格式的整体 JSON。
+ *
+ * 返回 `{ sites, cloud }`；解析失败抛错，由调用方转成 400。
+ */
+async function resolveRestoreSource(body) {
+  if (body && body.manifest) {
+    const pathname = String(body.manifest)
+    if (!pathname.startsWith(MANIFEST_PREFIX)) throw new Error('manifest 路径非法')
+    const m = await readJson(pathname)
+    if (!m || Number(m.schema) !== 2 || !m.sitesRef) throw new Error('备份清单不存在或格式不支持')
+    const sitesText = await readText(blobPathname(m.sitesRef))
+    if (sitesText == null) throw new Error('备份内容缺失（sites blob 不存在）')
+    const sites = JSON.parse(unpackText(sitesText))
+    let cloud = {}
+    if (m.cloudRef) {
+      const cloudText = await readText(blobPathname(m.cloudRef))
+      if (cloudText != null) {
+        try { cloud = JSON.parse(unpackText(cloudText)) } catch { cloud = {} }
+      }
+    }
+    return { sites, cloud, manifest: m }
+  }
+  const incoming = body && body.data
+  if (!incoming) throw new Error('缺少 data 或 manifest')
+  return { sites: incoming.sites, cloud: incoming.cloud || {}, manifest: null }
 }
 
 async function readBody(req) {
@@ -97,13 +225,28 @@ async function exportMeta(req, res) {
   const auth = checkAuthHeader(req)
   if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
   const { sites, cloud } = await readBackupSource()
+  const packed = packText(JSON.stringify({ sites, cloud }))
   res.status(200).json({
     ok: true,
     meta: true,
     counts: countsOf(sites, cloud),
-    bytes: Buffer.byteLength(JSON.stringify({ sites, cloud }), 'utf8'),
+    bytes: packed.rawBytes,
+    // 实际落盘体积（gzip 后）：面板据此显示「省了多少」，而不是拿原始体积充数
+    bytesStored: packed.storedBytes,
     at: new Date().toISOString(),
   })
+}
+
+/** GET /api/backup?list=1 → 备份清单（manifest + 旧格式），供后台选择恢复目标 */
+async function listBackupsHandler(req, res) {
+  const auth = checkAuthHeader(req)
+  if (!auth.ok) { res.status(auth.code).json({ ok: false, error: auth.error }); return }
+  try {
+    const items = await listBackups()
+    res.status(200).json({ ok: true, count: items.length, keep: BACKUP_KEEP, items })
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e?.message || e) })
+  }
 }
 
 async function exportBackup(req, res) {
@@ -139,40 +282,45 @@ async function restoreBackup(req, res) {
   let body
   try { body = await readBody(req) } catch { res.status(400).json({ ok: false, error: 'Invalid JSON body' }); return }
 
-  const incoming = body && body.data
-  if (!incoming || incoming.kind !== 'navigator-backup' || !incoming.sites) {
-    res.status(400).json({ ok: false, error: '不是有效的备份文件（缺少 kind/sites）' })
+  let source
+  try {
+    source = await resolveRestoreSource(body)
+  } catch (e) {
+    res.status(400).json({ ok: false, error: String(e?.message || e) })
+    return
+  }
+  const incomingSites = source.sites
+  if (!incomingSites || !incomingSites.sites) {
+    res.status(400).json({ ok: false, error: '不是有效的备份文件（缺少 sites）' })
     return
   }
 
   // 与站点数据面同一把尺子：坏结构绝不放行（站点表坏掉等于全站白屏）
-  const list0 = Array.isArray(incoming.sites.sites) ? incoming.sites.sites : null
+  const list0 = Array.isArray(incomingSites.sites) ? incomingSites.sites : null
   if (!isSitesValid(list0)) {
     res.status(400).json({ ok: false, error: '备份里的站点数据不合法（空数组 / 缺 id·name·url / id 重复）（未做任何改动）' })
     return
   }
 
-  // ① 先给当前数据拍快照 —— 恢复是一次覆盖写，没有回退路径就不能做
+  // ① 先给当前数据拍快照 —— 恢复是一次覆盖写，没有回退路径就不能做。
+  // 走新的内容寻址存储：当前数据若与某份已有 blob 相同，不重复占空间。
   const current = await readJson(SITES_PATH)
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
-  await writeJson(`${BACKUP_DIR}pre-restore-${stamp}.json`, {
-    at: new Date().toISOString(), kind: 'navigator-backup', schema: 1, sites: current, cloud: {},
-  })
+  const safety = await storeBackup({ sites: current, cloud: {}, backupKind: 'pre-restore' })
   await pruneBackups()
 
   // ② version 必须高于当前：客户端按「v <= cloudVersion 就不应用」判断
   const curVersion = Number(current && current.version) || 0
   const payload = {
-    ...incoming.sites,
+    ...incomingSites,
     sites: sanitizeSites(list0),
-    version: Math.max(curVersion + 1, Number(incoming.sites.version) || 1),
+    version: Math.max(curVersion + 1, Number(incomingSites.version) || 1),
   }
   await writeJson(SITES_PATH, payload)
 
   // ③ 旁路键：逐个写，坏的那个跳过（数据面已经恢复成功，不该被旁路拖垮）
   const restored = []
   const skipped = []
-  for (const [k, v] of Object.entries(incoming.cloud || {})) {
+  for (const [k, v] of Object.entries(source.cloud || {})) {
     if (!CLOUD_KEYS.includes(k)) { skipped.push(k); continue }
     try { await writeJson(k, v); restored.push(k) } catch { skipped.push(k) }
   }
@@ -182,17 +330,51 @@ async function restoreBackup(req, res) {
     restored: { version: payload.version, sites: payload.sites.length, categories: (payload.categories || []).length },
     cloudRestored: restored.length,
     cloudSkipped: skipped,
-    safetySnapshot: `${BACKUP_DIR}pre-restore-${stamp}.json`,
+    safetySnapshot: safety.pathname,
+    sourceManifest: source.manifest ? (body && body.manifest) || null : null,
   })
 }
 
-/** 恢复前的安全快照只留最近若干份，免得把存储撑爆 */
+/**
+ * 备份保留：**分层选择**而不是简单砍掉最旧的。
+ *
+ * 旧的「只留最近 20 份」在连续操作时会丢掉时间跨度 —— 20 次操作可能只覆盖 10 分钟，
+ * 一周前的状态反而没了。这里最近 8 份逐次保留，其余名额给每天 / 每周各一份，
+ * 总量仍是 20，覆盖时间显著变长。
+ *
+ * blob 按引用清理：manifest 删掉后，没有任何 manifest 引用的 blob 才会被删。
+ * 留 1 小时安全窗口，避免「manifest 还没写完，blob 先被清掉」。
+ */
 async function pruneBackups() {
   try {
-    const { blobs } = await list({ prefix: BACKUP_DIR, limit: 1000 })
-    if (blobs.length <= BACKUP_KEEP) return
-    const sorted = blobs.map(b => b.pathname).sort()
-    for (const p of sorted.slice(0, sorted.length - BACKUP_KEEP)) await del(p)
+    const items = await listBackups()
+    const doomed = selectManifestsToPrune(
+      items.map(i => ({ pathname: i.pathname, ts: i.ts })),
+      { keep: BACKUP_KEEP },
+    )
+    for (const p of doomed) {
+      try { await del(p) } catch { /* 单份删除失败不影响其它 */ }
+    }
+
+    // 剩余 manifest 引用到的 blob
+    const refs = new Set()
+    for (const item of items.filter(i => i.format === 'manifest' && !doomed.includes(i.pathname)).slice(0, 200)) {
+      try {
+        const row = await readJson(item.pathname)
+        if (row && row.sitesRef) refs.add(String(row.sitesRef))
+        if (row && row.cloudRef) refs.add(String(row.cloudRef))
+      } catch { /* 单份读不出来就当它没引用，安全窗口会兜住 */ }
+    }
+
+    const { blobs } = await list({ prefix: BLOB_PREFIX, limit: 1000 })
+    const cutoff = Date.now() - 3600_000
+    for (const b of blobs || []) {
+      const hash = String(b.pathname).slice(BLOB_PREFIX.length).split('.')[0]
+      if (refs.has(hash)) continue
+      const t = Date.parse(b.uploadedAt || '')
+      if (!Number.isFinite(t) || t > cutoff) continue
+      try { await del(b.pathname) } catch { /* 忽略单个失败 */ }
+    }
   } catch { /* 清理失败不影响恢复本身 */ }
 }
 
@@ -260,6 +442,7 @@ export default async function handler(req, res) {
     const query = (req.query && typeof req.query === 'object') ? req.query : {}
     if (query.object !== undefined) return exportObject(req, res, String(query.object))
     if (query.objects !== undefined) return exportObjects(req, res)
+    if (query.list === '1') return listBackupsHandler(req, res)
     if (query.meta === '1') return exportMeta(req, res)
     return exportBackup(req, res)
   }

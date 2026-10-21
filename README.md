@@ -179,6 +179,9 @@ pnpm run watch:deploy -- --debounce=3000 # 自定义防抖（最小 1000ms）
 > M8（安全收口 + 日志增强）已落地；V5 又补上发布门禁、云端快照回滚、操作审计、可用性看板与 hunk 分块暂存。
 > 控制台原定的 M9/M10 方向与验收定义见 [`docs/nav-console-next-plan.md`](docs/nav-console-next-plan.md)。
 > M9 实际被**智能体 CLI** 占用；V5 方案见 [`docs/NAV-v5-upgrade-plan.md`](docs/NAV-v5-upgrade-plan.md)。
+>
+> 三端同步、省空间备份与浏览器临时工作区的实现说明见
+> [`docs/sync-and-ingest-v0.1.md`](docs/sync-and-ingest-v0.1.md)。
 
 ### 开机自启与桌面快捷方式
 

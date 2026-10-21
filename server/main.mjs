@@ -438,3 +438,21 @@ server.listen(PORT, HOST, () => {
  * 这里的定时器不会触发 —— 线上靠 `tickOnDemand()` 请求驱动分片，见 cron.mjs 注释。
  */
 startHealthCron()
+
+/**
+ * 三端同步调度器（本地库 ↔ BotKeep ↔ Vercel）。
+ *
+ * 默认**关闭**：只有 `NAV_SYNC_ENABLED=1` 或状态文件里显式开启时才启动。
+ * 线上两端不跑定时器 —— 三个写者互相推没有收益，只会放大冲突；
+ * 线上的角色是「被动接收最新内容」。
+ *
+ * 路径用 ROOT 拼：源码直跑时 ROOT 是仓库根，产物里是 dist，
+ * 两种情况都能落到 `shared/tri-sync.mjs`。
+ */
+try {
+  const syncMod = await import(pathToFileURL(join(ROOT, 'shared', 'tri-sync.mjs')).href)
+  const s = syncMod.startSchedule()
+  if (s.started) console.log(`[nav-server] 三端同步调度器已启动（每 ${s.intervalSec}s）`)
+} catch (e) {
+  console.error('[nav-server] 三端同步调度器未启动：', e.message)
+}

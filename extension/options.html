@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>浏览器同步 · 设置</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body {
+      max-width: 680px;
+      margin: 32px auto;
+      padding: 0 20px;
+      font: 14px/1.6 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .sub { color: #64748b; margin-top: 0; }
+    fieldset {
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 16px;
+      margin: 18px 0;
+    }
+    legend { padding: 0 6px; font-weight: 600; }
+    label { display: block; margin: 10px 0 4px; }
+    input[type="text"], input[type="password"], input[type="number"], textarea {
+      width: 100%;
+      padding: 7px 9px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      font: inherit;
+      box-sizing: border-box;
+      background: transparent;
+      color: inherit;
+    }
+    textarea { min-height: 90px; resize: vertical; }
+    .row { display: flex; gap: 16px; }
+    .row > div { flex: 1; }
+    .actions { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+    button {
+      padding: 8px 16px;
+      border-radius: 7px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #0f172a;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
+    .hint { color: #64748b; font-size: 12px; }
+    #status { min-height: 22px; margin-top: 10px; }
+    #status.ok { color: #15803d; }
+    #status.error { color: #b91c1c; }
+    @media (prefers-color-scheme: dark) {
+      button { background: #1e293b; color: #e2e8f0; border-color: #334155; }
+      fieldset { border-color: #334155; }
+    }
+  </style>
+</head>
+<body>
+  <h1>浏览器同步 · 设置</h1>
+  <p class="sub">只把数据发到你填写的导航站；密钥保存在本机 Chrome 存储里。</p>
+
+  <fieldset>
+    <legend>连接</legend>
+    <label for="baseUrl">导航站地址</label>
+    <input id="baseUrl" type="text" placeholder="http://127.0.0.1:3000 或 https://你的域名">
+    <p class="hint">本地调试用 3000 端口；线上填部署后的域名（BotKeep / WorkBuddy）。</p>
+
+    <label for="apiKey">管理密钥</label>
+    <input id="apiKey" type="password" placeholder="data/admin-key.txt 的内容">
+    <p class="hint">密钥只用于请求你填写的站点，不会发给任何第三方。</p>
+
+    <div class="actions">
+      <button id="test" type="button">测试连接</button>
+      <span id="connInfo" class="hint"></span>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>默认筛选</legend>
+    <div class="row">
+      <div>
+        <label for="days">默认时间范围（天，0 = 全部）</label>
+        <input id="days" type="number" min="0" max="3650" value="90">
+      </div>
+      <div>
+        <label for="minVisits">最少访问次数</label>
+        <input id="minVisits" type="number" min="1" max="999" value="1">
+      </div>
+      <div>
+        <label for="maxItems">单次最多采集</label>
+        <input id="maxItems" type="number" min="1" max="2000" value="1000">
+      </div>
+    </div>
+    <label for="blacklist">域名黑名单</label>
+    <textarea id="blacklist" placeholder="每行一个，例如：&#10;baidu.com&#10;google.com/search"></textarea>
+    <p class="hint">命中这些字符串的网址不会进入预览。</p>
+  </fieldset>
+
+  <div class="actions">
+    <button id="save" class="primary" type="button">保存设置</button>
+    <span id="status" role="status"></span>
+  </div>
+
+  <script src="options.js" type="module"></script>
+</body>
+</html>

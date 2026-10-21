@@ -1,6 +1,6 @@
 {
-  "total": 119,
-  "registered": 119,
+  "total": 121,
+  "registered": 121,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -63,6 +63,7 @@
     "tools/console/test-hygiene.mjs",
     "tools/console/test-image-engine.mjs",
     "tools/console/test-infer.mjs",
+    "tools/console/test-ingest.mjs",
     "tools/console/test-inline-stability.mjs",
     "tools/console/test-input-focus-real.mjs",
     "tools/console/test-intent.mjs",
@@ -111,6 +112,7 @@
     "tools/console/test-theme-boot.mjs",
     "tools/console/test-theme.mjs",
     "tools/console/test-translate-engine.mjs",
+    "tools/console/test-tri-sync.mjs",
     "tools/console/test-trust.mjs",
     "tools/console/test-undo.mjs",
     "tools/console/test-uptime.mjs",
@@ -851,6 +853,18 @@
       "durationMs": 210
     },
     {
+      "file": "tools/console/test-ingest.mjs",
+      "name": "test-ingest",
+      "purpose": "浏览器临时工作区的门禁。",
+      "category": "数据与内容",
+      "lines": 161,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
       "file": "tools/console/test-inline-stability.mjs",
       "name": "test-inline-stability",
       "purpose": "「输入态不许驱动父级 v-if」的结构守卫。",
@@ -1431,6 +1445,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 213
+    },
+    {
+      "file": "tools/console/test-tri-sync.mjs",
+      "name": "test-tri-sync",
+      "purpose": "三端同步核心规则的门禁。",
+      "category": "服务端与运行时",
+      "lines": 164,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-trust.mjs",

@@ -18,6 +18,8 @@ export const ADMIN_SHORTCUTS = [
   { keys: ['g', 's'], tab: 'sites', label: '站点管理' },
   { keys: ['g', 'c'], tab: 'categories', label: '分类体系' },
   { keys: ['g', 'm'], tab: 'data-manager', label: '数据管理' },
+  { keys: ['g', 'x'], tab: 'sync', label: '三端同步' },
+  { keys: ['g', 'w'], tab: 'data-ingest', label: '浏览器工作区' },
   { keys: ['g', 'p'], tab: 'publish', label: '云端发布' },
   { keys: ['g', 'k'], tab: 'snapshots', label: '快照与回滚' },
   { keys: ['g', 'h'], tab: 'history', label: '发布历史' },

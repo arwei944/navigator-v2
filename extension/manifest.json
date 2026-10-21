@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "NewMax 导航站 · 浏览器同步",
+  "version": "0.1.0",
+  "description": "把浏览器历史、书签和当前标签页整理成标准站点，先放进临时工作区，确认后再入导航站主库。",
+  "permissions": ["history", "bookmarks", "tabs", "storage", "contextMenus"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "浏览器同步到导航站",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html"
+}

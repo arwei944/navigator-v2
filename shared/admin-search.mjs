@@ -18,6 +18,8 @@ export const ADMIN_TAB_KEYWORDS = {
   sites: '站点 网站 导入 书签 批量 排序 去重 site',
   categories: '分类 体系 域 group category',
   'data-manager': '数据 体检 质量 覆盖率 重复 孤儿分类 低置信度 修复 导出 csv json',
+  sync: '同步 三端 本地 botkeep workbuddy vercel 一致 冲突 选主 sync',
+  'data-ingest': '浏览器 历史 书签 标签页 临时工作区 工作区 导入 批次 分类 ingest staging',
   publish: '云端发布 热更新 预检 publish',
   snapshots: '快照 回滚 恢复 snapshot rollback',
   history: '发布历史 记录 history',

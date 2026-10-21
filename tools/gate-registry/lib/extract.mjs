@@ -148,7 +148,7 @@ const CATEGORY_RULES = [
     '数据与内容',
     // backup：备份守的是数据资产本身（站点/点击/健康全在同一个库里），归这里而不是「部署与发布」
     // mirror：镜像是云端数据的本地副本，守的是「数据完整性 + 不丢变化」，同属数据资产
-    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url|visit|click|domain|flow|infer|backup|mirror/i,
+    /data|site|quality|desc|category|alias|seed|audit|translate|glossary|meta|auto-add|affinity|trust|url|visit|click|domain|flow|infer|backup|mirror|ingest/i,
   ],
   [
     '服务端与运行时',
