@@ -25,7 +25,9 @@
  *   node scripts/deploy-botkeep.mjs --no-restore    # 只核对，异常时不自动恢复
  */
 import { publish } from '../tools/console/lib/publish/deploy.mjs'
+import { readFileSync } from 'node:fs'
 import { captureBaseline, verifyAfter, restoreBaseline } from './upgrade-guard.mjs'
+import { bumpPackageVersion } from './bump-version.mjs'
 
 const args = process.argv.slice(2)
 const skipBuild = args.includes('--skip-build')
@@ -34,8 +36,36 @@ const quiet = args.includes('--quiet')
 const full = args.includes('--full')
 const noGuard = args.includes('--no-guard')
 const noRestore = args.includes('--no-restore')
+/** 版本号默认在构建前递增；--no-bump 可关闭，--minor / --major 改变递增段 */
+const noBump = args.includes('--no-bump')
+const bumpPart = args.includes('--major') || args.includes('--bump=major')
+  ? 'major'
+  : args.includes('--minor') || args.includes('--bump=minor')
+    ? 'minor'
+    : 'patch'
 
 const log = quiet ? () => {} : (t) => process.stdout.write(String(t).endsWith('\n') ? t : t + '\n')
+
+/**
+ * 版本号必须在 `publish()` 的构建**之前**递增：
+ * vite 把 `__APP_VERSION__` 烘进产物，构建后再改 package.json 对线上没有任何影响。
+ *
+ * `--skip-build` 时刻意不递增：产物是旧的，改版本号只会造成
+ * 「package.json 显示 3.1.2、页面仍显示 3.1.1」的不一致。
+ */
+let versionInfo = null
+if (skipBuild) {
+  log('\n· 复用现有产物：不递增版本号（产物里的版本号不会变）')
+} else if (noBump) {
+  log('\n· 已指定 --no-bump：保持现有版本号')
+} else {
+  try {
+    versionInfo = bumpPackageVersion({ part: bumpPart })
+    log(`\n· 版本号 ${versionInfo.from} → ${versionInfo.to}`)
+  } catch (e) {
+    log(`  ⚠ 版本号递增失败（继续发布）：${e.message}`)
+  }
+}
 
 const baseline = noGuard
   ? { ok: false, skipped: true, reason: '--no-guard' }
@@ -65,6 +95,12 @@ process.stdout.write(JSON.stringify({
   online: r.online || '',
   seconds: r.seconds || 0,
   error: r.error || '',
+  appVersion: (() => {
+    try { return JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version || '' }
+    catch { return '' }
+  })(),
+  appVersionFrom: versionInfo?.from || '',
+  appVersionBumped: Boolean(versionInfo),
   dataGuard: guard ? {
     ok: Boolean(guard.ok),
     skipped: Boolean(guard.skipped),

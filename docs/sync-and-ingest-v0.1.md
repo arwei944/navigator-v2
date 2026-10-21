@@ -316,6 +316,23 @@ export NAV_SYNC_ENABLED=1
 export NAV_SYNC_INTERVAL_SEC=30
 ```
 
+### 发布版本号
+
+`node scripts/deploy-botkeep.mjs`（或 `npm run deploy`）在**构建之前**自动递增
+`package.json` 的 patch 版本，vite 把它注入为 `__APP_VERSION__`，侧栏与「关于」页
+随即显示新值。
+
+| 参数 | 行为 |
+|---|---|
+| 默认 | `3.1.0 → 3.1.1`，然后构建、部署 |
+| `--minor` / `--major` | 递增中间位 / 主位 |
+| `--no-bump` | 保持现有版本号 |
+| `--skip-build` | **不递增**（复用旧产物，改了版本也不会进包） |
+
+递增后 `package.json` 是未提交改动，建议发布完成后单独提交一次
+（例如 `chore(release): 3.1.1`）。`--skip-build` 时不要期待侧栏版本变化 ——
+这是刻意设计，避免「文件版本新、线上产物旧」。
+
 ### 已实现的环境变量
 
 | 变量 | 说明 |

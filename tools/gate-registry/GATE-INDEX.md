@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **125** 道门禁，其中已接入 `console:test:all` 的 **125** 道。
+> 共 **126** 道门禁，其中已接入 `console:test:all` 的 **126** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -13,7 +13,7 @@
 | 安全与鉴权 | 6 | `test-netguard` | 0.3s |
 | 搜索与交互 | 6 | `test-search` | 0.4s |
 | 部署与发布 | 10 | `test-endpoints-run` | 2.8s |
-| 工作区治理 | 12 | `test-hunks` | 4.5s |
+| 工作区治理 | 13 | `test-hunks` | 4.5s |
 | 服务端与运行时 | 24 | `test-mcp` | 34.6s |
 | 前端与体验 | 31 | `test-frontend` | 3.9s |
 | 数据与内容 | 34 | `test-trust` | 0.8s |
@@ -142,8 +142,9 @@
 | 118 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
 | 119 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
 | 120 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 121 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
-| 122 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
-| 123 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
-| 124 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 125 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |
+| 121 | `test-version-bump` | 工作区治理 | 版本号递增门禁：发布脚本会在构建前调用它，错了会把线上版本写乱。 | 66 | — |
+| 122 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
+| 123 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
+| 124 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
+| 125 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
+| 126 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |

@@ -1,6 +1,6 @@
 {
-  "total": 125,
-  "registered": 125,
+  "total": 126,
+  "registered": 126,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -123,6 +123,7 @@
     "tools/console/test-url-preview.mjs",
     "tools/console/test-url.mjs",
     "tools/console/test-v10.mjs",
+    "tools/console/test-version-bump.mjs",
     "tools/console/test-visit-tracking-real.mjs",
     "tools/console/test-visit-tracking.mjs",
     "tools/console/test-visual-layer.mjs",
@@ -1581,6 +1582,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 297
+    },
+    {
+      "file": "tools/console/test-version-bump.mjs",
+      "name": "test-version-bump",
+      "purpose": "版本号递增门禁：发布脚本会在构建前调用它，错了会把线上版本写乱。",
+      "category": "工作区治理",
+      "lines": 66,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-visit-tracking-real.mjs",
