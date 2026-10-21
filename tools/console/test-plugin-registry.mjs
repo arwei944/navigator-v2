@@ -3,7 +3,7 @@
  * 插件目录（统一注册表视图）自测：不联网。
  *
  * 覆盖：
- *   ① 9 个引擎组齐备，且形状归一（providers / current / available 一个都不少）
+ *   ① 9 个引擎组 + 数据管理齐备，且形状归一（providers / current / available 一个都不少）
  *   ② 注册链加载完整 —— translate 的内建译厂、image 的封面 provider 不能缺项
  *   ③ 链式组的 current.mode 三态（default / custom / off）随配置变化
  *   ④ site-store 必须是 locked 且 writable:false（数据安全单点，不许在面板改）
@@ -42,7 +42,7 @@ async function withEnv(pairs, fn) {
 
 const EXPECTED_IDS = [
   'site-engine', 'translate-engine', 'llm-engine', 'image-engine', 'cover-source',
-  'probe-engine', 'category-source', 'site-store', 'publisher',
+  'probe-engine', 'category-source', 'site-store', 'data-manager', 'publisher',
 ]
 
 async function main() {
@@ -50,7 +50,7 @@ async function main() {
   const groups = await pluginGroups({ check: false })
   const byId = new Map(groups.map(g => [g.id, g]))
 
-  check('9 个引擎组全部出现', () => {
+  check('9 个引擎组 + 数据管理全部出现', () => {
     assert.deepEqual(groups.map(g => g.id).sort(), [...EXPECTED_IDS].sort())
   })
   check('每组的公共字段齐备', () => {
@@ -127,6 +127,15 @@ async function main() {
     assert.equal(g.writable, false)
     assert.equal(g.hot, false)
     assert.match(g.note, /数据安全|覆盖/)
+  })
+
+  console.log('\n数据管理：只读诊断，不可配置')
+  check('strategy=locked 且 writable=false（不能成为第二条写通道）', () => {
+    const g = byId.get('data-manager')
+    assert.equal(g.strategy, 'locked')
+    assert.equal(g.writable, false)
+    assert.deepEqual(g.providers.map(p => p.id), ['audit', 'repair-plan', 'export'])
+    assert.match(g.note, /不直接写库|写通道/)
   })
 
   console.log('\n覆盖层：白名单与值校验')

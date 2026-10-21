@@ -1,5 +1,5 @@
 /**
- * 插件目录 —— 把散在 9 个引擎模块里的「注册表」聚成一份统一视图。
+ * 插件目录 —— 把散在 9 个引擎模块与 1 项数据管理能力里的「注册表」聚成一份统一视图。
  *
  * ## 它解决什么
  *
@@ -14,7 +14,7 @@
  *      · image 的封面 provider 由 `cover-source.mjs` 注册。
  *    少 import 一个，清单就**静默缺项**（不报错，只是少了）。所以加载必须集中在这里。
  *
- * 2. **归一成同一形状**。9 组引擎各自的 list* 返回字段并不一致（有的 async、有的带
+ * 2. **归一成同一形状**。各引擎的 list* 返回字段并不一致（有的 async、有的带
  *    reason、有的按 kind 分组），这里收敛成 `{ providers, current, available }`。
  *
  * 3. **配置覆盖层的纯函数**。文件读写交给宿主（站内是 `data/plugins.json`，控制台
@@ -256,7 +256,33 @@ export async function pluginGroups({ check = true } = {}) {
       + '因此站内写路径把 provider 固定为 kv，换后端须在 provider 层显式切换。',
   })
 
-  /* 9. 发布通道 —— 单选 */
+  /* 9. 数据管理 —— 只读诊断，刻意不可配置 */
+  groups.push({
+    id: 'data-manager',
+    label: '数据管理',
+    role: '站点库体检、受控修复与导出（只读诊断；写入复用站点库唯一通道）',
+    strategy: 'locked',
+    env: '',
+    hot: true,
+    writable: false,
+    available: true,
+    providers: [
+      { id: 'audit', label: '库级体检', order: 1, available: true, selected: true, active: true },
+      { id: 'repair-plan', label: '修复计划', order: 2, available: true, selected: true, active: true },
+      { id: 'export', label: '导出', order: 3, available: true, selected: true, active: true },
+    ],
+    current: {
+      mode: 'locked',
+      env: '',
+      ids: ['audit', 'repair-plan', 'export'],
+      label: '固定启用（修复计划只生成 nextSites，落库仍走 /api/sites）',
+    },
+    note: '本组刻意不可配置：数据管理插件只生成修复计划，不直接写库。'
+      + '写入仍走 POST /api/sites（CAS + 写前快照 + sanitizeSites 门禁），'
+      + '因此它不会成为站点库的第二条写通道。',
+  })
+
+  /* 10. 发布通道 —— 单选 */
   let pubCurrent
   const pubRequested = String(process.env.NAV_PUBLISHER || '').trim().toLowerCase()
   try {

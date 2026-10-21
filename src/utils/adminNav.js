@@ -25,6 +25,7 @@ export const TABS = [
   { id: 'overview', label: '仪表盘', group: 'overview' },
   { id: 'sites', label: '站点管理', group: 'data' },
   { id: 'categories', label: '分类体系', group: 'data' },
+  { id: 'data-manager', label: '数据管理', group: 'data' },
   { id: 'deploy', label: '部署', group: 'ops' },
   { id: 'plugins', label: '插件', group: 'ops' },
   { id: 'backup', label: '备份与恢复', group: 'ops' },
@@ -47,6 +48,7 @@ export const TAB_IDS = new Set(TABS.map((t) => t.id))
 export const DASH_DESC = {
   sites: '增删改、批量操作、书签导入',
   categories: '全部方向下的分类表',
+  'data-manager': '体检、受控修复、导入导出',
   deploy: '本地 / 上次构建 / 线上三方对照',
   plugins: '九个引擎模块的统一管理面',
   backup: '备份与恢复站点库',
@@ -92,6 +94,7 @@ export const RAIL_GROUPS = [
       { id: 'overview', kind: 'tab', tab: 'overview', label: '概览', icon: '◱' },
       { id: 'sites', kind: 'tab', tab: 'sites', label: '站点管理', icon: '☰' },
       { id: 'categories', kind: 'tab', tab: 'categories', label: '分类体系', icon: '◇' },
+      { id: 'data-manager', kind: 'tab', tab: 'data-manager', label: '数据管理', icon: '⊞' },
       { id: 'deploy', kind: 'tab', tab: 'deploy', label: '部署', icon: '⇪' },
       { id: 'plugins', kind: 'tab', tab: 'plugins', label: '插件', icon: '◈' },
       { id: 'snapshots', kind: 'tab', tab: 'snapshots', label: '快照与回滚', icon: '⟲' },

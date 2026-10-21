@@ -9,6 +9,8 @@ dist
 backups/
 tmp-payload.json
 tmp-console-payload.json
+# 临时服务日志（本地调试产物，不入库）
+.tmp-*.log
 perf-report/
 tools/console/launcher/nssm/
 tools/console/launcher/logs/

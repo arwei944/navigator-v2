@@ -1,6 +1,6 @@
 {
-  "total": 115,
-  "registered": 115,
+  "total": 119,
+  "registered": 119,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -28,6 +28,10 @@
     "tools/console/test-command-phrases.mjs",
     "tools/console/test-contrast.mjs",
     "tools/console/test-cron.mjs",
+    "tools/console/test-data-history.mjs",
+    "tools/console/test-data-import.mjs",
+    "tools/console/test-data-manager.mjs",
+    "tools/console/test-data-merge.mjs",
     "tools/console/test-data-quality.mjs",
     "tools/console/test-deploy-manifest.mjs",
     "tools/console/test-deploy-resume.mjs",
@@ -425,6 +429,54 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 1176
+    },
+    {
+      "file": "tools/console/test-data-history.mjs",
+      "name": "test-data-history",
+      "purpose": "体检趋势自测：不联网、不碰数据库。",
+      "category": "数据与内容",
+      "lines": 153,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-data-import.mjs",
+      "name": "test-data-import",
+      "purpose": "站点数据导入自测：不联网、不碰数据库。",
+      "category": "数据与内容",
+      "lines": 376,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-data-manager.mjs",
+      "name": "test-data-manager",
+      "purpose": "数据管理插件自测：不联网、不碰数据库。",
+      "category": "数据与内容",
+      "lines": 341,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
+    },
+    {
+      "file": "tools/console/test-data-merge.mjs",
+      "name": "test-data-merge",
+      "purpose": "重复站点合并自测：不联网、不碰数据库。",
+      "category": "数据与内容",
+      "lines": 225,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-data-quality.mjs",
@@ -1009,7 +1061,7 @@
       "name": "test-plugin-registry",
       "purpose": "插件目录（统一注册表视图）自测：不联网。",
       "category": "工作区治理",
-      "lines": 208,
+      "lines": 217,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,

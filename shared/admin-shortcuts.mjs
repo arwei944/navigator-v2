@@ -17,6 +17,7 @@ export const ADMIN_SHORTCUTS = [
   { keys: ['g', 'l'], tab: 'plugins', label: '插件' },
   { keys: ['g', 's'], tab: 'sites', label: '站点管理' },
   { keys: ['g', 'c'], tab: 'categories', label: '分类体系' },
+  { keys: ['g', 'm'], tab: 'data-manager', label: '数据管理' },
   { keys: ['g', 'p'], tab: 'publish', label: '云端发布' },
   { keys: ['g', 'k'], tab: 'snapshots', label: '快照与回滚' },
   { keys: ['g', 'h'], tab: 'history', label: '发布历史' },

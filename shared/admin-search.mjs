@@ -17,6 +17,7 @@ export const ADMIN_TAB_KEYWORDS = {
   preferences: '偏好 设置 开关 告警规则 preference settings',
   sites: '站点 网站 导入 书签 批量 排序 去重 site',
   categories: '分类 体系 域 group category',
+  'data-manager': '数据 体检 质量 覆盖率 重复 孤儿分类 低置信度 修复 导出 csv json',
   publish: '云端发布 热更新 预检 publish',
   snapshots: '快照 回滚 恢复 snapshot rollback',
   history: '发布历史 记录 history',

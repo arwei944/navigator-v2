@@ -158,7 +158,11 @@
     "console:test:secrets": "node tools/console/test-secrets.mjs",
     "console:test:backup": "node tools/console/test-backup.mjs",
     "console:test:mirror": "node tools/console/test-mirror.mjs",
-    "console:test:gate-concurrency": "node tools/console/test-gate-concurrency.mjs"
+    "console:test:gate-concurrency": "node tools/console/test-gate-concurrency.mjs",
+    "console:test:data-manager": "node tools/console/test-data-manager.mjs",
+    "console:test:data-import": "node tools/console/test-data-import.mjs",
+    "console:test:data-merge": "node tools/console/test-data-merge.mjs",
+    "console:test:data-history": "node tools/console/test-data-history.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

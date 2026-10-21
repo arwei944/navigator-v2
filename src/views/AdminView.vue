@@ -129,6 +129,20 @@
                 <div class="admin-stat-value">{{ favoritesStore.count }}</div>
                 <div class="admin-stat-label">收藏数</div>
               </div>
+              <div
+                class="admin-stat-card clickable"
+                role="button"
+                tabindex="0"
+                title="打开数据管理"
+                @click="selectTab('data-manager')"
+                @keydown.enter="selectTab('data-manager')"
+              >
+                <div class="admin-stat-value" :class="{ warn: dmIssue > 0 }">
+                  {{ dmIssue === null ? '—' : dmIssue }}
+                </div>
+                <div class="admin-stat-label">数据待处理</div>
+                <div v-if="dmLow !== null" class="admin-stat-sub">低置信度 {{ dmLow }}</div>
+              </div>
             </div>
             <div class="admin-section">
               <AdminInsights @open-ai="selectTab('ai')" />
@@ -140,6 +154,8 @@
           <AdminSitesPanel v-else-if="activeTab === 'sites'" :admin-key="adminKey" />
 
           <AdminCategoryManager v-else-if="activeTab === 'categories'" />
+
+          <AdminDataManager v-else-if="activeTab === 'data-manager'" :admin-key="adminKey" />
 
           <div v-else-if="activeTab === 'publish'" class="admin-section">
             <div class="admin-section-header">
@@ -240,6 +256,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useHistoryStore } from '@/stores/history'
 import { opsApi } from '@/services/opsApi'
+import { dataManagerApi } from '@/services/dataManagerApi'
 import { safeSetItem, safeRemoveItem } from '@/utils/safeStorage'
 import { ADMIN_SHORTCUTS } from '../../shared/admin-shortcuts.mjs'
 import { buildAdminIndex, searchAdminIndex } from '../../shared/admin-search.mjs'
@@ -252,6 +269,7 @@ import { useAdminPublish } from '@/composables/useAdminPublish'
 import AdminLogin from '@/components/admin/AdminLogin.vue'
 import AdminSitesPanel from '@/components/admin/AdminSitesPanel.vue'
 import AdminCategoryManager from '@/components/admin/AdminCategoryManager.vue'
+import AdminDataManager from '@/components/admin/AdminDataManager.vue'
 import AdminInsights from '@/components/admin/AdminInsights.vue'
 import AdminPublishPreflight from '@/components/admin/AdminPublishPreflight.vue'
 import AdminSnapshots from '@/components/admin/AdminSnapshots.vue'
@@ -268,6 +286,24 @@ const sitesStore = useSitesStore()
 const categoriesStore = useCategoriesStore()
 const favoritesStore = useFavoritesStore()
 const historyStore = useHistoryStore()
+
+/**
+ * 数据健康摘要 —— 概览页只显示一个数字，点进去才是完整报告。
+ *
+ * 失败静默：概览卡片拿不到数字不该让整页出现报错条，用户点进「数据管理」
+ * 仍会看到真实原因（那里有完整的错误分支）。
+ */
+const dmIssue = ref(null)
+const dmLow = ref(null)
+
+async function loadDataHealth() {
+  try {
+    const r = await dataManagerApi.summary(adminKey.value)
+    if (!r.ok) return
+    dmIssue.value = r.issueCount
+    dmLow.value = r.lowConfidence
+  } catch { /* 忽略：概览卡片是锦上添花，不阻断页面 */ }
+}
 
 const todayCount = computed(() => {
   const today = new Date()
@@ -405,6 +441,7 @@ onMounted(async () => {
   actions.attachShortcuts()
   auth.loadVersion()
   await auth.verifyExisting()
+  loadDataHealth()
 })
 
 onBeforeUnmount(() => {
@@ -617,7 +654,12 @@ watch(webhookUrl, (v) => {
   text-align: center;
 }
 .admin-stat-value { font-size: 28px; font-weight: 700; color: var(--accent); }
+.admin-stat-value.warn { color: var(--color-danger, #e5484d); }
 .admin-stat-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+.admin-stat-sub { font-size: 11.5px; color: var(--text-disabled, var(--text-secondary)); margin-top: 2px; }
+.admin-stat-card.clickable { cursor: pointer; transition: border-color .15s, transform .15s; }
+.admin-stat-card.clickable:hover { border-color: var(--accent); }
+.admin-stat-card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .admin-section { padding: 0 32px 32px; }
 
 .admin-section-header {
