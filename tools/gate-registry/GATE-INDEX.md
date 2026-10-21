@@ -1,7 +1,7 @@
 # 门禁台账（自动生成）
 
 > 生成命令：`npm run gate:index` ｜ 校验：`npm run console:test:gate-registry`
-> 共 **121** 道门禁，其中已接入 `console:test:all` 的 **121** 道。
+> 共 **122** 道门禁，其中已接入 `console:test:all` 的 **122** 道。
 
 ✅ 所有门禁脚本均已接入 `console:test:all`。
 
@@ -13,10 +13,10 @@
 | 安全与鉴权 | 6 | `test-netguard` | 0.3s |
 | 搜索与交互 | 6 | `test-search` | 0.4s |
 | 部署与发布 | 9 | `test-endpoints-run` | 2.8s |
-| 工作区治理 | 9 | `test-hunks` | 4.5s |
+| 工作区治理 | 12 | `test-hunks` | 4.5s |
 | 服务端与运行时 | 24 | `test-mcp` | 34.6s |
 | 前端与体验 | 31 | `test-frontend` | 3.9s |
-| 数据与内容 | 34 | `test-trust` | 0.8s |
+| 数据与内容 | 32 | `test-trust` | 0.8s |
 
 ## 清单
 
@@ -74,7 +74,7 @@
 | 50 | `test-glossary` | 前端与体验 | 离线词表（`shared/glossary.mjs`）用例：零依赖、不联网、零延迟。 | 188 | 0.5s |
 | 51 | `test-graph-layout` | 前端与体验 | 关系图布局用例：零依赖、不跑浏览器。 | 204 | 0.7s |
 | 52 | `test-gridnav` | 前端与体验 | src/utils/gridnav.js 用例：零依赖、不联网、纯函数穷举。 | 111 | 0.2s |
-| 53 | `test-guard` | 数据与内容 | api/metadata.js 的 SSRF 防护用例：确认内网 / 回环 / 链路本地地址一律被拒。 | 52 | 0.3s |
+| 53 | `test-guard` | 工作区治理 | api/metadata.js 的 SSRF 防护用例：确认内网 / 回环 / 链路本地地址一律被拒。 | 52 | 0.3s |
 | 54 | `test-health-fails` | 服务端与运行时 | 「连续不可达」计数与自动归档判据守卫：零依赖、不联网。 | 82 | 0.2s |
 | 55 | `test-health` | 服务端与运行时 | 健康判定的**合并口径**守卫（v10）。 | 112 | 0.2s |
 | 56 | `test-http-fetch` | 前端与体验 | `shared/http-fetch.mjs` 的**传输层**用例：零依赖，起本地服务器实测。 | 302 | 1.1s |
@@ -92,7 +92,7 @@
 | 68 | `test-local-meta` | 数据与内容 | 本地推断兜底（`src/services/localMeta.js`）用例：零依赖、不联网。 | 153 | 0.2s |
 | 69 | `test-meta-fast` | 数据与内容 | `/api/metadata` 的**快路径**用例：抓取早断、预算收紧、默认不翻译、同域缓存。 | 406 | 0.2s |
 | 70 | `test-meta-fetch` | 数据与内容 | 站点元信息抓取的**响应容错**用例：零依赖、不联网（打桩 globalThis.fetch）。 | 230 | 0.2s |
-| 71 | `test-meta-upgrade` | 数据与内容 | 「秒加之后的真实补全」（`src/services/metaUpgrade.js`）用例：零依赖、不联网。 | 246 | 0.2s |
+| 71 | `test-meta-upgrade` | 工作区治理 | 「秒加之后的真实补全」（`src/services/metaUpgrade.js`）用例：零依赖、不联网。 | 246 | 0.2s |
 | 72 | `test-mirror` | 数据与内容 | 门禁：云端 → 本地实时镜像同步（含「本地离线期间补齐」这条核心能力）。 | 408 | — |
 | 73 | `test-mobile` | 前端与体验 | 移动端触摸目标守卫（F4）：零依赖、静态检查。 | 85 | 0.2s |
 | 74 | `test-netguard` | 安全与鉴权 | 第三批 · 序 17 的守卫：SSRF 防线的**连接层**部分。 | 282 | 0.3s |
@@ -131,15 +131,16 @@
 | 107 | `test-theme-boot` | 前端与体验 | 主题「启动时序」守卫：持久化回填 → 补应用的那一段。 | 282 | 3.2s |
 | 108 | `test-theme` | 前端与体验 | 主题模型用例：零依赖、不联网、不起浏览器。 | 192 | 0.2s |
 | 109 | `test-translate-engine` | 数据与内容 | 翻译引擎（热拔插）自测：不联网，全部用注入的假 fetchText。 | 212 | 0.2s |
-| 110 | `test-tri-sync` | 服务端与运行时 | 三端同步核心规则的门禁。 | 164 | — |
+| 110 | `test-tri-sync` | 服务端与运行时 | 三端同步核心规则的门禁。 | 209 | — |
 | 111 | `test-trust` | 数据与内容 | nav-console 来源校验用例（零依赖）。 | 112 | 0.8s |
 | 112 | `test-undo` | 前端与体验 | E4b 守卫：撤销栈内核。 | 192 | 0.2s |
-| 113 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
-| 114 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
-| 115 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
-| 116 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
-| 117 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
-| 118 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
-| 119 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
-| 120 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
-| 121 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |
+| 113 | `test-upgrade-guard` | 工作区治理 | 升级数据保护的门禁。 | 103 | — |
+| 114 | `test-uptime` | 服务端与运行时 | 本站可用性内核：判定一次探测、折叠掉线区间、汇总可用率。 | 152 | 0.4s |
+| 115 | `test-url-preview` | 搜索与交互 | 网址预览纯函数：搜索框下拉里那张预览卡片的数据来源与状态判定。 | 141 | 0.2s |
+| 116 | `test-url` | 数据与内容 | src/utils/url.js 用例：零依赖、不联网。 | 127 | 0.2s |
+| 117 | `test-v10` | 服务端与运行时 | v10-P3/P4/P5 的接口守卫：备份恢复、封面提取、AI 降级。 | 193 | 0.3s |
+| 118 | `test-visit-tracking-real` | 数据与内容 | 访问追踪真机验证：在真实浏览器里跑一遍「点击 → 本机记录 → 云端上报」。 | 198 | — |
+| 119 | `test-visit-tracking` | 数据与内容 | 访问追踪守卫：并发写入语义 + 限流淘汰 + 本地存储收敛。 | 165 | — |
+| 120 | `test-visual-layer` | 前端与体验 | 视觉层门禁（统一视觉层） | 368 | 0.4s |
+| 121 | `test-visual-scheme` | 前端与体验 | src/utils/visualScheme.js 用例：零依赖、不联网、不起浏览器。 | 257 | 0.2s |
+| 122 | `test-mcp` | 服务端与运行时 | nav-mcp 端到端用例：用官方 SDK 的 Client 走真实 stdio 握手，逐条断言工具契约。 | 382 | 34.6s |

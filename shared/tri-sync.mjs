@@ -42,6 +42,25 @@ const STATE_FILE = join(STATE_DIR, '_state.json')
 const HISTORY_KEEP = 100
 const FETCH_TIMEOUT_MS = Number(process.env.NAV_SYNC_TIMEOUT_MS) || 12000
 
+/**
+ * 权威端：默认 BotKeep。空字符串表示回到「自动选最新」。
+ *
+ * 这是产品口径，不是技术默认值：线上真实数据在 BotKeep，任何自动选主都可能
+ * 因为某一端的一次误写把权威数据覆盖掉。要改必须显式配置。
+ */
+export function resolveAuthority(env = process.env) {
+  const raw = env.NAV_SYNC_AUTHORITY
+  if (raw === undefined) return 'botkeep'
+  return String(raw).trim()
+}
+
+/** 目标端有、权威端没有的站点（这些会在写入时被移除，必须先归档） */
+export function diffRemoved(targetSites, winnerSites) {
+  const keep = new Set((Array.isArray(winnerSites) ? winnerSites : []).map(s => String(s?.id || '')))
+  return (Array.isArray(targetSites) ? targetSites : [])
+    .filter(s => s && s.id && !keep.has(String(s.id)))
+}
+
 /** 端点清单：默认三端；`NAV_SYNC_ENDPOINTS` 可按 id 覆盖或追加 */
 export function resolveTargets(env = process.env) {
   const base = [
@@ -138,6 +157,34 @@ async function readLocalStore() {
     return JSON.parse(await new Response(blob.stream).text())
   } catch {
     return null
+  }
+}
+
+/**
+ * 写入前把「将被移除的目标端站点」完整存到本地。
+ *
+ * 权威模式下，本地 / WorkBuddy 上曾经添加、但 BotKeep 没有的站点会在同步后消失。
+ * 直接删掉等于把历史操作记录一起抹掉；这里先落一份完整 JSON（含 id、分类、
+ * 创建时间、访问计数），需要时可以按 id 恢复或重新导入。
+ */
+export function archiveRemoved(targetId, removed, winnerTarget) {
+  if (!Array.isArray(removed) || !removed.length) return { count: 0, path: null }
+  try {
+    const dir = join(STATE_DIR, 'removed')
+    mkdirSync(dir, { recursive: true })
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const path = join(dir, `${String(targetId)}-${stamp}.json`)
+    writeFileSync(path, JSON.stringify({
+      at: new Date().toISOString(),
+      target: String(targetId),
+      authority: String(winnerTarget?.id || ''),
+      authorityVersion: Number(winnerTarget?.data?.version) || 0,
+      count: removed.length,
+      sites: removed,
+    }, null, 2), 'utf8')
+    return { count: removed.length, path }
+  } catch (e) {
+    return { count: removed.length, path: null, error: String(e?.message || e) }
   }
 }
 
@@ -293,7 +340,8 @@ export async function runSync(opts = {}) {
   const key = adminKey()
   const started = Date.now()
   const read = await Promise.all(targets.map(t => readTarget(t, key)))
-  const plan = planSync(read)
+  const authorityId = resolveAuthority()
+  const plan = planSync(read, { authority: authorityId })
 
   /**
    * `plan.winner` 是**摘要**（给面板用，不含 sites 数组）。
@@ -302,10 +350,22 @@ export async function runSync(opts = {}) {
    */
   const winnerTarget = plan.winner ? read.find(t => t.id === plan.winner.id) : null
 
+  if (plan.authorityUnavailable) {
+    const result = {
+      ok: false,
+      error: `权威端 ${authorityId} 不可达或没有站点数据；本轮不执行任何写入`,
+      plan,
+      results: [],
+      seconds: Math.round((Date.now() - started) / 10) / 100,
+    }
+    record(result, opts.trigger || 'manual')
+    return result
+  }
+
   if (!plan.winner || !winnerTarget || !Array.isArray(winnerTarget.data?.sites)) {
     const result = {
       ok: false,
-      error: '三端都没有可用的站点数据（不执行任何写入）',
+      error: '没有可用的站点数据（不执行任何写入）',
       plan,
       results: [],
       seconds: Math.round((Date.now() - started) / 10) / 100,
@@ -337,9 +397,23 @@ export async function runSync(opts = {}) {
       continue
     }
     try {
+      /**
+       * 先归档「目标端有、权威端没有」的站点，再覆盖。
+       * 顺序不能反：写入失败时归档还在，写入成功时归档也已落盘。
+       */
+      const removed = diffRemoved(target.data?.sites, winnerTarget.data?.sites)
+      const archive = archiveRemoved(action.id, removed, winnerTarget)
       const payload = withLocalState(winnerTarget.data, target.data)
       const r = await writeTarget(target, payload, key)
-      results.push({ id: action.id, label: action.label, reason: action.reason, ...r })
+      results.push({
+        id: action.id,
+        label: action.label,
+        reason: action.reason,
+        ...r,
+        removed: archive.count,
+        archivePath: archive.path,
+        archiveError: archive.error || null,
+      })
     } catch (e) {
       results.push({ id: action.id, ok: false, error: String(e?.message || e) })
     }
@@ -372,13 +446,20 @@ function record(result, trigger) {
     trigger,
     ok: Boolean(result.ok),
     error: result.error || null,
+    authority: result.plan?.authority || null,
     winner: result.plan?.winner?.id || null,
     winnerVersion: result.plan?.winner?.version || null,
     actions: (result.plan?.actions || []).map(a => a.id),
     written: (result.results || []).filter(r => r.ok).map(r => r.id),
     failed: (result.results || []).filter(r => !r.ok).map(r => ({ id: r.id, error: r.error || `HTTP ${r.status}` })),
     conflicts: result.plan?.conflicts || [],
+    diverged: result.plan?.diverged || [],
     unreachable: result.plan?.unreachable || [],
+    // 被覆盖掉的目标端独有站点：数量与本地归档路径，便于事后恢复
+    removed: (result.results || []).reduce((n, r) => n + (Number(r.removed) || 0), 0),
+    archived: (result.results || []).filter(r => r.archivePath).map(r => ({
+      id: r.id, count: Number(r.removed) || 0, path: r.archivePath,
+    })),
     seconds: result.seconds || 0,
   }
   state.lastRun = at
@@ -398,6 +479,7 @@ export function status() {
   const envEnabled = process.env.NAV_SYNC_ENABLED === '1'
   return {
     ...state,
+    authority: resolveAuthority(),
     enabled: Boolean(timer) || envEnabled || state.enabled === true,
     intervalSec: Number(process.env.NAV_SYNC_INTERVAL_SEC) || state.intervalSec,
     targets: resolveTargets().map(t => ({

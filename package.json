@@ -164,7 +164,8 @@
     "console:test:data-merge": "node tools/console/test-data-merge.mjs",
     "console:test:data-history": "node tools/console/test-data-history.mjs",
     "console:test:tri-sync": "node tools/console/test-tri-sync.mjs",
-    "console:test:ingest": "node tools/console/test-ingest.mjs"
+    "console:test:ingest": "node tools/console/test-ingest.mjs",
+    "console:test:upgrade-guard": "node tools/console/test-upgrade-guard.mjs"
   },
   "dependencies": {
     "@vercel/blob": "^2.8.0",

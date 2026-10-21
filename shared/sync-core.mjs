@@ -132,12 +132,36 @@ export function pickWinner(targets) {
 export function planSync(targets, opts = {}) {
   const at = opts.at || new Date().toISOString()
   const list = Array.isArray(targets) ? targets : []
-  const winner = pickWinner(list)
+  /**
+   * 固定权威端（`NAV_SYNC_AUTHORITY`，默认 botkeep）。
+   *
+   * 与「自动选最新」的区别：
+   *   - 权威端**只读不写**。即使另一端的 `updatedAt` 更晚，也不会反向覆盖权威端；
+   *   - 权威端不可达时不执行任何写入 —— 宁可这一轮不同步，也不能让「另一个端
+   *     看起来更新」成为覆盖 BotKeep 的理由；
+   *   - 其他端比权威端新时记 `diverged`，面板显式提示，由人决定要不要人工处理。
+   */
+  const authorityId = opts.authority ? String(opts.authority) : ''
+  let winner = null
+  let authorityUnavailable = false
+
+  if (authorityId) {
+    const auth = list.find(t => String(t.id) === authorityId)
+    if (!auth || !auth.ok || !Array.isArray(auth.data?.sites) || auth.data.sites.length === 0) {
+      authorityUnavailable = true
+    } else {
+      winner = auth
+    }
+  } else {
+    winner = pickWinner(list)
+  }
+
   const summaries = list.map(summarizeTarget)
   const winnerFp = winner ? syncFingerprint(winner.data) : null
 
   const actions = []
   const conflicts = []
+  const diverged = []
   const unreachable = []
 
   for (const t of list) {
@@ -147,14 +171,27 @@ export function planSync(targets, opts = {}) {
       continue
     }
     if (!winner) continue
+    if (String(t.id) === String(winner.id)) continue
     const fp = syncFingerprint(t.data || {})
     if (fp === winnerFp) continue
 
     const targetTime = Date.parse(t.data?.updatedAt || '') || 0
     const winnerTime = Date.parse(winner.data?.updatedAt || '') || 0
-    // 目标比 winner 还新却内容不同：计划选择器不该产生这种结果（选主按时间），
-    // 但一旦出现，说明两端时间相同或时钟异常 —— 不覆盖，记冲突。
-    if (targetTime >= winnerTime && t.id !== winner.id) {
+
+    if (authorityId) {
+      // 权威模式下：另一端的更新时间更晚，只标记差异，仍然以权威端内容为准下发
+      if (targetTime > winnerTime) {
+        diverged.push({ id: String(t.id), label: s?.label || String(t.id), updatedAt: t.data?.updatedAt || null })
+      }
+      const reason = !t.data || !Array.isArray(t.data.sites) || t.data.sites.length === 0
+        ? 'empty'
+        : 'behind'
+      actions.push({ id: String(t.id), label: s?.label || String(t.id), reason })
+      continue
+    }
+
+    // 自动选主模式：目标比 winner 还新却内容不同，说明时间相同或时钟异常 —— 不覆盖
+    if (targetTime >= winnerTime) {
       conflicts.push({ id: String(t.id), label: s?.label || String(t.id) })
       continue
     }
@@ -166,10 +203,13 @@ export function planSync(targets, opts = {}) {
 
   return {
     at,
+    authority: authorityId || null,
+    authorityUnavailable,
     winner: winner ? summarizeTarget(winner) : null,
     targets: summaries,
     actions,
     conflicts,
+    diverged,
     consistent: Boolean(winner) && summaries.every(s => !s.ok || s.fingerprint === winnerFp),
     unreachable,
   }

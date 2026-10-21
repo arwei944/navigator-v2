@@ -1,6 +1,6 @@
 {
-  "total": 121,
-  "registered": 121,
+  "total": 122,
+  "registered": 122,
   "unregistered": [],
   "order": [
     "tools/console/test-a11y.mjs",
@@ -115,6 +115,7 @@
     "tools/console/test-tri-sync.mjs",
     "tools/console/test-trust.mjs",
     "tools/console/test-undo.mjs",
+    "tools/console/test-upgrade-guard.mjs",
     "tools/console/test-uptime.mjs",
     "tools/console/test-url-preview.mjs",
     "tools/console/test-url.mjs",
@@ -760,7 +761,7 @@
       "file": "tools/console/test-guard.mjs",
       "name": "test-guard",
       "purpose": "api/metadata.js 的 SSRF 防护用例：确认内网 / 回环 / 链路本地地址一律被拒。",
-      "category": "数据与内容",
+      "category": "工作区治理",
       "lines": 52,
       "included": true,
       "nodeFlags": [],
@@ -978,7 +979,7 @@
       "file": "tools/console/test-meta-upgrade.mjs",
       "name": "test-meta-upgrade",
       "purpose": "「秒加之后的真实补全」（`src/services/metaUpgrade.js`）用例：零依赖、不联网。",
-      "category": "数据与内容",
+      "category": "工作区治理",
       "lines": 246,
       "included": true,
       "nodeFlags": [],
@@ -1451,7 +1452,7 @@
       "name": "test-tri-sync",
       "purpose": "三端同步核心规则的门禁。",
       "category": "服务端与运行时",
-      "lines": 164,
+      "lines": 209,
       "included": true,
       "nodeFlags": [],
       "ciSkip": null,
@@ -1481,6 +1482,18 @@
       "ciSkip": null,
       "ciFlags": [],
       "durationMs": 218
+    },
+    {
+      "file": "tools/console/test-upgrade-guard.mjs",
+      "name": "test-upgrade-guard",
+      "purpose": "升级数据保护的门禁。",
+      "category": "工作区治理",
+      "lines": 103,
+      "included": true,
+      "nodeFlags": [],
+      "ciSkip": null,
+      "ciFlags": [],
+      "durationMs": null
     },
     {
       "file": "tools/console/test-uptime.mjs",

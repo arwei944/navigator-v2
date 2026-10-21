@@ -143,7 +143,7 @@ const CATEGORY_RULES = [
   ['部署与发布', /deploy|publish|release|botkeep|endpoint|manifest|schedule/i],
   ['安全与鉴权', /auth|security|netguard|session|secret|rate|token|dryrun/i],
   ['文档治理', /doc|readme/i],
-  ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size/i],
+  ['工作区治理', /hygiene|workspace|script|gate|env|deps|registry|hunks|robust|file-size|upgrade|guard/i],
   [
     '数据与内容',
     // backup：备份守的是数据资产本身（站点/点击/健康全在同一个库里），归这里而不是「部署与发布」

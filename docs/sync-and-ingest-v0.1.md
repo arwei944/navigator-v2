@@ -54,6 +54,25 @@ Vercel 于 2026-10-11 被平台停用（全站 402），默认不参与；只有
 4. 409 冲突时重新读取：内容已一致算成功，否则重试一次后放弃。
 5. 写后**重新读取复核**，以读回来的内容为准，不相信写入响应。
 
+### 权威源：BotKeep
+
+默认 `NAV_SYNC_AUTHORITY=botkeep`，同步方向是**单向**的：BotKeep → 本地 / WorkBuddy。
+
+- BotKeep **只读不写**。即使另一端的 `updatedAt` 更晚，也不会反向覆盖它；
+- BotKeep 不可达或没有站点数据时，本轮**不写任何一端**；
+- 另一端更新但内容不同时记 `diverged`，面板显式提示，仍以 BotKeep 内容下发；
+- 需要临时回到「自动选最新」时设 `NAV_SYNC_AUTHORITY=`（空字符串）。
+
+### 被移除站点的归档
+
+权威模式下，目标端有、BotKeep 没有的站点会在写入时消失。写入前会先把这些
+站点**完整**存到 `backups/sync/removed/<target>-<时间>.json`
+（含 id、名称、网址、分类、创建时间、访问计数、用途等），
+状态历史里也会记录数量与路径。
+
+这保证「历史添加过的站点」不会因为一次同步变成不可追溯的消失；
+需要时可以按 id 取回或重新导入。
+
 ### 密钥
 
 三端必须使用同一个 `SITES_ADMIN_KEY`（本地是 `data/admin-key.txt`）。
@@ -214,7 +233,52 @@ ops/backups/
 2. 设置里填站点地址与管理密钥；
 3. 扫描 → 确认分类 → 保存到临时工作区 → 去后台提升。
 
-## 四、运维
+## 四、升级数据保护
+
+### 已有保护与缺口
+
+- 部署包**排除 `data/`**（打包遍历跳过，并在打包前二次断言），部署本身不会覆盖线上库；
+- 容器 restart 保留文件系统；
+- 但平台**没有持久卷**：容器被平台重建时 `data/store.db` 会一起消失，部署路径救不回数据。
+
+### 升级保护流程
+
+`scripts/deploy-botkeep.mjs` 默认启用 `scripts/upgrade-guard.mjs`：
+
+1. **升级前**：`GET /api/backup` 拉取站点、分类与
+   `ops/audit.json`、`ops/health.json`、`clicks.json`、
+   `ops/publish-history.json`、`ops/notifications.json`，
+   存到 `backups/upgrades/<时间>-before.json`；
+2. **升级后核对**：
+   - 站点条数不下降；
+   - version 不回退；
+   - 升级前存在的每个站点 id 都还在（新增允许）；
+   - 审计记录条数不减少；
+3. **异常自动恢复**：用升级前备份 `POST /api/backup` 写回（恢复前接口会再拍一份安全快照），
+   恢复后重新核对。
+
+参数：
+
+| 参数 | 作用 |
+|---|---|
+| `--no-guard` | 关闭升级数据保护 |
+| `--no-restore` | 只核对，异常时不自动恢复 |
+
+未配置 `SITES_ADMIN_KEY` 或线上不可达时，保护会跳过并在输出里标明，不阻塞首次发布。
+
+### 操作记录的范围
+
+| 记录 | 位置 | 升级是否保留 |
+|---|---|---|
+| 站点（含 createdAt / visitCount / aliases / position） | `sites.json` | 是（备份 + 核对 id） |
+| 审计日志 | `ops/audit.json` | 是（备份 + 条数核对） |
+| 健康巡检 | `ops/health.json` | 是 |
+| 点击统计 | `clicks.json` | 是 |
+| 发布历史 | `ops/publish-history.json` | 是 |
+| 通知 | `ops/notifications.json` | 是 |
+| 对象变更日志 `changes` 表 | SQLite | 跟随数据库文件；容器重建后由镜像全量对齐 |
+
+## 五、运维
 
 ### 本地启动
 
@@ -237,6 +301,7 @@ export NAV_SYNC_INTERVAL_SEC=30
 
 | 变量 | 说明 |
 |---|---|
+| `NAV_SYNC_AUTHORITY` | 权威端 id（默认 `botkeep`；空字符串 = 自动选最新） |
 | `NAV_SYNC_LOCAL_URL` | 本地端地址 |
 | `NAV_SYNC_BOTKEEP_URL` | BotKeep 地址 |
 | `NAV_SYNC_WORKBUDDY_URL` | WorkBuddy 地址 |
@@ -247,7 +312,7 @@ export NAV_SYNC_INTERVAL_SEC=30
 | `NAV_SYNC_TIMEOUT_MS` | 单端请求超时（默认 12000） |
 | `NAV_SYNC_STATE_DIR` | 同步状态目录（默认 `backups/sync`） |
 
-## 五、已知边界
+## 六、已知边界
 
 - 同步范围是**站点业务字段**；归档 / 置顶 / 访问计数保持各端本地状态。
 - 分类表参与指纹，但当前三端 `sites.json` 都没有 `categories` 字段；

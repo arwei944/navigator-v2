@@ -117,8 +117,9 @@ onMounted(load)
       <div>
         <h2 class="sync-title">三端同步</h2>
         <p class="sync-sub">
-          本地库 ↔ BotKeep ↔ WorkBuddy。每次读取三端，按内容与更新时间选出最新的一份，
-          只推给落后的端；写入仍走各端 <code>POST /api/sites</code>（CAS + 写前快照）。
+          以 <b>{{ status?.authority || 'BotKeep' }}</b> 为权威源：只把它推给落后的端，
+          <b>永不反向覆盖权威端</b>；权威端不可达时本轮不写任何一端。
+          写入仍走各端 <code>POST /api/sites</code>（CAS + 写前快照）。
         </p>
       </div>
       <div class="sync-actions">
@@ -160,7 +161,8 @@ onMounted(load)
       <div class="sync-panel-head">
         <h3>同步计划</h3>
         <span class="sync-hint">
-          主端：{{ plan.winner ? plan.winner.label : '无（三端都不可用）' }}
+          权威源：{{ plan.authority || '自动选最新' }} ·
+          主端：{{ plan.winner ? plan.winner.label : '无（权威端不可用）' }}
         </span>
       </div>
       <div class="sync-chips">
@@ -173,8 +175,14 @@ onMounted(load)
         <span v-for="c in plan.conflicts" :key="c.id" class="sync-chip bad">
           冲突 {{ c.label }}
         </span>
+        <span v-for="d in plan.diverged" :key="d.id" class="sync-chip warn">
+          另一端更新 {{ d.label }}（仍以权威源为准）
+        </span>
         <span v-for="id in plan.unreachable" :key="id" class="sync-chip bad">不可达 {{ id }}</span>
       </div>
+      <p v-if="plan.authorityUnavailable" class="sync-msg bad">
+        权威端 {{ plan.authority }} 不可达或没有数据：本轮不会写入任何一端。
+      </p>
       <p v-if="plan.winner" class="sync-hint">
         主端版本 v{{ plan.winner.version }} · {{ fmtTime(plan.winner.updatedAt) }} ·
         指纹 <code>{{ shortFp(plan.winner.fingerprint) }}</code>
@@ -199,6 +207,9 @@ onMounted(load)
         </li>
       </ul>
       <p v-else class="sync-hint">{{ lastRun.noop ? '没有需要写入的端' : '未执行写入' }}</p>
+      <p v-if="lastRun.removed" class="sync-hint">
+        目标端独有站点 {{ lastRun.removed }} 条已先归档到 <code>backups/sync/removed/</code>，可随时取回。
+      </p>
       <p v-if="lastRun.error" class="sync-msg bad">{{ lastRun.error }}</p>
     </section>
 

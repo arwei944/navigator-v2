@@ -8,7 +8,7 @@
  */
 import assert from 'node:assert/strict'
 import { syncFingerprint, pickWinner, planSync } from '../../shared/sync-core.mjs'
-import { withLocalState } from '../../shared/tri-sync.mjs'
+import { withLocalState, resolveAuthority, diffRemoved } from '../../shared/tri-sync.mjs'
 
 let pass = 0
 let fail = 0
@@ -158,6 +158,51 @@ ok('写入合并不改变业务字段指纹', () => {
   const winner = data([baseSite('s1', { desc: '新' })])
   const target = data([baseSite('s1', { archived: true, visitCount: 3 })])
   assert.equal(syncFingerprint(withLocalState(winner, target)), syncFingerprint(winner))
+})
+
+ok('权威模式：固定 BotKeep 胜出，即使本地更新', () => {
+  const authority = data([baseSite('s1', { desc: '权威' })], { updatedAt: '2026-10-10T00:00:00.000Z' })
+  const localNewer = data([baseSite('s1', { desc: '本地新' })], { updatedAt: '2026-10-21T00:00:00.000Z' })
+  const plan = planSync([
+    { id: 'botkeep', ok: true, data: authority },
+    { id: 'local', ok: true, data: localNewer },
+    { id: 'workbuddy', ok: true, data: authority },
+  ], { authority: 'botkeep' })
+  assert.equal(plan.winner.id, 'botkeep')
+  assert.deepEqual(plan.actions.map(a => a.id), ['local'])
+  assert.equal(plan.diverged.length, 1)
+  assert.equal(plan.diverged[0].id, 'local')
+})
+
+ok('权威模式：权威端不可达时不下发任何写入', () => {
+  const plan = planSync([
+    { id: 'botkeep', ok: false, error: '连接超时' },
+    { id: 'local', ok: true, data: data([baseSite('s1')]) },
+  ], { authority: 'botkeep' })
+  assert.equal(plan.authorityUnavailable, true)
+  assert.equal(plan.winner, null)
+  assert.equal(plan.actions.length, 0)
+})
+
+ok('权威模式：内容一致时无动作', () => {
+  const same = data([baseSite('s1')])
+  const plan = planSync([
+    { id: 'botkeep', ok: true, data: same },
+    { id: 'local', ok: true, data: same },
+  ], { authority: 'botkeep' })
+  assert.equal(plan.consistent, true)
+  assert.equal(plan.actions.length, 0)
+})
+
+ok('diffRemoved 找出目标端独有站点', () => {
+  const removed = diffRemoved([baseSite('s1'), baseSite('local-only')], [baseSite('s1')])
+  assert.deepEqual(removed.map(s => s.id), ['local-only'])
+})
+
+ok('resolveAuthority 默认 botkeep，空字符串回到自动选主', () => {
+  assert.equal(resolveAuthority({}), 'botkeep')
+  assert.equal(resolveAuthority({ NAV_SYNC_AUTHORITY: '' }), '')
+  assert.equal(resolveAuthority({ NAV_SYNC_AUTHORITY: 'workbuddy' }), 'workbuddy')
 })
 
 console.log(`\n结果：${pass} 通过，${fail} 失败`)
