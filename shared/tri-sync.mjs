@@ -259,7 +259,8 @@ export function withLocalState(winnerData, targetData) {
     const merged = { ...site }
     if (local.archived === true) merged.archived = true
     if (local.pinned === true) merged.pinned = true
-    merged.visitCount = Number(local.visitCount) || 0
+    // 访问计数取两端较大值：既保留目标端已有的历史，也不把权威端更大的计数写小
+    merged.visitCount = Math.max(Number(site.visitCount) || 0, Number(local.visitCount) || 0)
     return merged
   })
   return { ...winnerData, sites }

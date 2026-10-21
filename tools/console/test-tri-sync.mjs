@@ -154,6 +154,12 @@ ok('写入合并保留目标端的归档/置顶/访问计数', () => {
   assert.equal(s2.archived, undefined)
 })
 
+ok('访问计数取两端较大值（不把权威端计数写小）', () => {
+  const winner = data([baseSite('s1', { visitCount: 20 })])
+  const target = data([baseSite('s1', { visitCount: 3 })])
+  assert.equal(withLocalState(winner, target).sites[0].visitCount, 20)
+})
+
 ok('写入合并不改变业务字段指纹', () => {
   const winner = data([baseSite('s1', { desc: '新' })])
   const target = data([baseSite('s1', { archived: true, visitCount: 3 })])
