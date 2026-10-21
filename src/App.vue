@@ -56,6 +56,12 @@
         <AdminView />
       </template>
 
+      <!-- 领域动态：路由组件直接渲染，不能落到下面的「常规视图」，
+           否则会显示站点卡片（/content 明明已经命中路由，却看到首页网格） -->
+      <template v-else-if="scope === 'content'">
+        <router-view />
+      </template>
+
       <!-- 常规视图 -->
       <template v-else>
         <!-- 站内搜索 + 列表操作合并为一条工具栏；统计与时钟下沉到侧栏底部 -->
