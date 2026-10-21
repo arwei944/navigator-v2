@@ -30,7 +30,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { planSync, syncFingerprint } from '../shared/sync-core.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const STATE_DIR = process.env.NAV_SYNC_STATE_DIR || join(HERE, '..', 'backups', 'sync')
+/**
+ * 状态目录默认落在**进程工作目录**下的 `backups/sync`。
+ *
+ * 不能按模块位置推导：源码直跑时 HERE 是 `shared/`，产物里是 `dist/shared/`，
+ * 会得到 `backups/` 与 `dist/backups/` 两份互不相认的历史 —— 面板看到自动同步
+ * 从来没跑过，CLI 却能看到。工作目录在两种启动方式下都是仓库根（或部署根）。
+ */
+const STATE_DIR = process.env.NAV_SYNC_STATE_DIR || join(process.cwd(), 'backups', 'sync')
 const STATE_FILE = join(STATE_DIR, '_state.json')
 const HISTORY_KEEP = 100
 const FETCH_TIMEOUT_MS = Number(process.env.NAV_SYNC_TIMEOUT_MS) || 12000
@@ -383,8 +390,16 @@ function record(result, trigger) {
 /** 面板读取：状态 + 端点清单（不含密钥） */
 export function status() {
   const state = readState()
+  /**
+   * 是否开启要反映**实际调度器**，不能只看状态文件里的旧值：
+   * 用 `NAV_SYNC_ENABLED=1` 启动时状态文件可能还是 `enabled:false`，
+   * 面板会显示「未开启」而定时器其实在跑（实测踩过）。
+   */
+  const envEnabled = process.env.NAV_SYNC_ENABLED === '1'
   return {
     ...state,
+    enabled: Boolean(timer) || envEnabled || state.enabled === true,
+    intervalSec: Number(process.env.NAV_SYNC_INTERVAL_SEC) || state.intervalSec,
     targets: resolveTargets().map(t => ({
       id: t.id,
       label: t.label,
