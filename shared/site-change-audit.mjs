@@ -44,8 +44,20 @@ function brief(site) {
   }
 }
 
+/**
+ * 布尔字段按「缺省 = false」比较。
+ *
+ * 各端对 `archived` / `pinned` 的表示不统一：有的写 `false`，有的完全不写字段。
+ * 直接比较 JSON 会把这两种等价形态判成更新 —— 实测一次同步误报了 56 条「修改」。
+ */
+const BOOLEAN_FIELDS = new Set(['archived', 'pinned'])
+
 function changed(before, after) {
   for (const field of AUDITED_FIELDS) {
+    if (BOOLEAN_FIELDS.has(field)) {
+      if (Boolean(before?.[field]) !== Boolean(after?.[field])) return true
+      continue
+    }
     if (stableStringify(before?.[field]) !== stableStringify(after?.[field])) return true
   }
   return false

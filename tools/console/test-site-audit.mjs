@@ -53,6 +53,12 @@ ok('访问计数与 updatedAt 变化不算更新', () => {
   assert.equal(diffSites(before, after).total, 0)
 })
 
+ok('布尔缺省与 false 等价，不误报', () => {
+  const before = [{ ...site('s1'), archived: undefined, pinned: undefined }]
+  const after = [{ ...site('s1'), archived: false, pinned: false }]
+  assert.equal(diffSites(before, after).total, 0)
+})
+
 ok('归档 / 置顶变化算更新', () => {
   const before = [site('s1')]
   const after = [site('s1', { archived: true, pinned: true })]
